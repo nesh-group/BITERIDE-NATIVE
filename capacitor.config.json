@@ -1,0 +1,9 @@
+{
+  "appId": "com.yourcompany.restaurantpartner",
+  "appName": "Restaurant Partner",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true
+  }
+}
