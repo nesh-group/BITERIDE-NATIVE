@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NESH DRIVER</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#17A9E0">
+<link rel="apple-touch-icon" href="./icon-512.png">
+<link rel="icon" href="./icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --ink:#0B2545;
+    --marigold:#2F80ED;
+    --chili:#E5484D;
+    --leaf:#17A9E0;
+    --cloud:#FFFFFF;
+    --muted:#A9C4E0;
+    --muted-2:#6E8CAE;
+    --field-bg:#123A5E;
+    --field-border:#1D4E7A;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--ink); font-family:'Inter',sans-serif;
+    display:flex; justify-content:center; min-height:100vh;
+  }
+  #app{ width:100%; max-width:420px; min-height:100vh; background:var(--ink); position:relative; }
+
+  @media (min-width:641px){
+    body{ background:linear-gradient(160deg,#081b32,#0B2545 55%,#0d2c4d); align-items:flex-start; padding:32px 16px; }
+    #app{ min-height:calc(100vh - 64px); border-radius:28px; box-shadow:0 30px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06); }
+  }
+  .screen{ display:none; padding-bottom:24px; }
+  .screen.active{ display:block; }
+
+  .header{ padding:40px 24px 24px; }
+  .eyebrow{ color:var(--marigold); font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:2px; margin:0; }
+  .title{ color:var(--cloud); font-family:'Fraunces',serif; font-size:28px; font-weight:700; margin:4px 0 0; }
+  .subtitle{ color:var(--muted); font-size:14px; margin:0 0 4px; }
+
+  .px{ padding-left:24px; padding-right:24px; }
+  .stack > * + *{ margin-top:14px; }
+
+  .field{
+    display:flex; align-items:center; gap:8px; padding:12px; border-radius:10px;
+    background:var(--field-bg); border:1px solid var(--field-border);
+  }
+  .field input, .field textarea{
+    background:transparent; border:none; outline:none; width:100%; font-size:14px;
+    color:var(--cloud); font-family:'Inter',sans-serif; resize:none;
+  }
+  .field svg{ flex-shrink:0; }
+
+  .btn-primary{
+    width:100%; padding:14px; border:none; border-radius:10px; background:var(--marigold);
+    color:var(--ink); font-weight:600; font-size:15px; font-family:'Inter',sans-serif; cursor:pointer;
+  }
+  .btn-primary:active{ transform:scale(0.98); }
+  .btn-primary:disabled{ background:#7FA0C4; opacity:.6; cursor:not-allowed; }
+
+  .btn-danger{
+    width:100%; padding:14px; border:none; border-radius:10px; background:transparent;
+    border:1.5px solid var(--chili); color:var(--chili); font-weight:600; font-size:14px; cursor:pointer;
+  }
+  .btn-link{
+    width:100%; text-align:center; padding:8px; background:none; border:none;
+    color:var(--marigold); font-size:14px; cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  .btn-back{ background:none; border:none; color:var(--marigold); cursor:pointer; padding:0; display:flex; }
+  .type-toggle{ display:flex; gap:10px; }
+  .type-opt{
+    flex:1; padding:16px 10px; border-radius:12px; border:1.5px solid var(--field-border);
+    background:var(--field-bg); display:flex; flex-direction:column; align-items:center; gap:6px;
+    cursor:pointer; color:var(--muted); font-size:13px; font-weight:600; font-family:'Inter',sans-serif;
+  }
+  .type-opt.active{ border-color:var(--marigold); background:rgba(47,128,237,0.12); color:var(--cloud); }
+  .type-badge{
+    display:inline-block; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700;
+    letter-spacing:.5px; text-transform:uppercase; font-family:'IBM Plex Mono',monospace;
+    background:var(--field-bg); border:1px solid var(--field-border); color:var(--marigold); margin-top:4px;
+  }
+  .gps-btn{
+    padding:12px 14px; border:none; border-radius:10px; background:var(--leaf);
+    color:var(--cloud); font-size:12px; font-weight:600; white-space:nowrap; cursor:pointer;
+  }
+  .row-flex{ display:flex; align-items:center; gap:8px; }
+  .flex-1{ flex:1; }
+  .error-text{ color:var(--chili); font-size:13px; margin:0; }
+  .hint-text{ color:var(--muted-2); font-size:12px; margin:0; }
+
+  .top-row{ padding:32px 24px 8px; display:flex; align-items:flex-start; justify-content:space-between; }
+  .rest-title{ color:var(--cloud); font-family:'Fraunces',serif; font-size:22px; font-weight:700; margin:0; }
+  .rest-sub{ color:var(--muted-2); font-size:12px; margin:4px 0 0; }
+
+  /* Online / offline toggle switch */
+  .online-toggle-row{ margin:16px 24px 0; padding:14px 16px; border-radius:14px; background:var(--field-bg); border:1px solid var(--field-border); display:flex; align-items:center; justify-content:space-between; }
+  .online-toggle-label{ color:var(--cloud); font-weight:700; font-size:14px; margin:0; }
+  .online-toggle-sub{ color:var(--muted-2); font-size:11px; margin:2px 0 0; }
+  .switch{ position:relative; width:46px; height:26px; flex-shrink:0; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .switch-track{
+    position:absolute; inset:0; background:#324f6e; border-radius:20px; cursor:pointer; transition:background .15s;
+  }
+  .switch-track::before{
+    content:''; position:absolute; width:20px; height:20px; left:3px; top:3px; background:#fff;
+    border-radius:50%; transition:transform .15s;
+  }
+  .switch input:checked + .switch-track{ background:#1BA672; }
+  .switch input:checked + .switch-track::before{ transform:translateX(20px); }
+
+  .section-row{ padding:24px 24px 0; display:flex; align-items:center; justify-content:space-between; }
+  .section-title{ color:var(--cloud); font-family:'Fraunces',serif; font-size:18px; font-weight:700; margin:0; }
+  .empty-text{ color:var(--muted-2); font-size:14px; padding:0 24px; }
+
+  .home-orders-list{ padding:16px 24px 4px; display:flex; flex-direction:column; gap:12px; }
+  .chit{ background:var(--cloud); border-radius:10px; padding:14px; }
+  .order-chit{ background:var(--cloud); border-radius:10px; padding:14px; cursor:pointer; border:none; width:100%; text-align:left; font-family:'Inter',sans-serif; display:block; }
+  .order-top{ display:flex; align-items:center; justify-content:space-between; }
+  .order-num{ color:var(--ink); font-weight:700; font-family:'IBM Plex Mono',monospace; font-size:14px; margin:0; }
+  .order-time{ color:#4A6B8A; font-size:11px; margin:2px 0 0; }
+  .order-mid{ display:flex; align-items:center; justify-content:space-between; margin-top:8px; }
+  .order-cust{ color:#0B2545; font-size:13px; margin:0; }
+  .order-total{ color:var(--ink); font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:14px; margin:0; }
+  .pill{
+    display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;
+    font-family:'IBM Plex Mono',monospace; letter-spacing:0.5px; text-transform:uppercase;
+  }
+  .pill-searching{ background:#F3D9AE; color:#8A5A0F; }
+  .pill-accepted{ background:#CFE0D6; color:#2C4A37; }
+  .pill-arriving{ background:#BFE3F0; color:#1C5A70; }
+  .pill-ontrip{ background:#BFE3F0; color:#1C5A70; }
+  .pill-completed{ background:#D6D0C4; color:#4A463D; }
+  .pill-cancelled{ background:#EFC3BA; color:#7A2A1D; }
+
+  /* Ride detail screen */
+  .detail-block{ margin:24px 24px 0; background:var(--cloud); border-radius:12px; padding:18px; }
+  .detail-label{ color:#5C574C; font-size:11px; font-family:'IBM Plex Mono',monospace; letter-spacing:1px; margin:0 0 4px; text-transform:uppercase; }
+  .detail-value{ color:var(--ink); font-size:14px; margin:0 0 14px; }
+  .detail-value:last-child{ margin-bottom:0; }
+  .detail-phone-link{ display:inline-flex; align-items:center; gap:6px; color:var(--leaf) !important; text-decoration:none; font-weight:700; }
+  .detail-phone-link::before{ content:"📞"; font-size:13px; }
+  .item-row{ display:flex; justify-content:space-between; font-size:13px; color:var(--ink); padding:4px 0; }
+  .item-row-total{ border-top:1px dashed var(--ink); margin-top:8px; padding-top:8px; font-weight:700; }
+  .status-actions{ padding:20px 24px 0; display:flex; flex-direction:column; gap:10px; }
+  .status-btn{ width:100%; padding:14px; border:none; border-radius:10px; font-weight:600; font-size:14px; cursor:pointer; font-family:'Inter',sans-serif; }
+  .status-btn.arriving{ background:var(--leaf); color:var(--cloud); }
+  .status-btn.ontrip{ background:#3A8FB0; color:var(--cloud); }
+  .status-btn.completed{ background:var(--marigold); color:var(--ink); }
+  .status-btn.cancel{ background:transparent; border:1.5px solid var(--chili); color:var(--chili); }
+  .detail-map-btn{
+    display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px;
+    border:1.5px solid var(--leaf); background:transparent; color:var(--leaf);
+    font-weight:600; font-size:12px; cursor:pointer; font-family:'Inter',sans-serif; margin-right:8px;
+  }
+
+  .logout-row{ padding:24px 24px 0; }
+  .earn-card{ margin:16px 24px 0; padding:18px; border-radius:14px; background:var(--field-bg); border:1px solid var(--field-border); display:flex; justify-content:space-between; }
+  .earn-item{ text-align:center; flex:1; }
+  .earn-value{ color:var(--cloud); font-family:'Fraunces',serif; font-size:20px; font-weight:700; margin:0; }
+  .earn-label{ color:var(--muted-2); font-size:11px; margin:4px 0 0; text-transform:uppercase; letter-spacing:.5px; font-family:'IBM Plex Mono',monospace; }
+
+  .bottom-tab-bar{
+    display:none; position:fixed; left:50%; transform:translateX(-50%);
+    bottom:0; width:100%; max-width:420px; background:var(--field-bg);
+    border-top:1px solid var(--field-border); z-index:500;
+    justify-content:space-around; align-items:center; padding:8px 0 max(8px, env(safe-area-inset-bottom));
+  }
+  .bottom-tab-bar.show{ display:flex; }
+  .tab-item{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;
+    background:none; border:none; color:var(--muted); font-size:11px; font-weight:600;
+    font-family:'Inter',sans-serif; cursor:pointer; padding:6px 0; position:relative;
+  }
+  .tab-item.active{ color:var(--marigold); }
+  .tab-item.active svg{ stroke:var(--marigold); }
+  .tab-badge{
+    position:absolute; top:-6px; left:100%; margin-left:-6px; min-width:16px; height:16px; padding:0 4px;
+    border-radius:10px; background:var(--chili); color:#fff; font-size:9px; font-weight:700;
+    display:none; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace;
+    white-space:nowrap; line-height:16px; text-align:center;
+  }
+  .screen-with-tabs{ padding-bottom:76px; }
+
+  .toast{
+    position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:999;
+    background:var(--leaf); color:var(--cloud); padding:14px 18px; border-radius:10px;
+    font-size:14px; font-weight:600; box-shadow:0 6px 20px rgba(0,0,0,.3); max-width:380px; width:calc(100% - 32px);
+    display:none; text-align:center;
+  }
+  .toast.show{ display:block; }
+
+  /* New-ride popup — same alarm/vibrate + card layout as a new food order */
+  .order-popup-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:9000;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .order-popup-overlay.show{ display:flex; }
+  .order-popup{
+    width:100%; max-width:420px; max-height:85vh; background:var(--cloud); border-radius:20px 20px 0 0;
+    padding:24px; animation:popupUp .25s ease-out; display:flex; flex-direction:column;
+  }
+  @keyframes popupUp{ from{ transform:translateY(30px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+  .order-popup-ring{
+    width:56px; height:56px; border-radius:50%; background:var(--chili); display:flex;
+    align-items:center; justify-content:center; margin:0 auto 12px; animation:ringPulse 1s infinite; flex-shrink:0;
+  }
+  @keyframes ringPulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.12); } }
+  .order-popup-eyebrow{ color:var(--chili); font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:2px; text-align:center; margin:0 0 4px; font-weight:700; flex-shrink:0; }
+  .order-popup-list{ overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+  .order-popup-card + .order-popup-card{ border-top:1px dashed var(--muted); padding-top:14px; }
+  .order-popup-title{ color:var(--ink); font-family:'Fraunces',serif; font-size:22px; font-weight:700; text-align:center; margin:4px 0 16px; }
+  .order-popup-body{ background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:8px; }
+  .order-popup-row{ display:flex; justify-content:space-between; font-size:13px; color:var(--ink); padding:3px 0; }
+  .order-popup-row-total{ border-top:1px dashed var(--ink); margin-top:6px; padding-top:6px; font-weight:700; }
+  .order-popup-cust{ color:#4A6B8A; font-size:12px; margin:8px 0 16px; text-align:center; }
+  .order-popup-btns{ display:flex; gap:10px; }
+  .order-popup-btns .btn-primary{ background:var(--leaf); color:var(--cloud); flex:1; }
+  .order-popup-btns .btn-danger{ flex:1; padding:14px; }
+
+  /* Reason modal — cancel ride */
+  .reason-modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:9200;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .reason-modal-overlay.show{ display:flex; }
+  .reason-modal-card{
+    width:100%; max-width:380px; background:var(--ink); border:1px solid var(--field-border);
+    border-radius:16px; padding:22px; box-shadow:0 20px 50px rgba(0,0,0,.4);
+  }
+  .reason-modal-title{ color:var(--cloud); font-family:'Fraunces',serif; font-size:19px; font-weight:700; margin:0 0 4px; }
+  .reason-modal-sub{ color:var(--muted); font-size:12px; margin:0 0 14px; }
+  .reason-modal-card textarea{
+    width:100%; min-height:90px; padding:12px; border-radius:10px; background:var(--field-bg);
+    border:1px solid var(--field-border); color:var(--cloud); font-family:'Inter',sans-serif;
+    font-size:14px; resize:vertical; outline:none;
+  }
+  .reason-modal-error{ color:var(--chili); font-size:12px; margin:8px 0 0; display:none; }
+  .reason-modal-btns{ display:flex; gap:10px; margin-top:16px; }
+  .reason-modal-btns .btn-danger{ flex:1; padding:12px; }
+  .reason-modal-btns .btn-primary{ flex:1; padding:12px; }
+
+  /* Audio-unlock gate — identical mechanism to the restaurant partner app:
+     mobile browsers block alert sound until a real tap happens on this page. */
+  #audio-gate{
+    position:fixed; inset:0; z-index:5000; background:var(--ink);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:18px; padding:24px; text-align:center;
+  }
+  #audio-gate.hide{ display:none; }
+  #audio-gate .bell{
+    width:72px; height:72px; border-radius:50%; background:var(--marigold);
+    display:flex; align-items:center; justify-content:center; animation:ringPulse 1s infinite;
+  }
+  #audio-gate h2{ color:var(--cloud); font-family:'Fraunces',serif; font-size:20px; margin:0; }
+  #audio-gate p{ color:var(--muted); font-size:13px; margin:0; max-width:280px; }
+  #audio-gate-btn{
+    padding:14px 28px; border:none; border-radius:10px; background:var(--marigold);
+    color:var(--ink); font-weight:700; font-size:15px; cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="audio-gate">
+  <div class="bell">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0B2545" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  </div>
+  <h2>Enable ride alerts</h2>
+  <p>Tap below once so your phone can play sound and vibration the moment a new ride request comes in — this is a one-time browser requirement.</p>
+  <button id="audio-gate-btn">Enable sound &amp; vibration</button>
+</div>
+<script>
+  try {
+    if (localStorage.getItem('nesh_driver_audio_enabled') === '1') {
+      document.getElementById('audio-gate').classList.add('hide');
+    }
+  } catch (e) {}
+</script>
+
+<div id="app">
+
+  <div class="toast" id="toast"></div>
+
+  <!-- NEW RIDE POPUP — same ring/vibrate pattern as the restaurant partner app's new-order popup -->
+  <div class="order-popup-overlay" id="order-popup-overlay">
+    <div class="order-popup">
+      <div class="order-popup-ring">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </div>
+      <p class="order-popup-eyebrow" id="popup-eyebrow">NEW RIDE</p>
+      <div class="order-popup-list" id="popup-list"></div>
+    </div>
+  </div>
+
+  <!-- REASON MODAL — cancel ride -->
+  <div class="reason-modal-overlay" id="reason-modal-overlay">
+    <div class="reason-modal-card">
+      <p class="reason-modal-title">Cancel ride</p>
+      <p class="reason-modal-sub">This will be shown to the rider in their app.</p>
+      <textarea id="reason-modal-input" placeholder="e.g. Vehicle breakdown, too far, rider unreachable…"></textarea>
+      <p class="reason-modal-error" id="reason-modal-error">Please enter a reason.</p>
+      <div class="reason-modal-btns">
+        <button class="btn-danger" onclick="closeReasonModal()">Back</button>
+        <button class="btn-primary" onclick="confirmReasonModal()">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <section class="screen active" id="screen-login">
+    <div class="header">
+      <p class="eyebrow">NESH DRIVER</p>
+      <h1 class="title">Welcome back</h1>
+    </div>
+    <div class="px stack">
+      <p class="subtitle">Login to start accepting rides.</p>
+      <div class="field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+        <input id="login-username" type="text" placeholder="Username" autocomplete="off" />
+      </div>
+      <div class="field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <input id="login-password" type="password" placeholder="Password" />
+      </div>
+      <p class="error-text" id="login-error" style="display:none;"></p>
+      <button class="btn-primary" id="login-submit">Login</button>
+      <button class="btn-link" onclick="showScreen('register')">New driver? Create an account</button>
+    </div>
+  </section>
+
+  <!-- REGISTER -->
+  <section class="screen" id="screen-register">
+    <div class="px" style="padding-top:32px;">
+      <button class="btn-back" onclick="showScreen('login')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+    </div>
+    <div class="header">
+      <p class="eyebrow">NEW DRIVER</p>
+      <h1 class="title">Set up your profile</h1>
+    </div>
+    <div class="px stack">
+      <p class="hint-text" style="text-transform:uppercase; letter-spacing:1px; font-family:'IBM Plex Mono',monospace; font-size:11px;">What do you want to do? (choose one or both)</p>
+      <div class="type-toggle" id="reg-service-toggle">
+        <div class="type-opt active" data-service="taxi">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17h14l-1.5-6a2 2 0 0 0-2-1.5H8.5a2 2 0 0 0-2 1.5L5 17Z"/><circle cx="8" cy="19" r="1.5"/><circle cx="16" cy="19" r="1.5"/></svg>
+          Taxi (rides)
+        </div>
+        <div class="type-opt active" data-service="delivery">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="14" height="10" rx="1"/><path d="M17 11h3l2 3v4h-5v-7Z"/><circle cx="7" cy="20" r="1.5"/><circle cx="17.5" cy="20" r="1.5"/></svg>
+          Delivery (shop items)
+        </div>
+      </div>
+      <p class="hint-text" style="text-transform:uppercase; letter-spacing:1px; font-family:'IBM Plex Mono',monospace; font-size:11px;">Vehicle type</p>
+      <div class="type-toggle" id="reg-type-toggle">
+        <div class="type-opt active" data-type="bike">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="17" r="3"/><circle cx="19" cy="17" r="3"/><path d="M5 17 9 9h5l3 8M9 9 7 6h3"/></svg>
+          Bike
+        </div>
+        <div class="type-opt" data-type="auto">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="9" width="16" height="8" rx="2"/><circle cx="7" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/><path d="M6 9V5h9l3 4"/></svg>
+          Auto
+        </div>
+        <div class="type-opt" data-type="cab">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17h14l-1.5-6a2 2 0 0 0-2-1.5H8.5a2 2 0 0 0-2 1.5L5 17Z"/><circle cx="8" cy="19" r="1.5"/><circle cx="16" cy="19" r="1.5"/></svg>
+          Cab
+        </div>
+      </div>
+      <div class="field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+        <input id="reg-name" type="text" placeholder="Full name" />
+      </div>
+      <div class="field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.34 1.79.65 2.65a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.43-1.22a2 2 0 0 1 2.11-.45c.86.31 1.75.53 2.65.65A2 2 0 0 1 22 16.92Z"/></svg>
+        <input id="reg-phone" type="tel" placeholder="Phone number" />
+      </div>
+      <div class="field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg>
+        <input id="reg-vehicle-number" type="text" placeholder="Vehicle number (e.g. KL-07-AB-1234)" />
+      </div>
+      <div class="field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+        <input id="reg-username" type="text" placeholder="Choose a username" autocomplete="off" />
+      </div>
+      <div class="field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <input id="reg-password" type="password" placeholder="Create password" />
+      </div>
+      <p class="error-text" id="reg-error" style="display:none;"></p>
+      <div style="padding-top:8px;">
+        <button class="btn-primary" id="reg-submit">Create account</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOME -->
+  <section class="screen screen-with-tabs" id="screen-home">
+    <div class="top-row">
+      <div>
+        <p class="eyebrow">DASHBOARD</p>
+        <h1 class="rest-title" id="home-driver-name">Driver</h1>
+        <p class="rest-sub" id="home-driver-vehicle"></p>
+        <span class="type-badge" id="home-type-badge">Bike</span>
+      </div>
+    </div>
+
+    <div class="online-toggle-row">
+      <div>
+        <p class="online-toggle-label" id="online-toggle-label">You're offline</p>
+        <p class="online-toggle-sub">Go online to start receiving ride requests</p>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="online-toggle-input" />
+        <span class="switch-track"></span>
+      </label>
+    </div>
+
+    <div id="home-current-ride-wrap"></div>
+    <div id="home-current-delivery-wrap"></div>
+
+    <div id="home-rides-section">
+      <div class="section-row">
+        <h2 class="section-title">Recent rides</h2>
+      </div>
+      <div class="home-orders-list" id="home-orders-list"></div>
+      <p class="empty-text" id="home-empty-text" style="padding:16px 24px 0;">No rides yet — completed and cancelled rides will show up here.</p>
+    </div>
+
+    <div id="home-deliveries-section">
+      <div class="section-row">
+        <h2 class="section-title">Recent deliveries</h2>
+      </div>
+      <div class="home-orders-list" id="home-deliveries-list"></div>
+      <p class="empty-text" id="home-deliveries-empty-text" style="padding:16px 24px 0;">No deliveries yet — completed deliveries will show up here.</p>
+    </div>
+  </section>
+
+  <!-- RIDE DETAIL -->
+  <section class="screen" id="screen-order-detail">
+    <div class="top-row">
+      <button class="btn-back" onclick="state.selectedRideId=null; showScreen('home')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E8A33D" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div>
+        <p class="eyebrow" id="od-order-num">RIDE</p>
+        <h1 class="title" id="od-status-title">Details</h1>
+      </div>
+    </div>
+
+    <div class="detail-block">
+      <p class="detail-label">Rider</p>
+      <p class="detail-value" id="od-cust-name"></p>
+      <p class="detail-label" id="od-cust-phone-label">Phone</p>
+      <a class="detail-value detail-phone-link" id="od-cust-phone" href="tel:"></a>
+      <p class="detail-label">Pickup</p>
+      <p class="detail-value" id="od-pickup-text"></p>
+      <p class="detail-label">Drop</p>
+      <p class="detail-value" id="od-drop-text"></p>
+      <button class="detail-map-btn" id="od-pickup-map-btn">📍 Pickup on map</button>
+      <button class="detail-map-btn" id="od-drop-map-btn">📍 Drop on map</button>
+    </div>
+
+    <div class="detail-block">
+      <div class="item-row"><span>Distance</span><span id="od-distance"></span></div>
+      <div class="item-row"><span>Vehicle</span><span id="od-vehicle"></span></div>
+      <div class="item-row item-row-total"><span>Fare</span><span id="od-total"></span></div>
+    </div>
+
+    <div class="status-actions" id="od-status-actions"></div>
+  </section>
+
+  <!-- ACCOUNT -->
+  <section class="screen screen-with-tabs" id="screen-account">
+    <div class="header">
+      <p class="eyebrow">ACCOUNT</p>
+      <h1 class="title" id="account-driver-name">Driver</h1>
+      <p class="subtitle" id="account-driver-vehicle"></p>
+    </div>
+    <div class="earn-card">
+      <div class="earn-item">
+        <p class="earn-value" id="earn-today">₹0</p>
+        <p class="earn-label">Today</p>
+      </div>
+      <div class="earn-item">
+        <p class="earn-value" id="earn-total">₹0</p>
+        <p class="earn-label">All time</p>
+      </div>
+      <div class="earn-item">
+        <p class="earn-value" id="earn-trips">0</p>
+        <p class="earn-label">Trips</p>
+      </div>
+    </div>
+    <div class="px stack" style="margin-top:20px;">
+      <div class="field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg>
+        <input id="account-vehicle-number" type="text" disabled />
+      </div>
+      <div class="field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.34 1.79.65 2.65a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.43-1.22a2 2 0 0 1 2.11-.45c.86.31 1.75.53 2.65.65A2 2 0 0 1 22 16.92Z"/></svg>
+        <input id="account-phone" type="text" disabled />
+      </div>
+    </div>
+    <div class="logout-row">
+      <a href="./index.html" onclick="try{localStorage.removeItem('nesh_last_app');}catch(e){}" style="display:block;text-align:center;color:var(--muted-2);font-size:13px;margin-bottom:12px;text-decoration:none;">&larr; Switch app</a>
+      <button class="btn-danger" id="logout-btn">Logout</button>
+    </div>
+  </section>
+
+  <nav class="bottom-tab-bar" id="bottom-tab-bar">
+    <button class="tab-item" id="tab-rides" onclick="showScreen('home')">
+      <span style="position:relative;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17h14l-1.5-6a2 2 0 0 0-2-1.5H8.5a2 2 0 0 0-2 1.5L5 17Z"/><circle cx="8" cy="19" r="1.5"/><circle cx="16" cy="19" r="1.5"/></svg>
+      </span>
+      Rides
+    </button>
+    <button class="tab-item" id="tab-account" onclick="showScreen('account')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+      Account
+    </button>
+  </nav>
+
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, push, set, get, update, remove, goOffline, goOnline } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  // Same Firebase project as the customer app and the restaurant partner
+  // app — rides written here are the exact 'rides' node the customer app's
+  // taxi-tracking screen already listens to, so nothing there needs to change.
+  const firebaseConfig = {
+    apiKey: "AIzaSyCrM5wKwsnGtIc7HSTk_5R1d3dXEcYyd7o",
+    authDomain: "texi-and-food.firebaseapp.com",
+    databaseURL: "https://texi-and-food-default-rtdb.firebaseio.com",
+    projectId: "texi-and-food",
+    storageBucket: "texi-and-food.firebasestorage.app",
+    messagingSenderId: "98800730432",
+    appId: "1:98800730432:web:9d7651e792c60baafabaa5"
+  };
+
+  const fbApp = initializeApp(firebaseConfig);
+  const db = getDatabase(fbApp);
+  window.fb = { db, ref, onValue, push, set, get, update, remove };
+
+  // Keep the realtime socket alive/reconnecting the same way the other two
+  // apps do, so a minimized driver app doesn't silently miss ride requests.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { try { goOffline(db); } catch (e) {} }
+    else { try { goOnline(db); } catch (e) {} }
+  });
+
+  window.dispatchEvent(new Event('fb-ready'));
+</script>
+
+<script>
+const state = {
+  username: null,
+  driver: null,
+  selectedRideId: null,
+  listenersAttached: false,
+  isOnline: false,
+  myLocation: null, // { lat, lng, updatedAt } — this driver's own last known GPS fix
+};
+let ridesCache = {}; // rideId -> ride, kept in sync by the one 'rides' listener
+let driversCache = {}; // username -> driver record, kept in sync by the 'taxi_drivers' listener —
+                        // used to rank this driver against everyone else online for nearest-first gating
+
+// Straight-line distance in km — same formula used by the customer app and
+// the dispatch worker, kept in sync so "nearest" means the same thing
+// everywhere.
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// How long a newly-created ride/delivery is offered only to whichever
+// driver ranks nearest, before every other matching online driver also
+// gets to see it in their popup. Mirrors NEAREST_TIMEOUT_MS in the worker,
+// but is enforced here too (independent of push delivery) so the in-app
+// popup never lags behind by the worker's minute-level Cron granularity.
+const NEAREST_WINDOW_MS = 25 * 1000;
+const MAX_MATCH_RADIUS_KM = 12;
+const LOCATION_STALE_MS = 3 * 60 * 1000;
+
+// ---------- Live location tracking (while online) ----------
+let locationWatchId = null;
+let lastLocationWriteAt = 0;
+const LOCATION_WRITE_MIN_INTERVAL_MS = 10 * 1000; // throttle Firebase writes
+
+function startLocationTracking() {
+  if (locationWatchId != null || !navigator.geolocation) return;
+  locationWatchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const { latitude, longitude } = pos.coords;
+      state.myLocation = { lat: latitude, lng: longitude, updatedAt: Date.now() };
+      renderHomeLists(); // so any "X km away" chips reflect the fresh fix
+      const now = Date.now();
+      if (now - lastLocationWriteAt < LOCATION_WRITE_MIN_INTERVAL_MS) return;
+      lastLocationWriteAt = now;
+      if (!state.username || !window.fb) return;
+      const { db, ref, update } = window.fb;
+      update(ref(db, 'taxi_drivers/' + state.username), {
+        location: { lat: latitude, lng: longitude, updatedAt: now },
+      }).catch(() => {});
+    },
+    (err) => { console.warn('Location watch error:', err); },
+    { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+  );
+}
+
+function stopLocationTracking() {
+  if (locationWatchId != null) {
+    navigator.geolocation.clearWatch(locationWatchId);
+    locationWatchId = null;
+  }
+}
+
+function listenDrivers() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'taxi_drivers'), snap => {
+    driversCache = snap.val() || {};
+  });
+}
+
+// Nothing in Firebase changes at the exact moment a ride/delivery's
+// nearest-only window elapses — re-check on a short timer (while online)
+// so the popup opens up to everyone right on schedule instead of waiting
+// for the next unrelated cache update.
+setInterval(() => { if (state.isOnline) refreshRidePopupFromCache(); }, 5000);
+
+// ---------- Screens ----------
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  window.scrollTo(0, 0);
+
+  const tabBar = document.getElementById('bottom-tab-bar');
+  const tabScreens = { home: 'tab-rides', account: 'tab-account' };
+  if (id in tabScreens) {
+    tabBar.classList.add('show');
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    document.getElementById(tabScreens[id]).classList.add('active');
+  } else {
+    tabBar.classList.remove('show');
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ---------- Alert sounds (Web Audio API) — byte-for-byte the same
+// technique the restaurant partner app uses, so ride alerts behave
+// identically to order alerts: a plain AudioBufferSourceNode instead of an
+// <audio> element, so Chrome never shows a system "Now Playing" card. ----------
+let audioCtx = null;
+let alarmBuffer = null;
+let cancelBuffer = null;
+let alarmSource = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+async function loadBuffer(url) {
+  const ctx = getAudioCtx();
+  const res = await fetch(url);
+  const arrBuf = await res.arrayBuffer();
+  return await ctx.decodeAudioData(arrBuf);
+}
+function playCancelAlert() {
+  try {
+    const ctx = getAudioCtx();
+    if (!cancelBuffer) return;
+    const src = ctx.createBufferSource();
+    src.buffer = cancelBuffer;
+    src.connect(ctx.destination);
+    src.start(0);
+  } catch (e) {}
+}
+
+let audioUnlocked = false;
+async function unlockAudio() {
+  if (audioUnlocked) return;
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') await ctx.resume();
+    if (!alarmBuffer) alarmBuffer = await loadBuffer('Boat_Alarm_Alert.mp3');
+    if (!cancelBuffer) cancelBuffer = await loadBuffer('Order_Cancelled_Alert.m4a');
+    audioUnlocked = true;
+    document.getElementById('audio-gate').classList.add('hide');
+    try { localStorage.setItem('nesh_driver_audio_enabled', '1'); } catch (e) {}
+  } catch (e) {}
+}
+document.getElementById('audio-gate-btn').addEventListener('click', unlockAudio);
+document.getElementById('audio-gate').addEventListener('click', unlockAudio);
+document.addEventListener('click', unlockAudio, { capture: true });
+document.addEventListener('touchstart', unlockAudio, { capture: true });
+unlockAudio();
+
+let vibrateInterval = null;
+function startRinging() {
+  stopRinging();
+  try {
+    const ctx = getAudioCtx();
+    if (alarmBuffer) {
+      alarmSource = ctx.createBufferSource();
+      alarmSource.buffer = alarmBuffer;
+      alarmSource.loop = false;
+      alarmSource.connect(ctx.destination);
+      alarmSource.start(0);
+    }
+  } catch (e) {}
+  if (navigator.vibrate) {
+    navigator.vibrate([500, 300, 500, 300, 500]);
+    vibrateInterval = setInterval(() => navigator.vibrate([500, 300, 500, 300, 500]), 2000);
+  }
+}
+function stopRinging() {
+  if (alarmSource) {
+    try { alarmSource.stop(0); } catch (e) {}
+    alarmSource = null;
+  }
+  if (vibrateInterval) { clearInterval(vibrateInterval); vibrateInterval = null; }
+  if (navigator.vibrate) navigator.vibrate(0);
+}
+
+// ---------- New-ride popup — same shape as the restaurant partner app's
+// new-order popup: keeps ringing until every request on screen is actioned. ----------
+const RIDE_TYPE_LABEL = { bike: 'Bike', auto: 'Auto', cab: 'Cab' };
+function renderOrderPopup(pendingList) {
+  const overlay = document.getElementById('order-popup-overlay');
+  const listEl = document.getElementById('popup-list');
+  const eyebrow = document.getElementById('popup-eyebrow');
+
+  if (!pendingList.length) {
+    overlay.classList.remove('show');
+    stopRinging();
+    listEl.innerHTML = "";
+    return;
+  }
+
+  eyebrow.textContent = pendingList.length > 1 ? `NEW REQUESTS (${pendingList.length})` : "NEW REQUEST";
+
+  listEl.innerHTML = "";
+  pendingList.forEach(item => {
+    const card = document.createElement('div');
+    card.className = "order-popup-card";
+    // "How far is the pickup from me right now" — the whole point of the
+    // nearest-first popup ordering; only shown when we actually have a fix.
+    const awayText = (item._distanceKm != null && item._distanceKm !== Infinity)
+      ? `<div class="order-popup-row"><span>Away from you</span><span>${item._distanceKm.toFixed(1)} km</span></div>`
+      : '';
+    if (item._kind === 'delivery') {
+      card.innerHTML = `
+        <h2 class="order-popup-title">Delivery${item.orderNumber ? ' #' + item.orderNumber : ''} · ₹${item.deliveryFee || 0}</h2>
+        <div class="order-popup-body">
+          ${awayText}
+          <div class="order-popup-row"><span>Pickup</span><span>${item._restName || 'Shop'}</span></div>
+          <div class="order-popup-row"><span>Drop</span><span>${item.customerAddress || '—'}</span></div>
+          <div class="order-popup-row order-popup-row-total"><span>Items</span><span>${item.items ? item.items.map(it => `${it.qty}x ${it.name}`).join(', ') : '—'}</span></div>
+        </div>
+        <p class="order-popup-cust">${item.customerName || 'Customer'}</p>
+        <div class="order-popup-btns">
+          <button class="btn-danger" data-action="reject" data-kind="delivery" data-id="${item._id}">Skip</button>
+          <button class="btn-primary" data-action="accept" data-kind="delivery" data-id="${item._id}">Accept delivery</button>
+        </div>
+      `;
+    } else {
+      card.innerHTML = `
+        <h2 class="order-popup-title">${RIDE_TYPE_LABEL[item.vehicleType] || 'Ride'} · ₹${item.fare || 0}</h2>
+        <div class="order-popup-body">
+          ${awayText}
+          <div class="order-popup-row"><span>Pickup</span><span>${(item.pickup && item.pickup.text) || '—'}</span></div>
+          <div class="order-popup-row"><span>Drop</span><span>${(item.drop && item.drop.text) || '—'}</span></div>
+          <div class="order-popup-row order-popup-row-total"><span>Trip distance</span><span>${item.distanceKm || 0} km</span></div>
+        </div>
+        <p class="order-popup-cust">${item.customerName || 'Rider'}</p>
+        <div class="order-popup-btns">
+          <button class="btn-danger" data-action="reject" data-kind="ride" data-id="${item._id}">Skip</button>
+          <button class="btn-primary" data-action="accept" data-kind="ride" data-id="${item._id}">Accept ride</button>
+        </div>
+      `;
+    }
+    listEl.appendChild(card);
+  });
+
+  listEl.querySelectorAll('[data-action]').forEach(btn => {
+    btn.onclick = () => handlePopupItemAction(btn.dataset.id, btn.dataset.action, btn.dataset.kind);
+  });
+
+  overlay.classList.add('show');
+  startRinging();
+}
+
+// Locally-dismissed ride ids (this driver tapped "Skip") — kept only in
+// memory so a skipped ride can still be offered again if it comes back
+// around (e.g. after being skipped by everyone) without re-querying anyone.
+const skippedRideIds = new Set();
+
+// Same idea, for delivery jobs. Delivery jobs live nested under
+// restaurants/{restId}/orders/{orderId} rather than a flat node, so each
+// job is tracked with a composite id "restId::orderId".
+let deliveriesCache = []; // flat array of { _restId, _orderId, ...order }
+const skippedDeliveryIds = new Set();
+
+function listenDeliveryJobs() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'restaurants'), snap => {
+    const val = snap.val() || {};
+    const flat = [];
+    Object.keys(val).forEach(restId => {
+      const rest = val[restId] || {};
+      const orders = rest.orders || {};
+      Object.keys(orders).forEach(orderId => {
+        flat.push(Object.assign({ _restId: restId, _orderId: orderId, _restName: rest.name || '', _restLocation: rest.location || null }, orders[orderId]));
+      });
+    });
+    deliveriesCache = flat;
+    renderHomeLists();
+    if (state.isOnline) refreshRidePopupFromCache();
+  });
+}
+
+async function handlePopupItemAction(id, action, kind) {
+  if (kind === 'delivery') return handlePopupDeliveryAction(id, action);
+  return handlePopupRideAction(id, action);
+}
+
+async function handlePopupRideAction(rideId, action) {
+  if (action === 'reject') {
+    skippedRideIds.add(rideId);
+    refreshRidePopupFromCache();
+    return;
+  }
+  const { db, ref, get, update } = window.fb;
+  try {
+    // Re-check the ride is still unclaimed right before writing, to shrink
+    // the window where two drivers could both tap Accept on the same ride.
+    const snap = await get(ref(db, 'rides/' + rideId));
+    const ride = snap.val();
+    if (!ride || ride.status !== 'searching') {
+      showToast("That ride was already taken");
+      refreshRidePopupFromCache();
+      return;
+    }
+    await update(ref(db, 'rides/' + rideId), {
+      status: 'accepted',
+      driverId: state.username,
+      driverName: state.driver.name,
+      driverPhone: state.driver.phone || '',
+      driverVehicleNumber: state.driver.vehicleNumber || '',
+    });
+    showToast("Ride accepted");
+  } catch (e) {
+    alert("Couldn't accept this ride — check your connection and try again.");
+  }
+}
+
+// compositeId is "restId::orderId"
+async function handlePopupDeliveryAction(compositeId, action) {
+  if (action === 'reject') {
+    skippedDeliveryIds.add(compositeId);
+    refreshRidePopupFromCache();
+    return;
+  }
+  const [restId, orderId] = compositeId.split('::');
+  const { db, ref, get, update } = window.fb;
+  try {
+    // Re-check the order is still unclaimed and still ready right before
+    // writing, to shrink the window where two drivers could both tap
+    // Accept on the same delivery.
+    const snap = await get(ref(db, 'restaurants/' + restId + '/orders/' + orderId));
+    const order = snap.val();
+    if (!order || order.status !== 'ready' || order.deliveryDriverId) {
+      showToast("That delivery was already taken");
+      refreshRidePopupFromCache();
+      return;
+    }
+    await update(ref(db, 'restaurants/' + restId + '/orders/' + orderId), {
+      deliveryDriverId: state.username,
+      deliveryDriverName: state.driver.name,
+      deliveryDriverPhone: state.driver.phone || '',
+    });
+    showToast("Delivery accepted");
+  } catch (e) {
+    alert("Couldn't accept this delivery — check your connection and try again.");
+  }
+}
+
+function driverDoesTaxi() {
+  return !state.driver.services || state.driver.services.taxi !== false;
+}
+function driverDoesDelivery() {
+  return !state.driver.services || state.driver.services.delivery !== false;
+}
+
+// Parses the "lat,lng" text format used for restaurants/{id}.location —
+// same shape the customer app writes and the worker parses.
+function parseLatLngStr(str) {
+  if (!str) return null;
+  const m = String(str).trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+}
+
+// Every other online driver who could plausibly also be offered this job
+// (same matching rules the worker uses), for ranking "am I nearest?".
+function onlineRivalCount(pickup, matchFn) {
+  return Object.entries(driversCache).filter(([id, d]) => {
+    if (!d || id === state.username || !matchFn(d)) return false;
+    const loc = d.location;
+    if (!loc || typeof loc.lat !== 'number' || !loc.updatedAt) return false;
+    if (Date.now() - loc.updatedAt > LOCATION_STALE_MS) return false;
+    return haversineKm(pickup.lat, pickup.lng, loc.lat, loc.lng) < myDistanceToPickup(pickup);
+  }).length;
+}
+function myDistanceToPickup(pickup) {
+  if (!state.myLocation) return Infinity;
+  return haversineKm(pickup.lat, pickup.lng, state.myLocation.lat, state.myLocation.lng);
+}
+
+// Decides whether THIS driver should be shown a given ride/delivery right
+// now: during the first NEAREST_WINDOW_MS after creation, only the driver
+// who currently ranks nearest (by live GPS distance to the pickup point)
+// sees it — same as the worker's nearest-first push. Once that window
+// elapses, it opens up to every driver within MAX_MATCH_RADIUS_KM,
+// regardless of rank, so nothing is ever silently missed if the closest
+// driver doesn't respond (mirrors the worker's Cron-driven broadcast
+// escalation, but checked locally so it isn't bound by the Cron's
+// once-a-minute granularity).
+function shouldOfferToMe(pickup, createdAt, matchFn) {
+  if (!pickup) return true; // no pickup coords on record — can't rank, so don't withhold it
+  const distanceKm = myDistanceToPickup(pickup);
+  const elapsed = Date.now() - (createdAt || 0);
+  if (elapsed < NEAREST_WINDOW_MS) {
+    if (distanceKm === Infinity) return false; // we don't know where we are yet — wait for the broadcast window
+    return onlineRivalCount(pickup, matchFn) === 0; // nobody online is currently closer than us
+  }
+  return distanceKm === Infinity || distanceKm <= MAX_MATCH_RADIUS_KM;
+}
+
+function refreshRidePopupFromCache() {
+  const rideMatchFn = d => d.isOnline === true && d.vehicleType === state.driver.vehicleType && (!d.services || d.services.taxi !== false);
+  const pendingRides = driverDoesTaxi()
+    ? Object.keys(ridesCache)
+        .map(id => Object.assign({ _id: id, _kind: 'ride' }, ridesCache[id]))
+        .filter(r => r.status === 'searching' && r.vehicleType === state.driver.vehicleType && !skippedRideIds.has(r._id))
+        .filter(r => shouldOfferToMe(r.pickup, r.createdAt, rideMatchFn))
+        .map(r => Object.assign({}, r, { _distanceKm: r.pickup ? myDistanceToPickup(r.pickup) : null }))
+    : [];
+
+  const deliveryMatchFn = d => d.isOnline === true && (!d.services || d.services.delivery !== false);
+  const pendingDeliveries = driverDoesDelivery()
+    ? deliveriesCache
+        .filter(o => o.status === 'ready' && !o.deliveryDriverId)
+        .map(o => Object.assign({}, o, { _id: o._restId + '::' + o._orderId, _kind: 'delivery' }))
+        .filter(o => !skippedDeliveryIds.has(o._id))
+        .filter(o => shouldOfferToMe(parseLatLngStr(o._restLocation), o.createdAt, deliveryMatchFn))
+        .map(o => Object.assign({}, o, { _distanceKm: (() => { const p = parseLatLngStr(o._restLocation); return p ? myDistanceToPickup(p) : null; })() }))
+    : [];
+
+  // Nearest first, same ordering an Uber-style dispatch would show.
+  const sorted = pendingRides.concat(pendingDeliveries).sort((a, b) => {
+    const da = a._distanceKm == null || a._distanceKm === Infinity ? Infinity : a._distanceKm;
+    const db_ = b._distanceKm == null || b._distanceKm === Infinity ? Infinity : b._distanceKm;
+    return da - db_;
+  });
+
+  renderOrderPopup(sorted);
+}
+
+// ---------- Reason modal (cancel ride) ----------
+let reasonModalRideId = null;
+function openReasonModal(rideId) {
+  reasonModalRideId = rideId;
+  document.getElementById('reason-modal-input').value = '';
+  document.getElementById('reason-modal-error').style.display = 'none';
+  document.getElementById('reason-modal-overlay').classList.add('show');
+}
+function closeReasonModal() {
+  document.getElementById('reason-modal-overlay').classList.remove('show');
+  reasonModalRideId = null;
+}
+async function confirmReasonModal() {
+  const input = document.getElementById('reason-modal-input');
+  const reason = (input.value || '').trim();
+  const errEl = document.getElementById('reason-modal-error');
+  if (!reason) { errEl.style.display = 'block'; return; }
+  const rideId = reasonModalRideId;
+  closeReasonModal();
+  try {
+    const { db, ref, update } = window.fb;
+    await update(ref(db, 'rides/' + rideId), { status: 'cancelled', statusReason: reason });
+    showToast("Ride cancelled");
+    playCancelAlert();
+    state.selectedRideId = null;
+    showScreen('home');
+  } catch (e) {
+    alert("Couldn't update the ride — check your connection and try again.");
+  }
+}
+window.closeReasonModal = closeReasonModal;
+window.confirmReasonModal = confirmReasonModal;
+window.showScreen = showScreen;
+
+// ---------- Login / Register ----------
+let selectedRegType = 'bike';
+document.querySelectorAll('#reg-type-toggle .type-opt').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('#reg-type-toggle .type-opt').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    selectedRegType = opt.dataset.type;
+  });
+});
+
+// Services picker is multi-select — each chip toggles independently, but
+// at least one must stay selected (enforced on submit).
+document.querySelectorAll('#reg-service-toggle .type-opt').forEach(opt => {
+  opt.addEventListener('click', () => {
+    opt.classList.toggle('active');
+  });
+});
+function getSelectedRegServices() {
+  const services = { taxi: false, delivery: false };
+  document.querySelectorAll('#reg-service-toggle .type-opt.active').forEach(opt => {
+    services[opt.dataset.service] = true;
+  });
+  return services;
+}
+
+document.getElementById('reg-submit').addEventListener('click', async () => {
+  const name = document.getElementById('reg-name').value.trim();
+  const phone = document.getElementById('reg-phone').value.trim();
+  const vehicleNumber = document.getElementById('reg-vehicle-number').value.trim();
+  const username = document.getElementById('reg-username').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const errEl = document.getElementById('reg-error');
+  errEl.style.display = 'none';
+  const services = getSelectedRegServices();
+  if (!services.taxi && !services.delivery) {
+    errEl.textContent = "Choose at least one — Taxi, Delivery, or both.";
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!name || !phone || !vehicleNumber || !username || !password) {
+    errEl.textContent = "Please fill in every field.";
+    errEl.style.display = 'block';
+    return;
+  }
+  const btn = document.getElementById('reg-submit');
+  btn.disabled = true;
+  try {
+    const { db, ref, get, set } = window.fb;
+    const existing = await get(ref(db, 'taxi_drivers/' + username));
+    if (existing.exists()) {
+      errEl.textContent = "That username is already taken.";
+      errEl.style.display = 'block';
+      return;
+    }
+    const record = {
+      name, phone, vehicleNumber, username, password,
+      vehicleType: selectedRegType,
+      services,
+      createdAt: Date.now(),
+    };
+    await set(ref(db, 'taxi_drivers/' + username), record);
+    logInDriver(username, record);
+  } catch (e) {
+    errEl.textContent = "Couldn't create your account — check your connection and try again.";
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function doLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!username || !password) {
+    errEl.textContent = "Enter username and password";
+    errEl.style.display = 'block';
+    return;
+  }
+  const btn = document.getElementById('login-submit');
+  btn.disabled = true;
+  try {
+    const { db, ref, get } = window.fb;
+    const snap = await get(ref(db, 'taxi_drivers/' + username));
+    if (!snap.exists()) {
+      errEl.textContent = "No driver account found for this username";
+      errEl.style.display = 'block';
+      return;
+    }
+    const rec = snap.val();
+    if (rec.password !== password) {
+      errEl.textContent = "Incorrect password";
+      errEl.style.display = 'block';
+      return;
+    }
+    logInDriver(username, rec);
+  } catch (e) {
+    errEl.textContent = "Couldn't log in — check your connection and try again.";
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById('login-submit').addEventListener('click', doLogin);
+document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+const VEHICLE_LABEL = { bike: 'Bike', auto: 'Auto', cab: 'Cab' };
+function logInDriver(username, data) {
+  state.username = username;
+  state.driver = data;
+  localStorage.setItem('nesh_driver_id', username);
+  try { localStorage.setItem('nesh_driver_data', JSON.stringify(data)); } catch (e) {}
+
+  document.getElementById('home-driver-name').textContent = data.name || username;
+  document.getElementById('home-driver-vehicle').textContent = data.vehicleNumber || '';
+  document.getElementById('home-type-badge').textContent = VEHICLE_LABEL[data.vehicleType] || 'Bike';
+  document.getElementById('account-driver-name').textContent = data.name || username;
+  document.getElementById('account-driver-vehicle').textContent = (VEHICLE_LABEL[data.vehicleType] || 'Bike') + ' · ' + (data.vehicleNumber || '');
+  document.getElementById('account-vehicle-number').value = data.vehicleNumber || '';
+  document.getElementById('account-phone').value = data.phone || '';
+
+  try {
+    const savedOnline = localStorage.getItem('nesh_driver_online_' + username);
+    state.isOnline = savedOnline === '1';
+  } catch (e) {}
+  document.getElementById('online-toggle-input').checked = state.isOnline;
+  updateOnlineLabel();
+  try {
+    const { db, ref, update } = window.fb;
+    update(ref(db, 'taxi_drivers/' + username), { isOnline: state.isOnline }).catch(() => {});
+  } catch (e) {}
+
+  showScreen('home');
+
+  if (!state.listenersAttached) {
+    state.listenersAttached = true;
+    listenRides();
+    listenDeliveryJobs();
+    listenDrivers();
+  }
+
+  if (state.isOnline) startLocationTracking();
+
+  registerForOrderPushNotifications();
+}
+
+document.getElementById('logout-btn').addEventListener('click', () => {
+  try {
+    if (state.username && window.fb) {
+      const { db, ref, update } = window.fb;
+      update(ref(db, 'taxi_drivers/' + state.username), { isOnline: false }).catch(() => {});
+    }
+  } catch (e) {}
+  stopLocationTracking();
+  localStorage.removeItem('nesh_driver_id');
+  localStorage.removeItem('nesh_driver_data');
+  location.reload();
+});
+
+// ---------- Online / offline ----------
+function updateOnlineLabel() {
+  document.getElementById('online-toggle-label').textContent = state.isOnline ? "You're online" : "You're offline";
+}
+document.getElementById('online-toggle-input').addEventListener('change', (e) => {
+  state.isOnline = e.target.checked;
+  updateOnlineLabel();
+  try { localStorage.setItem('nesh_driver_online_' + state.username, state.isOnline ? '1' : '0'); } catch (err) {}
+  if (state.isOnline) startLocationTracking();
+  else { stopLocationTracking(); refreshRidePopupFromCache(); } // drops the popup if it's open — going offline means no new rides
+  renderHomeLists();
+  try {
+    const { db, ref, update } = window.fb;
+    update(ref(db, 'taxi_drivers/' + state.username), { isOnline: state.isOnline }).catch(() => {});
+  } catch (err) {}
+});
+
+// ---------- Rides ----------
+function normalizeRideStatus(raw) {
+  const s = String(raw || 'searching').toLowerCase().trim();
+  if (['searching', 'pending', 'requested'].includes(s)) return 'searching';
+  if (['accepted', 'assigned', 'confirmed'].includes(s)) return 'accepted';
+  if (['arriving', 'arrived'].includes(s)) return 'arriving';
+  if (['ontrip', 'on_trip', 'in_progress', 'started'].includes(s)) return 'ontrip';
+  if (['completed', 'done', 'finished'].includes(s)) return 'completed';
+  if (['cancelled', 'canceled', 'rejected'].includes(s)) return 'cancelled';
+  return 'searching';
+}
+
+function listenRides() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'rides'), snap => {
+    const val = snap.val() || {};
+    ridesCache = val;
+    renderHomeLists();
+    if (state.isOnline) refreshRidePopupFromCache();
+    if (state.selectedRideId && ridesCache[state.selectedRideId]) {
+      renderRideDetail(state.selectedRideId, ridesCache[state.selectedRideId]);
+    }
+  });
+}
+
+function timeAgo(ts) {
+  if (!ts) return '';
+  const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + ' min ago';
+  const hrs = Math.round(mins / 60);
+  return hrs + ' hr ago';
+}
+
+function renderHomeLists() {
+  const all = Object.keys(ridesCache).map(id => Object.assign({ _id: id }, ridesCache[id]));
+
+  document.querySelectorAll('#home-rides-section').forEach(el => el.style.display = driverDoesTaxi() ? '' : 'none');
+  document.querySelectorAll('#home-deliveries-section').forEach(el => el.style.display = driverDoesDelivery() ? '' : 'none');
+
+  // A ride actively assigned to this driver (accepted/arriving/ontrip)
+  const current = all.find(r => r.driverId === state.username && ['accepted', 'arriving', 'ontrip'].includes(normalizeRideStatus(r.status)));
+  const wrap = document.getElementById('home-current-ride-wrap');
+  wrap.innerHTML = '';
+  if (current) {
+    const status = normalizeRideStatus(current.status);
+    const card = document.createElement('button');
+    card.className = 'order-chit';
+    card.style.margin = '16px 24px 0';
+    card.style.width = 'calc(100% - 48px)';
+    card.innerHTML = `
+      <div class="order-top">
+        <p class="order-num">Current ride · ${VEHICLE_LABEL[current.vehicleType] || ''}</p>
+        <span class="pill pill-${status}">${status}</span>
+      </div>
+      <div class="order-mid">
+        <p class="order-cust">${current.customerName || 'Rider'}</p>
+        <p class="order-total">₹${current.fare || 0}</p>
+      </div>
+    `;
+    card.addEventListener('click', () => openRideDetail(current._id));
+    wrap.appendChild(card);
+  }
+
+  // Recent (completed/cancelled) rides for this driver, most recent first
+  const past = all
+    .filter(r => r.driverId === state.username && ['completed', 'cancelled'].includes(normalizeRideStatus(r.status)))
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    .slice(0, 30);
+
+  const listEl = document.getElementById('home-orders-list');
+  const emptyEl = document.getElementById('home-empty-text');
+  listEl.innerHTML = '';
+  emptyEl.style.display = past.length ? 'none' : 'block';
+  past.forEach(r => {
+    const status = normalizeRideStatus(r.status);
+    const card = document.createElement('button');
+    card.className = 'order-chit';
+    card.innerHTML = `
+      <div class="order-top">
+        <p class="order-num">${VEHICLE_LABEL[r.vehicleType] || ''} · ${(r.distanceKm || 0)} km</p>
+        <p class="order-time">${timeAgo(r.createdAt)}</p>
+      </div>
+      <div class="order-mid">
+        <p class="order-cust">${r.customerName || 'Rider'}</p>
+        <p class="order-total">₹${r.fare || 0}</p>
+      </div>
+      <div style="margin-top:8px;"><span class="pill pill-${status}">${status}</span></div>
+    `;
+    card.addEventListener('click', () => openRideDetail(r._id));
+    listEl.appendChild(card);
+  });
+
+  renderEarnings(all);
+
+  // ---- Delivery jobs (from deliveriesCache, nested under restaurants) ----
+  const myDeliveries = deliveriesCache.filter(o => o.deliveryDriverId === state.username);
+
+  const currentDelivery = myDeliveries.find(o => o.status === 'ready');
+  const dWrap = document.getElementById('home-current-delivery-wrap');
+  dWrap.innerHTML = '';
+  if (currentDelivery) {
+    const items = (currentDelivery.items || []).map(it => `${it.qty}x ${it.name}`).join(', ');
+    const card = document.createElement('div');
+    card.className = 'order-chit';
+    card.style.margin = '16px 24px 0';
+    card.style.width = 'calc(100% - 48px)';
+    card.innerHTML = `
+      <div class="order-top">
+        <p class="order-num">Current delivery${currentDelivery.orderNumber ? ' #' + currentDelivery.orderNumber : ''} · ${currentDelivery._restName || ''}</p>
+        <span class="pill pill-accepted">ready</span>
+      </div>
+      <div class="order-mid">
+        <p class="order-cust">${currentDelivery.customerName || 'Customer'}</p>
+        <p class="order-total">₹${currentDelivery.deliveryFee || 0}</p>
+      </div>
+      <p style="margin:8px 0 0; color:var(--muted); font-size:13px;">${items || ''}</p>
+      <p style="margin:4px 0 0; color:var(--muted); font-size:13px;">${currentDelivery.customerAddress || ''}${currentDelivery.customerPhone ? ' · ' + currentDelivery.customerPhone : ''}</p>
+      <button class="btn-primary" style="margin-top:12px; width:100%;" data-mark-delivered="${currentDelivery._restId}::${currentDelivery._orderId}">Mark as delivered</button>
+    `;
+    dWrap.appendChild(card);
+    card.querySelector('[data-mark-delivered]').addEventListener('click', (e) => {
+      markDeliveryDelivered(e.target.dataset.markDelivered);
+    });
+  }
+
+  const pastDeliveries = myDeliveries
+    .filter(o => o.status === 'delivered')
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    .slice(0, 30);
+
+  const dListEl = document.getElementById('home-deliveries-list');
+  const dEmptyEl = document.getElementById('home-deliveries-empty-text');
+  dListEl.innerHTML = '';
+  dEmptyEl.style.display = pastDeliveries.length ? 'none' : 'block';
+  pastDeliveries.forEach(o => {
+    const card = document.createElement('div');
+    card.className = 'order-chit';
+    card.innerHTML = `
+      <div class="order-top">
+        <p class="order-num">${o._restName || ''}${o.orderNumber ? ' · #' + o.orderNumber : ''}</p>
+        <p class="order-time">${timeAgo(o.createdAt)}</p>
+      </div>
+      <div class="order-mid">
+        <p class="order-cust">${o.customerName || 'Customer'}</p>
+        <p class="order-total">₹${o.deliveryFee || 0}</p>
+      </div>
+      <div style="margin-top:8px;"><span class="pill pill-completed">delivered</span></div>
+    `;
+    dListEl.appendChild(card);
+  });
+}
+
+async function markDeliveryDelivered(compositeId) {
+  const [restId, orderId] = compositeId.split('::');
+  const { db, ref, update } = window.fb;
+  try {
+    await update(ref(db, 'restaurants/' + restId + '/orders/' + orderId), { status: 'delivered' });
+    showToast('Marked as delivered');
+  } catch (e) {
+    alert("Couldn't update — check your connection and try again.");
+  }
+}
+
+function renderEarnings(all) {
+  const mine = all.filter(r => r.driverId === state.username && normalizeRideStatus(r.status) === 'completed');
+  const total = mine.reduce((sum, r) => sum + (r.fare || 0), 0);
+  const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+  const today = mine.filter(r => (r.createdAt || 0) >= startOfDay.getTime()).reduce((sum, r) => sum + (r.fare || 0), 0);
+  document.getElementById('earn-today').textContent = '₹' + today;
+  document.getElementById('earn-total').textContent = '₹' + total;
+  document.getElementById('earn-trips').textContent = String(mine.length);
+}
+
+function buildMapUrl(pos) {
+  if (!pos || typeof pos.lat !== 'number' || typeof pos.lng !== 'number') return null;
+  return `https://www.google.com/maps?q=${pos.lat},${pos.lng}`;
+}
+
+function openRideDetail(rideId) {
+  state.selectedRideId = rideId;
+  const ride = ridesCache[rideId];
+  if (!ride) return;
+  renderRideDetail(rideId, ride);
+  showScreen('order-detail');
+}
+
+function renderRideDetail(rideId, o) {
+  const status = normalizeRideStatus(o.status);
+  document.getElementById('od-order-num').textContent = 'RIDE · ' + rideId.slice(-6).toUpperCase();
+  document.getElementById('od-status-title').textContent =
+    status === 'searching' ? 'Waiting for pickup' :
+    status === 'accepted' ? 'Head to pickup' :
+    status === 'arriving' ? 'Arrived at pickup' :
+    status === 'ontrip' ? 'Trip in progress' :
+    status === 'completed' ? 'Trip completed' : 'Ride cancelled';
+
+  document.getElementById('od-cust-name').textContent = o.customerName || 'Rider';
+  const phoneLink = document.getElementById('od-cust-phone');
+  if (o.customerNumber) {
+    phoneLink.textContent = o.customerNumber;
+    phoneLink.href = 'tel:' + o.customerNumber;
+    phoneLink.style.display = 'inline-flex';
+    document.getElementById('od-cust-phone-label').style.display = 'block';
+  } else {
+    phoneLink.style.display = 'none';
+    document.getElementById('od-cust-phone-label').style.display = 'none';
+  }
+  document.getElementById('od-pickup-text').textContent = (o.pickup && o.pickup.text) || '—';
+  document.getElementById('od-drop-text').textContent = (o.drop && o.drop.text) || '—';
+  document.getElementById('od-distance').textContent = (o.distanceKm || 0) + ' km';
+  document.getElementById('od-vehicle').textContent = VEHICLE_LABEL[o.vehicleType] || '';
+  document.getElementById('od-total').textContent = '₹' + (o.fare || 0);
+
+  const pickupBtn = document.getElementById('od-pickup-map-btn');
+  const pickupUrl = buildMapUrl(o.pickup);
+  pickupBtn.style.display = pickupUrl ? 'inline-flex' : 'none';
+  pickupBtn.onclick = () => window.open(pickupUrl, '_blank');
+
+  const dropBtn = document.getElementById('od-drop-map-btn');
+  const dropUrl = buildMapUrl(o.drop);
+  dropBtn.style.display = dropUrl ? 'inline-flex' : 'none';
+  dropBtn.onclick = () => window.open(dropUrl, '_blank');
+
+  const actionsEl = document.getElementById('od-status-actions');
+  actionsEl.innerHTML = '';
+  const buttons = [];
+  if (status === 'accepted') buttons.push({ label: 'Arrived at pickup', cls: 'arriving', next: 'arriving' });
+  if (status === 'arriving') buttons.push({ label: 'Start trip', cls: 'ontrip', next: 'ontrip' });
+  if (status === 'ontrip') buttons.push({ label: 'Complete trip', cls: 'completed', next: 'completed' });
+  if (['accepted', 'arriving'].includes(status)) buttons.push({ label: 'Cancel ride', cls: 'cancel', next: 'cancelled' });
+
+  buttons.forEach(b => {
+    const btn = document.createElement('button');
+    btn.className = 'status-btn ' + b.cls;
+    btn.textContent = b.label;
+    btn.addEventListener('click', () => {
+      if (b.next === 'cancelled') openReasonModal(rideId);
+      else updateRideStatus(rideId, b.next);
+    });
+    actionsEl.appendChild(btn);
+  });
+}
+
+async function updateRideStatus(rideId, newStatus) {
+  try {
+    const { db, ref, update } = window.fb;
+    await update(ref(db, 'rides/' + rideId), { status: newStatus });
+    showToast('Ride marked as ' + newStatus);
+  } catch (e) {
+    alert("Couldn't update this ride — check your connection and try again.");
+  }
+}
+
+// ---------- Boot ----------
+window.addEventListener('fb-ready', init);
+setTimeout(() => { if (!window.fb) showScreen('login'); }, 9000);
+
+function init() {
+  const savedId = localStorage.getItem('nesh_driver_id');
+  if (!savedId) { showScreen('login'); return; }
+
+  const { db, ref, get } = window.fb;
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem('nesh_driver_data') || 'null'); } catch (e) {}
+  if (cached) logInDriver(savedId, cached);
+
+  let settled = false;
+  const timeoutId = setTimeout(() => { settled = true; if (!cached) showScreen('login'); }, 7000);
+
+  get(ref(db, 'taxi_drivers/' + savedId)).then(snap => {
+    clearTimeout(timeoutId);
+    if (snap.exists()) {
+      logInDriver(savedId, snap.val());
+    } else if (!settled || cached) {
+      localStorage.removeItem('nesh_driver_id');
+      localStorage.removeItem('nesh_driver_data');
+      showScreen('login');
+    }
+  }).catch(() => {
+    clearTimeout(timeoutId);
+    if (!cached) showScreen('login');
+  });
+}
+
+// ---------------------------------------------------------------------
+// PUSH NOTIFICATION REGISTRATION — only does anything inside the native
+// (Capacitor) wrapped app. In a plain browser tab this silently does
+// nothing, so it's safe to always call.
+// ---------------------------------------------------------------------
+async function registerForOrderPushNotifications() {
+  if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.PushNotifications) {
+    return; // not running inside the native wrapper
+  }
+  const { PushNotifications } = window.Capacitor.Plugins;
+
+  try {
+    let permStatus = await PushNotifications.checkPermissions();
+    if (permStatus.receive !== 'granted') {
+      permStatus = await PushNotifications.requestPermissions();
+    }
+    if (permStatus.receive !== 'granted') {
+      console.warn('Push notification permission not granted.');
+      return;
+    }
+
+    await PushNotifications.register();
+
+    PushNotifications.addListener('registration', async (token) => {
+      if (!state.username) return;
+      const { db, ref, update } = window.fb;
+      try {
+        await update(ref(db, 'taxi_drivers/' + state.username), { fcmToken: token.value });
+      } catch (e) {
+        console.error('Failed to save FCM token:', e);
+      }
+    });
+
+    PushNotifications.addListener('registrationError', (err) => {
+      console.error('Push registration error:', err);
+    });
+
+    PushNotifications.addListener('pushNotificationActionPerformed', () => {
+      showScreen('home');
+    });
+  } catch (e) {
+    console.error('Push notification setup failed:', e);
+  }
+}
+</script>
+<script>
+(function(){
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('./sw.js').catch(function(err){
+        console.warn('SW register failed', err);
+      });
+    });
+  }
+})();
+</script>
+</body>
+</html>
