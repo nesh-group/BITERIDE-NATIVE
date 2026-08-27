@@ -1,0 +1,561 @@
+name: Build Android APK
+
+# Runs entirely on GitHub's own cloud servers — nothing installed on your
+# phone or any computer. Triggered manually from the "Actions" tab, or
+# automatically every time you push a change to the repo.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Java (needed by Android build tools)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install project dependencies
+        run: npm install
+
+      - name: Generate native Android project (if not already present)
+        # This is the step that normally needs a computer with Node.js —
+        # running it here means you never need Termux or a laptop at all.
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap init "NESH PARTNER" "com.yourcompany.restaurantpartner" --web-dir www
+            npx cap add android
+          fi
+
+      - name: Add permissions and native components to AndroidManifest.xml
+        # android/ is regenerated from scratch every run (never committed),
+        # so every permission and every custom native component (services,
+        # the ringing activity) has to be re-applied here every single
+        # build — same reasoning as the Firebase config and notification
+        # channel steps further down.
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+
+          if ! grep -q "ACCESS_FINE_LOCATION" "$MANIFEST"; then
+            sed -i '/<manifest /a\    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' "$MANIFEST"
+          fi
+
+          if ! grep -q "android.permission.VIBRATE" "$MANIFEST"; then
+            sed -i '/<manifest /a\    <uses-permission android:name="android.permission.VIBRATE" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />\n    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />' "$MANIFEST"
+          fi
+
+          # Register RideAlertFcmService as the app's sole FCM receiver
+          # (Capacitor's official docs call for exactly this — their own
+          # push plugin does not call its JS "pushNotificationReceived"
+          # event once the app has been killed, only while it's alive).
+          # RingingService is the foreground service that actually loops
+          # sound + vibration; RingingActivity is the full-screen "incoming
+          # ride" screen shown on top of the lock screen.
+          if ! grep -q "RideAlertFcmService" "$MANIFEST"; then
+            python3 - "$MANIFEST" << 'PYEOF'
+          import sys
+          path = sys.argv[1]
+          with open(path) as f:
+              content = f.read()
+          injection = '''
+              <service android:name=".RideAlertFcmService" android:exported="false">
+                  <intent-filter>
+                      <action android:name="com.google.firebase.MESSAGING_EVENT" />
+                  </intent-filter>
+              </service>
+              <service android:name=".RingingService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
+              <activity android:name=".RingingActivity"
+                  android:exported="false"
+                  android:launchMode="singleInstance"
+                  android:excludeFromRecents="true"
+                  android:showOnLockScreen="true"
+                  android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+          </application>'''
+          content = content.replace('</application>', injection, 1)
+          with open(path, 'w') as f:
+              f.write(content)
+          PYEOF
+          fi
+
+      - name: Generate app icon from resources/icon.png
+        # resources/icon.png (1024x1024, committed at the repo root) is
+        # rendered into every mipmap density Android needs. Like
+        # google-services.json below, this has to be re-applied every
+        # single build because android/ is regenerated from scratch each
+        # run and is never committed.
+        run: |
+          npm install -D @capacitor/assets
+          npx capacitor-assets generate --android
+
+      - name: Add Firebase config to the Android project
+        # google-services.json is committed at the repo root. The android/
+        # folder is regenerated from scratch on every run (it isn't
+        # committed), so this file and the Gradle plugin lines below have
+        # to be re-applied every single build — otherwise Firebase never
+        # "sees" this as a registered Android app.
+        run: |
+          cp google-services.json android/app/google-services.json
+
+          # Add the google-services classpath to the project-level build.gradle
+          if ! grep -q "com.google.gms:google-services" android/build.gradle; then
+            sed -i "/dependencies {/a\\        classpath 'com.google.gms:google-services:4.4.2'" android/build.gradle
+          fi
+
+          # Apply the plugin at the bottom of the app-level build.gradle
+          if ! grep -q "apply plugin: 'com.google.gms.google-services'" android/app/build.gradle; then
+            echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
+          fi
+
+      - name: Add Firebase Messaging and AndroidX dependencies
+        # RideAlertFcmService needs com.google.firebase:firebase-messaging to compile.
+        # This dependency is not in Capacitor's default app/build.gradle, so we add it here.
+        # Re-applied every build since android/ is regenerated from scratch each run.
+        run: |
+          if ! grep -q "firebase-messaging" android/app/build.gradle; then
+            sed -i "/dependencies {/a\\    implementation 'com.google.firebase:firebase-messaging:23.4.0'\n    implementation 'androidx.annotation:annotation:1.7.1'" android/app/build.gradle
+          fi
+
+      - name: Add custom alert sounds (order + ride)
+        # order_alert.mp3 and ride_alert.mp3 are committed at the repo
+        # root. Same reasoning as google-services.json above: android/ is
+        # regenerated every build, so both sound files have to be copied
+        # into res/raw every time too.
+        run: |
+          mkdir -p android/app/src/main/res/raw
+          cp order_alert.mp3 android/app/src/main/res/raw/order_alert.mp3
+          cp ride_alert.mp3 android/app/src/main/res/raw/ride_alert.mp3
+
+      - name: Add notification channels (sound + vibration) to MainActivity
+        # android/ is regenerated fresh every build, so MainActivity.java
+        # is rewritten here every time rather than committed and edited
+        # by hand. Creates the "order_alerts" channel (restaurant orders +
+        # driver delivery jobs, unchanged from before) plus tracks
+        # foreground/background state (AppState.isForeground) so
+        # RideAlertFcmService knows whether the driver is already looking
+        # at the app (in which case the in-app popup/ring handles it) or
+        # not (in which case the native full-screen ringing screen should
+        # take over). Also forwards Accept/Reject taps coming from the
+        # native ringing screen into the web app's own JS.
+        run: |
+          PKG_PATH="android/app/src/main/java/com/yourcompany/restaurantpartner"
+
+          cat > "$PKG_PATH/AppState.java" << 'EOF'
+          package com.yourcompany.restaurantpartner;
+
+          // Tracks whether an Activity of this app is currently visible, so
+          // RideAlertFcmService can decide whether to hand a ride alert to
+          // the already-open web app (which shows its own in-app popup and
+          // ring) or start the native full-screen ringing screen instead.
+          public class AppState {
+              public static volatile boolean isForeground = false;
+          }
+          EOF
+
+          cat > "$PKG_PATH/MainActivity.java" << 'EOF'
+          package com.yourcompany.restaurantpartner;
+
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.content.ContentResolver;
+          import android.content.Intent;
+          import android.media.AudioAttributes;
+          import android.net.Uri;
+          import android.os.Build;
+          import android.os.Bundle;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationManager manager = getSystemService(NotificationManager.class);
+                      AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                          .setUsage(AudioAttributes.USAGE_ALARM)
+                          .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                          .build();
+
+                      Uri soundUri = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + getPackageName() + "/raw/order_alert");
+                      NotificationChannel channel = new NotificationChannel(
+                          "order_alerts", "Order Alerts", NotificationManager.IMPORTANCE_HIGH
+                      );
+                      channel.setSound(soundUri, audioAttributes);
+                      channel.enableVibration(true);
+                      channel.setVibrationPattern(new long[]{0, 800, 300, 800, 300, 800, 300, 800});
+                      channel.setBypassDnd(true);
+                      manager.createNotificationChannel(channel);
+                  }
+
+                  handleIncomingIntent(getIntent());
+          }
+
+          @Override
+          protected void onNewIntent(Intent intent) {
+              super.onNewIntent(intent);
+              setIntent(intent);
+              handleIncomingIntent(intent);
+          }
+
+          @Override
+          protected void onResume() {
+              super.onResume();
+              AppState.isForeground = true;
+          }
+
+          @Override
+          protected void onPause() {
+              super.onPause();
+              AppState.isForeground = false;
+          }
+
+              // If this launch came from the native ringing screen (driver
+              // tapped Accept/Reject while the app was closed), forward that
+              // action into the web app's JS once it has finished loading —
+              // window.handleNativeRideAction (added in driver-app.html)
+              // self-retries until the page's own script is ready, so the
+              // exact timing of the WebView load doesn't matter.
+              private void handleIncomingIntent(Intent intent) {
+                  if (intent == null) return;
+                  String action = intent.getStringExtra("rideAction");
+                  String rideId = intent.getStringExtra("rideId");
+                  if (action == null || rideId == null) return;
+
+                  String js = "(function retry(){"
+                      + "if (window.handleNativeRideAction) {"
+                      + "window.handleNativeRideAction("
+                      + jsString(action) + "," + jsString(rideId) + "," + jsString("ride")
+                      + ");"
+                      + "} else { setTimeout(retry, 300); } })();";
+
+                  getBridge().getWebView().post(() ->
+                      getBridge().getWebView().evaluateJavascript(js, null)
+                  );
+              }
+
+              private String jsString(String s) {
+                  return "'" + s.replace("\\\\", "\\\\\\\\").replace("'", "\\\\'") + "'";
+              }
+          }
+          EOF
+
+          cat > "$PKG_PATH/RideAlertFcmService.java" << 'EOF'
+          package com.yourcompany.restaurantpartner;
+
+          import android.content.Intent;
+          import androidx.annotation.NonNull;
+          import androidx.core.content.ContextCompat;
+          import com.google.firebase.messaging.FirebaseMessagingService;
+          import com.google.firebase.messaging.RemoteMessage;
+          import java.util.Map;
+
+          // The app's sole FCM receiver (per Capacitor's own docs: their
+          // push-notifications plugin will not fire its JS event once the
+          // app has been killed, so a custom FirebaseMessagingService is
+          // the documented way to handle that case).
+          //
+          // Order/delivery alerts are untouched by this class: they are
+          // still sent as normal notification-payload messages, which
+          // Android auto-displays via the system tray whenever the app is
+          // backgrounded or killed WITHOUT ever calling onMessageReceived —
+          // so this class simply never sees them in that state, and there
+          // is nothing to change for them here.
+          //
+          // Ride alerts are sent data-only (see the Cloudflare Worker), so
+          // this method is guaranteed to run for every one of them,
+          // foreground or not.
+          public class RideAlertFcmService extends FirebaseMessagingService {
+              @Override
+              public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
+                  super.onMessageReceived(remoteMessage);
+                  Map<String, String> data = remoteMessage.getData();
+                  if (!"new_ride".equals(data.get("type"))) return;
+
+                  // Driver is already looking at the app — let the existing
+                  // in-app popup + ring (driven by the Firebase Realtime DB
+                  // listener, not this push) handle it, to avoid a second
+                  // ring/vibration stacking on top of it.
+                  if (AppState.isForeground) return;
+
+                  Intent serviceIntent = new Intent(this, RingingService.class);
+                  serviceIntent.putExtra("rideId", data.get("rideId"));
+                  serviceIntent.putExtra("title", data.get("title"));
+                  serviceIntent.putExtra("body", data.get("body"));
+                  ContextCompat.startForegroundService(this, serviceIntent);
+              }
+          }
+          EOF
+
+          cat > "$PKG_PATH/RingingService.java" << 'EOF'
+          package com.yourcompany.restaurantpartner;
+
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.app.Service;
+          import android.content.Intent;
+          import android.media.AudioAttributes;
+          import android.media.MediaPlayer;
+          import android.net.Uri;
+          import android.os.Build;
+          import android.os.IBinder;
+          import android.os.VibrationEffect;
+          import android.os.Vibrator;
+          import androidx.core.app.NotificationCompat;
+
+          // Foreground service that keeps the ride alert sound and
+          // vibration running continuously (looped) for as long as the
+          // ride sits un-answered, even with the app fully closed — this
+          // is what makes it behave like an incoming call instead of a
+          // single short buzz. RingingActivity (the full-screen "incoming
+          // ride" screen) stops this service the moment the driver taps
+          // Accept or Reject.
+          public class RingingService extends Service {
+              public static final String CHANNEL_ID = "ride_alerts";
+              private static final int NOTIF_ID = 4321;
+
+              private MediaPlayer mediaPlayer;
+              private Vibrator vibrator;
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  String rideId = intent.getStringExtra("rideId");
+                  String title = intent.getStringExtra("title");
+                  String body = intent.getStringExtra("body");
+
+                  startForeground(NOTIF_ID, buildNotification(rideId, title, body));
+                  startRingLoop();
+                  return START_NOT_STICKY;
+              }
+
+              private Notification buildNotification(String rideId, String title, String body) {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationManager manager = getSystemService(NotificationManager.class);
+                      if (manager.getNotificationChannel(CHANNEL_ID) == null) {
+                          NotificationChannel channel = new NotificationChannel(
+                              CHANNEL_ID, "Ride Alerts", NotificationManager.IMPORTANCE_HIGH
+                          );
+                          // Sound/vibration for THIS notification are set to
+                          // none — RingingService itself loops the real sound
+                          // and vibration below, so the channel doesn't also
+                          // need to (avoids doubling up).
+                          channel.setSound(null, null);
+                          channel.enableVibration(false);
+                          manager.createNotificationChannel(channel);
+                      }
+                  }
+
+                  Intent fullScreenIntent = new Intent(this, RingingActivity.class);
+                  fullScreenIntent.putExtra("rideId", rideId);
+                  fullScreenIntent.putExtra("title", title);
+                  fullScreenIntent.putExtra("body", body);
+                  fullScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                  PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
+                      this, 0, fullScreenIntent,
+                      PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                  );
+
+                  return new NotificationCompat.Builder(this, CHANNEL_ID)
+                      .setSmallIcon(android.R.drawable.ic_menu_call)
+                      .setContentTitle(title != null ? title : "New Ride Request")
+                      .setContentText(body != null ? body : "Tap to view")
+                      .setPriority(NotificationCompat.PRIORITY_MAX)
+                      .setCategory(NotificationCompat.CATEGORY_CALL)
+                      .setFullScreenIntent(fullScreenPendingIntent, true)
+                      .setContentIntent(fullScreenPendingIntent)
+                      .setOngoing(true)
+                      .setAutoCancel(false)
+                      .build();
+              }
+
+              private void startRingLoop() {
+                  try {
+                      Uri soundUri = Uri.parse(ContentResolver_SCHEME() + "://" + getPackageName() + "/raw/ride_alert");
+                      mediaPlayer = new MediaPlayer();
+                      mediaPlayer.setDataSource(this, soundUri);
+                      mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
+                          .setUsage(AudioAttributes.USAGE_ALARM)
+                          .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                          .build());
+                      mediaPlayer.setLooping(true);
+                      mediaPlayer.prepare();
+                      mediaPlayer.start();
+                  } catch (Exception ignored) {
+                      // If the sound fails to load for any reason, vibration
+                      // below still runs — the driver still gets alerted.
+                  }
+
+                  vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+                  if (vibrator != null) {
+                      long[] pattern = {0, 800, 300, 800, 300, 800, 300, 800};
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0));
+                      } else {
+                          vibrator.vibrate(pattern, 0);
+                      }
+                  }
+              }
+
+              private String ContentResolver_SCHEME() {
+                  return android.content.ContentResolver.SCHEME_ANDROID_RESOURCE;
+              }
+
+              @Override
+              public void onDestroy() {
+                  super.onDestroy();
+                  if (mediaPlayer != null) {
+                      try { mediaPlayer.stop(); mediaPlayer.release(); } catch (Exception ignored) {}
+                      mediaPlayer = null;
+                  }
+                  if (vibrator != null) {
+                      vibrator.cancel();
+                      vibrator = null;
+                  }
+              }
+
+              @Override
+              public IBinder onBind(Intent intent) { return null; }
+          }
+          EOF
+
+          cat > "$PKG_PATH/RingingActivity.java" << 'EOF'
+          package com.yourcompany.restaurantpartner;
+
+          import android.app.Activity;
+          import android.app.KeyguardManager;
+          import android.content.Intent;
+          import android.graphics.Color;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.view.Gravity;
+          import android.view.WindowManager;
+          import android.widget.Button;
+          import android.widget.LinearLayout;
+          import android.widget.TextView;
+
+          // Full-screen "incoming ride" screen — shown on top of the lock
+          // screen while the app was fully closed, exactly like an
+          // incoming-call screen. Built entirely in code (no XML layout)
+          // to keep this a single self-contained file. Stays up, ringing,
+          // until the driver taps Accept or Reject.
+          public class RingingActivity extends Activity {
+              private String rideId;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  if (Build.VERSION.SDK_INT >= 27) {
+                      setShowWhenLocked(true);
+                      setTurnScreenOn(true);
+                      KeyguardManager km = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+                      if (km != null) km.requestDismissKeyguard(this, null);
+                  } else {
+                      getWindow().addFlags(
+                          WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                              | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                              | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                              | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+                      );
+                  }
+
+                  rideId = getIntent().getStringExtra("rideId");
+                  String title = getIntent().getStringExtra("title");
+                  String body = getIntent().getStringExtra("body");
+
+                  setContentView(buildLayout(
+                      title != null ? title : "New Ride Request",
+                      body != null ? body : ""
+                  ));
+              }
+
+              private LinearLayout buildLayout(String title, String body) {
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setGravity(Gravity.CENTER);
+                  root.setPadding(60, 60, 60, 60);
+                  root.setBackgroundColor(Color.parseColor("#1a1a2e"));
+
+                  TextView titleView = new TextView(this);
+                  titleView.setText(title);
+                  titleView.setTextColor(Color.WHITE);
+                  titleView.setTextSize(24);
+                  titleView.setGravity(Gravity.CENTER);
+                  root.addView(titleView);
+
+                  TextView bodyView = new TextView(this);
+                  bodyView.setText(body);
+                  bodyView.setTextColor(Color.LTGRAY);
+                  bodyView.setTextSize(16);
+                  bodyView.setGravity(Gravity.CENTER);
+                  bodyView.setPadding(0, 24, 0, 80);
+                  root.addView(bodyView);
+
+                  Button acceptBtn = new Button(this);
+                  acceptBtn.setText("ACCEPT");
+                  acceptBtn.setBackgroundColor(Color.parseColor("#22c55e"));
+                  acceptBtn.setTextColor(Color.WHITE);
+                  acceptBtn.setOnClickListener(v -> finishWith("accept"));
+                  root.addView(acceptBtn);
+
+                  Button rejectBtn = new Button(this);
+                  rejectBtn.setText("REJECT");
+                  rejectBtn.setBackgroundColor(Color.parseColor("#ef4444"));
+                  rejectBtn.setTextColor(Color.WHITE);
+                  LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  params.topMargin = 24;
+                  rejectBtn.setLayoutParams(params);
+                  rejectBtn.setOnClickListener(v -> finishWith("reject"));
+                  root.addView(rejectBtn);
+
+                  return root;
+              }
+
+              private void finishWith(String action) {
+                  stopService(new Intent(this, RingingService.class));
+
+                  Intent launch = new Intent(this, MainActivity.class);
+                  launch.putExtra("rideAction", action);
+                  launch.putExtra("rideId", rideId);
+                  launch.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                  startActivity(launch);
+                  finish();
+              }
+
+              @Override
+              public void onBackPressed() {
+                  // Ignore back button — driver must tap Accept or Reject,
+                  // same as an incoming call screen.
+              }
+          }
+          EOF
+
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew assembleDebug
+
+      - name: Upload the built APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: restaurant-partner-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
