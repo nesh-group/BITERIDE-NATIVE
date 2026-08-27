@@ -8,6 +8,35 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:98800730432:android:e850572913a1b376fabaa5",
+        "android_client_info": {
+          "package_name": "com.yourcompany.neshapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "98800730432-fn8fsl2e947b9f9eovdgshfv5d9mm498.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAnHUARGYGZUbLrE0V_ER5DeDL248O4bxU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "98800730432-fn8fsl2e947b9f9eovdgshfv5d9mm498.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:98800730432:android:b0a1fbc256c1f23bfabaa5",
         "android_client_info": {
           "package_name": "com.yourcompany.restaurantpartner"
