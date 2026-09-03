@@ -26,6 +26,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Needed so the "Publish APK to a GitHub Release" step below is allowed
+    # to create a release. Without this, GitHub's default token is
+    # read-only and the release step fails with a 403 error.
+    permissions:
+      contents: write
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
