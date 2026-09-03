@@ -1732,19 +1732,23 @@
 
   function checkForUpdate() {
     // Only makes sense inside the native app, not a plain browser tab.
-    if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
+    if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) {
+      alert('DEBUG: Capacitor App plugin not found — update check skipped.');
+      return;
+    }
     if (!window.fb || !window.fb.db) { setTimeout(checkForUpdate, 1500); return; }
     window.Capacitor.Plugins.App.getInfo().then(function (info) {
       var currentBuild = parseInt(info.build, 10) || 0;
       var db = window.fb.db, ref = window.fb.ref, get = window.fb.get;
       get(ref(db, 'appConfig/latestVersion')).then(function (snap) {
         var v = snap.val();
+        alert('DEBUG: installed build=' + currentBuild + ', firebase build=' + (v && v.build) + ', apkUrl=' + (v && v.apkUrl));
         if (!v || !v.build || !v.apkUrl) return;
         if (parseInt(v.build, 10) > currentBuild) {
           showUpdateBanner(v.apkUrl, v.name || '');
         }
-      }).catch(function () {});
-    }).catch(function () {});
+      }).catch(function (e) { alert('DEBUG: Firebase read failed: ' + e); });
+    }).catch(function (e) { alert('DEBUG: getInfo failed: ' + e); });
   }
 
   setTimeout(checkForUpdate, 3000);
