@@ -1095,6 +1095,9 @@ unlockAudio();
 let vibrateInterval = null;
 function startRinging() {
   stopRinging();
+  // Sound intentionally disabled — popup and vibration still work as
+  // before. To bring the sound back later, uncomment the block below.
+  /*
   try {
     const ctx = getAudioCtx();
     if (alarmBuffer) {
@@ -1105,6 +1108,7 @@ function startRinging() {
       alarmSource.start(0);
     }
   } catch (e) {}
+  */
   if (navigator.vibrate) {
     navigator.vibrate([500, 300, 500, 300, 500]);
     vibrateInterval = setInterval(() => navigator.vibrate([500, 300, 500, 300, 500]), 2000);
