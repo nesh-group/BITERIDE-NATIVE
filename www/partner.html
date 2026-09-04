@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>window.NESH_BUILD_NUMBER = 0; /* replaced by CI at build time */</script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>NESH PARTNER</title>
@@ -1732,23 +1733,20 @@
 
   function checkForUpdate() {
     // Only makes sense inside the native app, not a plain browser tab.
-    if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) {
-      alert('DEBUG: Capacitor App plugin not found — update check skipped.');
-      return;
-    }
+    if (!window.Capacitor) return;
     if (!window.fb || !window.fb.db) { setTimeout(checkForUpdate, 1500); return; }
-    window.Capacitor.Plugins.App.getInfo().then(function (info) {
-      var currentBuild = parseInt(info.build, 10) || 0;
-      var db = window.fb.db, ref = window.fb.ref, get = window.fb.get;
-      get(ref(db, 'appConfig/latestVersion')).then(function (snap) {
-        var v = snap.val();
-        alert('DEBUG: installed build=' + currentBuild + ', firebase build=' + (v && v.build) + ', apkUrl=' + (v && v.apkUrl));
-        if (!v || !v.build || !v.apkUrl) return;
-        if (parseInt(v.build, 10) > currentBuild) {
-          showUpdateBanner(v.apkUrl, v.name || '');
-        }
-      }).catch(function (e) { alert('DEBUG: Firebase read failed: ' + e); });
-    }).catch(function (e) { alert('DEBUG: getInfo failed: ' + e); });
+    // Build number is baked in by build-apk.yml at build time (see
+    // NESH_BUILD_NUMBER in <head>) — this avoids depending on the
+    // @capacitor/app plugin, which isn't reliably available in every build.
+    var currentBuild = parseInt(window.NESH_BUILD_NUMBER, 10) || 0;
+    var db = window.fb.db, ref = window.fb.ref, get = window.fb.get;
+    get(ref(db, 'appConfig/latestVersion')).then(function (snap) {
+      var v = snap.val();
+      if (!v || !v.build || !v.apkUrl) return;
+      if (parseInt(v.build, 10) > currentBuild) {
+        showUpdateBanner(v.apkUrl, v.name || '');
+      }
+    }).catch(function () {});
   }
 
   setTimeout(checkForUpdate, 3000);
