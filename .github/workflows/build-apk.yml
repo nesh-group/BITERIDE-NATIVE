@@ -1,6 +1,6 @@
 name: Build Combined APK (Driver + Partner)
 
-# Runs entirely on GitHub's own cloud servers â€” nothing installed on your
+# Runs entirely on GitHub's own cloud servers — nothing installed on your
 # phone or any computer. Triggered manually from the "Actions" tab, or
 # automatically every time you push a change to the repo.
 #
@@ -156,7 +156,7 @@ jobs:
           // AlertFcmService can decide whether to hand an alert to the
           // already-open web app (in-app popup/ring) or start the native
           // full-screen ringing screen instead. NOTE: this is app-wide, not
-          // per-portal â€” if you want a ride alert to still ring natively
+          // per-portal — if you want a ride alert to still ring natively
           // while the partner portal is open (or vice versa), this flag
           // needs to be made portal-aware.
           public class AppState {
@@ -216,7 +216,7 @@ jobs:
                   super.onResume();
                   AppState.isForeground = true;
                   // NOTE: opening the app by itself does NOT stop
-                  // RingingService any more â€” only an explicit accept/
+                  // RingingService any more — only an explicit accept/
                   // reject/skip action (via the RingControl plugin, called
                   // from driver.html/partner.html's own action handlers)
                   // or RingingService's own 30-second timeout clears the
@@ -234,7 +234,7 @@ jobs:
               // navigate the WebView to the right portal page, then forward
               // the action into that page's own JS once it has finished
               // loading. window.handleNativeRideAction (used for both
-              // "ride" and "delivery" kinds â€” driver.html's own
+              // "ride" and "delivery" kinds — driver.html's own
               // handlePopupItemAction already branches on the kind
               // argument) / window.handleNativeOrderAction (used for
               // "order") self-retry until the page's own script is ready,
@@ -247,7 +247,7 @@ jobs:
               //   ride     -> plain rideId
               //   delivery -> composite "restId::orderId" (that's the exact
               //               format driver.html's handlePopupDeliveryAction
-              //               expects â€” see RingingActivity for where this
+              //               expects — see RingingActivity for where this
               //               composite id gets built)
               //   order    -> plain orderId
               private void handleIncomingIntent(Intent intent) {
@@ -298,7 +298,7 @@ jobs:
 
           // Lets driver.html/partner.html tell the native side "the person
           // just accepted/rejected/skipped this alert from inside the
-          // app" â€” the ONLY in-app trigger that should stop RingingService
+          // app" — the ONLY in-app trigger that should stop RingingService
           // early. Opening the app by itself does not call this; the
           // service otherwise only stops via its own 30-second timeout
           // (see RingingService) so it matches the Cloudflare Worker's
@@ -337,7 +337,7 @@ jobs:
           // exactly what the Cloudflare Worker sends and what each web
           // app's JS expects back:
           //   new_ride     -> data.rideId                         (plain)
-          //   new_delivery -> data.restId + "::" + data.orderId    (composite â€”
+          //   new_delivery -> data.restId + "::" + data.orderId    (composite —
           //                    driver.html's handlePopupDeliveryAction splits
           //                    on "::" to get restId/orderId back out)
           //   new_order    -> data.orderId                        (plain)
@@ -402,10 +402,10 @@ jobs:
           public class RingingService extends Service {
               private static final int NOTIF_ID = 4321;
               // Matches the Cloudflare Worker's NEAREST_TIMEOUT_MS exactly
-              // (25s) â€” past this point the ride/delivery may already have
+              // (25s) — past this point the ride/delivery may already have
               // been offered to another driver, so this device's alert
               // should stop on its own even if nobody accepts, rejects, or
-              // skips it here. Driver-side ("ride"/"delivery") only â€” the
+              // skips it here. Driver-side ("ride"/"delivery") only — the
               // Worker never reassigns a restaurant's own "order" alert to
               // another restaurant, so there's no matching window to
               // auto-stop against for that kind; it keeps ringing until
@@ -426,7 +426,7 @@ jobs:
 
                   // If a second ride/order/delivery arrives while the first
                   // one is still ringing (unanswered), this service gets
-                  // started again â€” without stopping the previous sound
+                  // started again — without stopping the previous sound
                   // first, the old and new MediaPlayer would both loop at
                   // once. Always clear out any currently-playing sound and
                   // vibration before starting the new one, so only the
@@ -498,7 +498,7 @@ jobs:
               private void startRingLoop(String kind) {
                   try {
                       // Delivery reuses the order_alert sound file (same
-                      // asset the old system used for delivery jobs) â€”
+                      // asset the old system used for delivery jobs) —
                       // ride gets its own ride_alert sound, and so does a
                       // restaurant order.
                       String soundName = "ride".equals(kind) ? "ride_alert" : "order_alert";
@@ -514,7 +514,7 @@ jobs:
                       mediaPlayer.start();
                   } catch (Exception ignored) {
                       // If the sound fails to load for any reason, vibration
-                      // below still runs â€” the user still gets alerted.
+                      // below still runs — the user still gets alerted.
                   }
 
                   vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
@@ -572,7 +572,7 @@ jobs:
           // Full-screen "incoming alert" screen shown on top of the lock
           // screen while the app was fully closed. Shared by both portals:
           // shows Accept/Reject for rides (driver portal), Accept/Open App
-          // for orders (partner portal â€” rejection needs a typed reason,
+          // for orders (partner portal — rejection needs a typed reason,
           // which only the web app's own modal can collect).
           public class RingingActivity extends Activity {
               private String alertId;
@@ -632,7 +632,7 @@ jobs:
                   root.addView(bodyView);
 
                   // Single action: open the app. No native Accept, no
-                  // native Reject â€” every decision (accept, reject/skip)
+                  // native Reject — every decision (accept, reject/skip)
                   // happens inside the app itself via the normal in-app
                   // popup once it's open.
                   Button openBtn = new Button(this);
@@ -646,12 +646,12 @@ jobs:
               }
 
               private void finishWith(String action) {
-                  // Deliberately NOT stopping RingingService here anymore â€”
+                  // Deliberately NOT stopping RingingService here anymore —
                   // tapping OPEN APP should only open the app, not close the
                   // alert. The sound/vibration/notification keep going until
                   // the person actually accepts or cancels inside
                   // driver.html/partner.html (which calls
-                  // RingControl.stopRinging()), or â€” driver side only â€” the
+                  // RingControl.stopRinging()), or — driver side only — the
                   // service's own 25s AUTO_STOP_MS timeout fires.
 
                   Intent launch = new Intent(this, MainActivity.class);
@@ -665,7 +665,7 @@ jobs:
 
               @Override
               public void onBackPressed() {
-                  // Ignore back button â€” user must tap one of the buttons,
+                  // Ignore back button — user must tap one of the buttons,
                   // same as an incoming call screen.
               }
           }
@@ -677,33 +677,33 @@ jobs:
       # empty machine every run, so a NEW random keystore was generated on
       # every single build. Android refuses to install an APK signed with a
       # different key over an already-installed app with the same package
-      # name â€” so every update forced an uninstall first.
+      # name — so every update forced an uninstall first.
       #
       # Fix: sign every build with the SAME keystore file, stored once as a
       # GitHub secret. To set this up (one-time):
       #   1. On any computer with a JDK installed, run:
       #        keytool -genkeypair -v -keystore nesh-release.keystore \
       #          -alias nesh -keyalg RSA -keysize 2048 -validity 10000
-      #      (pick your own passwords; write them down â€” you cannot recover them)
+      #      (pick your own passwords; write them down — you cannot recover them)
       #   2. Base64-encode it:
       #        base64 -w0 nesh-release.keystore > keystore.b64   (Linux)
       #        base64 -i nesh-release.keystore -o keystore.b64   (macOS)
-      #   3. In your GitHub repo: Settings â†’ Secrets and variables â†’ Actions
-      #      â†’ New repository secret. Add these 4 secrets:
+      #   3. In your GitHub repo: Settings → Secrets and variables → Actions
+      #      → New repository secret. Add these 4 secrets:
       #        ANDROID_KEYSTORE_BASE64   <- contents of keystore.b64
       #        ANDROID_KEYSTORE_PASSWORD <- password you set in step 1
       #        ANDROID_KEY_ALIAS         <- "nesh" (or whatever alias you used)
       #        ANDROID_KEY_PASSWORD      <- key password you set in step 1
       #   4. IMPORTANT: back up nesh-release.keystore somewhere safe (e.g. a
       #      password manager). If you ever lose it, you can NEVER publish an
-      #      update to people who already installed the app â€” they'd have to
+      #      update to people who already installed the app — they'd have to
       #      uninstall and reinstall fresh, one time, forever after.
       - name: Set up persistent signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::warning::ANDROID_KEYSTORE_BASE64 secret not set â€” falling back to Gradle's throwaway debug keystore. Updates will keep forcing an uninstall until you add the 4 signing secrets (see comments in this workflow)."
+            echo "::warning::ANDROID_KEYSTORE_BASE64 secret not set — falling back to Gradle's throwaway debug keystore. Updates will keep forcing an uninstall until you add the 4 signing secrets (see comments in this workflow)."
           else
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/nesh-release.keystore"
           fi
@@ -756,6 +756,22 @@ jobs:
           PYEOF
           fi
 
+      # ---- Makes the in-app "UPDATE" banner reliable ----
+      # The @capacitor/app plugin isn't guaranteed to be registered in
+      # every build, so instead of asking the plugin for the running
+      # app's version at runtime, we bake the real build number directly
+      # into the HTML here, at build time. driver.html and partner.html
+      # each start with a placeholder:
+      #   <script>window.NESH_BUILD_NUMBER = 0; ...</script>
+      # This step replaces the 0 with this run's actual version code.
+      - name: Bake build number into driver.html and partner.html
+        run: |
+          VERSION_CODE="${{ github.run_number }}"
+          sed -i "s/window.NESH_BUILD_NUMBER = [0-9]*;/window.NESH_BUILD_NUMBER = ${VERSION_CODE};/" www/driver.html
+          sed -i "s/window.NESH_BUILD_NUMBER = [0-9]*;/window.NESH_BUILD_NUMBER = ${VERSION_CODE};/" www/partner.html
+          grep -o "NESH_BUILD_NUMBER = [0-9]*" www/driver.html
+          grep -o "NESH_BUILD_NUMBER = [0-9]*" www/partner.html
+
       - name: Sync Capacitor Android project
         run: npx cap sync android
 
@@ -792,7 +808,7 @@ jobs:
       # Needs a FIREBASE_DB_URL secret, e.g.
       #   https://your-project-id-default-rtdb.firebaseio.com
       # This only works if your Database Rules allow writes to
-      # "appConfig" â€” if they don't, either open that one path up for
+      # "appConfig" — if they don't, either open that one path up for
       # writes, or add a FIREBASE_DB_AUTH secret (a database secret / ID
       # token) and append `&auth=$FIREBASE_DB_AUTH` to the URL below.
       - name: Announce the new version to the app (Firebase)
@@ -801,7 +817,7 @@ jobs:
           APK_URL: ${{ steps.release.outputs.url }}
         run: |
           if [ -z "$DB_URL" ]; then
-            echo "FIREBASE_DB_URL secret not set â€” skipping. The in-app update banner won't know about this build until you add that secret."
+            echo "FIREBASE_DB_URL secret not set — skipping. The in-app update banner won't know about this build until you add that secret."
             exit 0
           fi
           ASSET_URL=$(echo "$APK_URL" | sed 's#/tag/#/download/#')/app-debug.apk
