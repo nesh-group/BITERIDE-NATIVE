@@ -675,6 +675,14 @@
           Other Shop
         </div>
       </div>
+      <div class="field" id="reg-shop-category-wrap" style="display:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg>
+        <input id="reg-shop-category" type="text" list="shop-category-suggestions" placeholder="What kind of shop? e.g. Mobile Shop, Sports" maxlength="24" />
+      </div>
+      <datalist id="shop-category-suggestions">
+        <option value="Mobile Shop">
+        <option value="Sports">
+      </datalist>
       <div class="field">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>
         <input id="reg-name" type="text" placeholder="Restaurant name" />
@@ -808,7 +816,7 @@
       </div>
     </div>
     <input type="file" id="bulk-import-input" accept=".xlsx,.xls,.csv" style="display:none;" />
-    <p class="hint-text" style="padding:6px 24px 0; margin:0; font-size:11px; color:#6E8CAE; font-family:'Inter',sans-serif;">
+    <p class="hint-text" id="bulk-import-columns-hint" style="padding:6px 24px 0; margin:0; font-size:11px; color:#6E8CAE; font-family:'Inter',sans-serif;">
       Excel columns: <b>Name</b>, <b>Discription</b> (or Description), <b>Price</b>, <b>Unit</b> (optional — Piece/Gram/Kg, defaults to Piece), <b>Photo</b> (optional — image link)
     </p>
     <p style="padding:6px 24px 0; margin:0;">
@@ -821,7 +829,7 @@
         🏷️ Change price for several stock items at once →
       </button>
     </p>
-    <p style="padding:4px 24px 0; margin:0;">
+    <p id="bulk-unit-btn-wrap" style="padding:4px 24px 0; margin:0;">
       <button class="btn-link" id="bulk-unit-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;">
         ⚖️ Change unit for several stock items at once →
       </button>
@@ -1057,13 +1065,22 @@
       <div class="field">
         <input id="item-price" type="number" inputmode="decimal" placeholder="Price (₹)" />
       </div>
-      <p class="loc-field-label" style="margin-top:2px;">Sold by</p>
-      <div class="type-toggle" id="item-unit-toggle" style="gap:8px;">
-        <div class="type-opt active" data-unit="piece" style="padding:10px 6px; font-size:12px;">Piece</div>
-        <div class="type-opt" data-unit="gram" style="padding:10px 6px; font-size:12px;">Gram</div>
-        <div class="type-opt" data-unit="kg" style="padding:10px 6px; font-size:12px;">Kg</div>
+      <div id="item-unit-section">
+        <p class="loc-field-label" style="margin-top:2px;">Sold by</p>
+        <div class="type-toggle" id="item-unit-toggle" style="gap:8px;">
+          <div class="type-opt active" data-unit="piece" style="padding:10px 6px; font-size:12px;">Piece</div>
+          <div class="type-opt" data-unit="gram" style="padding:10px 6px; font-size:12px;">Gram</div>
+          <div class="type-opt" data-unit="kg" style="padding:10px 6px; font-size:12px;">Kg</div>
+        </div>
+        <p class="hint-text" id="item-unit-hint" style="margin-top:0;">Price above is the total price per item.</p>
       </div>
-      <p class="hint-text" id="item-unit-hint" style="margin-top:0;">Price above is the total price per item.</p>
+      <div id="item-sizes-section" style="display:none;">
+        <p class="loc-field-label" style="margin-top:2px;">Available sizes</p>
+        <div class="field">
+          <input id="item-sizes" type="text" placeholder="e.g. S, M, L, XL, 2XL" />
+        </div>
+        <p class="hint-text" style="margin-top:0;">Comma-separated (e.g. S, M, L, XL, 2XL or 6, 7, 8, 9, 10). Customers will pick one before ordering.</p>
+      </div>
       <div class="field" style="cursor:pointer;" id="item-unavailable-wrap">
         <input id="item-unavailable" type="checkbox" style="width:16px; height:16px; accent-color:var(--chili); margin:0; flex-shrink:0;" />
         <label for="item-unavailable" style="cursor:pointer; color:var(--cloud); font-size:14px;">Mark unavailable (hidden from customers)</label>
@@ -1339,6 +1356,11 @@
           <h3>Home Category Order</h3>
           <p>Reorder Food / Groceries / Other Shop / Taxi on the customer app home screen</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('shop-categories')">
+          <div class="op-home-icon">🏷️</div>
+          <h3>Shop Categories</h3>
+          <p>Add or remove the "Other Shop" category suggestions (Mobile Shop, Sports, etc.)</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('drivers')">
           <div class="op-home-icon">🚖</div>
           <h3>Drivers</h3>
@@ -1491,6 +1513,23 @@
     </div>
   </div>
 
+  <!-- SHOP CATEGORIES -->
+  <div class="op-section" id="op-section-shop-categories">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Shop Categories</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">These are the suggested categories offered when a partner registers as "Other Shop", and in every shop's category badge editor. Add new ones here any time — no code change needed.</p>
+      <div class="op-search-box" style="margin-bottom:6px;">
+        <input type="text" id="op-shop-category-new-input" placeholder="New category e.g. Bakery" maxlength="24">
+      </div>
+      <button type="button" class="op-btn op-btn-push" onclick="opAddShopCategory()">➕ Add category</button>
+      <p class="op-note" id="op-shop-category-status" style="margin-top:8px;"></p>
+      <div id="op-shop-category-list" style="margin-top:14px;"></div>
+    </div>
+  </div>
+
   <!-- DRIVERS -->
   <div class="op-section" id="op-section-drivers">
     <div class="op-section-header">
@@ -1575,7 +1614,7 @@
       <div style="margin-top:14px;">
         <p class="op-note" style="margin-bottom:4px;">Shop category badge — shown on top of this shop's photo in the customer app list. Leave blank to hide.</p>
         <div class="op-search-box" style="margin-bottom:6px;">
-          <input type="text" id="op-pm-category-input" placeholder="e.g. Bakery, Pure Veg, Bestseller" maxlength="24">
+          <input type="text" id="op-pm-category-input" list="shop-category-suggestions" placeholder="e.g. Bakery, Pure Veg, Bestseller" maxlength="24">
         </div>
         <button type="button" class="op-btn op-btn-push" onclick="opSaveShopCategory()">💾 Save category</button>
         <p class="op-note" id="op-pm-category-status" style="margin-top:4px;"></p>
@@ -1791,6 +1830,21 @@ const UNIT_HINTS = {
   kg: "Price above is the rate for 1 kilogram (e.g. ₹120 per kg)."
 };
 const UNIT_SUFFIX = { piece: "", gram: "/g", kg: "/kg" };
+// Weight-based pricing (Gram/Kg) only makes sense for loose-weight goods —
+// so it's only offered to Groceries partners. Hotel/restaurant and Other
+// Shop partners always save/import items as plain "piece" pricing, and the
+// "Sold by" toggle + related bulk tools stay hidden for them.
+function isGroceriesShop() {
+  return state.restaurant?.businessType === 'groceries';
+}
+// "Sports" is one of the free-text "Other Shop" categories (Mobile Shop,
+// Sports, etc — see SHOP_CATEGORY_DEFAULT). Only shops registered under
+// that exact category get the size picker on their items, since size only
+// makes sense for clothing/footwear-style sports goods.
+function isSportsShop() {
+  return state.restaurant?.businessType === 'online_shop' &&
+    String(state.restaurant?.opCategory || '').trim().toLowerCase() === 'sports';
+}
 function setItemUnitToggle(unit) {
   state.selectedUnit = unit || "piece";
   document.querySelectorAll('#item-unit-toggle .type-opt').forEach(el => {
@@ -1962,7 +2016,7 @@ function renderOrderPopup(pendingList) {
     card.className = "order-popup-card";
 
     const itemsHtml = (order.items || []).map(it =>
-      `<div class="order-popup-row"><span>${it.qty} × ${it.name}</span><span>₹${it.price * it.qty}</span></div>`
+      `<div class="order-popup-row"><span>${it.qty} × ${it.name}${it.desc ? `<br><span style="color:#8a94a3; font-size:11px;">${it.desc}</span>` : ''}</span><span>₹${it.price * it.qty}</span></div>`
     ).join('');
     const feeHtml = order.platformFee ? `<div class="order-popup-row"><span>Platform fee</span><span>₹${order.platformFee}</span></div>` : '';
     const deliveryHtml = order.deliveryFee ? `<div class="order-popup-row"><span>Delivery charge</span><span>₹${order.deliveryFee}</span></div>` : '';
@@ -2070,6 +2124,7 @@ setTimeout(() => {
 
 function init() {
   checkForPartnerAppUpdate();
+  listenShopCategories(); // populates the "Other Shop" category datalist for everyone, operator or not
 
   const isOperator = localStorage.getItem('asfood_is_operator') === '1';
   const savedId = isOperator ? null : localStorage.getItem('asfood_partner_id');
@@ -2302,6 +2357,18 @@ function logInRestaurant(id, data) {
   updateGpayBadge(data.gpayNumber || "");
   document.getElementById('rest-id-value').textContent = id;
   renderShopLink(id);
+  // Weight-based (Gram/Kg) pricing tools are groceries-only — hide the bulk
+  // "Change unit" shortcut and simplify the Excel-import column hint for
+  // Hotel / Other Shop partners, who only ever deal in flat per-piece pricing.
+  const groceriesShop = isGroceriesShop();
+  const bulkUnitBtnWrap = document.getElementById('bulk-unit-btn-wrap');
+  if (bulkUnitBtnWrap) bulkUnitBtnWrap.style.display = groceriesShop ? "block" : "none";
+  const importColumnsHint = document.getElementById('bulk-import-columns-hint');
+  if (importColumnsHint) {
+    importColumnsHint.innerHTML = groceriesShop
+      ? "Excel columns: <b>Name</b>, <b>Discription</b> (or Description), <b>Price</b>, <b>Unit</b> (optional — Piece/Gram/Kg, defaults to Piece), <b>Photo</b> (optional — image link)"
+      : "Excel columns: <b>Name</b>, <b>Discription</b> (or Description), <b>Price</b>, <b>Photo</b> (optional — image link)";
+  }
   let restoreScreen = 'home';
   try {
     const saved = localStorage.getItem('asfood_last_screen');
@@ -2726,6 +2793,12 @@ document.getElementById('reg-type-toggle').addEventListener('click', (e) => {
   if (!opt) return;
   regBusinessType = opt.dataset.type;
   document.querySelectorAll('#reg-type-toggle .type-opt').forEach(el => el.classList.toggle('active', el === opt));
+  // "Other Shop" is a catch-all business type, so ask what kind of shop it
+  // actually is (Mobile Shop, Sports, etc). Stored straight into opCategory
+  // — the same field the Operator Panel's "Shop category badge" edits — so
+  // it shows up as the shop's badge in the customer app immediately, no
+  // separate operator step needed for shops that set this at signup.
+  document.getElementById('reg-shop-category-wrap').style.display = regBusinessType === 'online_shop' ? "flex" : "none";
 });
 
 async function doRegister() {
@@ -2734,6 +2807,7 @@ async function doRegister() {
   const address = document.getElementById('reg-address').value.trim();
   const location = document.getElementById('reg-location').value.trim();
   const gst = document.getElementById('reg-gst').value.trim();
+  const shopCategory = document.getElementById('reg-shop-category').value.trim();
   const username = document.getElementById('reg-username').value.trim();
   const password = document.getElementById('reg-password').value;
   const errEl = document.getElementById('reg-error');
@@ -2763,6 +2837,9 @@ async function doRegister() {
       status: "active",
       createdAt: Date.now()
     };
+    if (businessType === 'online_shop' && shopCategory) {
+      record.opCategory = shopCategory;
+    }
     await set(ref(db, 'restaurants/' + username), record);
     logInRestaurant(username, record);
   } catch (e) {
@@ -3064,7 +3141,12 @@ function openItemForm(item) {
   document.getElementById('item-name').value = item ? item.name : "";
   document.getElementById('item-desc').value = item ? (item.desc || "") : "";
   document.getElementById('item-price').value = item ? item.price : "";
-  setItemUnitToggle(item ? (item.unit || "piece") : "piece");
+  const groceriesShop = isGroceriesShop();
+  document.getElementById('item-unit-section').style.display = groceriesShop ? "block" : "none";
+  setItemUnitToggle(groceriesShop && item ? (item.unit || "piece") : "piece");
+  const sportsShop = isSportsShop();
+  document.getElementById('item-sizes-section').style.display = sportsShop ? "block" : "none";
+  document.getElementById('item-sizes').value = (sportsShop && item && Array.isArray(item.sizes)) ? item.sizes.join(', ') : "";
   document.getElementById('item-unavailable').checked = !!(item && item.unavailable);
   document.getElementById('item-error').style.display = "none";
   document.getElementById('item-delete-btn').style.display = item ? "block" : "none";
@@ -3212,7 +3294,10 @@ async function saveItem() {
   btn.disabled = true;
   try {
     const { db, ref, push, set, update } = window.fb;
-    const data = { name, desc, price, unit: state.selectedUnit || "piece", photo: state.photoDataUrl || "", unavailable: document.getElementById('item-unavailable').checked };
+    const sizes = isSportsShop()
+      ? document.getElementById('item-sizes').value.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+    const data = { name, desc, price, unit: isGroceriesShop() ? (state.selectedUnit || "piece") : "piece", photo: state.photoDataUrl || "", unavailable: document.getElementById('item-unavailable').checked, sizes };
     if (state.editingItemId) {
       await update(ref(db, 'restaurants/' + state.restId + '/menu/' + state.editingItemId), data);
     } else {
@@ -3415,7 +3500,7 @@ async function handleBulkImportFile(e) {
       // are saved (state.photoDataUrl is just a URL string too).
       let photo = photoKey ? String(row[photoKey] || "").trim() : "";
       if (photo && !/^https?:\/\//i.test(photo)) photo = ""; // ignore junk/non-URL values
-      const unit = unitKey ? normalizeUnitCell(row[unitKey]) : 'piece';
+      const unit = (isGroceriesShop() && unitKey) ? normalizeUnitCell(row[unitKey]) : 'piece';
 
       if (!name || isNaN(price) || price < 0) {
         skipped++;
@@ -3622,7 +3707,7 @@ function renderOrderDetail(o) {
   (o.items || []).forEach(it => {
     const row = document.createElement('div');
     row.className = "item-row";
-    row.innerHTML = `<span>${it.qty} × ${it.name}</span><span>₹${it.price * it.qty}</span>`;
+    row.innerHTML = `<span>${it.qty} × ${it.name}${it.desc ? `<br><span style="color:#5C574C; font-size:11px;">${it.desc}</span>` : ''}</span><span>₹${it.price * it.qty}</span>`;
     itemsEl.appendChild(row);
   });
   if (o.platformFee) {
@@ -3996,7 +4081,7 @@ function listenPaymentPending() {
     listEl.innerHTML = "";
     list.forEach(order => {
       const itemsHtml = (order.items || []).map(it =>
-        `<div class="pay-pending-row"><span>${it.qty} × ${it.name}</span><span>₹${it.price * it.qty}</span></div>`
+        `<div class="pay-pending-row"><span>${it.qty} × ${it.name}${it.desc ? `<br><span style="color:#A9C4E0; font-size:10px;">${it.desc}</span>` : ''}</span><span>₹${it.price * it.qty}</span></div>`
       ).join('');
       const feeHtml = order.platformFee ? `<div class="pay-pending-row"><span>Platform fee</span><span>₹${order.platformFee}</span></div>` : '';
       const card = document.createElement('div');
@@ -4417,6 +4502,7 @@ function opOpenSection(name) {
   if (name === 'drivers') opRenderDriversList();
   if (name === 'zones') opRenderZonesList();
   if (name === 'category-order') opRenderCategoryOrder();
+  if (name === 'shop-categories') opRenderShopCategoriesList();
   if (name === 'delete-all') opOpenDeleteAllSection();
   if (name === 'support') opRenderChatConvList();
   if (name === 'pricing') opLoadExtraAmount();
@@ -4628,6 +4714,75 @@ function opSaveCategoryOrder() {
   set(ref(db, 'app_config/categoryOrder'), opCategoryOrderArr)
     .then(() => { status.textContent = 'Saved — the customer app will pick this up live.'; })
     .catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+/* ==================================================================
+   SHOP CATEGORIES — suggested category badges for "Other Shop"
+   partners (Mobile Shop, Sports, etc). Powers the datalist on both
+   the registration screen's "What kind of shop?" field and the
+   Operator Panel's per-shop category badge editor. Stored as a
+   simple array at app_config/shopCategories so the operator can add
+   new ones any time from the Shop Categories screen, no code change
+   needed. Kept live via onValue so a fresh category shows up in
+   both places immediately, even in an already-open tab.
+   ================================================================== */
+const SHOP_CATEGORY_DEFAULT = ['Mobile Shop', 'Sports'];
+let shopCategoryList = SHOP_CATEGORY_DEFAULT.slice();
+
+function listenShopCategories() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'app_config/shopCategories'), snap => {
+    const val = snap.val();
+    shopCategoryList = Array.isArray(val) && val.length ? val.slice() : SHOP_CATEGORY_DEFAULT.slice();
+    renderShopCategoryDatalist();
+    const sec = document.getElementById('op-section-shop-categories');
+    if (sec && sec.classList.contains('active')) opRenderShopCategoriesList();
+  });
+}
+function renderShopCategoryDatalist() {
+  const dl = document.getElementById('shop-category-suggestions');
+  if (!dl) return;
+  dl.innerHTML = shopCategoryList.map(c => `<option value="${escapeHtml(c)}">`).join('');
+}
+function opRenderShopCategoriesList() {
+  const wrap = document.getElementById('op-shop-category-list');
+  if (!wrap) return;
+  if (!shopCategoryList.length) {
+    wrap.innerHTML = '<p class="op-note">No categories yet — add one above.</p>';
+    return;
+  }
+  wrap.innerHTML = shopCategoryList.map((c, i) => `
+    <div class="op-partner-item" style="display:flex; align-items:center; justify-content:space-between;">
+      <span class="op-partner-name">${escapeHtml(c)}</span>
+      <button type="button" class="op-btn op-btn-danger" style="padding:6px 10px;" onclick="opRemoveShopCategory(${i})">✕ Remove</button>
+    </div>
+  `).join('');
+}
+function opSaveShopCategoryList(statusMsg) {
+  const { db, ref, set } = window.fb;
+  const status = document.getElementById('op-shop-category-status');
+  set(ref(db, 'app_config/shopCategories'), shopCategoryList)
+    .then(() => { if (status) status.textContent = statusMsg || 'Saved.'; })
+    .catch(err => { if (status) status.textContent = 'Error: ' + err.message; });
+}
+function opAddShopCategory() {
+  const input = document.getElementById('op-shop-category-new-input');
+  const status = document.getElementById('op-shop-category-status');
+  const val = input.value.trim();
+  if (!val) { status.textContent = 'Type a category name first.'; return; }
+  if (shopCategoryList.some(c => c.toLowerCase() === val.toLowerCase())) {
+    status.textContent = 'That category already exists.';
+    return;
+  }
+  shopCategoryList.push(val);
+  input.value = '';
+  opRenderShopCategoriesList();
+  opSaveShopCategoryList('Added — the registration screen and shop badge editor will offer it right away.');
+}
+function opRemoveShopCategory(i) {
+  shopCategoryList.splice(i, 1);
+  opRenderShopCategoriesList();
+  opSaveShopCategoryList('Removed.');
 }
 
 /* ==================================================================
