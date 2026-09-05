@@ -1372,6 +1372,11 @@
           <h3>Shop Categories</h3>
           <p>Add or remove the "Other Shop" category suggestions (Mobile Shop, Sports, etc.)</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('shop-order')">
+          <div class="op-home-icon">🔝</div>
+          <h3>Shop Order</h3>
+          <p>Pick which shop shows first within Food / Groceries / Other Shop in the customer app</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('drivers')">
           <div class="op-home-icon">🚖</div>
           <h3>Drivers</h3>
@@ -1538,6 +1543,25 @@
       <button type="button" class="op-btn op-btn-push" onclick="opAddShopCategory()">➕ Add category</button>
       <p class="op-note" id="op-shop-category-status" style="margin-top:8px;"></p>
       <div id="op-shop-category-list" style="margin-top:14px;"></div>
+    </div>
+  </div>
+
+  <!-- SHOP ORDER -->
+  <div class="op-section" id="op-section-shop-order">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Shop Order</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Controls which shop a customer sees first inside a category. Pick a category, use the arrows to reorder, then save. A new shop is added to the bottom automatically until you move it.</p>
+      <div class="type-toggle" style="margin-bottom:14px;">
+        <div class="type-opt active" id="op-shop-order-tab-hotel" onclick="opSwitchShopOrderCategory('hotel')">🍔 Food</div>
+        <div class="type-opt" id="op-shop-order-tab-groceries" onclick="opSwitchShopOrderCategory('groceries')">🛒 Groceries</div>
+        <div class="type-opt" id="op-shop-order-tab-online_shop" onclick="opSwitchShopOrderCategory('online_shop')">🛍️ Other Shop</div>
+      </div>
+      <div id="op-shop-order-list"></div>
+      <button type="button" class="op-btn op-btn-push" onclick="opSaveShopOrder()" style="margin-top:12px;">💾 Save order</button>
+      <p class="op-note" id="op-shop-order-status" style="margin-top:10px;"></p>
     </div>
   </div>
 
@@ -4500,6 +4524,7 @@ function opEnterPanel() {
   opListenDrivers();
   opListenRides();
   opListenCategoryOrder();
+  opListenShopOrder();
   setInterval(opUpdateOrdersHomeBadge, 30000); // keeps the "late" badge current even while sitting on the home screen
 }
 function opLogout() {
@@ -4516,6 +4541,7 @@ function opOpenSection(name) {
   if (name === 'zones') opRenderZonesList();
   if (name === 'category-order') opRenderCategoryOrder();
   if (name === 'shop-categories') opRenderShopCategoriesList();
+  if (name === 'shop-order') opBuildShopOrderWorking();
   if (name === 'delete-all') opOpenDeleteAllSection();
   if (name === 'support') opRenderChatConvList();
   if (name === 'pricing') opLoadExtraAmount();
@@ -4678,6 +4704,8 @@ function opListenPartners() {
     opUpdateOrdersHomeBadge();
     const reportDetail = document.getElementById('op-section-report-detail');
     if (reportDetail && reportDetail.classList.contains('active')) opRenderReportOrders();
+    const shopOrderSec = document.getElementById('op-section-shop-order');
+    if (shopOrderSec && shopOrderSec.classList.contains('active')) opBuildShopOrderWorking();
   });
 }
 function opTypeLabel(t) { return t === 'groceries' ? 'Groceries' : t === 'online_shop' ? 'Other Shop' : 'Hotel'; }
@@ -4796,6 +4824,82 @@ function opRemoveShopCategory(i) {
   shopCategoryList.splice(i, 1);
   opRenderShopCategoriesList();
   opSaveShopCategoryList('Removed.');
+}
+
+/* ==================================================================
+   SHOP ORDER — controls which shop a customer sees first within a
+   category (Food / Groceries / Other Shop) in the customer app's
+   shop list. Stored per category as an array of restaurant IDs at
+   app_config/shopOrder/{businessType}. A shop not yet in the saved
+   array (brand new signup, or the operator has never touched this
+   screen) is appended at the end automatically, so nothing goes
+   missing — it just starts at the bottom until reordered.
+   ================================================================== */
+let opShopOrderSaved = { hotel: [], groceries: [], online_shop: [] }; // last known-saved order per category, from Firebase
+let opShopOrderCategory = 'hotel';
+let opShopOrderWorking = []; // partner objects, in the order currently being edited for opShopOrderCategory
+
+function opListenShopOrder() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'app_config/shopOrder'), snap => {
+    const val = snap.val() || {};
+    opShopOrderSaved = {
+      hotel: Array.isArray(val.hotel) ? val.hotel.slice() : [],
+      groceries: Array.isArray(val.groceries) ? val.groceries.slice() : [],
+      online_shop: Array.isArray(val.online_shop) ? val.online_shop.slice() : []
+    };
+    const sec = document.getElementById('op-section-shop-order');
+    if (sec && sec.classList.contains('active')) opBuildShopOrderWorking();
+  });
+}
+function opSwitchShopOrderCategory(cat) {
+  opShopOrderCategory = cat;
+  ['hotel', 'groceries', 'online_shop'].forEach(c => {
+    document.getElementById('op-shop-order-tab-' + c).classList.toggle('active', c === cat);
+  });
+  opBuildShopOrderWorking();
+}
+function opBuildShopOrderWorking() {
+  const shopsInCategory = opAllPartners.filter(p => (p.businessType || 'hotel') === opShopOrderCategory);
+  const saved = opShopOrderSaved[opShopOrderCategory] || [];
+  const byId = {};
+  shopsInCategory.forEach(p => { byId[p._id] = p; });
+  const ordered = saved.filter(id => byId[id]).map(id => byId[id]);
+  const remaining = shopsInCategory.filter(p => !saved.includes(p._id));
+  opShopOrderWorking = ordered.concat(remaining);
+  opRenderShopOrderList();
+}
+function opRenderShopOrderList() {
+  const wrap = document.getElementById('op-shop-order-list');
+  if (!wrap) return;
+  if (!opShopOrderWorking.length) {
+    wrap.innerHTML = '<p class="op-note">No shops in this category yet.</p>';
+    return;
+  }
+  wrap.innerHTML = opShopOrderWorking.map((p, i) => `
+    <div class="op-partner-item" style="display:flex; align-items:center; justify-content:space-between;">
+      <span class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</span>
+      <span>
+        <button type="button" class="op-btn" style="padding:6px 10px; margin:0 0 0 6px;" onclick="opMoveShopOrder(${i}, -1)" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button type="button" class="op-btn" style="padding:6px 10px; margin:0 0 0 6px;" onclick="opMoveShopOrder(${i}, 1)" ${i === opShopOrderWorking.length - 1 ? 'disabled' : ''}>▼</button>
+      </span>
+    </div>
+  `).join('');
+}
+function opMoveShopOrder(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= opShopOrderWorking.length) return;
+  [opShopOrderWorking[i], opShopOrderWorking[j]] = [opShopOrderWorking[j], opShopOrderWorking[i]];
+  opRenderShopOrderList();
+}
+function opSaveShopOrder() {
+  const { db, ref, update } = window.fb;
+  const status = document.getElementById('op-shop-order-status');
+  status.textContent = 'Saving...';
+  const ids = opShopOrderWorking.map(p => p._id);
+  update(ref(db, 'app_config/shopOrder'), { [opShopOrderCategory]: ids })
+    .then(() => { status.textContent = 'Saved — the customer app will pick this up live.'; })
+    .catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
 /* ==================================================================
