@@ -2085,10 +2085,27 @@ function renderHomeLists() {
 
 async function markDeliveryDelivered(compositeId) {
   const [restId, orderId] = compositeId.split('::');
-  const { db, ref, update } = window.fb;
+  const { db, ref, update, get } = window.fb;
   try {
     await update(ref(db, 'restaurants/' + restId + '/orders/' + orderId), { status: 'delivered' });
     showToast('Marked as delivered');
+    // Fire-and-forget: let the customer know via a real OS-level push
+    // (same Cloudflare Worker used for the ride/delivery alerts above).
+    get(ref(db, 'restaurants/' + restId + '/orders/' + orderId)).then((snap) => {
+      const o = snap.val() || {};
+      if (!o.customerPhone) return;
+      fetch('https://broad-paper-6445.raise3715.workers.dev', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'customer',
+          customerPhone: o.customerPhone,
+          title: 'Order delivered!',
+          body: 'Enjoy your meal 🎉',
+          orderId, restId,
+        }),
+      }).catch(() => {});
+    }).catch(() => {});
   } catch (e) {
     alert("Couldn't update — check your connection and try again.");
   }

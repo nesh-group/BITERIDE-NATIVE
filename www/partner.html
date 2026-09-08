@@ -1397,6 +1397,11 @@
           <h3>Support Chat</h3>
           <p>Chat live with any restaurant partner</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('notify')">
+          <div class="op-home-icon">📢</div>
+          <h3>Send Notification</h3>
+          <p>Push an announcement/offer to every customer who has the app</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1482,6 +1487,23 @@
         <button type="button" class="op-btn op-btn-danger" onclick="opDeletePushedAppUpdate()">🗑 Delete Pushed Update</button>
       </div>
       <p class="op-note" id="op-app-update-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- SEND NOTIFICATION (broadcast to every customer) -->
+  <div class="op-section" id="op-section-notify">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Send Notification</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">This sends a real push notification (works even if the app is closed) to every customer device that has notifications enabled. Use it for offers, announcements, or downtime notices — not for individual order updates, which already go out automatically.</p>
+      <input type="text" id="op-notify-title-input" placeholder="Title (e.g. 🎉 20% off today!)" maxlength="60" style="width:100%;padding:10px;background:#0b0f19;color:#e2e8f0;border:1px solid #334155;font-size:.85rem;margin-bottom:10px;">
+      <textarea id="op-notify-body-input" placeholder="Message body..." style="height:100px;" maxlength="150"></textarea>
+      <div>
+        <button type="button" class="op-btn op-btn-push" onclick="opSendBroadcastNotification()">📢 Send to all customers</button>
+      </div>
+      <p class="op-note" id="op-notify-status" style="margin-top:10px;"></p>
     </div>
   </div>
 
@@ -3793,9 +3815,29 @@ async function updateOrderStatus(id, newStatus, orderData) {
     showToast("Order marked as " + newStatus);
     if (newStatus === 'cancelled') playCancelAlert();
     if (newStatus === 'ready') broadcastDeliveryJobToDrivers(id, orderData || {});
+    if (newStatus === 'preparing') notifyCustomerOrderStatus(orderData || {}, id, 'Order confirmed!', (state.restaurant && state.restaurant.name || 'Restaurant') + ' is preparing your order.');
   } catch (e) {
     alert("Couldn't update order — check your connection and try again.");
   }
+}
+
+// Fire-and-forget: let the customer know their order status changed via a
+// real OS-level push (same Cloudflare Worker used for driver/restaurant
+// alerts above), on top of whatever they see live in the app itself.
+function notifyCustomerOrderStatus(o, orderId, title, body) {
+  if (!o.customerPhone) return;
+  fetch('https://broad-paper-6445.raise3715.workers.dev', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'customer',
+      customerPhone: o.customerPhone,
+      title,
+      body,
+      orderId,
+      restId: state.restId,
+    }),
+  }).catch(() => {});
 }
 
 // Fire-and-forget: once a shop marks an order "ready", broadcast it to
@@ -4554,6 +4596,29 @@ function opOpenSection(name) {
     clearInterval(opOrdersLateTimer);
     opOrdersLateTimer = null;
   }
+}
+
+/* ---- Send Notification (FCM topic broadcast to every customer) ---- */
+function opSendBroadcastNotification() {
+  const titleEl = document.getElementById('op-notify-title-input');
+  const bodyEl = document.getElementById('op-notify-body-input');
+  const status = document.getElementById('op-notify-status');
+  const title = titleEl.value.trim();
+  const body = bodyEl.value.trim();
+  if (!title || !body) { status.textContent = 'Please fill in both title and message.'; return; }
+  status.textContent = 'Sending...';
+  fetch('https://broad-paper-6445.raise3715.workers.dev', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'broadcast', title, body }),
+  })
+    .then(res => res.json().catch(() => ({})))
+    .then(() => {
+      status.textContent = 'Sent! ✅';
+      titleEl.value = '';
+      bodyEl.value = '';
+    })
+    .catch(() => { status.textContent = 'Failed to send — check your connection and try again.'; });
 }
 
 /* ---- Extra Amount (Paisa) added to every item price for customers ---- */
