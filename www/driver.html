@@ -1328,7 +1328,10 @@ function driverDoesTaxi() {
   return !state.driver.services || state.driver.services.taxi !== false;
 }
 function driverDoesDelivery() {
-  return !state.driver.services || state.driver.services.delivery !== false;
+  // Food delivery jobs go to bike drivers only — auto/cab drivers never
+  // see or compete for "order ready" deliveries, regardless of their
+  // services.delivery flag.
+  return state.driver.vehicleType === 'bike' && (!state.driver.services || state.driver.services.delivery !== false);
 }
 
 // Parses the "lat,lng" text format used for restaurants/{id}.location —
@@ -1580,7 +1583,7 @@ function refreshRidePopupFromCache() {
         .map(r => Object.assign({}, r, { _distanceKm: r.pickup ? myDistanceToPickup(r.pickup) : null }))
     : [];
 
-  const deliveryMatchFn = d => d.isOnline === true && (!d.services || d.services.delivery !== false);
+  const deliveryMatchFn = d => d.isOnline === true && d.vehicleType === 'bike' && (!d.services || d.services.delivery !== false);
   const pendingDeliveries = driverDoesDelivery()
     ? deliveriesCache
         .filter(o => o.status === 'ready' && !o.deliveryDriverId)

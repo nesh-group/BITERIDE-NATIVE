@@ -3789,7 +3789,7 @@ function renderOrderDetail(o) {
   const buttons = [];
   if (status === 'preparing') buttons.push({ label: 'Mark as ready', cls: 'ready', next: 'ready' });
   if (status === 'ready') buttons.push({ label: 'Mark as delivered', cls: 'delivered', next: 'delivered' });
-  if (status !== 'delivered' && status !== 'cancelled' && status !== 'rejected') {
+  if (status !== 'delivered' && status !== 'cancelled' && status !== 'rejected' && status !== 'ready') {
     buttons.push({ label: 'Cancel order', cls: 'cancel', next: 'cancelled' });
   }
 
@@ -5202,7 +5202,7 @@ function opRenderDriversList() {
         <span class="op-partner-name">${d.zonePriority === true ? '⭐ ' : ''}${escapeHtml(d.name || d._id)}</span>
         <span class="op-partner-type">${d.isOnline ? '🟢 Online' : '⚪ Offline'}</span>
       </div>
-      <div class="op-partner-sub">${escapeHtml(d.vehicleType || '')} · ${d.zoneName ? escapeHtml(d.zoneName) : '⚠️ No zone set'}</div>
+      <div class="op-partner-sub">${escapeHtml(OP_VEHICLE_LABEL[d.vehicleType] || d.vehicleType || '')} · ${d.zoneName ? escapeHtml(d.zoneName) : '⚠️ No zone set'}</div>
     </div>
   `).join('');
 }
@@ -5215,21 +5215,29 @@ function opPopulateDriverZoneSelect() {
 // taxi rides still 'searching', and shop delivery orders that are 'ready'
 // but not yet claimed by any driver. Sourced from opAllPartners (which
 // already carries every restaurant's nested orders) and opAllRides.
+// Taxi rides show for any driver vehicle type (manual operator override).
+// Shop delivery orders are bike-only, no exceptions — never shown for an
+// auto/car driver, regardless of what the operator has selected.
+const OP_VEHICLE_LABEL = { bike: 'Bike', auto: 'Auto', cab: 'Car' };
 function opPopulateDriverOrderSelect() {
   const sel = document.getElementById('op-dm-order-select');
   const options = ['<option value="">— Select a pending order/ride —</option>'];
   opAllRides.filter(r => r.status === 'searching').forEach(r => {
-    options.push(`<option value="ride:${r._id}">🚕 Ride · ${escapeHtml(r.customerName || 'Rider')} · ${escapeHtml((r.pickup && r.pickup.text) || '—')}</option>`);
+    const vLabel = OP_VEHICLE_LABEL[r.vehicleType] || r.vehicleType || 'Auto';
+    options.push(`<option value="ride:${r._id}">🚕 Ride (${escapeHtml(vLabel)}) · ${escapeHtml(r.customerName || 'Rider')} · ${escapeHtml((r.pickup && r.pickup.text) || '—')}</option>`);
   });
-  opAllPartners.forEach(p => {
-    const orders = p.orders || {};
-    Object.keys(orders).forEach(oid => {
-      const o = orders[oid];
-      if (o.status === 'ready' && !o.deliveryDriverId) {
-        options.push(`<option value="delivery:${p._id}::${oid}">📦 ${escapeHtml(p.restaurantName || 'Shop')} · ${escapeHtml(o.orderNumber || oid)}</option>`);
-      }
+  const d = opAllDrivers.find(x => x._id === opCurrentDriverId);
+  if (d && d.vehicleType === 'bike') {
+    opAllPartners.forEach(p => {
+      const orders = p.orders || {};
+      Object.keys(orders).forEach(oid => {
+        const o = orders[oid];
+        if (o.status === 'ready' && !o.deliveryDriverId) {
+          options.push(`<option value="delivery:${p._id}::${oid}">📦 Delivery (Bike) · ${escapeHtml(p.restaurantName || 'Shop')} · ${escapeHtml(o.orderNumber || oid)}</option>`);
+        }
+      });
     });
-  });
+  }
   sel.innerHTML = options.join('');
 }
 function opShowDriverDetail(id, silentRefresh) {
@@ -5239,7 +5247,7 @@ function opShowDriverDetail(id, silentRefresh) {
   document.getElementById('op-dm-title').textContent = d.name || id;
   document.getElementById('op-dm-username').textContent = id;
   document.getElementById('op-dm-phone').textContent = d.phone || '—';
-  document.getElementById('op-dm-vehicle').textContent = d.vehicleType || '—';
+  document.getElementById('op-dm-vehicle').textContent = OP_VEHICLE_LABEL[d.vehicleType] || d.vehicleType || '—';
   document.getElementById('op-dm-status').textContent = d.isOnline ? 'Online' : 'Offline';
   document.getElementById('op-dm-zone').textContent = d.zoneName || 'Not set';
   opPopulateDriverZoneSelect();
@@ -5335,15 +5343,22 @@ function opAssignOrderToDriver() {
   const val = sel.value;
   if (!val) { status.textContent = 'Pick an order/ride first.'; return; }
   const { db, ref, update } = window.fb;
-  status.textContent = 'Assigning...';
   let path;
   if (val.startsWith('ride:')) {
     path = 'rides/' + val.slice(5);
   } else {
+    // Delivery orders are bike-only — refuse even if this got triggered
+    // some other way with a non-bike driver selected.
+    const d = opAllDrivers.find(x => x._id === opCurrentDriverId);
+    if (!d || d.vehicleType !== 'bike') {
+      status.textContent = 'Delivery orders can only be assigned to bike drivers.';
+      return;
+    }
     const rest = val.slice('delivery:'.length);
     const [restId, orderId] = rest.split('::');
     path = 'restaurants/' + restId + '/orders/' + orderId;
   }
+  status.textContent = 'Assigning...';
   update(ref(db, path), { assignedDriverId: opCurrentDriverId })
     .then(() => { status.textContent = 'Assigned — this driver will see it once online.'; opPopulateDriverOrderSelect(); })
     .catch(err => { status.textContent = 'Error: ' + err.message; });
