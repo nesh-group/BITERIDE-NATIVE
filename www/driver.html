@@ -245,6 +245,16 @@
   .order-popup-body{ background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:8px; }
   .order-popup-row{ display:flex; justify-content:space-between; font-size:13px; color:var(--ink); padding:3px 0; }
   .order-popup-row-total{ border-top:1px dashed var(--ink); margin-top:6px; padding-top:6px; font-weight:700; }
+  /* Pickup / Drop — made deliberately bigger + bolder than the rest of the
+     card's detail rows, since these two lines are what a driver actually
+     needs to read at a glance before accepting. */
+  .order-popup-loc-row{ display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:1px dashed var(--muted); }
+  .order-popup-loc-row:last-of-type{ border-bottom:none; }
+  .order-popup-loc-dot{ flex-shrink:0; width:10px; height:10px; border-radius:50%; margin-top:5px; }
+  .order-popup-loc-row.pickup .order-popup-loc-dot{ background:var(--leaf); }
+  .order-popup-loc-row.drop .order-popup-loc-dot{ background:var(--chili); }
+  .order-popup-loc-label{ font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:700; letter-spacing:1px; color:var(--muted-2); display:block; margin-bottom:2px; text-transform:uppercase; }
+  .order-popup-loc-text{ font-size:17px; font-weight:700; color:var(--ink); line-height:1.3; display:block; }
   .order-popup-cust{ color:#4A6B8A; font-size:12px; margin:8px 0 16px; text-align:center; }
   .order-popup-btns{ display:flex; gap:10px; }
   .order-popup-btns .btn-primary{ background:var(--leaf); color:var(--cloud); flex:1; }
@@ -920,7 +930,7 @@ function applyFriendlyLocationLabel(el, pos) {
 const NEAREST_WINDOW_MS = 25 * 1000;
 const MAX_MATCH_RADIUS_KM = 12;
 const LOCATION_STALE_MS = 3 * 60 * 1000;
-const NEAR_OVERRIDE_KM = 0.5; // within this distance, proximity beats the fairness ordering
+const NEAR_OVERRIDE_KM = 0.5; // within this distance, candidates are compared by order count (see rankAmongCandidates)
 
 // ---------- Live location tracking (while online) ----------
 let locationWatchId = null;
@@ -1111,7 +1121,12 @@ function startRinging() {
     }
   } catch (e) {}
   */
-  if (navigator.vibrate) {
+  // Inside the native wrapper, RingingService now vibrates on every alert
+  // (even while the app is in the foreground — see AlertFcmService), so
+  // vibrating here too would double it up. Only do it here in a plain
+  // browser tab, where there's no native ring to fall back on.
+  const isNativeApp = !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RingControl);
+  if (!isNativeApp && navigator.vibrate) {
     navigator.vibrate([500, 300, 500, 300, 500]);
     vibrateInterval = setInterval(() => navigator.vibrate([500, 300, 500, 300, 500]), 2000);
   }
@@ -1156,8 +1171,8 @@ function renderOrderPopup(pendingList) {
         <h2 class="order-popup-title">Delivery${item.orderNumber ? ' #' + item.orderNumber : ''} · ₹${item.deliveryFee || 0}</h2>
         <div class="order-popup-body">
           ${awayText}
-          <div class="order-popup-row"><span>Pickup</span><span>${item._restName || 'Shop'}</span></div>
-          <div class="order-popup-row"><span>Drop</span><span>${item.customerAddress || '—'}</span></div>
+          <div class="order-popup-loc-row pickup"><span class="order-popup-loc-dot"></span><span><span class="order-popup-loc-label">Pickup</span><span class="order-popup-loc-text">${item._restName || 'Shop'}</span></span></div>
+          <div class="order-popup-loc-row drop"><span class="order-popup-loc-dot"></span><span><span class="order-popup-loc-label">Drop</span><span class="order-popup-loc-text">${item.customerAddress || '—'}</span></span></div>
           <div class="order-popup-row order-popup-row-total"><span>Items</span><span>${item.items ? item.items.map(it => `${it.qty}x ${it.name}`).join(', ') : '—'}</span></div>
         </div>
         <p class="order-popup-cust">${item.customerName || 'Customer'}</p>
@@ -1171,8 +1186,8 @@ function renderOrderPopup(pendingList) {
         <h2 class="order-popup-title">${RIDE_TYPE_LABEL[item.vehicleType] || 'Ride'} · ₹${item.fare || 0}</h2>
         <div class="order-popup-body">
           ${awayText}
-          <div class="order-popup-row"><span>Pickup</span><span id="popup-pickup-${item._id}">${(item.pickup && item.pickup.text) || '—'}</span></div>
-          <div class="order-popup-row"><span>Drop</span><span id="popup-drop-${item._id}">${(item.drop && item.drop.text) || '—'}</span></div>
+          <div class="order-popup-loc-row pickup"><span class="order-popup-loc-dot"></span><span><span class="order-popup-loc-label">Pickup</span><span class="order-popup-loc-text" id="popup-pickup-${item._id}">${(item.pickup && item.pickup.text) || '—'}</span></span></div>
+          <div class="order-popup-loc-row drop"><span class="order-popup-loc-dot"></span><span><span class="order-popup-loc-label">Drop</span><span class="order-popup-loc-text" id="popup-drop-${item._id}">${(item.drop && item.drop.text) || '—'}</span></span></div>
           <div class="order-popup-row order-popup-row-total"><span>Trip distance</span><span>${item.distanceKm || 0} km</span></div>
         </div>
         <p class="order-popup-cust">${item.customerName || 'Rider'}</p>
@@ -1236,14 +1251,62 @@ async function handlePopupItemAction(id, action, kind) {
 
 // Called from native Java (RingingActivity, via MainActivity.evaluateJavascript)
 // when the driver taps Open App on the full-screen native ringing screen
-// shown while the app was closed. There's no native Accept or Reject
-// anymore — tapping the native screen just opens the app and stops the
-// ring; refreshRidePopupFromCache's own listener shows the in-app popup
-// as usual for a manual Accept/Skip.
+// shown while the app was closed (or backgrounded). Used to be a no-op,
+// which meant the popup only appeared once listenRides()/listenDeliveryJobs()
+// finished syncing the ENTIRE rides/restaurants tree from Firebase — slow,
+// and very noticeably NOT instant.
+//
+// Now: render a bare-bones popup for this exact id IMMEDIATELY (synchronous,
+// no network wait at all) so the card + ring/vibrate appear the instant the
+// app opens, then fetch just this one ride/order's node in the background —
+// far smaller and faster than the full tree sync — and hand off to
+// refreshRidePopupFromCache() for the real, correctly nearest-ordered/
+// filtered popup. That naturally replaces the placeholder (or clears it, if
+// the job's already been taken by someone else by the time we open).
 window.handleNativeRideAction = function (action, id, kind) {
-  // Intentionally a no-op — kept only so MainActivity always has a
-  // function to retry against before it's sure the page has loaded.
+  if (action !== 'open' || !id || (kind !== 'ride' && kind !== 'delivery')) return;
+  renderOrderPopup([{ _id: id, _kind: kind }]); // instant placeholder — starts the ring right away
+  fetchAndMergeNativeAlert(kind, id);
 };
+
+async function fetchAndMergeNativeAlert(kind, id) {
+  // Firebase may not have finished connecting yet at cold start (its SDK is
+  // loaded from a CDN as an ES module and only fires 'fb-ready' once that's
+  // done) — wait for it instead of failing silently.
+  if (!window.fb) {
+    window.addEventListener('fb-ready', () => fetchAndMergeNativeAlert(kind, id), { once: true });
+    return;
+  }
+  const { db, ref, get } = window.fb;
+  try {
+    if (kind === 'ride') {
+      const snap = await get(ref(db, 'rides/' + id));
+      if (snap.exists()) ridesCache[id] = snap.val();
+    } else {
+      const [restId, orderId] = id.split('::');
+      const snap = await get(ref(db, 'restaurants/' + restId + '/orders/' + orderId));
+      if (snap.exists()) {
+        let restName = '';
+        try {
+          const restNameSnap = await get(ref(db, 'restaurants/' + restId + '/name'));
+          restName = restNameSnap.val() || '';
+        } catch (e) {}
+        deliveriesCache = deliveriesCache
+          .filter(o => (o._restId + '::' + o._orderId) !== id)
+          .concat([Object.assign({ _restId: restId, _orderId: orderId, _restName: restName }, snap.val())]);
+      }
+    }
+  } catch (e) {
+    // Network hiccup on the targeted fetch — the normal listenRides()/
+    // listenDeliveryJobs() sync will still catch up shortly and refresh
+    // the popup once it does.
+  }
+  // driver profile (state.driver) comes from cached localStorage data set
+  // in init(), which also waits on 'fb-ready' — by the time we get here
+  // it's virtually always already set, but guard just in case.
+  if (state.driver) refreshRidePopupFromCache();
+  else window.addEventListener('fb-ready', () => { if (state.driver) refreshRidePopupFromCache(); }, { once: true });
+}
 
 async function handlePopupRideAction(rideId, action) {
   if (action === 'reject') {
@@ -1343,34 +1406,79 @@ function parseLatLngStr(str) {
   return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
 }
 
-// True if this driver has never once been assigned a ride or delivery —
-// used so a driver who hasn't earned anything yet gets first look within
-// their priority tier, instead of the same nearest few always winning.
-function hasNeverHadOrder(driverId) {
-  const hadRide = Object.values(ridesCache).some(r => r.driverId === driverId);
-  if (hadRide) return false;
-  return !deliveriesCache.some(o => o.deliveryDriverId === driverId);
+// How many rides + deliveries this driver has ever been assigned — used to
+// rank candidates by who has the fewest so far, instead of just nearest,
+// so orders spread out rather than piling on whoever's always closest.
+function driverOrderCount(driverId) {
+  const rideCount = Object.values(ridesCache).filter(r => r.driverId === driverId).length;
+  const deliveryCount = deliveriesCache.filter(o => o.deliveryDriverId === driverId).length;
+  return rideCount + deliveryCount;
+}
+// When did this driver's current online session start? Used as a tie-
+// breaker when two candidates have the exact same order count — whoever's
+// been waiting online longer goes first. Falls back to Infinity (ranks
+// last on this tiebreak) for a driver with no onlineSince on record yet.
+function driverOnlineSince(driverId) {
+  if (driverId === state.username) return (state.driver && state.driver.onlineSince) || Infinity;
+  const d = driversCache[driverId];
+  return (d && d.onlineSince) || Infinity;
 }
 
 // Ranks this driver among every other currently-matching online candidate
 // within MAX_MATCH_RADIUS_KM, so we know whose "turn" it is to be offered a
-// job. Ranking is two-level: drivers who have never had a single order yet
-// are ranked ahead of everyone else (as a group), and within each of those
-// two groups it's nearest-first. EXCEPTION: if anyone is within
-// NEAR_OVERRIDE_KM of the pickup, that closeness overrides the fairness
-// grouping entirely — among just those very-near candidates it's pure
-// nearest-first, since being that close matters more than turn-taking.
+// job. Ranking is by order count first — whoever has been assigned the
+// fewest rides+deliveries so far goes first, regardless of distance — then
+// by onlineSince (longest-waiting session first) as a tiebreak, then by
+// raw distance as a final tiebreak. Within NEAR_OVERRIDE_KM of the pickup,
+// the pool is narrowed to just those near candidates first, but the same
+// count-then-tiebreak ordering still applies among them — being close
+// doesn't skip the fairness ordering, it only narrows who's compared.
 // Returns rank -1 if this driver doesn't have a location fix yet (or is
 // excluded as busy, see includeBusy). When includeBusy is false, busy
 // drivers (isBusy on their taxi_drivers record) — including this one, via
 // amIBusy — are left out of the pool entirely, so free drivers always get
 // first claim on a job.
-function rankAmongCandidates(pickup, matchFn, myDistanceKm, amIBusy, includeBusy) {
+// Zone-aware candidate search order for a pickup point: the zone the point
+// actually falls inside comes first (if any), then every other drawn zone
+// nearest-centroid-first, and finally null (meaning "ignore zones, just use
+// radius") as a last-resort safety net. rankAmongCandidates walks this list
+// and stops at the first zone that actually has a matching candidate, so:
+//   - pickup inside a zone, drivers there  -> that zone's drivers only
+//   - pickup inside a zone, nobody there   -> nearest OTHER zone's drivers
+//   - pickup inside no drawn zone at all   -> nearest zone's drivers
+//   - no zone anywhere has a match         -> old radius-only behavior
+function zoneCentroid(zone) {
+  const pts = zone.bounds;
+  return {
+    lat: pts.reduce((s, p) => s + p.lat, 0) / pts.length,
+    lng: pts.reduce((s, p) => s + p.lng, 0) / pts.length
+  };
+}
+function orderedZoneIdsByProximity(pickup) {
+  const drawn = zonesCache.filter(z => z.bounds && z.bounds.length >= 3);
+  if (!drawn.length) return [null];
+  const containing = drawn.find(z => isPointInZoneBounds(pickup, z.bounds));
+  const rest = drawn
+    .filter(z => !containing || z._id !== containing._id)
+    .map(z => ({ id: z._id, distanceKm: haversineKm(pickup.lat, pickup.lng, zoneCentroid(z).lat, zoneCentroid(z).lng) }))
+    .sort((a, b) => a.distanceKm - b.distanceKm)
+    .map(z => z.id);
+  const ordered = containing ? [containing._id, ...rest] : rest;
+  ordered.push(null); // final safety net: ignore zones entirely
+  return ordered;
+}
+// Builds the raw candidate list for ONE zone (or, when zoneId is null, the
+// old zone-agnostic radius search). Split out of rankAmongCandidates so it
+// can be tried once per zone in proximity order.
+function candidatesForZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, zoneId) {
   const candidates = [];
-  if (!amIBusy || includeBusy) candidates.push({ id: state.username, distanceKm: myDistanceKm });
+  if ((!amIBusy || includeBusy) && (!zoneId || (state.driver && state.driver.zone === zoneId))) {
+    candidates.push({ id: state.username, distanceKm: myDistanceKm });
+  }
   Object.entries(driversCache).forEach(([id, d]) => {
     if (!d || id === state.username || !matchFn(d)) return;
     if (d.isBusy && !includeBusy) return;
+    if (zoneId && d.zone !== zoneId) return;
     const loc = d.location;
     if (!loc || typeof loc.lat !== 'number' || !loc.updatedAt) return;
     if (Date.now() - loc.updatedAt > LOCATION_STALE_MS) return;
@@ -1378,13 +1486,25 @@ function rankAmongCandidates(pickup, matchFn, myDistanceKm, amIBusy, includeBusy
     if (distanceKm > MAX_MATCH_RADIUS_KM) return;
     candidates.push({ id, distanceKm });
   });
+  return candidates;
+}
+function rankAmongCandidates(pickup, matchFn, myDistanceKm, amIBusy, includeBusy) {
+  let candidates = [];
+  for (const zoneId of orderedZoneIdsByProximity(pickup)) {
+    candidates = candidatesForZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, zoneId);
+    if (candidates.length) break;
+  }
+  // Within NEAR_OVERRIDE_KM, narrow the pool to just the near candidates —
+  // but even among them, it's the one with fewer orders so far who wins,
+  // not just whoever is physically closest. Distance only breaks a tie
+  // when order counts are equal.
   const veryNear = candidates.filter(c => c.distanceKm <= NEAR_OVERRIDE_KM);
   const pool = veryNear.length > 0 ? veryNear : candidates;
   pool.sort((a, b) => {
-    if (veryNear.length > 0) return a.distanceKm - b.distanceKm; // proximity override — fairness ordering skipped
-    const aNew = hasNeverHadOrder(a.id) ? 0 : 1;
-    const bNew = hasNeverHadOrder(b.id) ? 0 : 1;
-    if (aNew !== bNew) return aNew - bNew;
+    const countDiff = driverOrderCount(a.id) - driverOrderCount(b.id);
+    if (countDiff !== 0) return countDiff;
+    const onlineDiff = driverOnlineSince(a.id) - driverOnlineSince(b.id);
+    if (onlineDiff !== 0) return onlineDiff;
     return a.distanceKm - b.distanceKm;
   });
   return { rank: pool.findIndex(c => c.id === state.username), total: pool.length };
@@ -1835,7 +1955,11 @@ function logInDriver(username, data) {
   updateOnlineLabel();
   try {
     const { db, ref, update } = window.fb;
-    update(ref(db, 'taxi_drivers/' + username), { isOnline: state.isOnline }).catch(() => {});
+    // Only stamp onlineSince if it isn't already set — a page reload while
+    // already online shouldn't reset the driver's place in the queue.
+    const updates = { isOnline: state.isOnline };
+    if (state.isOnline && !data.onlineSince) updates.onlineSince = Date.now();
+    update(ref(db, 'taxi_drivers/' + username), updates).catch(() => {});
   } catch (e) {}
 
   showScreen('home');
@@ -1928,7 +2052,12 @@ document.getElementById('online-toggle-input').addEventListener('change', (e) =>
   renderHomeLists();
   try {
     const { db, ref, update } = window.fb;
-    update(ref(db, 'taxi_drivers/' + state.username), { isOnline: state.isOnline }).catch(() => {});
+    // onlineSince marks the start of this online session — used to rank
+    // drivers who haven't had an order yet by who's been waiting longest,
+    // instead of by distance. Cleared on going offline so the next session
+    // starts fresh.
+    const updates = { isOnline: state.isOnline, onlineSince: state.isOnline ? Date.now() : null };
+    update(ref(db, 'taxi_drivers/' + state.username), updates).catch(() => {});
   } catch (err) {}
 });
 

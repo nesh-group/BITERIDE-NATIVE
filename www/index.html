@@ -33,12 +33,16 @@
   <h1>NESH</h1>
   <p>Choose which portal to open</p>
   <button class="choice" onclick="go('driver')">
-    Driver
+    Driver Partner
     <small>Accept rides &amp; delivery jobs</small>
   </button>
   <button class="choice" onclick="go('partner')">
-    Restaurant Partner
+    Shop Partner
     <small>Manage incoming orders</small>
+  </button>
+  <button class="choice" onclick="go('bus')">
+    Bus Partner
+    <small>Broadcast live location &amp; manage stops</small>
   </button>
 </div>
 <script>
@@ -48,11 +52,11 @@
   // this by having MainActivity load driver.html/partner.html directly.
   function go(portal){
     localStorage.setItem('nesh_portal', portal);
-    window.location.href = portal === 'driver' ? 'driver.html' : 'partner.html';
+    window.location.href = portal + '.html';
   }
   (function(){
     var last = localStorage.getItem('nesh_portal');
-    if (last === 'driver' || last === 'partner') {
+    if (last === 'driver' || last === 'partner' || last === 'bus') {
       window.location.href = last + '.html';
     }
   })();

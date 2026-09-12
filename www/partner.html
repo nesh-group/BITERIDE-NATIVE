@@ -1337,6 +1337,12 @@
           <h3>Orders</h3>
           <p>All orders from every shop — Delivered, In Progress, Cancelled</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('buses')" style="position:relative;">
+          <span class="op-home-badge" id="op-buses-home-badge" style="display:none;"></span>
+          <div class="op-home-icon">🚌</div>
+          <h3>Buses</h3>
+          <p>Manage buses, routes, stops and stop requests from customers</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('report')">
           <div class="op-home-icon">📅</div>
           <h3>Daily Report</h3>
@@ -1616,6 +1622,31 @@
     </div>
   </div>
 
+  <!-- BUSES -->
+  <div class="op-section" id="op-section-buses">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Buses</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Buses shown in the customer app's bus tracker. Location/on-duty status is set live by the bus's own device — everything else (route, stops, trips) is set here.</p>
+      <div class="op-mc-row" style="margin-bottom:10px;"><b>Bus feature in customer app:</b> <span id="op-bus-feature-status">—</span></div>
+      <button type="button" class="op-btn" id="op-bus-feature-toggle-btn" onclick="opToggleBusFeature()" style="margin-bottom:14px;"></button>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="text" id="op-bus-id-input" placeholder="Bus ID (e.g. KL10AB1234, no spaces)">
+      </div>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="text" id="op-bus-name-input" placeholder="Display name (e.g. KL-10 AB 1234)">
+      </div>
+      <button type="button" class="op-btn op-btn-push" onclick="opAddBus()">➕ Add bus</button>
+      <p class="op-note" id="op-bus-add-status" style="margin-top:8px;"></p>
+      <div class="op-search-box" style="margin-top:16px;">
+        <input type="text" id="op-buses-search" placeholder="Search buses…" oninput="opRenderBusesList()">
+      </div>
+      <div id="op-buses-list" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
   <!-- TAXI FARE -->
   <div class="op-section" id="op-section-taxi-fare">
     <div class="op-section-header">
@@ -1724,6 +1755,27 @@
       </div>
     </div>
   </div>
+  <!-- Order → customer detail + block/unblock modal -->
+  <div class="op-modal-overlay" id="op-order-customer-modal">
+    <div class="op-modal-card">
+      <h3 id="op-oc-title">Customer</h3>
+      <div class="op-mc-row"><b>Order:</b> <span id="op-oc-order"></span></div>
+      <div class="op-mc-row"><b>Phone:</b> <span id="op-oc-phone"></span></div>
+      <div class="op-mc-row"><b>Address:</b> <span id="op-oc-address"></span></div>
+      <div class="op-mc-row"><b>Device ID:</b> <span id="op-oc-device" style="word-break:break-all;"></span></div>
+      <div class="op-mc-row" id="op-oc-block-status" style="margin-top:10px;"></div>
+      <div style="margin-top:10px;">
+        <p class="op-note" style="margin-bottom:6px;">Message shown to the customer if blocked (also used as the reason):</p>
+        <textarea id="op-oc-message" rows="3" placeholder="e.g. Blocked for repeated fake/abusive orders. Contact support to appeal." style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; resize:vertical;"></textarea>
+      </div>
+      <div style="margin-top:14px;">
+        <button type="button" class="op-btn op-btn-danger" id="op-oc-block-btn" onclick="opBlockOrderCustomer()">⛔ Block user &amp; device</button>
+        <button type="button" class="op-btn op-btn-push" id="op-oc-unblock-btn" style="display:none;" onclick="opUnblockOrderCustomer()">✅ Unblock</button>
+        <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="opCloseOrderCustomerModal()">Close</button>
+        <p class="op-note" id="op-oc-status" style="margin-top:6px;"></p>
+      </div>
+    </div>
+  </div>
   <!-- Driver zone boundary modal -->
   <div class="op-modal-overlay" id="op-zone-boundary-modal">
     <div class="op-modal-card op-modal-card-wide">
@@ -1748,6 +1800,70 @@
       </div>
       <div style="margin-top:14px;">
         <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-zone-boundary-modal').classList.remove('show')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bus detail modal: route, stops, trips, stop requests -->
+  <div class="op-modal-overlay" id="op-bus-modal">
+    <div class="op-modal-card op-modal-card-wide">
+      <h3 id="op-bus-title">Bus</h3>
+      <div class="op-mc-row"><b>Bus ID:</b> <span id="op-bus-id-display"></span></div>
+      <div class="op-mc-row"><b>Status:</b> <span id="op-bus-onduty-status">—</span></div>
+      <div class="op-search-box" style="margin-bottom:6px;">
+        <input type="text" id="op-bus-name-edit" placeholder="Display name">
+      </div>
+      <div class="op-search-box" style="margin-bottom:6px;">
+        <input type="text" id="op-bus-photo-edit" placeholder="Photo URL (optional)">
+      </div>
+      <button type="button" class="op-btn op-btn-push" onclick="opSaveBusBasics()">💾 Save name/photo</button>
+      <p class="op-note" id="op-bus-basics-status" style="margin-top:6px;"></p>
+
+      <div style="margin-top:16px; border-top:1px solid #124a24; padding-top:12px;">
+        <p class="op-note" style="margin-bottom:6px;">Tap the map, then use one of the buttons below to save that point as Route Start, Route End, or a new Stop.</p>
+        <div class="op-search-box" style="margin-bottom:0;">
+          <input type="text" id="op-bus-search" placeholder="Search area, street, landmark…" autocomplete="off">
+        </div>
+        <div class="op-zone-search-results" id="op-bus-search-results"></div>
+        <div class="op-zone-map-wrap">
+          <div class="op-zone-map" id="op-bus-map"></div>
+          <p class="op-zone-map-hint" id="op-bus-map-hint">Tap the map to pick a point</p>
+        </div>
+        <div class="op-search-box" style="margin-top:8px; margin-bottom:0;">
+          <input type="text" id="op-bus-point-name" placeholder="Name for this point (e.g. 'Town Bus Stand')">
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+          <button type="button" class="op-btn op-btn-push" style="flex:1; margin:0;" onclick="opSetBusRouteStart()">🟢 Set as Route Start</button>
+          <button type="button" class="op-btn op-btn-push" style="flex:1; margin:0;" onclick="opSetBusRouteEnd()">🔴 Set as Route End</button>
+          <button type="button" class="op-btn op-btn-push" style="flex:1; margin:0;" onclick="opAddBusStop()">➕ Add as Stop</button>
+        </div>
+        <p class="op-note" id="op-bus-map-status" style="margin-top:6px;"></p>
+      </div>
+
+      <div style="margin-top:16px; border-top:1px solid #124a24; padding-top:12px;">
+        <div class="op-mc-row"><b>Route Start:</b> <span id="op-bus-route-start-label">—</span></div>
+        <div class="op-mc-row"><b>Route End:</b> <span id="op-bus-route-end-label">—</span></div>
+        <p class="op-note" style="margin:8px 0 4px;">Stops (in order):</p>
+        <div id="op-bus-stops-list"></div>
+      </div>
+
+      <div style="margin-top:16px; border-top:1px solid #124a24; padding-top:12px;">
+        <p class="op-note" style="margin-bottom:6px;">Trips — daily departure times shown to customers:</p>
+        <div class="op-search-box" style="margin-bottom:6px;">
+          <input type="text" id="op-bus-trip-time-input" placeholder="Time e.g. 08:30">
+        </div>
+        <button type="button" class="op-btn op-btn-push" onclick="opAddBusTrip()">➕ Add trip time</button>
+        <div id="op-bus-trips-list" style="margin-top:8px;"></div>
+      </div>
+
+      <div style="margin-top:16px; border-top:1px solid #124a24; padding-top:12px;">
+        <p class="op-note" style="margin-bottom:6px;">Stop requests from customers — accept to add as a real stop, or dismiss.</p>
+        <div id="op-bus-requests-list"></div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <button type="button" class="op-btn op-btn-danger" onclick="opDeleteBus()">🗑 Delete Bus</button>
+        <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-bus-modal').classList.remove('show')">Close</button>
       </div>
     </div>
   </div>
@@ -4565,6 +4681,8 @@ function opEnterPanel() {
   opListenZones();
   opListenDrivers();
   opListenRides();
+  opListenBuses();
+  opListenBusFeatureToggle();
   opListenCategoryOrder();
   opListenShopOrder();
   setInterval(opUpdateOrdersHomeBadge, 30000); // keeps the "late" badge current even while sitting on the home screen
@@ -5173,6 +5291,334 @@ document.getElementById('op-zb-search').addEventListener('input', () => {
 });
 
 /* ==================================================================
+   BUSES — buses/{busId} node (name, photo, onDuty, location set live by
+   the bus's own device; route/stops/trips/stopRequests managed here).
+   ================================================================== */
+let opAllBuses = [];
+let opCurrentBusId = null;
+let opBusFeatureEnabled = true;
+function opListenBusFeatureToggle() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'app_config/busFeatureEnabled'), snap => {
+    opBusFeatureEnabled = snap.val() !== false;
+    const statusEl = document.getElementById('op-bus-feature-status');
+    const btn = document.getElementById('op-bus-feature-toggle-btn');
+    if (statusEl) statusEl.textContent = opBusFeatureEnabled ? '🟢 ON — customers can see it' : '⚪ OFF — hidden from customer app';
+    if (btn) {
+      btn.textContent = opBusFeatureEnabled ? '⛔ Turn OFF for customers' : '✅ Turn ON for customers';
+      btn.className = 'op-btn ' + (opBusFeatureEnabled ? 'op-btn-danger' : 'op-btn-push');
+    }
+  });
+}
+function opToggleBusFeature() {
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'app_config/busFeatureEnabled'), !opBusFeatureEnabled).catch(err => alert('Error: ' + err.message));
+}
+function opListenBuses() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'buses'), snap => {
+    const list = [];
+    snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
+    list.sort((a, b) => (a.name || a._id).localeCompare(b.name || b._id));
+    opAllBuses = list;
+    opRenderBusesList();
+    opUpdateBusesHomeBadge();
+    if (opCurrentBusId && document.getElementById('op-bus-modal').classList.contains('show')) {
+      opOpenBusModal(opCurrentBusId, true);
+    }
+  });
+}
+function opUpdateBusesHomeBadge() {
+  const badge = document.getElementById('op-buses-home-badge');
+  if (!badge) return;
+  const pending = opAllBuses.reduce((sum, b) => sum + Object.keys(b.stopRequests || {}).length, 0);
+  if (pending > 0) { badge.style.display = 'inline-block'; badge.textContent = pending + ' request' + (pending === 1 ? '' : 's'); }
+  else { badge.style.display = 'none'; }
+}
+function opRenderBusesList() {
+  const wrap = document.getElementById('op-buses-list');
+  if (!wrap) return;
+  const q = (document.getElementById('op-buses-search').value || '').toLowerCase();
+  const filtered = opAllBuses.filter(b => !q || (b.name || '').toLowerCase().includes(q) || b._id.toLowerCase().includes(q));
+  if (!filtered.length) { wrap.innerHTML = '<div class="op-empty">No buses yet — add one above.</div>'; return; }
+  wrap.innerHTML = filtered.map(b => {
+    const reqCount = Object.keys(b.stopRequests || {}).length;
+    const stopCount = Object.keys(b.stops || {}).length;
+    return `
+    <div class="op-partner-item" onclick="opOpenBusModal('${b._id}')">
+      <div class="op-partner-top">
+        <span class="op-partner-name">${escapeHtml(b.name || b._id)}</span>
+        <span class="op-partner-type">${b.onDuty ? '🟢 On duty' : '⚪ Off duty'}</span>
+      </div>
+      <div class="op-partner-sub">${stopCount} stop${stopCount === 1 ? '' : 's'}${reqCount ? ' · ⚠️ ' + reqCount + ' pending request' + (reqCount === 1 ? '' : 's') : ''}</div>
+    </div>
+  `;
+  }).join('');
+}
+function opAddBus() {
+  const idInput = document.getElementById('op-bus-id-input');
+  const nameInput = document.getElementById('op-bus-name-input');
+  const status = document.getElementById('op-bus-add-status');
+  const id = (idInput.value || '').trim().replace(/[.#$\[\]/\s]/g, '_');
+  const name = (nameInput.value || '').trim();
+  if (!id || !name) { status.textContent = 'Enter both a bus ID and a display name.'; return; }
+  const { db, ref, get, set } = window.fb;
+  get(ref(db, 'buses/' + id)).then(snap => {
+    if (snap.exists()) { status.textContent = 'A bus with this ID already exists.'; return; }
+    set(ref(db, 'buses/' + id), { name, createdAt: Date.now() }).then(() => {
+      idInput.value = ''; nameInput.value = '';
+      status.textContent = 'Bus added.';
+    }).catch(err => { status.textContent = 'Error: ' + err.message; });
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opDeleteBus() {
+  if (!opCurrentBusId) return;
+  if (!confirm('Permanently delete bus "' + opCurrentBusId + '"? This removes its route, stops and trips. This cannot be undone.')) return;
+  const { db, ref, remove } = window.fb;
+  remove(ref(db, 'buses/' + opCurrentBusId)).then(() => {
+    document.getElementById('op-bus-modal').classList.remove('show');
+  }).catch(err => alert('Error: ' + err.message));
+}
+
+/* ---- Bus detail modal: basics, map point-picker, stops, trips, requests ---- */
+const OP_BUS_DEFAULT_CENTER = { lat: 10.8505, lng: 76.2711 }; // Kerala, India fallback
+let opBusMap = null;
+let opBusPendingMarker = null;
+let opBusPendingPoint = null; // {lat, lng} last tapped on the map, not yet saved
+let opBusFixedMarkers = []; // start/end/stop markers currently drawn
+
+function opBusEnsureMap(startLat, startLng) {
+  if (opBusMap) return;
+  opBusMap = L.map('op-bus-map', { attributionControl: false }).setView([startLat, startLng], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(opBusMap);
+  opBusMap.on('click', e => {
+    opBusPendingPoint = { lat: e.latlng.lat, lng: e.latlng.lng };
+    opBusRedrawPendingMarker();
+  });
+}
+function opBusRedrawPendingMarker() {
+  if (opBusPendingMarker) { opBusMap.removeLayer(opBusPendingMarker); opBusPendingMarker = null; }
+  if (opBusPendingPoint) {
+    opBusPendingMarker = L.circleMarker([opBusPendingPoint.lat, opBusPendingPoint.lng], {
+      radius: 8, color: '#facc15', weight: 2, fillColor: '#facc15', fillOpacity: 0.9
+    }).addTo(opBusMap);
+    document.getElementById('op-bus-map-hint').textContent = 'Point picked — name it above, then choose Start / End / Add Stop';
+  } else {
+    document.getElementById('op-bus-map-hint').textContent = 'Tap the map to pick a point';
+  }
+}
+function opBusRedrawFixedMarkers(bus) {
+  opBusFixedMarkers.forEach(m => opBusMap.removeLayer(m));
+  opBusFixedMarkers = [];
+  const addM = (pt, color, label) => {
+    if (!pt || typeof pt.lat !== 'number') return;
+    const m = L.circleMarker([pt.lat, pt.lng], { radius: 7, color, weight: 2, fillColor: color, fillOpacity: 1 }).addTo(opBusMap);
+    m.bindTooltip(label, { permanent: true, direction: 'top', offset: [0, -6], className: 'op-zone-pt-label' });
+    opBusFixedMarkers.push(m);
+  };
+  addM(bus.routeStart, '#22c55e', 'Start');
+  addM(bus.routeEnd, '#ef4444', 'End');
+  Object.values(bus.stops || {}).sort((a, b) => (a.order || 0) - (b.order || 0)).forEach((s, i) => addM(s, '#38bdf8', 'Stop ' + (i + 1)));
+}
+function opOpenBusModal(busId, keepModalOpen) {
+  const b = opAllBuses.find(x => x._id === busId);
+  if (!b) return;
+  opCurrentBusId = busId;
+  document.getElementById('op-bus-title').textContent = b.name || busId;
+  document.getElementById('op-bus-id-display').textContent = busId;
+  document.getElementById('op-bus-onduty-status').textContent = b.onDuty ? '🟢 On duty (live)' : '⚪ Off duty';
+  document.getElementById('op-bus-name-edit').value = b.name || '';
+  document.getElementById('op-bus-photo-edit').value = b.photo || '';
+  document.getElementById('op-bus-basics-status').textContent = '';
+  document.getElementById('op-bus-map-status').textContent = '';
+  document.getElementById('op-bus-point-name').value = '';
+  document.getElementById('op-bus-search').value = '';
+  opBusHideSearchResults();
+  opBusPendingPoint = null;
+  document.getElementById('op-bus-route-start-label').textContent = b.routeStart ? (b.routeStart.name || 'Set') : '—';
+  document.getElementById('op-bus-route-end-label').textContent = b.routeEnd ? (b.routeEnd.name || 'Set') : '—';
+  opRenderBusStopsList(b);
+  opRenderBusTripsList(b);
+  opRenderBusRequestsList(b);
+
+  const startLat = (b.routeStart && b.routeStart.lat) || (b.location && b.location.lat) || OP_BUS_DEFAULT_CENTER.lat;
+  const startLng = (b.routeStart && b.routeStart.lng) || (b.location && b.location.lng) || OP_BUS_DEFAULT_CENTER.lng;
+
+  if (!keepModalOpen) document.getElementById('op-bus-modal').classList.add('show');
+  setTimeout(() => {
+    opBusEnsureMap(startLat, startLng);
+    opBusMap.invalidateSize();
+    opBusRedrawPendingMarker();
+    opBusRedrawFixedMarkers(b);
+  }, 60);
+}
+function opSaveBusBasics() {
+  const status = document.getElementById('op-bus-basics-status');
+  if (!opCurrentBusId) return;
+  const name = document.getElementById('op-bus-name-edit').value.trim();
+  const photo = document.getElementById('op-bus-photo-edit').value.trim();
+  if (!name) { status.textContent = 'Enter a display name.'; return; }
+  const { db, ref, update } = window.fb;
+  status.textContent = 'Saving…';
+  update(ref(db, 'buses/' + opCurrentBusId), { name, photo }).then(() => {
+    status.textContent = 'Saved.';
+    document.getElementById('op-bus-title').textContent = name;
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opSetBusRouteStart() { opSaveBusPoint('routeStart'); }
+function opSetBusRouteEnd() { opSaveBusPoint('routeEnd'); }
+function opSaveBusPoint(field) {
+  const status = document.getElementById('op-bus-map-status');
+  if (!opCurrentBusId || !opBusPendingPoint) { status.textContent = 'Tap the map first to pick a point.'; return; }
+  const name = document.getElementById('op-bus-point-name').value.trim();
+  if (!name) { status.textContent = 'Give this point a name first.'; return; }
+  const { db, ref, update } = window.fb;
+  const point = { name, lat: opBusPendingPoint.lat, lng: opBusPendingPoint.lng };
+  update(ref(db, 'buses/' + opCurrentBusId), { [field]: point }).then(() => {
+    status.textContent = 'Saved.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opAddBusStop() {
+  const status = document.getElementById('op-bus-map-status');
+  if (!opCurrentBusId || !opBusPendingPoint) { status.textContent = 'Tap the map first to pick a point.'; return; }
+  const name = document.getElementById('op-bus-point-name').value.trim();
+  if (!name) { status.textContent = 'Give this stop a name first.'; return; }
+  const b = opAllBuses.find(x => x._id === opCurrentBusId);
+  const order = Object.keys((b && b.stops) || {}).length;
+  const { db, ref, push, set } = window.fb;
+  const stopRef = push(ref(db, 'buses/' + opCurrentBusId + '/stops'));
+  set(stopRef, { name, lat: opBusPendingPoint.lat, lng: opBusPendingPoint.lng, order }).then(() => {
+    status.textContent = 'Stop added.';
+    document.getElementById('op-bus-point-name').value = '';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opRemoveBusStop(busId, stopId) {
+  if (!confirm('Remove this stop?')) return;
+  const { db, ref, remove } = window.fb;
+  remove(ref(db, 'buses/' + busId + '/stops/' + stopId)).catch(err => alert('Error: ' + err.message));
+}
+function opRenderBusStopsList(b) {
+  const wrap = document.getElementById('op-bus-stops-list');
+  const stops = Object.entries(b.stops || {}).sort((a, b2) => (a[1].order || 0) - (b2[1].order || 0));
+  if (!stops.length) { wrap.innerHTML = '<div class="op-empty">No stops added yet.</div>'; return; }
+  wrap.innerHTML = stops.map(([id, s], i) => `
+    <div class="op-partner-item" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <span>${i + 1}. ${escapeHtml(s.name || '')}</span>
+      <button type="button" class="op-btn op-btn-danger" style="padding:4px 8px; margin:0;" onclick="opRemoveBusStop('${b._id}','${id}')">🗑</button>
+    </div>
+  `).join('');
+}
+function opAddBusTrip() {
+  const input = document.getElementById('op-bus-trip-time-input');
+  const time = (input.value || '').trim();
+  if (!opCurrentBusId || !/^\d{1,2}:\d{2}$/.test(time)) { alert('Enter a time like 08:30.'); return; }
+  const { db, ref, push, set } = window.fb;
+  const tripRef = push(ref(db, 'buses/' + opCurrentBusId + '/trips'));
+  set(tripRef, { time }).then(() => { input.value = ''; }).catch(err => alert('Error: ' + err.message));
+}
+function opRemoveBusTrip(busId, tripId) {
+  const { db, ref, remove } = window.fb;
+  remove(ref(db, 'buses/' + busId + '/trips/' + tripId)).catch(err => alert('Error: ' + err.message));
+}
+function opRenderBusTripsList(b) {
+  const wrap = document.getElementById('op-bus-trips-list');
+  const trips = Object.entries(b.trips || {}).sort((a, b2) => (a[1].time || '').localeCompare(b2[1].time || ''));
+  if (!trips.length) { wrap.innerHTML = '<div class="op-empty">No trip times added yet.</div>'; return; }
+  wrap.innerHTML = trips.map(([id, t]) => `
+    <div class="op-partner-item" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <span>🕒 ${escapeHtml(t.time || '')}</span>
+      <button type="button" class="op-btn op-btn-danger" style="padding:4px 8px; margin:0;" onclick="opRemoveBusTrip('${b._id}','${id}')">🗑</button>
+    </div>
+  `).join('');
+}
+function opAcceptBusRequest(busId, reqId) {
+  const b = opAllBuses.find(x => x._id === busId);
+  const req = b && b.stopRequests && b.stopRequests[reqId];
+  if (!req) return;
+  const order = Object.keys((b && b.stops) || {}).length;
+  const { db, ref, push, set, remove, update } = window.fb;
+  const stopRef = push(ref(db, 'buses/' + busId + '/stops'));
+  set(stopRef, { name: req.name, lat: req.lat, lng: req.lng, order }).then(() => {
+    remove(ref(db, 'buses/' + busId + '/stopRequests/' + reqId));
+  }).catch(err => alert('Error: ' + err.message));
+}
+function opDismissBusRequest(busId, reqId) {
+  const { db, ref, remove } = window.fb;
+  remove(ref(db, 'buses/' + busId + '/stopRequests/' + reqId)).catch(err => alert('Error: ' + err.message));
+}
+function opRenderBusRequestsList(b) {
+  const wrap = document.getElementById('op-bus-requests-list');
+  const reqs = Object.entries(b.stopRequests || {}).sort((a, b2) => (b2[1].ts || 0) - (a[1].ts || 0));
+  if (!reqs.length) { wrap.innerHTML = '<div class="op-empty">No pending stop requests.</div>'; return; }
+  wrap.innerHTML = reqs.map(([id, r]) => `
+    <div class="op-partner-item" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <span>📍 ${escapeHtml(r.name || '')} · ${timeAgo(r.ts || Date.now())}</span>
+      <div style="display:flex; gap:6px; flex-shrink:0;">
+        <button type="button" class="op-btn op-btn-push" style="padding:4px 8px; margin:0;" onclick="opAcceptBusRequest('${b._id}','${id}')">✅</button>
+        <button type="button" class="op-btn op-btn-danger" style="padding:4px 8px; margin:0;" onclick="opDismissBusRequest('${b._id}','${id}')">✖</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ---- Search-to-jump on the bus map (OpenStreetMap Nominatim) ----
+function opBusHideSearchResults() {
+  const el = document.getElementById('op-bus-search-results');
+  el.classList.remove('show');
+  el.innerHTML = '';
+}
+function opBusJumpTo(place) {
+  const lat = parseFloat(place.lat), lng = parseFloat(place.lon);
+  document.getElementById('op-bus-search').value = place.display_name;
+  opBusHideSearchResults();
+  if (opBusMap) opBusMap.setView([lat, lng], 15);
+}
+function opBusRenderSearchResults(results) {
+  const el = document.getElementById('op-bus-search-results');
+  el.innerHTML = '';
+  if (!results.length) {
+    el.innerHTML = '<p class="op-zone-search-item">No matches found.</p>';
+    el.classList.add('show');
+    return;
+  }
+  results.forEach(place => {
+    const item = document.createElement('div');
+    item.className = 'op-zone-search-item';
+    const main = place.display_name.split(',')[0];
+    const rest = place.display_name.split(',').slice(1).join(',').trim();
+    item.innerHTML = `<div>${main}</div>` + (rest ? `<div class="op-zone-search-item-sub">${rest}</div>` : '');
+    item.addEventListener('click', () => opBusJumpTo(place));
+    el.appendChild(item);
+  });
+  el.classList.add('show');
+}
+let opBusSearchDebounce = null, opBusSearchAbort = null;
+document.getElementById('op-bus-search').addEventListener('input', () => {
+  const query = document.getElementById('op-bus-search').value.trim();
+  clearTimeout(opBusSearchDebounce);
+  if (query.length < 3) { opBusHideSearchResults(); return; }
+  const el = document.getElementById('op-bus-search-results');
+  el.innerHTML = '<p class="op-zone-search-item">Searching…</p>';
+  el.classList.add('show');
+  opBusSearchDebounce = setTimeout(async () => {
+    try {
+      if (opBusSearchAbort) opBusSearchAbort.abort();
+      opBusSearchAbort = new AbortController();
+      const url = 'https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=6&countrycodes=in&q=' + encodeURIComponent(query);
+      const res = await fetch(url, { signal: opBusSearchAbort.signal, headers: { 'Accept-Language': 'en' } });
+      const data = await res.json();
+      opBusRenderSearchResults(Array.isArray(data) ? data : []);
+    } catch (e) {
+      if (e.name !== 'AbortError') {
+        const el2 = document.getElementById('op-bus-search-results');
+        el2.innerHTML = '<p class="op-zone-search-item">Search failed — check your connection.</p>';
+        el2.classList.add('show');
+      }
+    }
+  }, 450);
+});
+
+/* ==================================================================
    DRIVERS — list of taxi_drivers, with per-driver zone assignment
    and direct order assignment (both operator-only actions).
    ================================================================== */
@@ -5442,7 +5888,7 @@ function opRenderOrdersList() {
     const isLate = opOrderIsLate(o, now);
     const itemCount = (o.items || []).reduce((s, it) => s + (it.qty || 0), 0);
     return `
-      <div class="op-order-item${isLate ? ' late' : ''}">
+      <div class="op-order-item${isLate ? ' late' : ''}" onclick="opOpenOrderCustomer('${o._shopId}','${o._id}')">
         <div class="op-order-top">
           <span class="op-order-shop">${escapeHtml(o._shopName)}</span>
           <span class="op-order-status-pill op-order-status-${status}">${escapeHtml(status)}</span>
@@ -5452,6 +5898,89 @@ function opRenderOrdersList() {
       </div>
     `;
   }).join('');
+}
+
+/* ---- Order → customer detail + block/unblock ---- */
+// Firebase keys can't contain '.', '#', '$', '[', ']', '/' — this scrubs any
+// identifier (phone number, device id) before it's used as a path segment.
+// Must match the same scrubbing used on the customer-app side.
+function opSanitizeFbKey(s) {
+  return String(s || '').replace(/[.#$\[\]/]/g, '_');
+}
+let opCurrentOrderCustomer = null; // { phone, deviceId, name }
+function opOpenOrderCustomer(shopId, orderId) {
+  const p = opAllPartners.find(x => x._id === shopId);
+  const o = p && p.orders && p.orders[orderId];
+  if (!o) return;
+  opCurrentOrderCustomer = {
+    phone: o.customerPhone || o.customerNumber || '',
+    deviceId: o.customerDeviceId || '',
+    name: o.customerName || 'Guest'
+  };
+  document.getElementById('op-oc-title').textContent = opCurrentOrderCustomer.name;
+  document.getElementById('op-oc-order').textContent = '#' + (o.orderNumber || orderId) + ' · ' + (p.restaurantName || shopId);
+  document.getElementById('op-oc-phone').textContent = opCurrentOrderCustomer.phone || '—';
+  document.getElementById('op-oc-address').textContent = o.customerAddress || o.customerLocation || '—';
+  document.getElementById('op-oc-device').textContent = opCurrentOrderCustomer.deviceId || '—';
+  document.getElementById('op-oc-message').value = '';
+  document.getElementById('op-oc-status').textContent = '';
+  const modal = document.getElementById('op-order-customer-modal');
+  modal.classList.add('show');
+
+  // Live-check current block status for this phone, so the buttons reflect
+  // reality even if this customer was blocked from a different order.
+  const statusEl = document.getElementById('op-oc-block-status');
+  statusEl.textContent = 'Checking block status…';
+  if (!opCurrentOrderCustomer.phone) {
+    statusEl.textContent = 'No phone number on this order — cannot block/unblock the user.';
+  } else {
+    const { db, ref, get } = window.fb;
+    get(ref(db, 'blockedUsers/' + opSanitizeFbKey(opCurrentOrderCustomer.phone))).then(snap => {
+      const blocked = snap.exists();
+      statusEl.textContent = blocked ? '⛔ This user is currently blocked.' : '✅ This user is not blocked.';
+      document.getElementById('op-oc-block-btn').style.display = blocked ? 'none' : 'inline-block';
+      document.getElementById('op-oc-unblock-btn').style.display = blocked ? 'inline-block' : 'none';
+      if (blocked && snap.val().message) document.getElementById('op-oc-message').value = snap.val().message;
+    }).catch(() => { statusEl.textContent = ''; });
+  }
+}
+function opCloseOrderCustomerModal() {
+  document.getElementById('op-order-customer-modal').classList.remove('show');
+}
+function opBlockOrderCustomer() {
+  const c = opCurrentOrderCustomer;
+  const status = document.getElementById('op-oc-status');
+  if (!c || !c.phone) { status.textContent = 'No phone number on this order.'; return; }
+  const message = document.getElementById('op-oc-message').value.trim() || 'Your account has been blocked. Please contact support.';
+  if (!confirm('Block ' + (c.name || 'this user') + ' (' + c.phone + ')? They — and this device, if known — will lose access to the customer app immediately.')) return;
+  status.textContent = 'Blocking…';
+  const { db, ref, set, update } = window.fb;
+  const record = { message, blockedAt: Date.now(), blockedBy: 'operator', phone: c.phone, name: c.name || '' };
+  const updates = {};
+  updates['blockedUsers/' + opSanitizeFbKey(c.phone)] = record;
+  if (c.deviceId) updates['blockedDevices/' + opSanitizeFbKey(c.deviceId)] = record;
+  update(ref(db), updates).then(() => {
+    status.textContent = 'Blocked. The customer app will show your message immediately.';
+    document.getElementById('op-oc-block-btn').style.display = 'none';
+    document.getElementById('op-oc-unblock-btn').style.display = 'inline-block';
+    document.getElementById('op-oc-block-status').textContent = '⛔ This user is currently blocked.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opUnblockOrderCustomer() {
+  const c = opCurrentOrderCustomer;
+  const status = document.getElementById('op-oc-status');
+  if (!c || !c.phone) { status.textContent = 'No phone number on this order.'; return; }
+  status.textContent = 'Unblocking…';
+  const { db, ref, remove, update } = window.fb;
+  const updates = {};
+  updates['blockedUsers/' + opSanitizeFbKey(c.phone)] = null;
+  if (c.deviceId) updates['blockedDevices/' + opSanitizeFbKey(c.deviceId)] = null;
+  update(ref(db), updates).then(() => {
+    status.textContent = 'Unblocked — access restored.';
+    document.getElementById('op-oc-block-btn').style.display = 'inline-block';
+    document.getElementById('op-oc-unblock-btn').style.display = 'none';
+    document.getElementById('op-oc-block-status').textContent = '✅ This user is not blocked.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
 /* ---- Daily Report (pick a shop, then a date, see + clear that day's orders) ---- */
