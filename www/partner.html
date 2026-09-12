@@ -914,6 +914,29 @@
       </div>
     </div>
 
+    <div class="px" style="margin-top:16px;">
+      <div class="pay-pending-card" id="shop-hours-card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+          <p class="rest-title" style="font-size:15px; margin:0;">Opening &amp; closing time</p>
+          <span class="nav-badge" id="shop-hours-badge" style="background:#6E8CAE;">Off</span>
+        </div>
+        <p class="hint-text" style="margin-bottom:12px;">Set your daily hours and the shop will show as closed to customers automatically outside this time — no manual toggling needed.</p>
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+          <div class="field" style="flex:1;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <input id="shop-open-time" type="time" />
+          </div>
+          <div class="field" style="flex:1;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <input id="shop-close-time" type="time" />
+          </div>
+        </div>
+        <button type="button" class="btn-primary" id="shop-hours-save-btn" style="margin-bottom:8px;">Save hours &amp; turn on</button>
+        <button type="button" class="btn-danger" id="shop-hours-off-btn" style="width:100%;">Turn off automatic hours</button>
+        <p class="hint-text" id="shop-hours-status" style="margin-top:10px; margin-bottom:0;"></p>
+      </div>
+    </div>
+
     <div class="px" style="margin-top:20px;">
       <div class="section-row" style="padding:0 0 8px;">
         <h2 class="section-title">Location</h2>
@@ -2569,6 +2592,7 @@ function logInRestaurant(id, data) {
   updateDeliveryChargeBadge();
   updateShopDiscountBadge();
   renderShopAvailability();
+  renderShopHours();
   document.getElementById('support-fab').classList.add('show');
 }
 
@@ -2640,6 +2664,97 @@ async function toggleShopAvailability() {
   }
 }
 document.getElementById('shop-avail-toggle-btn').addEventListener('click', toggleShopAvailability);
+
+// ---------- SHOP HOURS (daily opening/closing time — the customer app
+// computes live whether "now" falls inside this window and automatically
+// shows the shop as closed, with no stock and no ordering possible,
+// outside it — no manual toggling needed once this is turned on) ----------
+function formatTime12(hhmm) {
+  if (!hhmm || hhmm.indexOf(':') === -1) return hhmm || '';
+  const [h, m] = hhmm.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = ((h % 12) || 12);
+  return h12 + ':' + String(m).padStart(2, '0') + ' ' + period;
+}
+
+// Same "is now inside the window" logic the customer app uses — kept here
+// too so the partner can see a live Open/Closed preview on this screen.
+// Handles overnight windows (e.g. open 18:00, close 02:00).
+function isWithinShopHours(openTime, closeTime, now) {
+  if (!openTime || !closeTime || openTime === closeTime) return true;
+  const [oh, om] = openTime.split(':').map(Number);
+  const [ch, cm] = closeTime.split(':').map(Number);
+  const openMins = oh * 60 + om;
+  const closeMins = ch * 60 + cm;
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  if (openMins < closeMins) return nowMins >= openMins && nowMins < closeMins;
+  return nowMins >= openMins || nowMins < closeMins; // overnight window
+}
+
+function renderShopHours() {
+  const r = state.restaurant || {};
+  const badge = document.getElementById('shop-hours-badge');
+  const status = document.getElementById('shop-hours-status');
+  const openInput = document.getElementById('shop-open-time');
+  const closeInput = document.getElementById('shop-close-time');
+  if (!badge || !status || !openInput || !closeInput) return;
+  if (document.activeElement !== openInput) openInput.value = r.openTime || '';
+  if (document.activeElement !== closeInput) closeInput.value = r.closeTime || '';
+  if (r.hoursEnabled && r.openTime && r.closeTime) {
+    const open = isWithinShopHours(r.openTime, r.closeTime, new Date());
+    badge.textContent = open ? "On · Open now" : "On · Closed now";
+    badge.style.background = open ? "#1f7a3d" : "var(--chili)";
+    status.textContent = "Customers will see your shop as closed outside " +
+      formatTime12(r.openTime) + " – " + formatTime12(r.closeTime) + " every day.";
+  } else {
+    badge.textContent = "Off";
+    badge.style.background = "#6E8CAE";
+    status.textContent = "Automatic hours are off — your shop follows only the manual availability toggle above.";
+  }
+}
+// Keep the live Open/Closed preview accurate while the partner is looking
+// at this screen (it doesn't change what's stored, just this label).
+setInterval(() => { if (state.restaurant) renderShopHours(); }, 30000);
+
+async function saveShopHours() {
+  const openInput = document.getElementById('shop-open-time');
+  const closeInput = document.getElementById('shop-close-time');
+  const btn = document.getElementById('shop-hours-save-btn');
+  const openTime = openInput.value;
+  const closeTime = closeInput.value;
+  if (!openTime || !closeTime) { showToast("Set both an opening and closing time first"); return; }
+  if (openTime === closeTime) { showToast("Opening and closing time can't be the same"); return; }
+  const { db, ref, update } = window.fb;
+  btn.disabled = true;
+  try {
+    await update(ref(db, 'restaurants/' + state.restId), { openTime, closeTime, hoursEnabled: true });
+    state.restaurant = { ...(state.restaurant || {}), openTime, closeTime, hoursEnabled: true };
+    renderShopHours();
+    showToast("Shop hours saved");
+  } catch (e) {
+    showToast("Couldn't update — check your connection and try again.");
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById('shop-hours-save-btn').addEventListener('click', saveShopHours);
+
+async function turnOffShopHours() {
+  const { db, ref, update } = window.fb;
+  const btn = document.getElementById('shop-hours-off-btn');
+  btn.disabled = true;
+  try {
+    await update(ref(db, 'restaurants/' + state.restId), { hoursEnabled: false });
+    state.restaurant = { ...(state.restaurant || {}), hoursEnabled: false };
+    renderShopHours();
+    showToast("Automatic hours turned off");
+  } catch (e) {
+    showToast("Couldn't update — check your connection and try again.");
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById('shop-hours-off-btn').addEventListener('click', turnOffShopHours);
 
 // ---------- SHOP DISCOUNT (one flat amount, auto-shown to every customer
 // checking out with this shop — no per-customer targeting) ----------
