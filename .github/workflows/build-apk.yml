@@ -6,11 +6,19 @@ name: Build Combined APK (Driver + Partner)
 #
 # This replaces build-apk-driver.yml and build-apk-partner.yml. Instead of
 # two separate apps, it produces ONE apk with a home screen where the user
-# picks "Driver" or "Restaurant Partner". Your www/ folder must contain:
-#   www/index.html   <- portal chooser (new)
+# picks "Driver", "Restaurant Partner", or "Bus". Your www/ folder must contain:
+#   www/index.html   <- portal chooser (Driver / Partner / Bus)
 #   www/driver.html  <- old driver-app.html, renamed
 #   www/partner.html <- old partner-app.html, renamed
+#   www/bus.html     <- bus operator app (stops + live location broadcast)
 #   www/manifest.json, www/icon-192.png, www/icon-512.png (shared, as before)
+#
+# NOTE on permissions: bus.html is the only portal that needs background
+# location (ACCESS_BACKGROUND_LOCATION, FOREGROUND_SERVICE_LOCATION) so it
+# keeps broadcasting with the screen off / app swiped away. Because all
+# three portals ship in one APK, Android grants that permission to the
+# WHOLE app — driver.html/partner.html simply never call the APIs that use
+# it, so nothing changes for them.
 #
 # IMPORTANT: because there is now only one app package
 # (com.yourcompany.neshapp instead of two), you must register a NEW
@@ -50,7 +58,9 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install project dependencies
-        run: npm install
+        run: |
+          npm install
+          npm install @capacitor-community/background-geolocation
 
       - name: Generate native Android project (if not already present)
         run: |
@@ -68,6 +78,14 @@ jobs:
 
           if ! grep -q "ACCESS_FINE_LOCATION" "$MANIFEST"; then
             sed -i '/<manifest /a\    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' "$MANIFEST"
+          fi
+
+          # Added for the Bus operator portal — lets bus.html keep sending
+          # location with the screen off or the app swiped away (driver.html
+          # and partner.html don't request these, so they're unaffected and
+          # stay foreground-only as before).
+          if ! grep -q "ACCESS_BACKGROUND_LOCATION" "$MANIFEST"; then
+            sed -i '/<manifest /a\    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />' "$MANIFEST"
           fi
 
           if ! grep -q "android.permission.VIBRATE" "$MANIFEST"; then
@@ -363,7 +381,14 @@ jobs:
                       return;
                   }
 
-                  if (AppState.isForeground) return;
+                  // Previously skipped entirely while the app was in the
+                  // foreground (AppState.isForeground), relying only on the
+                  // in-app popup/vibration from the web app's own Firebase
+                  // listener. Now the native ring/notification/full-screen
+                  // alert fires every time, same as when the app is closed
+                  // — the in-app popup still shows too (via
+                  // refreshRidePopupFromCache), so while the app is open
+                  // the driver gets both together.
 
                   Intent serviceIntent = new Intent(this, RingingService.class);
                   serviceIntent.putExtra("kind", kind);
