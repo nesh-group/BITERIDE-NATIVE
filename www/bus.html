@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>NESH Bus — Operator</title>
+<meta name="theme-color" content="#F2B705" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --bg:#FFFFFF; --bg-outer:#FFFCF2; --ink:#2B2410;
+    --marigold:#F2B705; --marigold-dark:#D69E00; --chili:#C97F00; --leaf:#1BA672; --red:#D1453B;
+    --muted:#B4A87F; --muted-2:#6B5E3D; --field-bg:#FFF8DF; --field-border:#F2E2A6;
+    --card-shadow:0 2px 14px rgba(43,36,16,.08);
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg-outer); font-family:'Inter',sans-serif; display:flex; justify-content:center; min-height:100vh; }
+  #app{ width:100%; max-width:420px; min-height:100vh; background:var(--bg); position:relative; padding-top:env(safe-area-inset-top); }
+  .screen{ display:none; padding:24px; padding-bottom:40px; }
+  .screen.active{ display:block; }
+  .eyebrow{ color:var(--chili); font-weight:700; font-size:12px; letter-spacing:1.5px; margin:0; }
+  .title{ color:var(--ink); font-family:'Fraunces',serif; font-size:26px; font-weight:700; margin:4px 0 16px; }
+  .field{ display:flex; align-items:center; gap:8px; padding:13px 14px; border-radius:12px; background:var(--field-bg); border:1.5px solid var(--field-border); margin-bottom:14px; }
+  .field input{ background:transparent; border:none; outline:none; width:100%; font-size:15px; color:var(--ink); font-family:'Inter',sans-serif; }
+  .btn-primary{ width:100%; padding:15px; border:none; border-radius:12px; background:var(--marigold); color:var(--ink); font-weight:700; font-size:15px; cursor:pointer; box-shadow:0 6px 16px rgba(242,183,5,.35); }
+  .btn-primary:disabled{ background:#E3DFD8; color:var(--muted); box-shadow:none; }
+  .btn-secondary{ width:100%; padding:14px; border-radius:12px; background:var(--field-bg); border:1.5px solid var(--field-border); color:var(--ink); font-weight:700; font-size:14px; cursor:pointer; margin-top:10px; }
+  .btn-danger-text{ background:none; border:none; color:var(--red); font-weight:700; font-size:13px; cursor:pointer; padding:6px; }
+  .btn-accept-text{ background:none; border:none; color:var(--leaf); font-weight:700; font-size:13px; cursor:pointer; padding:6px; }
+  .card{ background:#fff; border:1px solid var(--field-border); border-radius:16px; padding:16px; box-shadow:var(--card-shadow); margin-bottom:14px; }
+  .bus-name{ font-family:'Fraunces',serif; font-size:22px; font-weight:700; color:var(--ink); margin:0; }
+  .bus-sub{ color:var(--muted-2); font-size:13px; margin:2px 0 0; }
+  .toggle-row{ display:flex; align-items:center; justify-content:space-between; }
+  .switch{ position:relative; width:52px; height:30px; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .slider{ position:absolute; cursor:pointer; inset:0; background:#E3DFD8; border-radius:30px; transition:.2s; }
+  .slider:before{ position:absolute; content:""; height:24px; width:24px; left:3px; top:3px; background:white; border-radius:50%; transition:.2s; }
+  input:checked + .slider{ background:var(--leaf); }
+  input:checked + .slider:before{ transform:translateX(22px); }
+  .status-pill{ display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:20px; font-size:12px; font-weight:700; margin-top:8px; }
+  .status-live{ background:rgba(27,166,114,.1); color:var(--leaf); }
+  .status-off{ background:#F1EEE4; color:var(--muted-2); }
+  .stop-row{ display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--field-border); }
+  .stop-num{ width:24px; height:24px; border-radius:50%; background:var(--field-bg); border:1.5px solid var(--marigold-dark); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--chili); flex-shrink:0; }
+  .stop-name{ flex:1; font-size:14px; color:var(--ink); }
+  .btn-back{ background:none; border:none; color:var(--chili); font-weight:700; cursor:pointer; padding:0; margin-bottom:16px; font-size:14px; }
+  .note{ background:#FFF3E0; border:1.5px solid #F2CC8F; border-radius:12px; padding:12px 14px; font-size:12.5px; color:var(--muted-2); line-height:1.5; margin-top:16px; }
+  .hint-text{ color:var(--muted); font-size:12.5px; }
+
+  .loc-card{ display:flex; align-items:center; gap:12px; }
+  .loc-card-dot{ width:14px; height:14px; border-radius:50%; flex-shrink:0; }
+  .loc-card-dot.start{ background:var(--leaf); }
+  .loc-card-dot.end{ background:var(--red); }
+  .loc-card-body{ flex:1; min-width:0; }
+  .loc-card-label{ color:var(--muted-2); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin:0; }
+  .loc-card-name{ color:var(--ink); font-size:14.5px; font-weight:700; margin:2px 0 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .loc-card-name.unset{ color:var(--muted); font-weight:500; }
+  .loc-card-btn{ flex-shrink:0; background:var(--field-bg); border:1.5px solid var(--field-border); color:var(--chili); font-weight:700; font-size:12.5px; border-radius:10px; padding:8px 12px; cursor:pointer; }
+  .section-label{ color:var(--chili); font-weight:700; font-size:12px; letter-spacing:1px; margin:22px 0 8px; }
+
+  .picker-map-wrap{ position:relative; border-radius:14px; overflow:hidden; border:1.5px solid var(--field-border); }
+  .picker-map{ width:100%; height:280px; background:var(--field-bg); }
+  .picker-pin{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-100%);
+    font-size:34px; pointer-events:none; z-index:500; filter:drop-shadow(0 3px 4px rgba(43,36,16,.35));
+  }
+  .picker-use-gps{ position:absolute; right:10px; bottom:10px; z-index:500; background:#fff; border:1.5px solid var(--field-border); border-radius:10px; padding:8px 12px; font-size:12px; font-weight:700; color:var(--chili); cursor:pointer; box-shadow:0 2px 8px rgba(43,36,16,.15); }</style>
+</head>
+<body>
+<div id="app">
+
+  <section class="screen active" id="screen-login">
+    <p class="eyebrow">NESH BUS</p>
+    <h1 class="title">Operator Login</h1>
+    <div class="field">
+      <input id="login-bus-name" type="text" placeholder="Bus name (e.g. KL-10 AB 1234)" />
+    </div>
+    <div class="field">
+      <input id="login-bus-password" type="password" placeholder="Password" />
+    </div>
+    <button class="btn-primary" id="login-btn">Continue</button>
+  </section>
+
+  <section class="screen" id="screen-home">
+    <p class="eyebrow">NESH BUS</p>
+    <div class="card" style="display:flex; align-items:center; gap:14px;">
+      <div id="bus-photo-preview" style="width:56px; height:56px; border-radius:14px; background:var(--field-bg); border:1.5px solid var(--field-border); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:24px; overflow:hidden; background-size:cover; background-position:center;">🚌</div>
+      <div style="flex:1; min-width:0;">
+        <p class="bus-name" id="home-bus-name">Bus</p>
+        <p class="bus-sub">Live location broadcast</p>
+        <div id="status-pill" class="status-pill status-off">● Offline</div>
+      </div>
+    </div>
+    <button class="btn-secondary" id="bus-photo-btn">📷 Add / Change Bus Photo</button>
+    <input type="file" id="bus-photo-input" accept="image/*" style="display:none;" />
+    <p class="hint-text" id="bus-photo-hint" style="margin-top:6px;"></p>
+    <div class="card toggle-row">
+      <div>
+        <p style="margin:0; font-weight:700; color:var(--ink); font-size:15px;">On Duty</p>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="on-duty-toggle" />
+        <span class="slider"></span>
+      </label>
+    </div>
+    <button class="btn-secondary" id="manage-stops-btn">🚏 Manage Stops (<span id="stops-count">0</span>)</button>
+    <button class="btn-secondary" id="manage-trips-btn">🕐 Trip Timings (<span id="trips-count">0</span>)</button>
+    <button class="btn-secondary" id="manage-route-btn">🗺️ Route Line</button>
+    <button class="btn-danger-text" id="logout-btn" style="margin-top:18px;">Switch bus / Logout</button>
+
+  </section>
+
+  <section class="screen" id="screen-stops">
+    <button class="btn-back" id="stops-back-btn">← Back</button>
+    <p class="eyebrow">ROUTE</p>
+    <h1 class="title">Manage Route</h1>
+
+    <p class="section-label">START</p>
+    <div class="card loc-card">
+      <div class="loc-card-dot start"></div>
+      <div class="loc-card-body">
+        <p class="loc-card-label">Start location</p>
+        <p class="loc-card-name unset" id="route-start-name">Not set</p>
+      </div>
+      <button class="loc-card-btn" id="route-start-btn">Set</button>
+    </div>
+
+    <p class="section-label">STOPS IN BETWEEN</p>
+    <button class="btn-primary" id="add-stop-btn">📍 Add a bus stop</button>
+    <p class="eyebrow" id="requests-label" style="margin-top:24px; display:none;">CUSTOMER REQUESTS</p>
+    <div id="stop-requests-list"></div>
+    <div id="stops-list" style="margin-top:14px;"></div>
+
+    <p class="section-label">END</p>
+    <div class="card loc-card">
+      <div class="loc-card-dot end"></div>
+      <div class="loc-card-body">
+        <p class="loc-card-label">End location</p>
+        <p class="loc-card-name unset" id="route-end-name">Not set</p>
+      </div>
+      <button class="loc-card-btn" id="route-end-btn">Set</button>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-location-picker">
+    <button class="btn-back" id="picker-back-btn">← Back</button>
+    <p class="eyebrow" id="picker-eyebrow">ROUTE</p>
+    <h1 class="title" id="picker-title">Set Location</h1>
+    <div class="picker-map-wrap">
+      <div class="picker-map" id="picker-map"></div>
+      <div class="picker-pin">📍</div>
+      <button class="picker-use-gps" id="picker-use-gps-btn">Use my location</button>
+    </div>
+    <div class="field">
+      <input id="picker-name-input" type="text" placeholder="Location name (e.g. Town Bus Stand)" />
+    </div>
+    <button class="btn-primary" id="picker-save-btn">Save location</button>
+  </section>
+
+  <section class="screen" id="screen-trips">
+    <button class="btn-back" id="trips-back-btn">← Back</button>
+    <p class="eyebrow">SCHEDULE</p>
+    <h1 class="title">Trip Timings</h1>
+    <div class="field">
+      <input id="trip-time-input" type="time" style="color:var(--ink);" />
+    </div>
+    <div class="field">
+      <select id="trip-from-select" style="background:transparent; border:none; outline:none; width:100%; font-size:15px; color:var(--ink); font-family:'Inter',sans-serif;"></select>
+    </div>
+    <div class="field">
+      <select id="trip-to-select" style="background:transparent; border:none; outline:none; width:100%; font-size:15px; color:var(--ink); font-family:'Inter',sans-serif;"></select>
+    </div>
+    <button class="btn-primary" id="add-trip-btn">+ Add trip timing</button>
+    <p class="hint-text" id="trip-add-hint" style="margin-top:8px;"></p>
+    <div id="trips-list" style="margin-top:20px;"></div>
+  </section>
+
+  <section class="screen" id="screen-route">
+    <button class="btn-back" id="route-back-btn">← Back</button>
+    <p class="eyebrow">ROUTE</p>
+    <h1 class="title">Route Line</h1>
+    <div class="card">
+      <p style="margin:0; font-weight:700; color:var(--ink); font-size:15px;">Recorded points: <span id="route-point-count">0</span></p>
+      <div id="route-status-pill" class="status-pill status-off" style="margin-top:8px;">● Not recording</div>
+    </div>
+    <button class="btn-primary" id="route-record-btn">▶ Start recording route</button>
+    <button class="btn-danger-text" id="route-clear-btn" style="margin-top:14px;">🗑 Clear recorded route</button>
+  </section>
+
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, push, set, update, remove, onDisconnect, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCrM5wKwsnGtIc7HSTk_5R1d3dXEcYyd7o",
+    authDomain: "texi-and-food.firebaseapp.com",
+    databaseURL: "https://texi-and-food-default-rtdb.firebaseio.com",
+    projectId: "texi-and-food",
+    storageBucket: "texi-and-food.firebasestorage.app",
+    messagingSenderId: "98800730432",
+    appId: "1:98800730432:web:9d7651e792c60baafabaa5"
+  };
+  const fbApp = initializeApp(firebaseConfig);
+  const db = getDatabase(fbApp);
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + id).classList.add('active');
+  }
+
+  function slugify(name) {
+    return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'bus';
+  }
+  let busId = localStorage.getItem('nesh_bus_id');
+  let busName = localStorage.getItem('nesh_bus_name');
+
+  function enterHome() {
+    document.getElementById('home-bus-name').textContent = busName;
+    showScreen('home');
+    watchStopsCount();
+    watchOnDutyState();
+    watchTripsCount();
+    watchBusPhoto();
+  }
+
+  document.getElementById('login-btn').addEventListener('click', async () => {
+    const nameInput = document.getElementById('login-bus-name');
+    const passInput = document.getElementById('login-bus-password');
+    const name = nameInput.value.trim();
+    const password = passInput.value;
+    if (!name || !password) { alert('Please enter both the bus name and password'); return; }
+    const id = slugify(name);
+    const loginBtn = document.getElementById('login-btn');
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Please wait…';
+    try {
+      const snap = await get(ref(db, 'buses/' + id));
+      const existing = snap.val();
+      if (existing && existing.password) {
+        if (existing.password !== password) {
+          alert('A different password is already set for this bus name. Please enter the correct password.');
+          return;
+        }
+      } else {
+        await set(ref(db, 'buses/' + id + '/password'), password);
+      }
+      busId = id; busName = name;
+      localStorage.setItem('nesh_bus_id', busId);
+      localStorage.setItem('nesh_bus_name', busName);
+      set(ref(db, 'buses/' + busId + '/name'), busName);
+      enterHome();
+    } catch (e) {
+      alert('Login failed — please check your internet connection');
+    } finally {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Continue';
+    }
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    stopTracking();
+    localStorage.removeItem('nesh_bus_id');
+    localStorage.removeItem('nesh_bus_name');
+    busId = null; busName = null;
+    document.getElementById('login-bus-name').value = '';
+    document.getElementById('login-bus-password').value = '';
+    showScreen('login');
+  });
+
+  if (busId && busName) enterHome();
+
+  const toggle = document.getElementById('on-duty-toggle');
+  const statusPill = document.getElementById('status-pill');
+  let watchId = null;
+  let bgWatcherId = null;
+  let wakeLock = null;
+  let lastSentAt = 0;
+  let heartbeatTimer = null;
+  const SEND_INTERVAL_MS = 15000;
+  const HEARTBEAT_MS = 60000;
+
+  function setStatusUI(onDuty) {
+    statusPill.textContent = onDuty ? '● Live now' : '● Offline';
+    statusPill.className = 'status-pill ' + (onDuty ? 'status-live' : 'status-off');
+    toggle.checked = onDuty;
+  }
+
+  function watchOnDutyState() {
+    onValue(ref(db, 'buses/' + busId + '/onDuty'), snap => {
+      if (!watchId && !bgWatcherId) setStatusUI(!!snap.val());
+    });
+  }
+
+  async function requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+    } catch (e) {  }
+  }
+  function releaseWakeLock() {
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  }
+
+  function sendLocation(lat, lng, speed) {
+    const now = Date.now();
+    if (now - lastSentAt < SEND_INTERVAL_MS) return;
+    lastSentAt = now;
+    update(ref(db, 'buses/' + busId + '/location'), { lat, lng, speed: speed || null, ts: now });
+  }
+
+  function startHeartbeat() {
+    heartbeatTimer = setInterval(() => {
+      set(ref(db, 'buses/' + busId + '/location/ts'), Date.now());
+    }, HEARTBEAT_MS);
+  }
+  function stopHeartbeat() {
+    if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+  }
+
+  function startTracking() {
+    set(ref(db, 'buses/' + busId + '/onDuty'), true);
+    set(ref(db, 'buses/' + busId + '/name'), busName);
+    onDisconnect(ref(db, 'buses/' + busId + '/onDuty')).set(false);
+    setStatusUI(true);
+    startHeartbeat();
+
+    const BG = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation;
+    if (BG) {
+      BG.addWatcher({
+        backgroundMessage: "NESH Bus is tracking location",
+        backgroundTitle: busName + " — Live",
+        requestPermissions: true,
+        stale: false,
+        distanceFilter: 25
+      }, (location, error) => {
+        if (error) { console.warn('BackgroundGeolocation error', error); return; }
+        if (location) sendLocation(location.latitude, location.longitude, location.speed);
+      }).then(id => { bgWatcherId = id; });
+    } else {
+      if (!navigator.geolocation) { alert('GPS not available on this device/browser.'); toggle.checked = false; stopHeartbeat(); return; }
+      requestWakeLock();
+      watchId = navigator.geolocation.watchPosition(pos => {
+        sendLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.speed);
+      }, err => console.warn('GPS error', err), { enableHighAccuracy: false, maximumAge: 8000, timeout: 15000 });
+    }
+  }
+
+  function stopTracking() {
+    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    const BG = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation;
+    if (BG && bgWatcherId) { BG.removeWatcher({ id: bgWatcherId }); bgWatcherId = null; }
+    stopHeartbeat();
+    releaseWakeLock();
+    if (busId) set(ref(db, 'buses/' + busId + '/onDuty'), false);
+    setStatusUI(false);
+  }
+
+  toggle.addEventListener('change', () => {
+    if (toggle.checked) startTracking(); else stopTracking();
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && watchId !== null && !wakeLock) requestWakeLock();
+  });
+
+  function watchStopsCount() {
+    onValue(ref(db, 'buses/' + busId + '/stops'), snap => {
+      const stops = snap.val() || {};
+      document.getElementById('stops-count').textContent = Object.keys(stops).length;
+    });
+  }
+
+  function watchRouteEnds() {
+    onValue(ref(db, 'buses/' + busId + '/routeStart'), snap => {
+      const v = snap.val();
+      const el = document.getElementById('route-start-name');
+      el.textContent = v && v.name ? v.name : 'Not set';
+      el.classList.toggle('unset', !(v && v.name));
+      document.getElementById('route-start-btn').textContent = v && v.name ? 'Change' : 'Set';
+    });
+    onValue(ref(db, 'buses/' + busId + '/routeEnd'), snap => {
+      const v = snap.val();
+      const el = document.getElementById('route-end-name');
+      el.textContent = v && v.name ? v.name : 'Not set';
+      el.classList.toggle('unset', !(v && v.name));
+      document.getElementById('route-end-btn').textContent = v && v.name ? 'Change' : 'Set';
+    });
+  }
+
+  document.getElementById('manage-stops-btn').addEventListener('click', () => {
+    showScreen('stops');
+    renderStops();
+    watchStopRequests();
+    watchRouteEnds();
+  });
+  document.getElementById('stops-back-btn').addEventListener('click', () => showScreen('home'));
+
+  let pickerMap = null;
+  let pickerMode = 'stop';
+
+  function ensurePickerMap() {
+    if (pickerMap) return;
+    pickerMap = L.map('picker-map', { zoomControl: false, attributionControl: false }).setView([10.5, 76.2], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(pickerMap);
+  }
+
+  function centerPickerOnGps(showAlertOnFail) {
+    if (!navigator.geolocation) { if (showAlertOnFail) alert('GPS not available on this device/browser.'); return; }
+    navigator.geolocation.getCurrentPosition(pos => {
+      pickerMap.setView([pos.coords.latitude, pos.coords.longitude], 17);
+    }, () => { if (showAlertOnFail) alert('Could not get location — please check if GPS is turned on'); }, { enableHighAccuracy: true, timeout: 15000 });
+  }
+
+  function openLocationPicker(mode, existing) {
+    pickerMode = mode;
+    document.getElementById('picker-title').textContent =
+      mode === 'start' ? 'Set Start Location' : mode === 'end' ? 'Set End Location' : 'Add a Bus Stop';
+    document.getElementById('picker-name-input').value = (existing && existing.name) || '';
+    showScreen('location-picker');
+    setTimeout(() => {
+      ensurePickerMap();
+      pickerMap.invalidateSize();
+      if (existing && typeof existing.lat === 'number') {
+        pickerMap.setView([existing.lat, existing.lng], 17);
+      } else {
+        centerPickerOnGps(false);
+      }
+    }, 60);
+  }
+
+  document.getElementById('route-start-btn').addEventListener('click', () => {
+    onValue(ref(db, 'buses/' + busId + '/routeStart'), snap => openLocationPicker('start', snap.val()), { onlyOnce: true });
+  });
+  document.getElementById('route-end-btn').addEventListener('click', () => {
+    onValue(ref(db, 'buses/' + busId + '/routeEnd'), snap => openLocationPicker('end', snap.val()), { onlyOnce: true });
+  });
+  document.getElementById('add-stop-btn').addEventListener('click', () => openLocationPicker('stop', null));
+  document.getElementById('picker-back-btn').addEventListener('click', () => showScreen('stops'));
+  document.getElementById('picker-use-gps-btn').addEventListener('click', () => centerPickerOnGps(true));
+
+  document.getElementById('picker-save-btn').addEventListener('click', () => {
+    const name = document.getElementById('picker-name-input').value.trim();
+    if (!name) { alert('Please type a name for the location'); return; }
+    const center = pickerMap.getCenter();
+    const lat = center.lat, lng = center.lng;
+    if (pickerMode === 'start') {
+      set(ref(db, 'buses/' + busId + '/routeStart'), { name, lat, lng });
+    } else if (pickerMode === 'end') {
+      set(ref(db, 'buses/' + busId + '/routeEnd'), { name, lat, lng });
+    } else {
+      const stopsRef = ref(db, 'buses/' + busId + '/stops');
+      onValue(stopsRef, snap => {
+        const count = Object.keys(snap.val() || {}).length;
+        set(push(stopsRef), { name, lat, lng, order: count });
+      }, { onlyOnce: true });
+    }
+    showScreen('stops');
+  });
+
+  function watchStopRequests() {
+    onValue(ref(db, 'buses/' + busId + '/stopRequests'), snap => {
+      const reqs = snap.val() || {};
+      const entries = Object.entries(reqs);
+      const label = document.getElementById('requests-label');
+      const listEl = document.getElementById('stop-requests-list');
+      label.style.display = entries.length ? 'block' : 'none';
+      listEl.innerHTML = '';
+      entries.forEach(([reqId, req]) => {
+        const row = document.createElement('div');
+        row.className = 'stop-row';
+        row.innerHTML = `<div class="stop-name">📍 ${escapeHtml(req.name || 'Stop')}</div>`;
+        const acceptBtn = document.createElement('button');
+        acceptBtn.className = 'btn-accept-text';
+        acceptBtn.textContent = 'Accept';
+        acceptBtn.addEventListener('click', () => acceptStopRequest(reqId, req));
+        const rejectBtn = document.createElement('button');
+        rejectBtn.className = 'btn-danger-text';
+        rejectBtn.textContent = 'Reject';
+        rejectBtn.addEventListener('click', () => remove(ref(db, 'buses/' + busId + '/stopRequests/' + reqId)));
+        row.appendChild(acceptBtn);
+        row.appendChild(rejectBtn);
+        listEl.appendChild(row);
+      });
+    });
+  }
+
+  function acceptStopRequest(reqId, req) {
+    const stopsRef = ref(db, 'buses/' + busId + '/stops');
+    onValue(stopsRef, snap => {
+      const count = Object.keys(snap.val() || {}).length;
+      const newStopRef = push(stopsRef);
+      set(newStopRef, { name: req.name, lat: req.lat, lng: req.lng, order: count });
+      remove(ref(db, 'buses/' + busId + '/stopRequests/' + reqId));
+    }, { onlyOnce: true });
+  }
+
+  function renderStops() {
+    const listEl = document.getElementById('stops-list');
+    onValue(ref(db, 'buses/' + busId + '/stops'), snap => {
+      const stops = snap.val() || {};
+      const entries = Object.entries(stops).sort((a, b) => (a[1].order || 0) - (b[1].order || 0));
+      listEl.innerHTML = '';
+      entries.forEach(([stopId, stop], i) => {
+        const row = document.createElement('div');
+        row.className = 'stop-row';
+        row.innerHTML = `<div class="stop-num">${i + 1}</div><div class="stop-name">${escapeHtml(stop.name || 'Stop')}</div>`;
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn-danger-text';
+        delBtn.textContent = 'Remove';
+        delBtn.addEventListener('click', () => remove(ref(db, 'buses/' + busId + '/stops/' + stopId)));
+        row.appendChild(delBtn);
+        listEl.appendChild(row);
+      });
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function watchTripsCount() {
+    onValue(ref(db, 'buses/' + busId + '/trips'), snap => {
+      const trips = snap.val() || {};
+      document.getElementById('trips-count').textContent = Object.keys(trips).length;
+    });
+  }
+
+  function fillTripStopSelects() {
+    onValue(ref(db, 'buses/' + busId + '/stops'), snap => {
+      const stops = snap.val() || {};
+      const list = Object.values(stops).sort((a, b) => (a.order || 0) - (b.order || 0));
+      const fromSel = document.getElementById('trip-from-select');
+      const toSel = document.getElementById('trip-to-select');
+      const hint = document.getElementById('trip-add-hint');
+      const addBtn = document.getElementById('add-trip-btn');
+      const optsHtml = list.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
+      fromSel.innerHTML = optsHtml;
+      toSel.innerHTML = optsHtml;
+      const ready = list.length >= 2;
+      addBtn.disabled = !ready;
+      hint.textContent = ready
+        ? 'Select the From/To for the trip direction and add the time.'
+        : 'Add stops first (at least 2) — then you can select From/To here.';
+    }, { onlyOnce: true });
+  }
+
+  function renderTrips() {
+    onValue(ref(db, 'buses/' + busId + '/trips'), snap => {
+      const trips = snap.val() || {};
+      const entries = Object.entries(trips).sort((a, b) => (a[1].time || '').localeCompare(b[1].time || ''));
+      const listEl = document.getElementById('trips-list');
+      listEl.innerHTML = '';
+      entries.forEach(([tripId, trip]) => {
+        const row = document.createElement('div');
+        row.className = 'stop-row';
+        row.innerHTML = `<div class="stop-name"><b>${escapeHtml(trip.time || '--:--')}</b> &nbsp; ${escapeHtml(trip.from || '')} → ${escapeHtml(trip.to || '')}</div>`;
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn-danger-text';
+        delBtn.textContent = 'Remove';
+        delBtn.addEventListener('click', () => remove(ref(db, 'buses/' + busId + '/trips/' + tripId)));
+        row.appendChild(delBtn);
+        listEl.appendChild(row);
+      });
+    });
+  }
+
+  document.getElementById('manage-trips-btn').addEventListener('click', () => {
+    showScreen('trips');
+    fillTripStopSelects();
+    renderTrips();
+  });
+  document.getElementById('trips-back-btn').addEventListener('click', () => showScreen('home'));
+
+  document.getElementById('add-trip-btn').addEventListener('click', () => {
+    const time = document.getElementById('trip-time-input').value;
+    const from = document.getElementById('trip-from-select').value;
+    const to = document.getElementById('trip-to-select').value;
+    const hint = document.getElementById('trip-add-hint');
+    if (!time) { hint.textContent = 'Please select a time'; hint.style.color = 'var(--red)'; return; }
+    if (!from || !to || from === to) { hint.textContent = 'From and To must be different stops'; hint.style.color = 'var(--red)'; return; }
+    push(ref(db, 'buses/' + busId + '/trips'), { time, from, to });
+    hint.style.color = 'var(--muted-2)';
+    hint.textContent = 'Trip timing added ✓';
+  });
+
+  let routeWatchId = null;
+  let routeRecording = false;
+  let routeLastPoint = null;
+  let routeSeq = 0;
+  const ROUTE_POINT_MIN_METERS = 15;
+
+  function haversineMetersLocal(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function setRouteUI() {
+    const pill = document.getElementById('route-status-pill');
+    const btn = document.getElementById('route-record-btn');
+    pill.textContent = routeRecording ? '● Recording' : '● Not recording';
+    pill.className = 'status-pill ' + (routeRecording ? 'status-live' : 'status-off');
+    btn.textContent = routeRecording ? '⏹ Stop recording' : '▶ Start recording route';
+  }
+
+  function watchRoutePointCount() {
+    onValue(ref(db, 'buses/' + busId + '/routePoints'), snap => {
+      const pts = snap.val() || {};
+      document.getElementById('route-point-count').textContent = Object.keys(pts).length;
+      routeSeq = Object.keys(pts).length;
+    });
+  }
+
+  document.getElementById('manage-route-btn').addEventListener('click', () => {
+    showScreen('route');
+    setRouteUI();
+    watchRoutePointCount();
+  });
+  document.getElementById('route-back-btn').addEventListener('click', () => showScreen('home'));
+
+  document.getElementById('route-record-btn').addEventListener('click', () => {
+    if (!routeRecording) {
+      if (!navigator.geolocation) { alert('GPS not available on this device/browser.'); return; }
+      routeRecording = true;
+      routeLastPoint = null;
+      setRouteUI();
+      routeWatchId = navigator.geolocation.watchPosition(pos => {
+        const { latitude, longitude } = pos.coords;
+        if (routeLastPoint) {
+          const moved = haversineMetersLocal(routeLastPoint.lat, routeLastPoint.lng, latitude, longitude);
+          if (moved < ROUTE_POINT_MIN_METERS) return;
+        }
+        routeLastPoint = { lat: latitude, lng: longitude };
+        push(ref(db, 'buses/' + busId + '/routePoints'), { lat: latitude, lng: longitude, seq: routeSeq++, ts: Date.now() });
+      }, err => console.warn('Route GPS error', err), { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+    } else {
+      routeRecording = false;
+      if (routeWatchId !== null) { navigator.geolocation.clearWatch(routeWatchId); routeWatchId = null; }
+      setRouteUI();
+    }
+  });
+
+  document.getElementById('route-clear-btn').addEventListener('click', () => {
+    if (!confirm('Delete the entire recorded route line?')) return;
+    remove(ref(db, 'buses/' + busId + '/routePoints'));
+    routeLastPoint = null;
+    routeSeq = 0;
+  });
+
+  const BUS_PHOTO_MAX_DIM = 320;
+  const BUS_PHOTO_QUALITY = 0.6;
+
+  function watchBusPhoto() {
+    onValue(ref(db, 'buses/' + busId + '/photo'), snap => {
+      const dataUrl = snap.val();
+      const preview = document.getElementById('bus-photo-preview');
+      if (dataUrl) {
+        preview.style.backgroundImage = `url('${dataUrl}')`;
+        preview.textContent = '';
+      } else {
+        preview.style.backgroundImage = '';
+        preview.textContent = '🚌';
+      }
+    });
+  }
+
+  function compressImageFile(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = () => { img.src = reader.result; };
+      reader.onerror = reject;
+      img.onload = () => {
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2;
+        const sy = (img.height - side) / 2;
+        const outSide = Math.min(BUS_PHOTO_MAX_DIM, side);
+        const canvas = document.createElement('canvas');
+        canvas.width = outSide;
+        canvas.height = outSide;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, outSide, outSide);
+        resolve(canvas.toDataURL('image/jpeg', BUS_PHOTO_QUALITY));
+      };
+      img.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  document.getElementById('bus-photo-btn').addEventListener('click', () => {
+    document.getElementById('bus-photo-input').click();
+  });
+
+  document.getElementById('bus-photo-input').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    const hint = document.getElementById('bus-photo-hint');
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { hint.textContent = 'Please select an image file only'; hint.style.color = 'var(--red)'; return; }
+    hint.textContent = 'Saving photo…';
+    hint.style.color = 'var(--muted)';
+    try {
+      const dataUrl = await compressImageFile(file);
+      await set(ref(db, 'buses/' + busId + '/photo'), dataUrl);
+      hint.textContent = 'Photo updated ✓';
+      hint.style.color = 'var(--leaf)';
+    } catch (err) {
+      hint.textContent = 'Could not save photo, please try again';
+      hint.style.color = 'var(--red)';
+    }
+    e.target.value = '';
+  });
+</script>
+</body>
+</html>
