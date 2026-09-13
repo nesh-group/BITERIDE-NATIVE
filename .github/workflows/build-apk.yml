@@ -61,7 +61,6 @@ jobs:
         run: |
           npm install --legacy-peer-deps
           npm install @capacitor-community/background-geolocation --legacy-peer-deps
-          npm install @capacitor/filesystem --legacy-peer-deps
 
       - name: Generate native Android project (if not already present)
         run: |
@@ -379,16 +378,29 @@ jobs:
           import com.getcapacitor.PluginMethod;
           import com.getcapacitor.annotation.CapacitorPlugin;
           import java.io.File;
+          import java.io.FileOutputStream;
+          import java.io.InputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.util.concurrent.ExecutorService;
+          import java.util.concurrent.Executors;
 
           // Lets the in-app "UPDATE" banner (driver.html/partner.html)
           // install a downloaded APK with a single system confirmation
           // tap, instead of routing the person through the browser's
-          // download flow first. The web side downloads the new APK into
-          // this app's own cache folder (via @capacitor/filesystem, path
-          // "update.apk") and then calls install() with that same path.
+          // download flow first.
           //
-          // JS usage:
-          //   window.Capacitor.Plugins.ApkInstaller.install({ path: '<cache dir>/update.apk' })
+          // downloadAndInstall() does the network download itself, in
+          // plain Java, straight to a file — the APK bytes never cross
+          // the JS-to-native bridge (which chokes on multi-megabyte
+          // payloads in some Capacitor versions if the JS side tries to
+          // fetch() + base64-encode + Filesystem.writeFile() a ~10 MB
+          // file). JS only has to pass the download URL:
+          //
+          //   window.Capacitor.Plugins.ApkInstaller.downloadAndInstall({ url: apkUrl })
+          //
+          // install() (taking a raw file path) is kept for completeness /
+          // manual use, but the update banner no longer calls it directly.
           //
           // Requires android.permission.REQUEST_INSTALL_PACKAGES (added to
           // AndroidManifest.xml) and the FileProvider <provider> entry
@@ -397,6 +409,43 @@ jobs:
           // reasons on the versions this app targets.
           @CapacitorPlugin(name = "ApkInstaller")
           public class ApkInstallerPlugin extends Plugin {
+              private final ExecutorService executor = Executors.newSingleThreadExecutor();
+
+              @PluginMethod
+              public void downloadAndInstall(PluginCall call) {
+                  String url = call.getString("url");
+                  if (url == null) {
+                      call.reject("Missing 'url'");
+                      return;
+                  }
+                  executor.execute(() -> {
+                      File apkFile = new File(getContext().getCacheDir(), "update.apk");
+                      HttpURLConnection conn = null;
+                      try {
+                          conn = (HttpURLConnection) new URL(url).openConnection();
+                          conn.setInstanceFollowRedirects(true);
+                          conn.connect();
+                          if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                              call.reject("Download failed: HTTP " + conn.getResponseCode());
+                              return;
+                          }
+                          try (InputStream in = conn.getInputStream();
+                               FileOutputStream out = new FileOutputStream(apkFile)) {
+                              byte[] buffer = new byte[8192];
+                              int read;
+                              while ((read = in.read(buffer)) != -1) {
+                                  out.write(buffer, 0, read);
+                              }
+                          }
+                          installFile(apkFile, call);
+                      } catch (Exception e) {
+                          call.reject("Download failed: " + e.getMessage());
+                      } finally {
+                          if (conn != null) conn.disconnect();
+                      }
+                  });
+              }
+
               @PluginMethod
               public void install(PluginCall call) {
                   String path = call.getString("path");
@@ -404,10 +453,13 @@ jobs:
                       call.reject("Missing 'path'");
                       return;
                   }
+                  installFile(new File(path), call);
+              }
+
+              private void installFile(File apkFile, PluginCall call) {
                   try {
-                      File apkFile = new File(path);
                       if (!apkFile.exists()) {
-                          call.reject("File not found: " + path);
+                          call.reject("File not found: " + apkFile.getAbsolutePath());
                           return;
                       }
                       Uri apkUri = FileProvider.getUriForFile(
