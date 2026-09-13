@@ -2503,12 +2503,31 @@ function init() {
   document.getElementById('reg-gps-btn').addEventListener('click', useGps);
 
   // Logout
-  document.getElementById('logout-btn').addEventListener('click', () => {
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    // Clear this shop's push-notification token and active-session marker
+    // so orders that come in while logged out don't fire a native
+    // notification on this device. Only do this if THIS device is still
+    // the active session — if another device logged into this same shop
+    // more recently, it already owns these fields and we shouldn't wipe
+    // its session out from under it.
+    try {
+      if (state.restId && window.fb) {
+        const { db, ref, get, update } = window.fb;
+        const snap = await get(ref(db, 'restaurants/' + state.restId + '/activeSession'));
+        if (snap.val() === getMySessionId()) {
+          await update(ref(db, 'restaurants/' + state.restId), { fcmToken: null, activeSession: null });
+        }
+      }
+    } catch (e) {}
     localStorage.removeItem('asfood_partner_id');
     localStorage.removeItem('asfood_partner_data');
     localStorage.removeItem('asfood_last_screen');
-    state = { restId: null, restaurant: null, editingItemId: null, photoDataUrl: "", listenersAttached: false };
-    showScreen('login');
+    // Reload the page so every Firebase onValue listener attached for this
+    // shop (order badge, orders list, menu, etc.) is torn down cleanly.
+    // Without this, the old listeners stay alive in the background and, if
+    // a different shop logs in afterwards on the same device, their order
+    // data ends up mixed with the new shop's.
+    location.reload();
   });
 
   // Support chat (partner side)
@@ -2708,6 +2727,40 @@ function showAppVideo(url, seenKey) {
   video.play().catch(() => { closeBtn.style.display = 'inline-block'; });
 }
 
+// ---------- SINGLE-DEVICE LOGIN ----------
+// Only one device should get order push notifications / be treated as
+// "logged in" for a shop at a time. Each device generates its own random
+// session id per page load; whichever device most recently logged in
+// writes its id to restaurants/{id}/activeSession. Every logged-in device
+// watches that field — if it ever sees a different session id there, it
+// means another device just logged into this same shop, so this device
+// force-logs-out itself.
+let mySessionId = null;
+function getMySessionId() {
+  if (!mySessionId) mySessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+  return mySessionId;
+}
+async function claimActiveSession() {
+  if (!state.restId || !window.fb) return;
+  const { db, ref, update } = window.fb;
+  try { await update(ref(db, 'restaurants/' + state.restId), { activeSession: getMySessionId() }); } catch (e) {}
+}
+function listenActiveSession() {
+  if (!state.restId || !window.fb) return;
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'restaurants/' + state.restId + '/activeSession'), snap => {
+    const val = snap.val();
+    if (val && val !== getMySessionId()) forceLoggedOutElsewhere();
+  });
+}
+function forceLoggedOutElsewhere() {
+  try { localStorage.removeItem('asfood_partner_id'); } catch (e) {}
+  try { localStorage.removeItem('asfood_partner_data'); } catch (e) {}
+  try { localStorage.removeItem('asfood_last_screen'); } catch (e) {}
+  alert("You've been logged out because this shop was logged in on another device.");
+  location.reload();
+}
+
 function logInRestaurant(id, data) {
   state.restId = id;
   state.restaurant = data;
@@ -2763,6 +2816,10 @@ function logInRestaurant(id, data) {
     registerForOrderPushNotifications();
     listenShopBikeDrivers();
     checkAndShowAppVideo('shopAppVideo', 'nesh_shop_video_seen');
+    // Claim this device as the active session for the shop BEFORE watching
+    // it, so the first snapshot the listener sees is our own write, not a
+    // stale one from a previous device.
+    claimActiveSession().then(listenActiveSession);
   }
   updateZoneBadge();
   updateDeliveryChargeBadge();
