@@ -1406,6 +1406,11 @@
           <h3>Shop Order</h3>
           <p>Pick which shop shows first within Food / Groceries / Other Shop in the customer app</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('taxi-orders')" style="position:relative;">
+          <div class="op-home-icon">🚕</div>
+          <h3>Taxi Orders</h3>
+          <p>View all taxi rides — in progress, completed or cancelled, filterable by zone</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('drivers')">
           <div class="op-home-icon">🚖</div>
           <h3>Drivers</h3>
@@ -1449,6 +1454,24 @@
       </div>
       <div class="op-search-box"><input type="text" id="op-orders-search" placeholder="Search by shop, order # or customer..." oninput="opRenderOrdersList()"></div>
       <div id="op-orders-list"></div>
+    </div>
+  </div>
+
+  <!-- TAXI ORDERS (rides) -->
+  <div class="op-section" id="op-section-taxi-orders">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Taxi Orders</h2>
+    </div>
+    <div class="op-section-body">
+      <div class="op-order-tabs">
+        <button type="button" class="op-order-tab active" data-tab="inprogress" onclick="opSwitchRidesTab('inprogress')">In Progress</button>
+        <button type="button" class="op-order-tab" data-tab="completed" onclick="opSwitchRidesTab('completed')">Completed</button>
+        <button type="button" class="op-order-tab" data-tab="cancelled" onclick="opSwitchRidesTab('cancelled')">Cancelled</button>
+      </div>
+      <div class="op-search-box"><input type="text" id="op-rides-search" placeholder="Search by customer or driver..." oninput="opRenderRidesList()"></div>
+      <div class="op-search-box"><select id="op-rides-zone-filter" onchange="opRenderRidesList()" style="width:100%; padding:9px 10px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-size:.85rem; font-family:inherit;"><option value="">All zones</option></select></div>
+      <div id="op-rides-list"></div>
     </div>
   </div>
 
@@ -1562,6 +1585,7 @@
     </div>
     <div class="op-section-body">
       <div class="op-search-box"><input type="text" id="op-partners-search" placeholder="Search restaurants..." oninput="opRenderPartnersList()"></div>
+      <div class="op-search-box"><select id="op-partners-area-filter" onchange="opRenderPartnersList()" style="width:100%; padding:9px 10px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-size:.85rem; font-family:inherit;"><option value="">All areas</option></select></div>
       <div id="op-partners-list"></div>
     </div>
   </div>
@@ -1624,6 +1648,7 @@
     </div>
     <div class="op-section-body">
       <div class="op-search-box"><input type="text" id="op-drivers-search" placeholder="Search drivers..." oninput="opRenderDriversList()"></div>
+      <div class="op-search-box"><select id="op-drivers-zone-filter" onchange="opRenderDriversList()" style="width:100%; padding:9px 10px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-size:.85rem; font-family:inherit;"><option value="">All zones</option></select></div>
       <div id="op-drivers-list"></div>
     </div>
   </div>
@@ -1729,6 +1754,12 @@
         </div>
         <button type="button" class="op-btn op-btn-push" onclick="opSaveShopCategory()">💾 Save category</button>
         <p class="op-note" id="op-pm-category-status" style="margin-top:4px;"></p>
+      </div>
+      <div style="margin-top:14px;">
+        <p class="op-note" style="margin-bottom:4px;">Area — mark which area this shop is in. Use the area filter on the Restaurant Partners list to see all shops in one area.</p>
+        <select id="op-pm-area-select" style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
+        <button type="button" class="op-btn op-btn-push" onclick="opSavePartnerArea()">💾 Save area</button>
+        <p class="op-note" id="op-pm-area-status" style="margin-top:4px;"></p>
       </div>
       <div style="margin-top:14px;">
         <button type="button" class="op-btn" id="op-pm-toggle-btn" onclick="opTogglePartnerStatus()"></button>
@@ -4811,8 +4842,9 @@ function opOpenSection(name) {
   document.querySelectorAll('#operator-container .op-section').forEach(s => s.classList.remove('active'));
   document.getElementById('op-section-' + name).classList.add('active');
   if (name === 'push') opUpdateAppCodeSizeLabel();
-  if (name === 'partners') opRenderPartnersList();
-  if (name === 'drivers') opRenderDriversList();
+  if (name === 'partners') { opPopulatePartnersAreaFilter(); opRenderPartnersList(); }
+  if (name === 'drivers') { opPopulateDriversZoneFilter(); opRenderDriversList(); }
+  if (name === 'taxi-orders') { opPopulateRidesZoneFilter(); opRenderRidesList(); }
   if (name === 'zones') opRenderZonesList();
   if (name === 'category-order') opRenderCategoryOrder();
   if (name === 'shop-categories') opRenderShopCategoriesList();
@@ -5217,6 +5249,14 @@ function opListenZones() {
     if (opCurrentDriverId && document.getElementById('op-driver-modal').classList.contains('show')) {
       opPopulateDriverZoneSelect();
     }
+    // Keep the partner modal's area dropdown and the partners-list area
+    // filter current too, since they share this same zone list.
+    if (opCurrentPartnerId && document.getElementById('op-partner-modal').classList.contains('show')) {
+      opPopulatePartnerAreaSelect();
+    }
+    opPopulatePartnersAreaFilter();
+    opPopulateDriversZoneFilter();
+    opPopulateRidesZoneFilter();
   });
 }
 function opRenderZonesList() {
@@ -5755,7 +5795,13 @@ function opRenderDriversList() {
   const wrap = document.getElementById('op-drivers-list');
   if (!wrap) return;
   const q = (document.getElementById('op-drivers-search').value || '').toLowerCase();
-  const filtered = opAllDrivers.filter(d => !q || (d.name || '').toLowerCase().includes(q) || d._id.toLowerCase().includes(q));
+  const zoneFilterEl = document.getElementById('op-drivers-zone-filter');
+  const zoneFilter = zoneFilterEl ? zoneFilterEl.value : '';
+  const filtered = opAllDrivers.filter(d => {
+    const matchesQuery = !q || (d.name || '').toLowerCase().includes(q) || d._id.toLowerCase().includes(q);
+    const matchesZone = !zoneFilter || d.zone === zoneFilter;
+    return matchesQuery && matchesZone;
+  });
   if (!filtered.length) { wrap.innerHTML = '<div class="op-empty">No drivers found.</div>'; return; }
   wrap.innerHTML = filtered.map(d => `
     <div class="op-partner-item" onclick="opShowDriverDetail('${d._id}')">
@@ -5766,6 +5812,13 @@ function opRenderDriversList() {
       <div class="op-partner-sub">${escapeHtml(OP_VEHICLE_LABEL[d.vehicleType] || d.vehicleType || '')} · ${d.zoneName ? escapeHtml(d.zoneName) : '⚠️ No zone set'}</div>
     </div>
   `).join('');
+}
+function opPopulateDriversZoneFilter() {
+  const sel = document.getElementById('op-drivers-zone-filter');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All zones</option>' + opAllZones.map(z => `<option value="${z._id}">${escapeHtml(z.name || '')}</option>`).join('');
+  if (current && opAllZones.some(z => z._id === current)) sel.value = current;
 }
 function opPopulateDriverZoneSelect() {
   const d = opAllDrivers.find(x => x._id === opCurrentDriverId);
@@ -5894,6 +5947,43 @@ function opSaveDriverZone() {
     .then(() => { status.textContent = 'Zone updated.'; })
     .catch(err => { status.textContent = 'Error: ' + err.message; });
 }
+// Restaurant "area" tagging — reuses the same named-zone list drivers pick
+// from (driver_zones/{zoneId}), just applied to shops instead. Stored on
+// the restaurant as { area: zoneId, areaName: zoneName } so the partners
+// list can filter by area without a second lookup.
+function opPopulatePartnerAreaSelect() {
+  const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
+  const sel = document.getElementById('op-pm-area-select');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— No area —</option>' + opAllZones.map(z => `<option value="${z._id}" ${p && p.area === z._id ? 'selected' : ''}>${escapeHtml(z.name || '')}</option>`).join('');
+}
+function opSavePartnerArea() {
+  if (!opCurrentPartnerId) return;
+  const sel = document.getElementById('op-pm-area-select');
+  const status = document.getElementById('op-pm-area-status');
+  const zoneId = sel.value;
+  const zone = opAllZones.find(z => z._id === zoneId);
+  const { db, ref, update } = window.fb;
+  status.textContent = 'Saving...';
+  update(ref(db, 'restaurants/' + opCurrentPartnerId), { area: zoneId || null, areaName: zone ? zone.name : null })
+    .then(() => {
+      const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
+      if (p) { p.area = zoneId || null; p.areaName = zone ? zone.name : null; }
+      status.textContent = 'Area updated.';
+      opRenderPartnersList();
+    })
+    .catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+// Keeps the "All areas" filter dropdown on the partners list in sync with
+// the named-zone list (same source as the driver zones and the per-shop
+// area picker above), without losing whatever the operator has selected.
+function opPopulatePartnersAreaFilter() {
+  const sel = document.getElementById('op-partners-area-filter');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All areas</option>' + opAllZones.map(z => `<option value="${z._id}">${escapeHtml(z.name || '')}</option>`).join('');
+  if (current && opAllZones.some(z => z._id === current)) sel.value = current;
+}
 // Writes assignedDriverId onto the chosen ride/order. The driver app treats
 // this as an override — that order is offered ONLY to this driver, and only
 // once they're online, regardless of the normal nearest-driver ranking.
@@ -5936,7 +6026,76 @@ function opListenRides() {
     if (opCurrentDriverId && document.getElementById('op-driver-modal').classList.contains('show')) {
       opPopulateDriverOrderSelect();
     }
+    opRenderRidesList();
   });
+}
+
+/* ---- Taxi Orders (rides) list — mirrors the shop Orders screen: three
+   status tabs, a text search, and (rides-specific) a zone filter using the
+   same named-zone list drivers and shop areas share. ---- */
+let opRidesTab = 'inprogress';
+function opSwitchRidesTab(tab) {
+  opRidesTab = tab;
+  document.querySelectorAll('#op-section-taxi-orders .op-order-tab').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === tab);
+  });
+  opRenderRidesList();
+}
+function opPopulateRidesZoneFilter() {
+  const sel = document.getElementById('op-rides-zone-filter');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All zones</option>' + opAllZones.map(z => `<option value="${z._id}">${escapeHtml(z.name || '')}</option>`).join('');
+  if (current && opAllZones.some(z => z._id === current)) sel.value = current;
+}
+function opRenderRidesList() {
+  const wrap = document.getElementById('op-rides-list');
+  if (!wrap) return;
+  const q = (document.getElementById('op-rides-search').value || '').toLowerCase();
+  const zoneFilterEl = document.getElementById('op-rides-zone-filter');
+  const zoneFilter = zoneFilterEl ? zoneFilterEl.value : '';
+
+  let list = opAllRides.filter(r => {
+    const status = (r.status || 'searching').toLowerCase();
+    if (opRidesTab === 'completed') return ['completed', 'done', 'finished'].includes(status);
+    if (opRidesTab === 'cancelled') return ['cancelled', 'rejected'].includes(status);
+    return !['completed', 'done', 'finished', 'cancelled', 'rejected'].includes(status); // in progress
+  });
+  if (q) {
+    list = list.filter(r =>
+      (r.customerName || '').toLowerCase().includes(q) ||
+      (r.driverName || '').toLowerCase().includes(q)
+    );
+  }
+  if (zoneFilter) {
+    // A ride doesn't carry a zone of its own — filter by the zone of the
+    // driver currently assigned to it, so "select a zone" shows rides
+    // being served by drivers in that zone.
+    list = list.filter(r => {
+      const d = opAllDrivers.find(x => x._id === r.driverId);
+      return d && d.zone === zoneFilter;
+    });
+  }
+  list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+  if (!list.length) { wrap.innerHTML = '<div class="op-empty">No taxi orders here.</div>'; return; }
+
+  wrap.innerHTML = list.map(r => {
+    const status = (r.status || 'searching').toLowerCase();
+    const vLabel = OP_VEHICLE_LABEL[r.vehicleType] || r.vehicleType || 'Auto';
+    const pickup = (r.pickup && r.pickup.text) || '—';
+    const drop = (r.drop && r.drop.text) || '—';
+    return `
+      <div class="op-order-item">
+        <div class="op-order-top">
+          <span class="op-order-shop">🚕 ${vLabel} · ${escapeHtml(r.customerName || 'Rider')}</span>
+          <span class="op-order-status-pill op-order-status-${status}">${escapeHtml(status)}</span>
+        </div>
+        <div class="op-order-sub">${escapeHtml(pickup)} → ${escapeHtml(drop)}</div>
+        <div class="op-order-sub">${r.driverName ? '👤 ' + escapeHtml(r.driverName) : '⚠️ No driver assigned'} · ₹${r.fare || r.estimatedFare || 0} · ${timeAgo(r.createdAt || Date.now())}</div>
+      </div>
+    `;
+  }).join('');
 }
 
 
@@ -6284,7 +6443,13 @@ function opRenderPartnersList() {
   const wrap = document.getElementById('op-partners-list');
   if (!wrap) return;
   const q = (document.getElementById('op-partners-search').value || '').toLowerCase();
-  const filtered = opAllPartners.filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q));
+  const areaFilterEl = document.getElementById('op-partners-area-filter');
+  const areaFilter = areaFilterEl ? areaFilterEl.value : '';
+  const filtered = opAllPartners.filter(p => {
+    const matchesQuery = !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q);
+    const matchesArea = !areaFilter || p.area === areaFilter;
+    return matchesQuery && matchesArea;
+  });
   if (!filtered.length) { wrap.innerHTML = '<div class="op-empty">No restaurant partners found.</div>'; return; }
   wrap.innerHTML = filtered.map(p => `
     <div class="op-partner-item" onclick="opShowPartnerDetail('${p._id}')">
@@ -6292,7 +6457,7 @@ function opRenderPartnersList() {
         <span class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</span>
         <span class="op-partner-type">${opTypeLabel(p.businessType)}</span>
       </div>
-      <div class="op-partner-sub">${escapeHtml(p.address || '')} ${p.status === 'suspended' ? ' · ⛔ SUSPENDED' : ''} · Due ₹${opComputeDue(p)}</div>
+      <div class="op-partner-sub">${escapeHtml(p.address || '')}${p.areaName ? ' · 📍 ' + escapeHtml(p.areaName) : ''} ${p.status === 'suspended' ? ' · ⛔ SUSPENDED' : ''} · Due ₹${opComputeDue(p)}</div>
     </div>
   `).join('');
 }
@@ -6310,6 +6475,8 @@ function opShowPartnerDetail(id) {
   document.getElementById('op-pm-settle-status').textContent = '';
   document.getElementById('op-pm-category-input').value = p.opCategory || '';
   document.getElementById('op-pm-category-status').textContent = '';
+  opPopulatePartnerAreaSelect();
+  document.getElementById('op-pm-area-status').textContent = '';
   const suspended = p.status === 'suspended';
   document.getElementById('op-pm-status').textContent = suspended ? 'Suspended' : 'Active';
   const toggleBtn = document.getElementById('op-pm-toggle-btn');

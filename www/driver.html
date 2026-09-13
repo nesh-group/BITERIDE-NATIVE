@@ -412,11 +412,12 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17h14l-1.5-6a2 2 0 0 0-2-1.5H8.5a2 2 0 0 0-2 1.5L5 17Z"/><circle cx="8" cy="19" r="1.5"/><circle cx="16" cy="19" r="1.5"/></svg>
           Taxi (rides)
         </div>
-        <div class="type-opt active" data-service="delivery">
+        <div class="type-opt active" data-service="delivery" id="reg-service-delivery-opt">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="14" height="10" rx="1"/><path d="M17 11h3l2 3v4h-5v-7Z"/><circle cx="7" cy="20" r="1.5"/><circle cx="17.5" cy="20" r="1.5"/></svg>
           Delivery (shop items)
         </div>
       </div>
+      <p class="hint-text" id="reg-service-vehicle-note" style="display:none; margin:-8px 0 0; font-size:11px;">Auto/Cab drivers do taxi rides only — food &amp; grocery delivery is for bike drivers.</p>
       <p class="hint-text" style="text-transform:uppercase; letter-spacing:1px; font-family:'IBM Plex Mono',monospace; font-size:11px;">Vehicle type</p>
       <div class="type-toggle" id="reg-type-toggle">
         <div class="type-opt active" data-type="bike">
@@ -630,6 +631,7 @@
         </div>
       </div>
       <p class="error-text" id="account-service-error" style="display:none;"></p>
+      <p class="hint-text" id="account-service-vehicle-note" style="display:none; margin:-4px 0 0; font-size:11px;">Auto/Cab drivers do taxi rides only — food &amp; grocery delivery is for bike drivers.</p>
       <button class="btn-primary" id="account-service-save-btn">Save work type</button>
     </div>
     <div class="logout-row">
@@ -1816,18 +1818,41 @@ window.confirmOtpModal = confirmOtpModal;
 
 // ---------- Login / Register ----------
 let selectedRegType = 'bike';
+// Delivery (shop items) is bike-only — see driverDoesDelivery()/deliveryMatchFn
+// elsewhere in this file. Auto/Cab drivers should only ever see Taxi, so
+// this hides the Delivery chip and forces Taxi-only whenever a non-bike
+// vehicle is chosen, and restores the normal picker when Bike is chosen.
+function applyRegVehicleServiceRestriction() {
+  const deliveryOpt = document.getElementById('reg-service-delivery-opt');
+  const note = document.getElementById('reg-service-vehicle-note');
+  const taxiOpt = document.querySelector('#reg-service-toggle .type-opt[data-service="taxi"]');
+  if (selectedRegType === 'bike') {
+    deliveryOpt.style.display = '';
+    note.style.display = 'none';
+  } else {
+    deliveryOpt.classList.remove('active');
+    deliveryOpt.style.display = 'none';
+    taxiOpt.classList.add('active');
+    note.style.display = 'block';
+  }
+}
 document.querySelectorAll('#reg-type-toggle .type-opt').forEach(opt => {
   opt.addEventListener('click', () => {
     document.querySelectorAll('#reg-type-toggle .type-opt').forEach(o => o.classList.remove('active'));
     opt.classList.add('active');
     selectedRegType = opt.dataset.type;
+    applyRegVehicleServiceRestriction();
   });
 });
+applyRegVehicleServiceRestriction();
 
 // Services picker is multi-select — each chip toggles independently, but
-// at least one must stay selected (enforced on submit).
+// at least one must stay selected (enforced on submit). The Delivery chip
+// only responds to clicks while it's visible (bike selected) — see
+// applyRegVehicleServiceRestriction() above.
 document.querySelectorAll('#reg-service-toggle .type-opt').forEach(opt => {
   opt.addEventListener('click', () => {
+    if (opt.dataset.service === 'delivery' && opt.style.display === 'none') return;
     opt.classList.toggle('active');
   });
 });
@@ -1980,17 +2005,25 @@ function logInDriver(username, data) {
 // ---------- Account: editable work type (taxi / delivery / both) ----------
 // Lets drivers created before the services picker existed (who default to
 // both) — or anyone who wants to change their mind later — update which
-// job types they receive, without needing a new account.
+// job types they receive, without needing a new account. Delivery stays
+// bike-only here too (see applyRegVehicleServiceRestriction above) — an
+// auto/cab driver never gets to turn delivery back on from this screen.
 function renderAccountServiceToggle() {
   const services = (state.driver && state.driver.services) || { taxi: true, delivery: true };
+  const isBike = !state.driver || state.driver.vehicleType === 'bike';
+  const deliveryOpt = document.querySelector('#account-service-toggle .type-opt[data-service="delivery"]');
+  const note = document.getElementById('account-service-vehicle-note');
   document.querySelectorAll('#account-service-toggle .type-opt').forEach(opt => {
     const key = opt.dataset.service;
-    const isActive = services[key] !== false;
+    const isActive = key === 'delivery' && !isBike ? false : services[key] !== false;
     opt.classList.toggle('active', isActive);
   });
+  if (deliveryOpt) deliveryOpt.style.display = isBike ? '' : 'none';
+  if (note) note.style.display = isBike ? 'none' : 'block';
 }
 document.querySelectorAll('#account-service-toggle .type-opt').forEach(opt => {
   opt.addEventListener('click', () => {
+    if (opt.dataset.service === 'delivery' && opt.style.display === 'none') return;
     opt.classList.toggle('active');
   });
 });
