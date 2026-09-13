@@ -309,6 +309,20 @@
     color:var(--ink); font-weight:700; font-size:15px; cursor:pointer; font-family:'Inter',sans-serif;
   }
   .hidden{ display:none !important; }
+  .app-video-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:99999;
+    display:none; align-items:center; justify-content:center; flex-direction:column;
+  }
+  .app-video-overlay.show{ display:flex; }
+  .app-video-overlay video{ width:100%; max-width:480px; max-height:78vh; background:#000; }
+  .app-video-skip-btn{
+    position:absolute; top:18px; right:18px; background:rgba(255,255,255,.15); border:none;
+    color:#fff; width:34px; height:34px; border-radius:50%; font-size:16px; cursor:pointer; z-index:1;
+  }
+  .app-video-close-btn{
+    margin-top:16px; padding:10px 28px; border-radius:999px; border:none; background:var(--marigold);
+    color:var(--ink); font-weight:700; font-size:14px; cursor:pointer; display:none; font-family:'Inter',sans-serif;
+  }
 </style>
 </head>
 <body>
@@ -332,6 +346,15 @@
 <div id="app">
 
   <div class="toast" id="toast"></div>
+
+  <!-- One-time promo/welcome video — content set from the Operator Panel
+       (App Videos) in the shop/partner app. Shown once per device per
+       video; see checkAndShowAppVideo(). -->
+  <div class="app-video-overlay" id="app-video-overlay">
+    <button type="button" class="app-video-skip-btn" id="app-video-skip-btn">✕</button>
+    <video id="app-video-player" playsinline webkit-playsinline></video>
+    <button type="button" class="app-video-close-btn" id="app-video-close-btn">Close</button>
+  </div>
 
   <!-- NEW RIDE POPUP — same ring/vibrate pattern as the restaurant partner app's new-order popup -->
   <div class="order-popup-overlay" id="order-popup-overlay">
@@ -1956,6 +1979,49 @@ document.getElementById('login-submit').addEventListener('click', doLogin);
 document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
 const VEHICLE_LABEL = { bike: 'Bike', auto: 'Auto', cab: 'Cab' };
+// ---------- One-time promo/welcome video (set from the shop app's Operator
+// Panel → App Videos, at app_config/driverAppVideo). Plays once per device
+// — the "seen" flag lives in localStorage keyed to that video's updatedAt,
+// so it survives closing/reopening the app, but a NEW video uploaded by
+// the operator plays again for everyone since its updatedAt changes. ----------
+function checkAndShowAppVideo(configKey, storagePrefix) {
+  try {
+    const { db, ref, get } = window.fb;
+    get(ref(db, 'app_config/' + configKey)).then(snap => {
+      const data = snap.val();
+      if (!data || !data.url) return;
+      const seenKey = storagePrefix + '_' + (data.updatedAt || data.url);
+      let seen = false;
+      try { seen = localStorage.getItem(seenKey) === '1'; } catch (e) {}
+      if (seen) return;
+      showAppVideo(data.url, seenKey);
+    }).catch(() => {});
+  } catch (e) {}
+}
+function showAppVideo(url, seenKey) {
+  const overlay = document.getElementById('app-video-overlay');
+  const video = document.getElementById('app-video-player');
+  const closeBtn = document.getElementById('app-video-close-btn');
+  const skipBtn = document.getElementById('app-video-skip-btn');
+  if (!overlay || !video) return;
+  video.src = url;
+  video.controls = false;
+  video.autoplay = true;
+  closeBtn.style.display = 'none';
+  overlay.classList.add('show');
+  const markSeenAndClose = () => {
+    try { localStorage.setItem(seenKey, '1'); } catch (e) {}
+    overlay.classList.remove('show');
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+  };
+  video.onended = () => { closeBtn.style.display = 'inline-block'; };
+  closeBtn.onclick = markSeenAndClose;
+  skipBtn.onclick = markSeenAndClose;
+  video.play().catch(() => { closeBtn.style.display = 'inline-block'; });
+}
+
 function logInDriver(username, data) {
   state.username = username;
   state.driver = data;
@@ -1995,6 +2061,7 @@ function logInDriver(username, data) {
     listenDeliveryJobs();
     listenDrivers();
     listenDriverDue();
+    checkAndShowAppVideo('driverAppVideo', 'nesh_driver_video_seen');
   }
 
   if (state.isOnline) startLocationTracking();

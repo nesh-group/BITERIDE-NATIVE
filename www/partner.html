@@ -575,6 +575,20 @@
     #operator-container .op-back-to-list{ display:inline-block; background:none; border:none; color:#33ff66; font-size:1.25rem; cursor:pointer; margin-right:6px; }
   }
   #operator-container .op-back-to-list{ display:none; }
+  .app-video-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:99999;
+    display:none; align-items:center; justify-content:center; flex-direction:column;
+  }
+  .app-video-overlay.show{ display:flex; }
+  .app-video-overlay video{ width:100%; max-width:480px; max-height:78vh; background:#000; }
+  .app-video-skip-btn{
+    position:absolute; top:18px; right:18px; background:rgba(255,255,255,.15); border:none;
+    color:#fff; width:34px; height:34px; border-radius:50%; font-size:16px; cursor:pointer; z-index:1;
+  }
+  .app-video-close-btn{
+    margin-top:16px; padding:10px 28px; border-radius:999px; border:none; background:var(--marigold);
+    color:var(--ink); font-weight:700; font-size:14px; cursor:pointer; display:none; font-family:'Inter',sans-serif;
+  }
 </style>
 </head>
 <body>
@@ -601,6 +615,14 @@
 <div id="app">
 
   <div class="toast" id="toast"></div>
+
+  <!-- One-time promo/welcome video — content set from the Operator Panel
+       (App Videos). Shown once per device per video; see checkAndShowAppVideo(). -->
+  <div class="app-video-overlay" id="app-video-overlay">
+    <button type="button" class="app-video-skip-btn" id="app-video-skip-btn">✕</button>
+    <video id="app-video-player" playsinline webkit-playsinline></video>
+    <button type="button" class="app-video-close-btn" id="app-video-close-btn">Close</button>
+  </div>
 
   <div class="order-popup-overlay" id="order-popup-overlay">
     <div class="order-popup">
@@ -1386,6 +1408,11 @@
           <h3>Extra Amount</h3>
           <p>Set/edit the ₹ amount added on top of every item price shown to customers</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('app-videos')">
+          <div class="op-home-icon">🎬</div>
+          <h3>App Videos</h3>
+          <p>Set a one-time welcome/promo video for the Shop app and the Driver app</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('partners')">
           <div class="op-home-icon">🏬</div>
           <h3>Restaurant Partners</h3>
@@ -1574,6 +1601,33 @@
         <button type="button" class="op-btn op-btn-push" onclick="opSaveExtraAmount()">💾 Save</button>
       </div>
       <p class="op-note" id="op-extra-amount-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- APP VIDEOS — one-time welcome/promo video shown when the shop app or
+       driver app opens. Separate video per app; each plays once per device,
+       and re-uploading a new URL here makes it play again for everyone. -->
+  <div class="op-section" id="op-section-app-videos">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>App Videos</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Paste a direct video link (.mp4 works best). It plays once automatically the next time that app opens — once someone closes or finishes it, it won't show again on their phone, even after closing and reopening the app. Uploading a new link here makes it play again for everyone. Leave blank and save to turn a video off.</p>
+
+      <h3 style="color:#33ff66; font-size:14px; margin:18px 0 6px;">🏬 Shop / Partner App video</h3>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="text" id="op-shop-video-input" placeholder="https://example.com/shop-video.mp4">
+      </div>
+      <button type="button" class="op-btn op-btn-push" onclick="opSaveAppVideo('shopAppVideo','op-shop-video-input','op-shop-video-status')">💾 Save shop app video</button>
+      <p class="op-note" id="op-shop-video-status" style="margin-top:8px;"></p>
+
+      <h3 style="color:#33ff66; font-size:14px; margin:22px 0 6px;">🚖 Driver App video</h3>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="text" id="op-driver-video-input" placeholder="https://example.com/driver-video.mp4">
+      </div>
+      <button type="button" class="op-btn op-btn-push" onclick="opSaveAppVideo('driverAppVideo','op-driver-video-input','op-driver-video-status')">💾 Save driver app video</button>
+      <p class="op-note" id="op-driver-video-status" style="margin-top:8px;"></p>
     </div>
   </div>
 
@@ -2565,6 +2619,51 @@ function bizNoun(businessType) {
   return businessType === 'hotel' || !businessType ? 'Restaurant' : 'Shop';
 }
 
+// ---------- One-time promo/welcome video (set from Operator Panel → App
+// Videos). configKey picks which app_config node to read; each app (shop
+// vs driver) gets its own video and its own "seen" flag, keyed to that
+// video's updatedAt so uploading a NEW video makes it play again for
+// everyone, but re-closing the SAME video never shows it twice on one
+// device — even across a full app close/reopen, since the flag lives in
+// localStorage, not just in-memory state.
+function checkAndShowAppVideo(configKey, storagePrefix) {
+  try {
+    const { db, ref, get } = window.fb;
+    get(ref(db, 'app_config/' + configKey)).then(snap => {
+      const data = snap.val();
+      if (!data || !data.url) return;
+      const seenKey = storagePrefix + '_' + (data.updatedAt || data.url);
+      let seen = false;
+      try { seen = localStorage.getItem(seenKey) === '1'; } catch (e) {}
+      if (seen) return;
+      showAppVideo(data.url, seenKey);
+    }).catch(() => {});
+  } catch (e) {}
+}
+function showAppVideo(url, seenKey) {
+  const overlay = document.getElementById('app-video-overlay');
+  const video = document.getElementById('app-video-player');
+  const closeBtn = document.getElementById('app-video-close-btn');
+  const skipBtn = document.getElementById('app-video-skip-btn');
+  if (!overlay || !video) return;
+  video.src = url;
+  video.controls = false;
+  video.autoplay = true;
+  closeBtn.style.display = 'none';
+  overlay.classList.add('show');
+  const markSeenAndClose = () => {
+    try { localStorage.setItem(seenKey, '1'); } catch (e) {}
+    overlay.classList.remove('show');
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+  };
+  video.onended = () => { closeBtn.style.display = 'inline-block'; };
+  closeBtn.onclick = markSeenAndClose;
+  skipBtn.onclick = markSeenAndClose;
+  video.play().catch(() => { closeBtn.style.display = 'inline-block'; });
+}
+
 function logInRestaurant(id, data) {
   state.restId = id;
   state.restaurant = data;
@@ -2618,6 +2717,7 @@ function logInRestaurant(id, data) {
     listenDeliveryEarnings();
     listenPartnerSupportMessages();
     registerForOrderPushNotifications();
+    checkAndShowAppVideo('shopAppVideo', 'nesh_shop_video_seen');
   }
   updateZoneBadge();
   updateDeliveryChargeBadge();
@@ -4845,6 +4945,7 @@ function opOpenSection(name) {
   if (name === 'partners') { opPopulatePartnersAreaFilter(); opRenderPartnersList(); }
   if (name === 'drivers') { opPopulateDriversZoneFilter(); opRenderDriversList(); }
   if (name === 'taxi-orders') { opPopulateRidesZoneFilter(); opRenderRidesList(); }
+  if (name === 'app-videos') opLoadAppVideos();
   if (name === 'zones') opRenderZonesList();
   if (name === 'category-order') opRenderCategoryOrder();
   if (name === 'shop-categories') opRenderShopCategoriesList();
@@ -4913,6 +5014,38 @@ function opSaveExtraAmount() {
     updatedAt: new Date().toLocaleString()
   }).then(() => {
     status.textContent = 'Saved! Customers now see item prices + ₹' + amount + '.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+/* ---- App Videos: one-time welcome/promo video per app ----
+   Stored at app_config/shopAppVideo and app_config/driverAppVideo, each
+   as { url, updatedAt }. updatedAt doubles as the "version" that the shop
+   and driver apps key their localStorage "already seen" flag off of (see
+   checkAndShowAppVideo() near logInRestaurant/logInDriver) — saving a new
+   URL here bumps updatedAt, which makes it play again for everyone even
+   if they'd already dismissed a previous video. */
+function opLoadAppVideos() {
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'app_config/shopAppVideo')).then(snap => {
+    const data = snap.val();
+    document.getElementById('op-shop-video-input').value = (data && data.url) || '';
+  }).catch(() => {});
+  get(ref(db, 'app_config/driverAppVideo')).then(snap => {
+    const data = snap.val();
+    document.getElementById('op-driver-video-input').value = (data && data.url) || '';
+  }).catch(() => {});
+}
+function opSaveAppVideo(configKey, inputId, statusId) {
+  const input = document.getElementById(inputId);
+  const status = document.getElementById(statusId);
+  const url = input.value.trim();
+  status.textContent = 'Saving...';
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'app_config/' + configKey), {
+    url,
+    updatedAt: Date.now()
+  }).then(() => {
+    status.textContent = url ? 'Saved! It will play once for everyone the next time they open the app.' : 'Video turned off.';
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
