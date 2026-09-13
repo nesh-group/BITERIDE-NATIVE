@@ -61,6 +61,7 @@ jobs:
         run: |
           npm install
           npm install @capacitor-community/background-geolocation
+          npm install @capacitor/filesystem
 
       - name: Generate native Android project (if not already present)
         run: |
@@ -92,6 +93,16 @@ jobs:
             sed -i '/<manifest /a\    <uses-permission android:name="android.permission.VIBRATE" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />\n    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />' "$MANIFEST"
           fi
 
+          # Lets the app trigger the system "Install this app?" prompt
+          # itself (for the in-app auto-update banner) instead of routing
+          # the person through their browser's download flow first. The
+          # actual FileProvider <provider> entry that makes this safe
+          # (sharing a downloaded APK file without exposing raw file://
+          # paths) is added further down, right before </application>.
+          if ! grep -q "REQUEST_INSTALL_PACKAGES" "$MANIFEST"; then
+            sed -i '/<manifest /a\    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />' "$MANIFEST"
+          fi
+
           # Register ONE AlertFcmService as the app's sole FCM receiver.
           # Firebase only allows a single FirebaseMessagingService per app,
           # which is exactly why the driver app's RideAlertFcmService and
@@ -117,12 +128,33 @@ jobs:
                   android:excludeFromRecents="true"
                   android:showOnLockScreen="true"
                   android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+              <provider
+                  android:name="androidx.core.content.FileProvider"
+                  android:authorities="${applicationId}.fileprovider"
+                  android:exported="false"
+                  android:grantUriPermissions="true">
+                  <meta-data
+                      android:name="android.support.FILE_PROVIDER_PATHS"
+                      android:resource="@xml/file_paths" />
+              </provider>
           </application>'''
           content = content.replace('</application>', injection, 1)
           with open(path, 'w') as f:
               f.write(content)
           PYEOF
           fi
+
+          # The FileProvider entry above points at this file_paths.xml,
+          # which whitelists the app's own cache folder — that's where the
+          # downloaded update APK gets saved (see ApkInstallerPlugin.java)
+          # before the system installer is asked to open it.
+          mkdir -p android/app/src/main/res/xml
+          cat > android/app/src/main/res/xml/file_paths.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+              <cache-path name="update_apk" path="." />
+          </paths>
+          EOF
 
       - name: Generate app icon from resources/icon.png
         run: |
@@ -199,6 +231,7 @@ jobs:
               @Override
               public void onCreate(Bundle savedInstanceState) {
                   registerPlugin(RingControlPlugin.class);
+                  registerPlugin(ApkInstallerPlugin.class);
                   super.onCreate(savedInstanceState);
 
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -330,6 +363,69 @@ jobs:
               public void stopRinging(PluginCall call) {
                   getContext().stopService(new Intent(getContext(), RingingService.class));
                   call.resolve();
+              }
+          }
+          EOF
+
+          cat > "$PKG_PATH/ApkInstallerPlugin.java" << 'EOF'
+          package com.yourcompany.neshapp;
+
+          import android.content.Intent;
+          import android.net.Uri;
+          import androidx.core.content.FileProvider;
+          import com.getcapacitor.JSObject;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+          import java.io.File;
+
+          // Lets the in-app "UPDATE" banner (driver.html/partner.html)
+          // install a downloaded APK with a single system confirmation
+          // tap, instead of routing the person through the browser's
+          // download flow first. The web side downloads the new APK into
+          // this app's own cache folder (via @capacitor/filesystem, path
+          // "update.apk") and then calls install() with that same path.
+          //
+          // JS usage:
+          //   window.Capacitor.Plugins.ApkInstaller.install({ path: '<cache dir>/update.apk' })
+          //
+          // Requires android.permission.REQUEST_INSTALL_PACKAGES (added to
+          // AndroidManifest.xml) and the FileProvider <provider> entry
+          // (also in AndroidManifest.xml, backed by res/xml/file_paths.xml)
+          // — a bare file:// Uri would be blocked by Android for security
+          // reasons on the versions this app targets.
+          @CapacitorPlugin(name = "ApkInstaller")
+          public class ApkInstallerPlugin extends Plugin {
+              @PluginMethod
+              public void install(PluginCall call) {
+                  String path = call.getString("path");
+                  if (path == null) {
+                      call.reject("Missing 'path'");
+                      return;
+                  }
+                  try {
+                      File apkFile = new File(path);
+                      if (!apkFile.exists()) {
+                          call.reject("File not found: " + path);
+                          return;
+                      }
+                      Uri apkUri = FileProvider.getUriForFile(
+                          getContext(),
+                          getContext().getPackageName() + ".fileprovider",
+                          apkFile
+                      );
+                      Intent intent = new Intent(Intent.ACTION_VIEW);
+                      intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                      intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                      getContext().startActivity(intent);
+                      JSObject result = new JSObject();
+                      result.put("started", true);
+                      call.resolve(result);
+                  } catch (Exception e) {
+                      call.reject("Install failed: " + e.getMessage());
+                  }
               }
           }
           EOF
