@@ -59,9 +59,9 @@ jobs:
 
       - name: Install project dependencies
         run: |
-          npm install
-          npm install @capacitor-community/background-geolocation
-          npm install @capacitor/filesystem
+          npm install --legacy-peer-deps
+          npm install @capacitor-community/background-geolocation --legacy-peer-deps
+          npm install @capacitor/filesystem --legacy-peer-deps
 
       - name: Generate native Android project (if not already present)
         run: |
