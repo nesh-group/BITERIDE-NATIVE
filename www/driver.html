@@ -783,7 +783,52 @@
     btn.textContent = 'UPDATE';
     btn.style.cssText = 'background:#22c55e;color:#fff;border:0;border-radius:6px;' +
       'padding:8px 14px;font-weight:bold;flex-shrink:0;';
-    btn.onclick = function () {
+
+    // Downloads the APK into the app's own cache folder (via
+    // @capacitor/filesystem) and hands it to the native ApkInstaller
+    // plugin, which fires Android's own "Install this app?" prompt
+    // directly — no browser tab, no download-notification tap first.
+    // Falls back to the old browser-download flow if anything here is
+    // unavailable (e.g. testing in a plain browser tab).
+    function installSilently() {
+      var Filesystem = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem;
+      var ApkInstaller = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ApkInstaller;
+      if (!Filesystem || !ApkInstaller) return false;
+      label.textContent = 'Downloading update…';
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+      fetch(apkUrl).then(function (res) { return res.blob(); }).then(function (blob) {
+        return new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onloadend = function () {
+            // reader.result is "data:application/octet-stream;base64,XXXX"
+            var base64 = String(reader.result).split(',')[1];
+            resolve(base64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }).then(function (base64) {
+        return Filesystem.writeFile({ path: 'update.apk', directory: 'CACHE', data: base64, recursive: true });
+      }).then(function () {
+        return Filesystem.getUri({ path: 'update.apk', directory: 'CACHE' });
+      }).then(function (res) {
+        // res.uri looks like "file:///data/.../cache/update.apk" — the
+        // native plugin wants a plain filesystem path, not a file:// URL.
+        var path = res.uri.replace(/^file:\/\//, '');
+        return ApkInstaller.install({ path: path });
+      }).then(function () {
+        bar.remove();
+      }).catch(function () {
+        label.textContent = 'Download failed — tap to try in browser';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.onclick = openInBrowser;
+      });
+      return true;
+    }
+
+    function openInBrowser() {
       try {
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Browser) {
           window.Capacitor.Plugins.Browser.open({ url: apkUrl });
@@ -793,6 +838,10 @@
       } catch (e) {
         window.open(apkUrl, '_blank');
       }
+    }
+
+    btn.onclick = function () {
+      if (!installSilently()) openInBrowser();
     };
     bar.appendChild(label);
     bar.appendChild(btn);
