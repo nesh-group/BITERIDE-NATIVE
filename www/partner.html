@@ -1832,6 +1832,18 @@
         <p class="op-note" id="op-pm-driver-status" style="margin-top:4px;"></p>
       </div>
       <div style="margin-top:14px;">
+        <p class="op-note" style="margin-bottom:4px;">Bulk import stock — Excel/CSV with Name, Discription, Price, Unit (optional), Photo link (optional). Adds items to this shop's menu.</p>
+        <input type="file" id="op-pm-bulk-import-input" accept=".xlsx,.xls,.csv" style="display:none;" onchange="opHandleBulkImportFile(event)" />
+        <button type="button" class="op-btn op-btn-push" id="op-pm-bulk-import-btn" onclick="document.getElementById('op-pm-bulk-import-input').click()">📥 Bulk import stock</button>
+        <p class="op-note" id="op-pm-bulk-import-status" style="margin-top:4px; display:none;"></p>
+      </div>
+      <div style="margin-top:14px;">
+        <p class="op-note" style="margin-bottom:4px;">Bulk upload photos — uploads and downloads a photo-links.csv (FileName, Photo link) for you to match up yourself. Doesn't read or show this shop's existing stock.</p>
+        <input type="file" id="op-pm-bulk-photo-input" accept="image/*" multiple style="display:none;" onchange="opHandleBulkPhotoUpload(event)" />
+        <button type="button" class="op-btn op-btn-push" id="op-pm-bulk-photo-btn" onclick="document.getElementById('op-pm-bulk-photo-input').click()">📷 Bulk upload photos</button>
+        <p class="op-note" id="op-pm-bulk-photo-status" style="margin-top:4px; display:none;"></p>
+      </div>
+      <div style="margin-top:14px;">
         <button type="button" class="op-btn" id="op-pm-toggle-btn" onclick="opTogglePartnerStatus()"></button>
         <button type="button" class="op-btn" onclick="opOpenChatWith(opCurrentPartnerId); document.getElementById('op-partner-modal').classList.remove('show'); opOpenSection('support');">💬 Chat</button>
         <button type="button" class="op-btn op-btn-danger" onclick="opDeletePartner()">🗑 Delete Account</button>
@@ -3860,79 +3872,101 @@ async function handleBulkPhotoUpload(e) {
   const files = Array.from(e.target.files || []);
   e.target.value = ""; // allow re-selecting the same files later
   if (!files.length) return;
+  await importPhotosForShop(files, state.restId, document.getElementById('bulk-photo-status'), document.getElementById('bulk-photo-btn'));
+}
 
-  const statusEl = document.getElementById('bulk-photo-status');
-  const btn = document.getElementById('bulk-photo-btn');
+// Shared by both the shop's own "Bulk-upload photos" button and the
+// operator panel's per-shop bulk photo upload — same upload logic, just
+// pointed at whichever restId is relevant. skipMatching=true (used by the
+// operator panel) skips downloading that shop's whole menu for name-
+// matching — the operator flow only ever adds, it never needs to read or
+// show a shop's existing stock, so every photo just goes into the CSV.
+async function importPhotosForShop(files, targetRestId, statusEl, btn, skipMatching) {
   statusEl.style.display = "block";
   statusEl.style.color = "var(--marigold)";
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
 
-  // Build a lookup of existing stock item names -> id, so a photo whose
-  // filename matches an item name can be attached to that item directly
-  // instead of only ending up in the CSV.
-  const nameToId = {};
-  state.menuItems.forEach(it => { nameToId[normalizeMatchName(it.name)] = it.id; });
+  try {
+    if (!targetRestId) throw new Error("No shop selected.");
+    const { db, ref, get, update } = window.fb;
 
-  const { db, ref, update } = window.fb;
-  const unmatched = []; // { file, url } — goes into the CSV for manual matching
-  let uploaded = 0, failed = 0, attached = 0;
-
-  for (const file of files) {
-    statusEl.textContent = `Uploading photo ${uploaded + failed + 1}/${files.length}…`;
-    try {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = ev => resolve(ev.target.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+    // Build a lookup of existing stock item names -> id, so a photo whose
+    // filename matches an item name can be attached to that item directly
+    // instead of only ending up in the CSV. Skipped entirely in
+    // skipMatching mode to avoid downloading the shop's whole menu.
+    let nameToId = {};
+    if (!skipMatching) {
+      const menuSnap = await get(ref(db, 'restaurants/' + targetRestId + '/menu'));
+      menuSnap.forEach(child => {
+        const it = child.val();
+        nameToId[normalizeMatchName(it.name)] = child.key;
       });
-      const img = await new Promise((resolve, reject) => {
-        const im = new Image();
-        im.onload = () => resolve(im);
-        im.onerror = reject;
-        im.src = dataUrl;
-      });
-      const blob = await resizeImageToBlob(img, 600, 0.7);
-      const url = await uploadPhotoToCloudinary(blob);
-      uploaded++;
-
-      const matchId = nameToId[normalizeMatchName(stripExt(file.name))];
-      if (matchId) {
-        await update(ref(db, 'restaurants/' + state.restId + '/menu/' + matchId), { photo: url });
-        attached++;
-      } else {
-        unmatched.push({ file: file.name, url });
-      }
-    } catch (err) {
-      failed++;
     }
-  }
 
-  // Any photo that didn't match an existing stock item's name still gets a
-  // downloadable CSV (FileName, Photo) for manual matching / bulk import.
-  if (unmatched.length) {
-    const csvRows = [["FileName", "Photo"]].concat(
-      unmatched.map(r => [csvEscape(stripExt(r.file)), csvEscape(r.url)])
-    );
-    const csvContent = csvRows.map(r => r.join(",")).join("\n");
-    const csvBlob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const dlUrl = URL.createObjectURL(csvBlob);
-    const a = document.createElement('a');
-    a.href = dlUrl;
-    a.download = "photo-links.csv";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(dlUrl);
-  }
+    const unmatched = []; // { file, url } — goes into the CSV for manual matching
+    let uploaded = 0, failed = 0, attached = 0;
 
-  statusEl.style.color = failed > 0 ? "var(--chili)" : "#2C4A37";
-  let msg = `Done — ${uploaded} uploaded`;
-  if (attached > 0) msg += `, ${attached} matched by name and attached to your stock items`;
-  if (unmatched.length) msg += `, ${unmatched.length} had no name match — downloaded photo-links.csv for those`;
-  if (failed > 0) msg += `, ${failed} failed`;
-  statusEl.textContent = msg + ".";
-  btn.disabled = false;
+    for (const file of files) {
+      statusEl.textContent = `Uploading photo ${uploaded + failed + 1}/${files.length}…`;
+      try {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = ev => resolve(ev.target.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const img = await new Promise((resolve, reject) => {
+          const im = new Image();
+          im.onload = () => resolve(im);
+          im.onerror = reject;
+          im.src = dataUrl;
+        });
+        const blob = await resizeImageToBlob(img, 600, 0.7);
+        const url = await uploadPhotoToCloudinary(blob);
+        uploaded++;
+
+        const matchId = nameToId[normalizeMatchName(stripExt(file.name))];
+        if (matchId) {
+          await update(ref(db, 'restaurants/' + targetRestId + '/menu/' + matchId), { photo: url });
+          attached++;
+        } else {
+          unmatched.push({ file: file.name, url });
+        }
+      } catch (err) {
+        failed++;
+      }
+    }
+
+    // Any photo that didn't match an existing stock item's name still gets a
+    // downloadable CSV (FileName, Photo) for manual matching / bulk import.
+    if (unmatched.length) {
+      const csvRows = [["FileName", "Photo"]].concat(
+        unmatched.map(r => [csvEscape(stripExt(r.file)), csvEscape(r.url)])
+      );
+      const csvContent = csvRows.map(r => r.join(",")).join("\n");
+      const csvBlob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const dlUrl = URL.createObjectURL(csvBlob);
+      const a = document.createElement('a');
+      a.href = dlUrl;
+      a.download = "photo-links.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(dlUrl);
+    }
+
+    statusEl.style.color = failed > 0 ? "var(--chili)" : "#2C4A37";
+    let msg = `Done — ${uploaded} uploaded`;
+    if (attached > 0) msg += `, ${attached} matched by name and attached to your stock items`;
+    if (unmatched.length) msg += `, ${unmatched.length} had no name match — downloaded photo-links.csv for those`;
+    if (failed > 0) msg += `, ${failed} failed`;
+    statusEl.textContent = msg + ".";
+  } catch (err) {
+    statusEl.style.color = "var(--chili)";
+    statusEl.textContent = "Upload failed: " + (err && err.message ? err.message : "check your connection and try again.");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 // ---------- BULK IMPORT (Excel) ----------
@@ -3961,15 +3995,20 @@ async function handleBulkImportFile(e) {
   const file = e.target.files[0];
   e.target.value = ""; // allow re-selecting the same file later
   if (!file) return;
+  await importMenuFileForShop(file, state.restId, isGroceriesShop(), document.getElementById('bulk-import-status'), document.getElementById('bulk-import-btn'));
+}
 
-  const statusEl = document.getElementById('bulk-import-status');
-  const btn = document.getElementById('bulk-import-btn');
+// Shared by both the shop's own "Bulk import" button and the operator
+// panel's per-shop bulk import — same parsing/writing logic, just pointed
+// at whichever restId is relevant.
+async function importMenuFileForShop(file, targetRestId, groceriesShop, statusEl, btn) {
   statusEl.style.display = "block";
   statusEl.style.color = "var(--marigold)";
   statusEl.textContent = "Reading file…";
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
 
   try {
+    if (!targetRestId) throw new Error("No shop selected.");
     if (typeof XLSX === 'undefined') {
       throw new Error("Excel reader didn't load — check your connection and try again.");
     }
@@ -4006,7 +4045,7 @@ async function handleBulkImportFile(e) {
     }
 
     const { db, ref, push, update } = window.fb;
-    const menuRef = ref(db, 'restaurants/' + state.restId + '/menu');
+    const menuRef = ref(db, 'restaurants/' + targetRestId + '/menu');
 
     let added = 0, skipped = 0, withPhoto = 0;
     const BATCH_SIZE = 300; // keep each Firebase update() payload reasonably sized
@@ -4023,7 +4062,7 @@ async function handleBulkImportFile(e) {
       // are saved (state.photoDataUrl is just a URL string too).
       let photo = photoKey ? String(row[photoKey] || "").trim() : "";
       if (photo && !/^https?:\/\//i.test(photo)) photo = ""; // ignore junk/non-URL values
-      const unit = (isGroceriesShop() && unitKey) ? normalizeUnitCell(row[unitKey]) : 'piece';
+      const unit = (groceriesShop && unitKey) ? normalizeUnitCell(row[unitKey]) : 'piece';
 
       if (!name || isNaN(price) || price < 0) {
         skipped++;
@@ -4059,7 +4098,7 @@ async function handleBulkImportFile(e) {
     statusEl.textContent = "Import failed: " + (err && err.message ? err.message : "check your connection and try again.");
     console.error('[bulk-import] error:', err);
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -6900,6 +6939,10 @@ function opShowPartnerDetail(id) {
   document.getElementById('op-pm-settle-status').textContent = '';
   document.getElementById('op-pm-category-input').value = p.opCategory || '';
   document.getElementById('op-pm-category-status').textContent = '';
+  document.getElementById('op-pm-bulk-import-status').textContent = '';
+  document.getElementById('op-pm-bulk-import-status').style.display = 'none';
+  document.getElementById('op-pm-bulk-photo-status').textContent = '';
+  document.getElementById('op-pm-bulk-photo-status').style.display = 'none';
   opPopulatePartnerAreaSelect();
   document.getElementById('op-pm-area-status').textContent = '';
   opPopulatePartnerDriverSelect();
@@ -6937,6 +6980,41 @@ function opSettleDue() {
     input.value = '';
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
+// Operator panel's "Bulk upload photos" — same filename-matching uploader
+// the shop itself uses (importPhotosForShop), just pointed at whichever
+// shop the operator currently has open in the partner detail modal.
+async function opHandleBulkPhotoUpload(e) {
+  const files = Array.from(e.target.files || []);
+  e.target.value = ""; // allow re-selecting the same files later
+  if (!files.length) return;
+  await importPhotosForShop(
+    files,
+    opCurrentPartnerId,
+    document.getElementById('op-pm-bulk-photo-status'),
+    document.getElementById('op-pm-bulk-photo-btn'),
+    true // skipMatching — operator flow only adds, never reads/shows existing stock
+  );
+}
+
+// Operator panel's "Bulk import stock" — same Excel/CSV importer the shop
+// itself uses (importMenuFileForShop), just pointed at whichever shop the
+// operator currently has open in the partner detail modal.
+async function opHandleBulkImportFile(e) {
+  const file = e.target.files[0];
+  e.target.value = ""; // allow re-selecting the same file later
+  if (!file) return;
+  const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
+  if (!p) return;
+  const groceriesShop = p.businessType === 'groceries';
+  await importMenuFileForShop(
+    file,
+    opCurrentPartnerId,
+    groceriesShop,
+    document.getElementById('op-pm-bulk-import-status'),
+    document.getElementById('op-pm-bulk-import-btn')
+  );
+}
+
 function opSaveShopCategory() {
   const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
   const input = document.getElementById('op-pm-category-input');
