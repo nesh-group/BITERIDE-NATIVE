@@ -158,7 +158,7 @@ jobs:
 
       - name: Generate app icon from resources/icon.png
         run: |
-          npm install -D @capacitor/assets
+          npm install -D @capacitor/assets --legacy-peer-deps
           npx capacitor-assets generate --android
 
       - name: Add Firebase config to the Android project
