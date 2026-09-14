@@ -1929,19 +1929,22 @@
   <div class="op-modal-overlay" id="op-zone-boundary-modal">
     <div class="op-modal-card op-modal-card-wide">
       <h3 id="op-zb-title">Zone boundary</h3>
-      <p class="op-note" id="op-zb-desc" style="margin-bottom:8px;">Draw the area this zone covers — tap the map to add points (3+ needed). Used to match drivers to nearby orders/rides by zone.</p>
+      <p class="op-note" id="op-zb-desc" style="margin-bottom:8px;">Pan/zoom to find the spot, then press "Draw the zone" and drag across the map to outline the area — no need to tap point by point.</p>
       <div class="op-search-box" style="margin-bottom:0;">
         <input type="text" id="op-zb-search" placeholder="Search area, street, landmark…" autocomplete="off">
       </div>
       <div class="op-zone-search-results" id="op-zb-search-results"></div>
+      <div style="margin:8px 0;">
+        <button type="button" class="op-btn" id="op-zb-draw-toggle" style="width:100%; margin:0;" onclick="opZbToggleDrawMode()">✏️ Draw the zone</button>
+      </div>
       <div class="op-zone-map-wrap">
         <div class="op-zone-map" id="op-zb-map"></div>
-        <p class="op-zone-map-hint" id="op-zb-map-hint">Tap the map to add a point</p>
+        <p class="op-zone-map-hint" id="op-zb-map-hint">Pan/zoom to the right spot, then press "Draw the zone"</p>
       </div>
       <p class="op-note" id="op-zb-point-count" style="margin-top:8px;">0 points added</p>
       <p class="op-note" id="op-zb-error" style="display:none; color:#ff4444;"></p>
       <div style="display:flex; gap:8px; margin-top:10px;">
-        <button type="button" class="op-btn op-btn-danger" style="flex:1; margin:0;" onclick="opZbUndo()">Undo point</button>
+        <button type="button" class="op-btn op-btn-danger" style="flex:1; margin:0;" onclick="opZbUndo()">Undo bit</button>
         <button type="button" class="op-btn op-btn-danger" style="flex:1; margin:0;" onclick="opZbClear()">Clear all</button>
       </div>
       <div style="margin-top:10px;">
@@ -5748,29 +5751,94 @@ let opZbMap = null;
 let opZbMarkers = [];
 let opZbPolygon = null;
 let opZbPoints = []; // [{lat, lng}, ...]
+// Freehand drawing state: instead of tapping one point at a time, the
+// operator presses "Draw the zone", drags across the map, and every ~10px
+// of pointer movement gets recorded as a point — so a single drag stroke
+// outlines the whole shape, then the toggle flips back to pan/zoom mode.
+let opZbDrawMode = false;
+let opZbDrawing = false;
+let opZbLastContainerPt = null;
+const OP_ZB_MIN_PX_GAP = 10;
 
 function opZbEnsureMap(startLat, startLng) {
   if (opZbMap) return;
   opZbMap = L.map('op-zb-map', { attributionControl: false }).setView([startLat, startLng], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(opZbMap);
-  opZbMap.on('click', e => {
-    opZbPoints.push({ lat: e.latlng.lat, lng: e.latlng.lng });
+
+  const addStrokePoint = (latlng, force) => {
+    const pt = opZbMap.latLngToContainerPoint(latlng);
+    if (!force && opZbLastContainerPt && pt.distanceTo(opZbLastContainerPt) < OP_ZB_MIN_PX_GAP) return;
+    opZbLastContainerPt = pt;
+    opZbPoints.push({ lat: latlng.lat, lng: latlng.lng });
     opZbRedraw();
-  });
+  };
+  const startStroke = latlng => {
+    opZbDrawing = true;
+    opZbLastContainerPt = null;
+    addStrokePoint(latlng, true);
+  };
+  const finishStroke = () => {
+    if (!opZbDrawing) return;
+    opZbDrawing = false;
+    opZbToggleDrawMode(false); // hand control back to pan/zoom after one stroke
+  };
+
+  // Desktop mouse dragging.
+  opZbMap.on('mousedown', e => { if (opZbDrawMode) startStroke(e.latlng); });
+  opZbMap.on('mousemove', e => { if (opZbDrawMode && opZbDrawing) addStrokePoint(e.latlng); });
+  opZbMap.on('mouseup', finishStroke);
+  opZbMap.on('mouseout', () => { if (opZbDrawing) finishStroke(); });
+
+  // Mobile touch dragging — phones don't fire continuous 'mousemove' from a
+  // touch drag (only a one-off synthetic click), so touch needs its own
+  // listeners straight on the map container, reading touch coordinates
+  // directly instead of relying on Leaflet's mouse-event re-firing.
+  const container = opZbMap.getContainer();
+  const touchLatLng = touch => {
+    const rect = container.getBoundingClientRect();
+    return opZbMap.containerPointToLatLng([touch.clientX - rect.left, touch.clientY - rect.top]);
+  };
+  container.addEventListener('touchstart', e => {
+    if (!opZbDrawMode || !e.touches.length) return;
+    e.preventDefault();
+    startStroke(touchLatLng(e.touches[0]));
+  }, { passive: false });
+  container.addEventListener('touchmove', e => {
+    if (!opZbDrawMode || !opZbDrawing || !e.touches.length) return;
+    e.preventDefault();
+    addStrokePoint(touchLatLng(e.touches[0]));
+  }, { passive: false });
+  container.addEventListener('touchend', finishStroke);
+  container.addEventListener('touchcancel', finishStroke);
+}
+
+function opZbToggleDrawMode(forceOn) {
+  opZbDrawMode = typeof forceOn === 'boolean' ? forceOn : !opZbDrawMode;
+  const btn = document.getElementById('op-zb-draw-toggle');
+  if (opZbMap) {
+    if (opZbDrawMode) {
+      opZbMap.dragging.disable();
+      opZbMap.doubleClickZoom.disable();
+      opZbMap.scrollWheelZoom.disable();
+    } else {
+      opZbMap.dragging.enable();
+      opZbMap.doubleClickZoom.enable();
+      opZbMap.scrollWheelZoom.enable();
+    }
+  }
+  if (btn) btn.textContent = opZbDrawMode ? '✋ Stop drawing (pan/zoom)' : '✏️ Draw the zone';
+  const hint = document.getElementById('op-zb-map-hint');
+  if (hint) {
+    hint.textContent = opZbDrawMode
+      ? 'Press and drag across the map to outline the zone'
+      : (opZbPoints.length >= 3 ? 'Looks good — press "Draw the zone" to redo, or save below' : 'Pan/zoom to the right spot, then press "Draw the zone"');
+  }
 }
 
 function opZbRedraw() {
   opZbMarkers.forEach(m => opZbMap.removeLayer(m));
   opZbMarkers = [];
   if (opZbPolygon) { opZbMap.removeLayer(opZbPolygon); opZbPolygon = null; }
-
-  opZbPoints.forEach((p, idx) => {
-    const marker = L.circleMarker([p.lat, p.lng], {
-      radius: 7, color: '#39ff14', weight: 2, fillColor: '#39ff14', fillOpacity: 1
-    }).addTo(opZbMap);
-    marker.bindTooltip(String(idx + 1), { permanent: true, direction: 'top', offset: [0, -6], className: 'op-zone-pt-label' });
-    opZbMarkers.push(marker);
-  });
 
   if (opZbPoints.length >= 2) {
     opZbPolygon = L.polygon(opZbPoints.map(p => [p.lat, p.lng]), {
@@ -5780,8 +5848,10 @@ function opZbRedraw() {
 
   document.getElementById('op-zb-point-count').textContent =
     opZbPoints.length + (opZbPoints.length === 1 ? ' point added' : ' points added');
-  document.getElementById('op-zb-map-hint').textContent =
-    opZbPoints.length < 3 ? 'Tap the map to add a point (need 3+)' : 'Tap to add more, or save your boundary';
+  if (!opZbDrawMode) {
+    document.getElementById('op-zb-map-hint').textContent =
+      opZbPoints.length >= 3 ? 'Looks good — press "Draw the zone" to redo, or save below' : 'Pan/zoom to the right spot, then press "Draw the zone"';
+  }
 }
 
 function opOpenZoneBoundaryModal(zoneId) {
@@ -5790,7 +5860,7 @@ function opOpenZoneBoundaryModal(zoneId) {
   opZbCurrentZoneId = zoneId;
   opZbTarget = { type: 'driverZone', id: zoneId };
   document.getElementById('op-zb-title').textContent = 'Boundary — ' + (z.name || zoneId);
-  document.getElementById('op-zb-desc').textContent = 'Draw the area this zone covers — tap the map to add points (3+ needed). Used to match drivers to nearby orders/rides by zone.';
+  document.getElementById('op-zb-desc').textContent = 'Pan/zoom to find the spot, then press "Draw the zone" and drag across the map to outline it. Used to match drivers to nearby orders/rides by zone.';
   document.getElementById('op-zb-error').style.display = 'none';
   document.getElementById('op-zb-search').value = '';
   opZbHideSearchResults();
@@ -5807,7 +5877,7 @@ function opOpenShopZoneModal(partnerId) {
   if (!p) return;
   opZbTarget = { type: 'shopZone', id: partnerId };
   document.getElementById('op-zb-title').textContent = 'Delivery zone — ' + (p.restaurantName || partnerId);
-  document.getElementById('op-zb-desc').textContent = "Draw the area this shop delivers to — tap the map to add points (3+ needed). This is the shop's own delivery zone; saving here sets it for the shop too.";
+  document.getElementById('op-zb-desc').textContent = "Pan/zoom to find the spot, then press \"Draw the zone\" and drag across the map to outline where this shop delivers. Saving here sets it for the shop too.";
   document.getElementById('op-zb-error').style.display = 'none';
   document.getElementById('op-zb-search').value = '';
   opZbHideSearchResults();
@@ -5822,6 +5892,7 @@ function opZbShowMap() {
   document.getElementById('op-zone-boundary-modal').classList.add('show');
   setTimeout(() => {
     opZbEnsureMap(startLat, startLng);
+    opZbToggleDrawMode(false); // always open in pan/zoom mode
     opZbMap.invalidateSize();
     if (opZbPoints.length) {
       const bounds = L.latLngBounds(opZbPoints.map(p => [p.lat, p.lng]));
