@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{
     --ink:#0B2545;
@@ -1851,10 +1852,35 @@
         <p class="op-note" id="op-pm-bulk-import-status" style="margin-top:4px; display:none;"></p>
       </div>
       <div style="margin-top:14px;">
-        <p class="op-note" style="margin-bottom:4px;">Bulk upload photos — uploads and downloads a photo-links.csv (FileName, Photo link) for you to match up yourself. Doesn't read or show this shop's existing stock.</p>
+        <p class="op-note" style="margin-bottom:4px;">Bulk upload photos — matches each photo's filename to a stock item by name (same as the shop's own uploader) and attaches it directly. Unmatched photos are downloaded as photo-links.csv for manual matching.</p>
         <input type="file" id="op-pm-bulk-photo-input" accept="image/*" multiple style="display:none;" onchange="opHandleBulkPhotoUpload(event)" />
         <button type="button" class="op-btn op-btn-push" id="op-pm-bulk-photo-btn" onclick="document.getElementById('op-pm-bulk-photo-input').click()">📷 Bulk upload photos</button>
         <p class="op-note" id="op-pm-bulk-photo-status" style="margin-top:4px; display:none;"></p>
+      </div>
+      <div style="margin-top:14px;">
+        <p class="op-note" style="margin-bottom:4px;">Export stock — downloads this shop's full stock as an Excel file, in the same column format (Name, Discription, Price, Unit, Photo) the Bulk import above expects.</p>
+        <button type="button" class="op-btn op-btn-push" id="op-pm-export-stock-btn" onclick="opExportStock()">📤 Export stock (Excel)</button>
+        <p class="op-note" id="op-pm-export-stock-status" style="margin-top:4px; display:none;"></p>
+      </div>
+      <div style="margin-top:14px;">
+        <p class="op-note" style="margin-bottom:4px;">Export photos — downloads every stock item's uploaded photo as a .zip, each file named after the item (e.g. "Chicken Biryani.jpg"). Only fetches the photos themselves (from Cloudinary), not the shop's database records — doesn't add to Firebase download usage.</p>
+        <button type="button" class="op-btn op-btn-push" id="op-pm-export-photos-btn" onclick="opExportPhotos()">🖼️ Export photos (.zip)</button>
+        <p class="op-note" id="op-pm-export-photos-status" style="margin-top:4px; display:none;"></p>
+      </div>
+      <div style="margin-top:14px;">
+        <p class="op-note" style="margin-bottom:4px;">Clear all stock — permanently deletes every stock item for this shop. Export first if you want a backup. Confirming requires this shop's own login (username + password), plus a final confirmation.</p>
+        <button type="button" class="op-btn op-btn-danger" id="op-pm-clear-stock-btn" onclick="opShowClearStockAuth()">🗑️ Clear all stock</button>
+        <div id="op-pm-clear-stock-auth" style="display:none; margin-top:10px;">
+          <div class="op-search-box" style="margin-bottom:6px;">
+            <input type="text" id="op-pm-clear-stock-username" placeholder="Shop username" autocomplete="off">
+          </div>
+          <div class="op-search-box" style="margin-bottom:6px;">
+            <input type="password" id="op-pm-clear-stock-password" placeholder="Shop password" autocomplete="off">
+          </div>
+          <button type="button" class="op-btn op-btn-danger" onclick="opConfirmClearStock()">Verify &amp; clear all stock</button>
+          <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="opCancelClearStockAuth()">Cancel</button>
+        </div>
+        <p class="op-note" id="op-pm-clear-stock-status" style="margin-top:4px; display:none;"></p>
       </div>
       <div style="margin-top:14px;">
         <button type="button" class="op-btn" id="op-pm-toggle-btn" onclick="opTogglePartnerStatus()"></button>
@@ -3888,36 +3914,34 @@ async function handleBulkPhotoUpload(e) {
   const files = Array.from(e.target.files || []);
   e.target.value = ""; // allow re-selecting the same files later
   if (!files.length) return;
-  await importPhotosForShop(files, state.restId, document.getElementById('bulk-photo-status'), document.getElementById('bulk-photo-btn'));
+  await importPhotosForShop(files, state.restId, document.getElementById('bulk-photo-status'), document.getElementById('bulk-photo-btn'), state.menuItems);
 }
 
 // Shared by both the shop's own "Bulk-upload photos" button and the
 // operator panel's per-shop bulk photo upload — same upload logic, just
-// pointed at whichever restId is relevant. skipMatching=true (used by the
-// operator panel) skips downloading that shop's whole menu for name-
-// matching — the operator flow only ever adds, it never needs to read or
-// show a shop's existing stock, so every photo just goes into the CSV.
-async function importPhotosForShop(files, targetRestId, statusEl, btn, skipMatching) {
+// pointed at whichever restId is relevant. menuItems is an array of
+// {id, name, ...} for that shop, taken from data ALREADY held in memory
+// (state.menuItems for the shop's own view, opAllPartners for the operator
+// panel) — never fetched fresh here, so this adds zero extra Firebase
+// reads no matter who calls it. Pass an empty/missing array only if truly
+// no menu data is available; matching is then simply skipped.
+async function importPhotosForShop(files, targetRestId, statusEl, btn, menuItems) {
   statusEl.style.display = "block";
   statusEl.style.color = "var(--marigold)";
   if (btn) btn.disabled = true;
 
   try {
     if (!targetRestId) throw new Error("No shop selected.");
-    const { db, ref, get, update } = window.fb;
+    const { db, ref, update } = window.fb;
 
     // Build a lookup of existing stock item names -> id, so a photo whose
     // filename matches an item name can be attached to that item directly
-    // instead of only ending up in the CSV. Skipped entirely in
-    // skipMatching mode to avoid downloading the shop's whole menu.
+    // instead of only ending up in the CSV. Built entirely from the
+    // in-memory menuItems passed in — no network call here.
     let nameToId = {};
-    if (!skipMatching) {
-      const menuSnap = await get(ref(db, 'restaurants/' + targetRestId + '/menu'));
-      menuSnap.forEach(child => {
-        const it = child.val();
-        nameToId[normalizeMatchName(it.name)] = child.key;
-      });
-    }
+    (menuItems || []).forEach(it => {
+      nameToId[normalizeMatchName(it.name)] = it.id;
+    });
 
     const unmatched = []; // { file, url } — goes into the CSV for manual matching
     let uploaded = 0, failed = 0, attached = 0;
@@ -7074,6 +7098,13 @@ function opShowPartnerDetail(id) {
   document.getElementById('op-pm-bulk-import-status').style.display = 'none';
   document.getElementById('op-pm-bulk-photo-status').textContent = '';
   document.getElementById('op-pm-bulk-photo-status').style.display = 'none';
+  document.getElementById('op-pm-export-stock-status').textContent = '';
+  document.getElementById('op-pm-export-stock-status').style.display = 'none';
+  document.getElementById('op-pm-export-photos-status').textContent = '';
+  document.getElementById('op-pm-export-photos-status').style.display = 'none';
+  document.getElementById('op-pm-clear-stock-auth').style.display = 'none';
+  document.getElementById('op-pm-clear-stock-status').textContent = '';
+  document.getElementById('op-pm-clear-stock-status').style.display = 'none';
   opPopulatePartnerAreaSelect();
   document.getElementById('op-pm-area-status').textContent = '';
   opPopulatePartnerDriverSelect();
@@ -7113,18 +7144,190 @@ function opSettleDue() {
 }
 // Operator panel's "Bulk upload photos" — same filename-matching uploader
 // the shop itself uses (importPhotosForShop), just pointed at whichever
-// shop the operator currently has open in the partner detail modal.
+// shop the operator currently has open in the partner detail modal. The
+// shop's menu is already sitting in memory (opAllPartners is kept synced
+// via the single 'restaurants' listener in opListenPartners, which pulls
+// down every partner's full record including their menu), so we build the
+// name-matching list straight from that — no extra Firebase read.
 async function opHandleBulkPhotoUpload(e) {
   const files = Array.from(e.target.files || []);
   e.target.value = ""; // allow re-selecting the same files later
   if (!files.length) return;
+  const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
+  const menuItems = Object.entries((p && p.menu) || {}).map(([id, it]) => ({ id, name: it.name }));
   await importPhotosForShop(
     files,
     opCurrentPartnerId,
     document.getElementById('op-pm-bulk-photo-status'),
     document.getElementById('op-pm-bulk-photo-btn'),
-    true // skipMatching — operator flow only adds, never reads/shows existing stock
+    menuItems
   );
+}
+
+// ---------- Operator: Export stock (Excel) / Clear all stock ----------
+// Export builds an .xlsx with the exact columns importMenuFileForShop reads
+// (Name, Discription, Price, Unit, Photo) so the file can be re-imported
+// as-is. Built straight from the in-memory opAllPartners copy of this
+// shop's menu — no extra Firebase read.
+function opExportStock() {
+  const status = document.getElementById('op-pm-export-stock-status');
+  status.style.display = 'block';
+  status.style.color = 'var(--marigold)';
+  const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
+  const menuObj = (p && p.menu) || {};
+  const rows = Object.values(menuObj).map(it => ({
+    Name: it.name || '',
+    Discription: it.desc || '',
+    Price: it.price != null ? it.price : '',
+    Unit: it.unit || 'piece',
+    Photo: it.photo || ''
+  }));
+  if (!rows.length) {
+    status.style.color = 'var(--chili)';
+    status.textContent = 'This shop has no stock items to export.';
+    return;
+  }
+  try {
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Stock');
+    const safeName = String((p && p.restaurantName) || opCurrentPartnerId).replace(/[^a-z0-9]+/gi, '-');
+    XLSX.writeFile(wb, safeName + '-stock.xlsx');
+    status.style.color = '#2C4A37';
+    status.textContent = `Exported ${rows.length} item${rows.length === 1 ? '' : 's'}.`;
+  } catch (err) {
+    status.style.color = 'var(--chili)';
+    status.textContent = 'Export failed: ' + (err && err.message ? err.message : 'try again.');
+  }
+}
+
+// Downloads every item's uploaded photo (the Cloudinary URL stored on that
+// menu item) and bundles them into a single .zip, each file named after
+// the item. This only pulls the photos themselves — straight from
+// Cloudinary — using the photo URLs already sitting in the in-memory
+// opAllPartners copy of this shop's menu; it never touches the Firebase
+// database again, so it adds nothing to Firebase's download/bandwidth
+// usage. Item name clashes (two items with the same name) get -2, -3 etc.
+// appended so no photo silently overwrites another in the zip.
+async function opExportPhotos() {
+  const status = document.getElementById('op-pm-export-photos-status');
+  status.style.display = 'block';
+  status.style.color = 'var(--marigold)';
+  const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
+  const menuObj = (p && p.menu) || {};
+  const items = Object.values(menuObj).filter(it => it.photo);
+  if (!items.length) {
+    status.style.color = 'var(--chili)';
+    status.textContent = 'No items with photos to export.';
+    return;
+  }
+  if (typeof JSZip === 'undefined') {
+    status.style.color = 'var(--chili)';
+    status.textContent = "Zip library didn't load — check your connection and try again.";
+    return;
+  }
+  const btn = document.getElementById('op-pm-export-photos-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const zip = new JSZip();
+    const usedNames = {};
+    let done = 0, failed = 0;
+    for (const it of items) {
+      status.textContent = `Downloading photo ${done + failed + 1}/${items.length}…`;
+      try {
+        const res = await fetch(it.photo);
+        if (!res.ok) throw new Error('fetch failed');
+        const blob = await res.blob();
+        let ext = (blob.type && blob.type.split('/')[1]) || '';
+        if (!ext || ext.length > 5 || ext.includes('+')) {
+          const m = it.photo.match(/\.([a-zA-Z0-9]{2,4})(?:\?|$)/);
+          ext = m ? m[1] : 'jpg';
+        }
+        const base = String(it.name || 'item').trim().replace(/[\\/:*?"<>|]/g, '').slice(0, 80) || 'item';
+        let filename = base + '.' + ext;
+        if (usedNames[base] != null) {
+          usedNames[base]++;
+          filename = base + '-' + usedNames[base] + '.' + ext;
+        } else {
+          usedNames[base] = 1;
+        }
+        zip.file(filename, blob);
+        done++;
+      } catch (err) {
+        failed++;
+      }
+    }
+    if (done === 0) {
+      status.style.color = 'var(--chili)';
+      status.textContent = 'Could not download any photos — check your connection and try again.';
+      return;
+    }
+    status.textContent = 'Building zip…';
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const safeName = String((p && p.restaurantName) || opCurrentPartnerId).replace(/[^a-z0-9]+/gi, '-');
+    const dlUrl = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = dlUrl;
+    a.download = safeName + '-photos.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(dlUrl);
+    status.style.color = '#2C4A37';
+    status.textContent = `Done — ${done} photo${done === 1 ? '' : 's'} exported` + (failed > 0 ? `, ${failed} failed` : '') + '.';
+  } catch (err) {
+    status.style.color = 'var(--chili)';
+    status.textContent = 'Export failed: ' + (err && err.message ? err.message : 'try again.');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function opShowClearStockAuth() {
+  document.getElementById('op-pm-clear-stock-auth').style.display = 'block';
+  document.getElementById('op-pm-clear-stock-username').value = '';
+  document.getElementById('op-pm-clear-stock-password').value = '';
+  document.getElementById('op-pm-clear-stock-status').style.display = 'none';
+}
+function opCancelClearStockAuth() {
+  document.getElementById('op-pm-clear-stock-auth').style.display = 'none';
+}
+
+// Deletes this shop's ENTIRE stock. Gated on the shop's own login
+// (username + password — restId doubles as username, password checked the
+// same way doLogin() checks it, straight off the already-loaded
+// opAllPartners copy, so no extra read) so a stray tap in the operator
+// panel can't wipe a shop's stock — plus one final confirm() naming the
+// shop and item count before the delete actually fires.
+async function opConfirmClearStock() {
+  const status = document.getElementById('op-pm-clear-stock-status');
+  status.style.display = 'block';
+  const username = document.getElementById('op-pm-clear-stock-username').value.trim();
+  const password = document.getElementById('op-pm-clear-stock-password').value;
+  const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
+  if (!p) { status.style.color = 'var(--chili)'; status.textContent = 'Shop not found.'; return; }
+  if (username !== p._id || password !== p.password) {
+    status.style.color = 'var(--chili)';
+    status.textContent = "Username or password doesn't match this shop's login.";
+    return;
+  }
+  const itemCount = Object.keys(p.menu || {}).length;
+  if (!confirm(`This will permanently delete all ${itemCount} stock item(s) for "${p.restaurantName || p._id}". This cannot be undone. Continue?`)) {
+    return;
+  }
+  status.style.color = 'var(--marigold)';
+  status.textContent = 'Clearing…';
+  try {
+    const { db, ref, remove } = window.fb;
+    await remove(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu'));
+    status.style.color = '#2C4A37';
+    status.textContent = 'All stock cleared.';
+    document.getElementById('op-pm-clear-stock-auth').style.display = 'none';
+    showToast('Stock cleared for ' + (p.restaurantName || p._id));
+  } catch (err) {
+    status.style.color = 'var(--chili)';
+    status.textContent = 'Failed: ' + (err && err.message ? err.message : 'check your connection and try again.');
+  }
 }
 
 // Operator panel's "Bulk import stock" — same Excel/CSV importer the shop
