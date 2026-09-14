@@ -1834,6 +1834,11 @@
         <p class="op-note" id="op-pm-area-status" style="margin-top:4px;"></p>
       </div>
       <div style="margin-top:14px;">
+        <p class="op-note" style="margin-bottom:4px;">Delivery zone — the exact area this shop delivers to (a custom shape, separate from the Area above). Drawing it here saves straight to the shop, so it shows up already set in their own app.</p>
+        <p class="op-note" id="op-pm-zone-status" style="margin-bottom:6px;">—</p>
+        <button type="button" class="op-btn op-btn-push" id="op-pm-zone-btn" onclick="opOpenShopZoneModal(opCurrentPartnerId)">🗺️ Draw delivery zone</button>
+      </div>
+      <div style="margin-top:14px;">
         <p class="op-note" style="margin-bottom:4px;">Assigned delivery boy — a bike driver dedicated to this shop. Once set, every order this shop marks "ready" goes straight to this driver only, instead of the usual nearest-free-bike matching.</p>
         <select id="op-pm-driver-select" style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
         <button type="button" class="op-btn op-btn-push" onclick="opSavePartnerDeliveryBoy()">💾 Save delivery boy</button>
@@ -1924,7 +1929,7 @@
   <div class="op-modal-overlay" id="op-zone-boundary-modal">
     <div class="op-modal-card op-modal-card-wide">
       <h3 id="op-zb-title">Zone boundary</h3>
-      <p class="op-note" style="margin-bottom:8px;">Draw the area this zone covers — tap the map to add points (3+ needed). Used to match drivers to nearby orders/rides by zone.</p>
+      <p class="op-note" id="op-zb-desc" style="margin-bottom:8px;">Draw the area this zone covers — tap the map to add points (3+ needed). Used to match drivers to nearby orders/rides by zone.</p>
       <div class="op-search-box" style="margin-bottom:0;">
         <input type="text" id="op-zb-search" placeholder="Search area, street, landmark…" autocomplete="off">
       </div>
@@ -5735,6 +5740,10 @@ function opDeleteZone(id) {
    same [{lat,lng},...] shape as a restaurant's deliveryZone. ---- */
 const OP_ZB_DEFAULT_CENTER = { lat: 10.8505, lng: 76.2711 }; // Kerala, India fallback
 let opZbCurrentZoneId = null;
+// Which thing this shared map modal is currently editing — a named
+// driver_zone's boundary, or one shop's own custom delivery zone.
+// { type: 'driverZone', id: zoneId } or { type: 'shopZone', id: partnerId }
+let opZbTarget = null;
 let opZbMap = null;
 let opZbMarkers = [];
 let opZbPolygon = null;
@@ -5779,12 +5788,34 @@ function opOpenZoneBoundaryModal(zoneId) {
   const z = opAllZones.find(x => x._id === zoneId);
   if (!z) return;
   opZbCurrentZoneId = zoneId;
+  opZbTarget = { type: 'driverZone', id: zoneId };
   document.getElementById('op-zb-title').textContent = 'Boundary — ' + (z.name || zoneId);
+  document.getElementById('op-zb-desc').textContent = 'Draw the area this zone covers — tap the map to add points (3+ needed). Used to match drivers to nearby orders/rides by zone.';
   document.getElementById('op-zb-error').style.display = 'none';
   document.getElementById('op-zb-search').value = '';
   opZbHideSearchResults();
   opZbPoints = Array.isArray(z.bounds) ? z.bounds.map(p => ({ lat: p.lat, lng: p.lng })) : [];
+  opZbShowMap();
+}
 
+// Same shared map modal, pointed at one shop's own custom delivery zone
+// (restaurants/{id}.deliveryZone) instead of a named driver_zones boundary.
+// Saving here writes straight to the shop's own record, so it shows up
+// already set the next time that shop opens their own app.
+function opOpenShopZoneModal(partnerId) {
+  const p = opAllPartners.find(x => x._id === partnerId);
+  if (!p) return;
+  opZbTarget = { type: 'shopZone', id: partnerId };
+  document.getElementById('op-zb-title').textContent = 'Delivery zone — ' + (p.restaurantName || partnerId);
+  document.getElementById('op-zb-desc').textContent = "Draw the area this shop delivers to — tap the map to add points (3+ needed). This is the shop's own delivery zone; saving here sets it for the shop too.";
+  document.getElementById('op-zb-error').style.display = 'none';
+  document.getElementById('op-zb-search').value = '';
+  opZbHideSearchResults();
+  opZbPoints = Array.isArray(p.deliveryZone) ? p.deliveryZone.map(pt => ({ lat: pt.lat, lng: pt.lng })) : [];
+  opZbShowMap();
+}
+
+function opZbShowMap() {
   const startLat = (opZbPoints[0] && opZbPoints[0].lat) ?? OP_ZB_DEFAULT_CENTER.lat;
   const startLng = (opZbPoints[0] && opZbPoints[0].lng) ?? OP_ZB_DEFAULT_CENTER.lng;
 
@@ -5805,6 +5836,14 @@ function opOpenZoneBoundaryModal(zoneId) {
 function opZbUndo() { opZbPoints.pop(); opZbRedraw(); }
 function opZbClear() { opZbPoints = []; opZbRedraw(); }
 
+// Updates the "Delivery zone" status line in the Partner detail modal.
+function opRenderShopZoneStatus(p) {
+  const el = document.getElementById('op-pm-zone-status');
+  if (!el) return;
+  const has = Array.isArray(p.deliveryZone) && p.deliveryZone.length >= 3;
+  el.textContent = has ? '📍 Zone set' : '⚠️ No zone set yet';
+}
+
 function opSaveZoneBoundary() {
   const errEl = document.getElementById('op-zb-error');
   errEl.style.display = 'none';
@@ -5813,10 +5852,20 @@ function opSaveZoneBoundary() {
     errEl.style.display = 'block';
     return;
   }
-  if (!opZbCurrentZoneId) return;
+  if (!opZbTarget) return;
   const { db, ref, update } = window.fb;
-  update(ref(db, 'driver_zones/' + opZbCurrentZoneId), { bounds: opZbPoints })
+  const isShopZone = opZbTarget.type === 'shopZone';
+  const path = isShopZone ? 'restaurants/' + opZbTarget.id : 'driver_zones/' + opZbTarget.id;
+  const field = isShopZone ? 'deliveryZone' : 'bounds';
+  update(ref(db, path), { [field]: opZbPoints })
     .then(() => {
+      if (isShopZone) {
+        const p = opAllPartners.find(x => x._id === opZbTarget.id);
+        if (p) {
+          p.deliveryZone = opZbPoints;
+          if (opCurrentPartnerId === opZbTarget.id) opRenderShopZoneStatus(p);
+        }
+      }
       document.getElementById('op-zone-boundary-modal').classList.remove('show');
     })
     .catch(err => { errEl.textContent = 'Error: ' + err.message; errEl.style.display = 'block'; });
@@ -6949,6 +6998,7 @@ function opShowPartnerDetail(id) {
   document.getElementById('op-pm-category-status').textContent = '';
   opRenderShopPhoto(p.photo || '');
   document.getElementById('op-pm-shop-photo-status').textContent = '';
+  opRenderShopZoneStatus(p);
   document.getElementById('op-pm-bulk-import-status').textContent = '';
   document.getElementById('op-pm-bulk-import-status').style.display = 'none';
   document.getElementById('op-pm-bulk-photo-status').textContent = '';
