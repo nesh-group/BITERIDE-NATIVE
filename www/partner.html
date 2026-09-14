@@ -1812,6 +1812,14 @@
         <p class="op-note" id="op-pm-settle-status" style="margin-top:4px;"></p>
       </div>
       <div style="margin-top:14px;">
+        <p class="op-note" style="margin-bottom:6px;">Shop photo — shown on this shop's card in the customer app list.</p>
+        <img id="op-pm-shop-photo-preview" style="display:none; width:100%; max-height:160px; object-fit:cover; border-radius:10px; margin-bottom:8px;" />
+        <input type="file" id="op-pm-shop-photo-input" accept="image/*" style="display:none;" onchange="handleOpShopPhotoSelect(event)" />
+        <button type="button" class="op-btn op-btn-push" id="op-pm-shop-photo-btn" onclick="document.getElementById('op-pm-shop-photo-input').click()">📷 Upload shop photo</button>
+        <button type="button" class="op-btn op-btn-danger" id="op-pm-shop-photo-remove-btn" style="display:none;" onclick="opRemoveShopPhoto()">Remove photo</button>
+        <p class="op-note" id="op-pm-shop-photo-status" style="margin-top:4px;"></p>
+      </div>
+      <div style="margin-top:14px;">
         <p class="op-note" style="margin-bottom:4px;">Shop category badge — shown on top of this shop's photo in the customer app list. Leave blank to hide.</p>
         <div class="op-search-box" style="margin-bottom:6px;">
           <input type="text" id="op-pm-category-input" list="shop-category-suggestions" placeholder="e.g. Bakery, Pure Veg, Bestseller" maxlength="24">
@@ -6939,6 +6947,8 @@ function opShowPartnerDetail(id) {
   document.getElementById('op-pm-settle-status').textContent = '';
   document.getElementById('op-pm-category-input').value = p.opCategory || '';
   document.getElementById('op-pm-category-status').textContent = '';
+  opRenderShopPhoto(p.photo || '');
+  document.getElementById('op-pm-shop-photo-status').textContent = '';
   document.getElementById('op-pm-bulk-import-status').textContent = '';
   document.getElementById('op-pm-bulk-import-status').style.display = 'none';
   document.getElementById('op-pm-bulk-photo-status').textContent = '';
@@ -7026,6 +7036,66 @@ function opSaveShopCategory() {
   update(ref(db, 'restaurants/' + opCurrentPartnerId), { opCategory: value }).then(() => {
     p.opCategory = value;
     status.textContent = value ? 'Saved — badge shows "' + value + '".' : 'Saved — badge hidden.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+// ---- Operator panel: shop photo (uploads to the same `restaurants/{id}.photo`
+// field the shop's own "Restaurant photo" uploader writes to — same
+// Cloudinary resize/upload helpers, just pointed at whichever shop the
+// operator currently has open in the partner detail modal). ----
+function opRenderShopPhoto(url) {
+  const preview = document.getElementById('op-pm-shop-photo-preview');
+  const removeBtn = document.getElementById('op-pm-shop-photo-remove-btn');
+  if (url) {
+    preview.src = url; preview.style.display = 'block';
+    removeBtn.style.display = 'inline-block';
+  } else {
+    preview.style.display = 'none';
+    removeBtn.style.display = 'none';
+  }
+}
+function handleOpShopPhotoSelect(e) {
+  const file = e.target.files[0];
+  e.target.value = ""; // allow re-selecting the same file later
+  if (!file || !opCurrentPartnerId) return;
+  const partnerId = opCurrentPartnerId;
+  const status = document.getElementById('op-pm-shop-photo-status');
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = async () => {
+      opRenderShopPhoto(ev.target.result); // instant local preview
+      status.textContent = 'Uploading photo...';
+      try {
+        const blob = await resizeImageToBlob(img, 800, 0.7);
+        const url = await uploadPhotoToCloudinary(blob);
+        const { db, ref, update } = window.fb;
+        await update(ref(db, 'restaurants/' + partnerId), { photo: url });
+        const p = opAllPartners.find(x => x._id === partnerId);
+        if (p) p.photo = url;
+        if (opCurrentPartnerId === partnerId) opRenderShopPhoto(url);
+        status.textContent = 'Shop photo updated.';
+      } catch (err) {
+        status.textContent = "Couldn't upload photo — check your connection and try again.";
+        const p = opAllPartners.find(x => x._id === partnerId);
+        if (opCurrentPartnerId === partnerId) opRenderShopPhoto(p ? (p.photo || '') : '');
+      }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function opRemoveShopPhoto() {
+  if (!opCurrentPartnerId) return;
+  const partnerId = opCurrentPartnerId;
+  const status = document.getElementById('op-pm-shop-photo-status');
+  opRenderShopPhoto("");
+  status.textContent = 'Removing...';
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'restaurants/' + partnerId), { photo: null }).then(() => {
+    const p = opAllPartners.find(x => x._id === partnerId);
+    if (p) p.photo = null;
+    status.textContent = 'Shop photo removed.';
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 function opTogglePartnerStatus() {
