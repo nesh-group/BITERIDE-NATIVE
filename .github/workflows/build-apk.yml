@@ -15,10 +15,10 @@ name: Build Combined APK (Driver + Partner)
 #
 # NOTE on permissions: bus.html is the only portal that needs background
 # location (ACCESS_BACKGROUND_LOCATION, FOREGROUND_SERVICE_LOCATION) so it
-# keeps broadcasting with the screen off / app swiped away. Because all
-# three portals ship in one APK, Android grants that permission to the
-# WHOLE app — driver.html/partner.html simply never call the APIs that use
-# it, so nothing changes for them.
+# keeps broadcasting every ~20s with the screen off / app swiped away.
+# Because all three portals ship in one APK, Android grants that
+# permission to the WHOLE app — driver.html/partner.html simply never
+# call the APIs that use it, so nothing changes for them.
 #
 # IMPORTANT: because there is now only one app package
 # (com.yourcompany.neshapp instead of two), you must register a NEW
@@ -81,9 +81,9 @@ jobs:
           fi
 
           # Added for the Bus operator portal — lets bus.html keep sending
-          # location with the screen off or the app swiped away (driver.html
-          # and partner.html don't request these, so they're unaffected and
-          # stay foreground-only as before).
+          # location every ~20s with the screen off or the app swiped away
+          # (driver.html and partner.html don't request these, so they're
+          # unaffected and stay foreground-only as before).
           if ! grep -q "ACCESS_BACKGROUND_LOCATION" "$MANIFEST"; then
             sed -i '/<manifest /a\    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />' "$MANIFEST"
           fi
