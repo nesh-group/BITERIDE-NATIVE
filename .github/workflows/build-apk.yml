@@ -54,8 +54,12 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # android-actions/setup-android@v3 used to be here, but it calls the
+      # legacy `sdkmanager ... tools` command — Google discontinued that
+      # 'tools' package, so the action now fails every run with "Failed to
+      # find package 'tools'". GitHub's ubuntu-latest runners already ship
+      # a full Android SDK (cmdline-tools included) at $ANDROID_HOME/
+      # $ANDROID_SDK_ROOT, so the step was just removed rather than fixed.
 
       - name: Install project dependencies
         run: |
