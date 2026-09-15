@@ -283,7 +283,7 @@
   let wakeLock = null;
   let lastSentAt = 0;
   let heartbeatTimer = null;
-  const SEND_INTERVAL_MS = 15000;
+  const SEND_INTERVAL_MS = 20000;
   const HEARTBEAT_MS = 60000;
 
   function setStatusUI(onDuty) {
@@ -339,9 +339,20 @@
         stale: false,
         distanceFilter: 25
       }, (location, error) => {
-        if (error) { console.warn('BackgroundGeolocation error', error); return; }
+        if (error) {
+          console.warn('BackgroundGeolocation error', error);
+          // Surface it instead of failing silently — this is almost
+          // always the "Allow all the time" background location
+          // permission not being granted in Android Settings, which
+          // looks exactly like "goes offline when app closes".
+          alert('Background location error: ' + (error.message || JSON.stringify(error)) + '\n\nGo to Settings → Apps → NESH → Permissions → Location, and set it to "Allow all the time".');
+          return;
+        }
         if (location) sendLocation(location.latitude, location.longitude, location.speed);
-      }).then(id => { bgWatcherId = id; });
+      }).then(id => { bgWatcherId = id; }).catch(err => {
+        console.warn('BackgroundGeolocation addWatcher failed', err);
+        alert('Could not start background tracking: ' + (err && err.message ? err.message : err) + '\n\nCheck that Location permission is set to "Allow all the time" in Settings → Apps → NESH → Permissions, and that Battery/Battery-saver restrictions for this app are turned off.');
+      });
     } else {
       if (!navigator.geolocation) { alert('GPS not available on this device/browser.'); toggle.checked = false; stopHeartbeat(); return; }
       requestWakeLock();
