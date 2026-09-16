@@ -110,6 +110,8 @@ jobs:
           sed -i "s#com\.android\.tools\.build:gradle:[0-9.]*#com.android.tools.build:gradle:8.6.0#" build.gradle
           sed -i -E "s/compileSdkVersion( *=)? *[0-9]+/compileSdkVersion = 35/" variables.gradle
           sed -i -E "s/targetSdkVersion( *=)? *[0-9]+/targetSdkVersion = 35/" variables.gradle
+          # play-services-location:21.4.0 requires minSdk 23+; project default (22) is too low.
+          sed -i -E "s/minSdkVersion( *=)? *[0-9]+/minSdkVersion = 23/" variables.gradle
           echo "---- variables.gradle after bump ----"
           cat variables.gradle
           echo "---- AGP version after bump ----"
