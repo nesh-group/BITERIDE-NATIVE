@@ -13,12 +13,14 @@ name: Build Combined APK (Driver + Partner)
 #   www/bus.html     <- bus operator app (stops + live location broadcast)
 #   www/manifest.json, www/icon-192.png, www/icon-512.png (shared, as before)
 #
-# NOTE on permissions: bus.html is the only portal that needs background
-# location (ACCESS_BACKGROUND_LOCATION, FOREGROUND_SERVICE_LOCATION) so it
-# keeps broadcasting every ~20s with the screen off / app swiped away.
-# Because all three portals ship in one APK, Android grants that
-# permission to the WHOLE app — driver.html/partner.html simply never
-# call the APIs that use it, so nothing changes for them.
+# NOTE on permissions: bus.html and driver.html both need background
+# location (ACCESS_BACKGROUND_LOCATION, FOREGROUND_SERVICE_LOCATION) so
+# they keep broadcasting the driver/bus's position every so often with the
+# screen off or the app swiped away — bus.html every ~20s, driver.html
+# via @capgo/background-geolocation's distance-filtered updates while a
+# driver is online. Because all three portals ship in one APK, Android
+# grants that permission to the WHOLE app — partner.html simply never
+# calls the APIs that use it, so nothing changes there.
 #
 # IMPORTANT: because there is now only one app package
 # (com.yourcompany.neshapp instead of two), you must register a NEW
@@ -64,7 +66,7 @@ jobs:
       - name: Install project dependencies
         run: |
           npm install --legacy-peer-deps
-          npm install @capacitor-community/background-geolocation --legacy-peer-deps
+          npm install @capgo/background-geolocation --legacy-peer-deps
 
       - name: Generate native Android project (if not already present)
         run: |
@@ -72,6 +74,23 @@ jobs:
             npx cap init "NESH" "com.yourcompany.neshapp" --web-dir www
             npx cap add android
           fi
+
+      # @capgo/background-geolocation needs this Capacitor config flag on
+      # Android, otherwise location updates from the WebView still halt
+      # after ~5 minutes in the background — the exact bug this plugin
+      # swap was meant to fix. Patched here (idempotent) since
+      # capacitor.config.json is committed to the repo and cap init only
+      # creates it fresh the very first time.
+      - name: Enable Android legacy bridge for background-geolocation
+        run: |
+          node -e "
+            const fs = require('fs');
+            const path = 'capacitor.config.json';
+            const cfg = JSON.parse(fs.readFileSync(path, 'utf8'));
+            cfg.android = cfg.android || {};
+            cfg.android.useLegacyBridge = true;
+            fs.writeFileSync(path, JSON.stringify(cfg, null, 2));
+          "
 
       - name: Add permissions and native components to AndroidManifest.xml
         # android/ is regenerated from scratch every run (never committed),
@@ -489,8 +508,14 @@ jobs:
           cat > "$PKG_PATH/AlertFcmService.java" << 'EOF'
           package com.yourcompany.neshapp;
 
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
           import android.content.Intent;
+          import android.os.Build;
           import androidx.annotation.NonNull;
+          import androidx.core.app.NotificationCompat;
+          import androidx.core.app.NotificationManagerCompat;
           import androidx.core.content.ContextCompat;
           import com.google.firebase.messaging.FirebaseMessagingService;
           import com.google.firebase.messaging.RemoteMessage;
@@ -512,11 +537,25 @@ jobs:
           //                    on "::" to get restId/orderId back out)
           //   new_order    -> data.orderId                        (plain)
           public class AlertFcmService extends FirebaseMessagingService {
+              private static final int CANCEL_NOTIF_ID = 4322;
+
               @Override
               public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
                   super.onMessageReceived(remoteMessage);
                   Map<String, String> data = remoteMessage.getData();
                   String type = data.get("type");
+
+                  // Order was cancelled — kill the looping alarm sound /
+                  // vibration / full-screen ring immediately (this is the
+                  // ONLY type that stops RingingService instead of
+                  // starting it). Swap in a short, silent, auto-dismissing
+                  // notice instead — NOT the order_alert ring sound, and
+                  // it never lingers: gone on its own after 5s.
+                  if ("cancel_ring".equals(type)) {
+                      stopService(new Intent(this, RingingService.class));
+                      showCancelNotice(data.get("title"), data.get("body"));
+                      return;
+                  }
 
                   String kind;
                   String id;
@@ -548,6 +587,35 @@ jobs:
                   serviceIntent.putExtra("title", data.get("title"));
                   serviceIntent.putExtra("body", data.get("body"));
                   ContextCompat.startForegroundService(this, serviceIntent);
+              }
+
+              // Plain notice that the order got cancelled — deliberately
+              // NOT run through RingingService: no loop, no alarm sound,
+              // no full-screen intent, no "ongoing" flag. setTimeoutAfter
+              // makes the system auto-cancel it 5s after it's posted, so
+              // it never needs a matching cancel() call anywhere else.
+              private void showCancelNotice(String title, String body) {
+                  String channelId = "order_cancel_notice";
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationManager manager = getSystemService(NotificationManager.class);
+                      if (manager.getNotificationChannel(channelId) == null) {
+                          NotificationChannel channel = new NotificationChannel(
+                              channelId, "Order Cancelled", NotificationManager.IMPORTANCE_DEFAULT
+                          );
+                          manager.createNotificationChannel(channel);
+                      }
+                  }
+
+                  Notification notification = new NotificationCompat.Builder(this, channelId)
+                      .setSmallIcon(android.R.drawable.ic_menu_close_clear_cancel)
+                      .setContentTitle(title != null ? title : "Order Cancelled")
+                      .setContentText(body != null ? body : "The customer cancelled this order.")
+                      .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                      .setAutoCancel(true)
+                      .setTimeoutAfter(5000)
+                      .build();
+
+                  NotificationManagerCompat.from(this).notify(CANCEL_NOTIF_ID, notification);
               }
           }
           EOF
