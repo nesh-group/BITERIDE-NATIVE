@@ -54,7 +54,17 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          # Must be 21+, not 17: bcprov-jdk18on-1.79.jar (pulled in by
+          # capgo-background-geolocation) is a Multi-Release JAR with
+          # class files under META-INF/versions/21/ targeting Java 21.
+          # JDK 17 can't parse those entries, so Gradle's own classpath
+          # instrumentation step fails on that exact jar every time with
+          # "Failed to create Jar file ... bcprov-jdk18on-1.79.jar" — a
+          # deterministic JDK/jar mismatch, not a flaky race (confirmed:
+          # retries and --max-workers=1 didn't help, because there was
+          # never a race to lose). JDK 21 can read those entries, and
+          # both Gradle 8.2.1 and the AGP version here run fine on it.
+          java-version: '21'
 
       # android-actions/setup-android@v3 used to be here, but it calls the
       # legacy `sdkmanager ... tools` command — Google discontinued that
@@ -979,21 +989,7 @@ jobs:
           NESH_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           NESH_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           NESH_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          chmod +x gradlew
-          # Gradle has a known race condition in its dependency-artifact-
-          # transform cache: when multiple worker threads try to
-          # materialize the SAME jar (e.g. bcprov-jdk18on, pulled in by
-          # capgo-background-geolocation) into the module cache at once,
-          # one loses the race and the whole build fails with
-          # "Failed to create Jar file ... ExecutionException". Retrying
-          # alone isn't reliable — this project's dependency graph hits
-          # the same race deterministically on this runner's core count,
-          # so all 3 retries failed the exact same way. --max-workers=1
-          # forces every transform through one worker, one at a time, so
-          # there's never a second thread to race against — this removes
-          # the failure at the source rather than hoping a retry dodges it.
-          ./gradlew assembleDebug --max-workers=1
+        run: chmod +x gradlew && ./gradlew assembleDebug
 
       - name: Upload the built APK (for you to download from the Actions tab)
         uses: actions/upload-artifact@v4
