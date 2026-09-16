@@ -72,6 +72,18 @@
     width:100%; text-align:center; padding:8px; background:none; border:none;
     color:var(--marigold); font-size:14px; cursor:pointer; font-family:'Inter',sans-serif;
   }
+  .btn-outline{
+    padding:10px 14px; border-radius:10px; background:transparent; border:1.5px solid var(--marigold);
+    color:var(--marigold); font-weight:600; font-size:13px; font-family:'Inter',sans-serif; cursor:pointer;
+  }
+  .btn-outline:active{ transform:scale(0.98); }
+  .photo-picker-row{ display:flex; align-items:center; gap:14px; }
+  .photo-avatar{
+    width:64px; height:64px; border-radius:50%; flex-shrink:0; overflow:hidden;
+    background:var(--field-bg); border:1.5px solid var(--field-border);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .photo-avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
   .btn-back{ background:none; border:none; color:var(--marigold); cursor:pointer; padding:0; display:flex; }
   .type-toggle{ display:flex; gap:10px; }
   .type-opt{
@@ -446,6 +458,21 @@
         </div>
       </div>
       <p class="hint-text" id="reg-service-vehicle-note" style="display:none; margin:-8px 0 0; font-size:11px;">Auto/Cab drivers do taxi rides only — food &amp; grocery delivery is for bike drivers.</p>
+      <p class="hint-text" style="text-transform:uppercase; letter-spacing:1px; font-family:'IBM Plex Mono',monospace; font-size:11px;">Your photo (required)</p>
+      <div class="photo-picker-row">
+        <div class="photo-avatar" id="reg-photo-avatar">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--muted-2)" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+        </div>
+        <div class="flex-1">
+          <div class="row-flex">
+            <button type="button" class="btn-outline flex-1" id="reg-photo-camera-btn">📷 Take photo</button>
+            <button type="button" class="btn-outline flex-1" id="reg-photo-gallery-btn">🖼️ Gallery</button>
+          </div>
+          <p class="hint-text" style="margin-top:6px;">Customers see this when a driver is matched to their ride — clear face photo, no helmet.</p>
+        </div>
+        <input type="file" accept="image/*" capture="user" id="reg-photo-camera-input" style="display:none;" />
+        <input type="file" accept="image/*" id="reg-photo-gallery-input" style="display:none;" />
+      </div>
       <p class="hint-text" style="text-transform:uppercase; letter-spacing:1px; font-family:'IBM Plex Mono',monospace; font-size:11px;">Vehicle type</p>
       <div class="type-toggle" id="reg-type-toggle">
         <div class="type-opt active" data-type="bike">
@@ -617,6 +644,22 @@
       <p class="eyebrow">ACCOUNT</p>
       <h1 class="title" id="account-driver-name">Driver</h1>
       <p class="subtitle" id="account-driver-vehicle"></p>
+    </div>
+    <div class="px">
+      <div class="photo-picker-row">
+        <div class="photo-avatar" id="account-photo-avatar" style="width:64px; height:64px;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--muted-2)" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+        </div>
+        <div class="flex-1">
+          <div class="row-flex">
+            <button type="button" class="btn-outline flex-1" id="account-photo-camera-btn">📷 Take photo</button>
+            <button type="button" class="btn-outline flex-1" id="account-photo-gallery-btn">🖼️ Gallery</button>
+          </div>
+          <p class="hint-text" id="account-photo-hint" style="margin-top:6px; display:none;">Required before you can go online — customers see this photo when matched to your ride.</p>
+        </div>
+        <input type="file" accept="image/*" capture="user" id="account-photo-camera-input" style="display:none;" />
+        <input type="file" accept="image/*" id="account-photo-gallery-input" style="display:none;" />
+      </div>
     </div>
     <div class="earn-card">
       <div class="earn-item">
@@ -1004,7 +1047,7 @@ function applyFriendlyLocationLabel(el, pos) {
 // gets to see it in their popup. Mirrors NEAREST_TIMEOUT_MS in the worker,
 // but is enforced here too (independent of push delivery) so the in-app
 // popup never lags behind by the worker's minute-level Cron granularity.
-const NEAREST_WINDOW_MS = 25 * 1000;
+const NEAREST_WINDOW_MS = 10 * 1000;
 const MAX_MATCH_RADIUS_KM = 12;
 const LOCATION_STALE_MS = 3 * 60 * 1000;
 const NEAR_OVERRIDE_KM = 0.5; // within this distance, candidates are compared by order count (see rankAmongCandidates)
@@ -1496,11 +1539,24 @@ async function handlePopupRideAction(rideId, action) {
     clearDeliveredNotifications();
     // If we're a zone-priority driver, release our exclusive hold right
     // away so every other driver's rotation opens up immediately instead
-    // of waiting out the full 25s window. Harmless no-op if this job
-    // wasn't actually being held for us.
+    // of waiting out the full NEAREST_WINDOW_MS window. Harmless no-op if
+    // this job wasn't actually being held for us.
     if (state.driver && state.driver.zonePriority === true) {
       const { db, ref, update } = window.fb;
       update(ref(db, 'rides/' + rideId), { zoneHoldReleasedAt: Date.now() }).catch(() => {});
+    }
+    // If the customer specifically approved me as the candidate for this
+    // ride (see index.html's driver-candidate approval flow), skipping it
+    // must hand it back rather than let it quietly vanish — clear the
+    // routing and record the decline so the customer's app moves on to
+    // the next-nearest driver instead of this one being offered again.
+    const rideInCache = ridesCache[rideId];
+    if (rideInCache && rideInCache.candidateDriverId === state.username) {
+      const { db, ref, update } = window.fb;
+      update(ref(db, 'rides/' + rideId), {
+        candidateDriverId: null,
+        ['declinedDriverIds/' + state.username]: true,
+      }).catch(() => {});
     }
     refreshRidePopupFromCache();
     return;
@@ -1608,18 +1664,18 @@ function driverOnlineSince(driverId) {
 
 // Ranks this driver among every other currently-matching online candidate
 // within MAX_MATCH_RADIUS_KM, so we know whose "turn" it is to be offered a
-// job. Ranking is by order count first — whoever has been assigned the
-// fewest rides+deliveries so far goes first, regardless of distance — then
-// by onlineSince (longest-waiting session first) as a tiebreak, then by
-// raw distance as a final tiebreak. Within NEAR_OVERRIDE_KM of the pickup,
-// the pool is narrowed to just those near candidates first, but the same
-// count-then-tiebreak ordering still applies among them — being close
-// doesn't skip the fairness ordering, it only narrows who's compared.
-// Returns rank -1 if this driver doesn't have a location fix yet (or is
-// excluded as busy, see includeBusy). When includeBusy is false, busy
-// drivers (isBusy on their taxi_drivers record) — including this one, via
-// amIBusy — are left out of the pool entirely, so free drivers always get
-// first claim on a job.
+// job. Ranking is distance-first — the nearest driver to the pickup wins.
+// But drivers who are clustered close together shouldn't have it decided by
+// a handful of metres: any candidate within NEAR_OVERRIDE_KM of whoever's
+// nearest is pulled into that same "cluster", and within the cluster it's
+// order count that decides — whoever has been assigned the fewest
+// rides+deliveries so far goes first — then onlineSince (longest-waiting
+// session first) as a tiebreak, then raw distance as a final tiebreak.
+// Candidates outside the cluster keep their plain distance order. Returns
+// rank -1 if this driver doesn't have a location fix yet (or is excluded as
+// busy, see includeBusy). When includeBusy is false, busy drivers (isBusy on
+// their taxi_drivers record) — including this one, via amIBusy — are left
+// out of the pool entirely, so free drivers always get first claim on a job.
 // Zone-aware candidate search order for a pickup point: the zone the point
 // actually falls inside comes first (if any), then every other drawn zone
 // nearest-centroid-first, and finally null (meaning "ignore zones, just use
@@ -1676,19 +1732,26 @@ function rankAmongCandidates(pickup, matchFn, myDistanceKm, amIBusy, includeBusy
     candidates = candidatesForZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, zoneId);
     if (candidates.length) break;
   }
-  // Within NEAR_OVERRIDE_KM, narrow the pool to just the near candidates —
-  // but even among them, it's the one with fewer orders so far who wins,
-  // not just whoever is physically closest. Distance only breaks a tie
-  // when order counts are equal.
-  const veryNear = candidates.filter(c => c.distanceKm <= NEAR_OVERRIDE_KM);
-  const pool = veryNear.length > 0 ? veryNear : candidates;
-  pool.sort((a, b) => {
+  // Distance-first: sort everyone by raw distance to the pickup, nearest
+  // first. Then pull out the "cluster" — every candidate within
+  // NEAR_OVERRIDE_KM of whoever's nearest — since a few hundred metres
+  // shouldn't be the deciding factor among drivers who are all basically
+  // right there. Within that cluster, order count decides (fewest orders
+  // so far wins), then onlineSince, then raw distance as a final tiebreak.
+  // Anyone farther than the cluster keeps their plain distance ranking.
+  const byDistance = candidates.slice().sort((a, b) => a.distanceKm - b.distanceKm);
+  if (!byDistance.length) return { rank: -1, total: 0 };
+  const minDistanceKm = byDistance[0].distanceKm;
+  const cluster = byDistance.filter(c => c.distanceKm - minDistanceKm <= NEAR_OVERRIDE_KM);
+  const rest = byDistance.filter(c => c.distanceKm - minDistanceKm > NEAR_OVERRIDE_KM);
+  cluster.sort((a, b) => {
     const countDiff = driverOrderCount(a.id) - driverOrderCount(b.id);
     if (countDiff !== 0) return countDiff;
     const onlineDiff = driverOnlineSince(a.id) - driverOnlineSince(b.id);
     if (onlineDiff !== 0) return onlineDiff;
     return a.distanceKm - b.distanceKm;
   });
+  const pool = [...cluster, ...rest];
   return { rank: pool.findIndex(c => c.id === state.username), total: pool.length };
 }
 function myDistanceToPickup(pickup) {
@@ -1902,11 +1965,16 @@ function refreshRidePopupFromCache() {
     ? Object.keys(ridesCache)
         .map(id => Object.assign({ _id: id, _kind: 'ride' }, ridesCache[id]))
         .filter(r => r.status === 'searching' && !skippedRideIds.has(r._id))
-        // Operator-assigned rides: only the assigned driver ever sees it
-        // (bypassing vehicle-type match and the nearest-first ranking below)
-        // — anyone else's app filters it out entirely.
-        .filter(r => r.assignedDriverId ? r.assignedDriverId === state.username : r.vehicleType === state.driver.vehicleType)
-        .filter(r => r.assignedDriverId === state.username || shouldOfferToMe(r.pickup, r.createdAt, rideMatchFn, amIBusy, r.zoneHoldReleasedAt))
+        // Operator-assigned rides, and rides the customer has specifically
+        // approved this driver for (candidateDriverId — see index.html's
+        // driver-candidate approval flow): only that one driver ever sees
+        // it (bypassing vehicle-type match and the nearest-first ranking
+        // below) — anyone else's app filters it out entirely.
+        .filter(r => {
+          const forcedTo = r.assignedDriverId || r.candidateDriverId;
+          return forcedTo ? forcedTo === state.username : r.vehicleType === state.driver.vehicleType;
+        })
+        .filter(r => r.assignedDriverId === state.username || r.candidateDriverId === state.username || shouldOfferToMe(r.pickup, r.createdAt, rideMatchFn, amIBusy, r.zoneHoldReleasedAt))
         .map(r => Object.assign({}, r, { _distanceKm: r.pickup ? myDistanceToPickup(r.pickup) : null }))
     : [];
 
@@ -2072,6 +2140,73 @@ document.querySelectorAll('#reg-service-toggle .type-opt').forEach(opt => {
     opt.classList.toggle('active');
   });
 });
+// ---------- Driver photo: capture, compress to a small JPEG data URL ----------
+// No Cloudinary/storage bucket wired up for this app, so the compressed
+// photo is stored directly as a base64 data URL on the driver record
+// (taxi_drivers/{id}.photo) — small enough (a few KB) for Realtime Database.
+function compressPhotoFile(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = () => { img.src = reader.result; };
+    reader.onerror = reject;
+    img.onload = () => {
+      const MAX = 480;
+      let w = img.width, h = img.height;
+      if (w > h && w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      else if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+let regPhotoDataUrl = '';
+function setPhotoAvatarPreview(avatarEl, dataUrl) {
+  avatarEl.innerHTML = dataUrl
+    ? `<img src="${dataUrl}" alt="Photo" />`
+    : `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--muted-2)" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>`;
+}
+document.getElementById('reg-photo-camera-btn').addEventListener('click', () => {
+  document.getElementById('reg-photo-camera-input').click();
+});
+document.getElementById('reg-photo-gallery-btn').addEventListener('click', () => {
+  document.getElementById('reg-photo-gallery-input').click();
+});
+async function handleRegPhotoFile(file) {
+  if (!file) return;
+  const camBtn = document.getElementById('reg-photo-camera-btn');
+  const galBtn = document.getElementById('reg-photo-gallery-btn');
+  camBtn.disabled = true; galBtn.disabled = true;
+  const prevCam = camBtn.textContent, prevGal = galBtn.textContent;
+  camBtn.textContent = 'Processing…'; galBtn.textContent = 'Processing…';
+  try {
+    regPhotoDataUrl = await compressPhotoFile(file);
+    setPhotoAvatarPreview(document.getElementById('reg-photo-avatar'), regPhotoDataUrl);
+    camBtn.textContent = '📷 Retake'; galBtn.textContent = '🖼️ Gallery';
+  } catch (err) {
+    document.getElementById('reg-error').textContent = "Couldn't read that photo — try another.";
+    document.getElementById('reg-error').style.display = 'block';
+    camBtn.textContent = prevCam; galBtn.textContent = prevGal;
+  } finally {
+    camBtn.disabled = false; galBtn.disabled = false;
+  }
+}
+document.getElementById('reg-photo-camera-input').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  handleRegPhotoFile(file);
+  e.target.value = '';
+});
+document.getElementById('reg-photo-gallery-input').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  handleRegPhotoFile(file);
+  e.target.value = '';
+});
+
 function getSelectedRegServices() {
   const services = { taxi: false, delivery: false };
   document.querySelectorAll('#reg-service-toggle .type-opt.active').forEach(opt => {
@@ -2100,6 +2235,11 @@ document.getElementById('reg-submit').addEventListener('click', async () => {
     errEl.style.display = 'block';
     return;
   }
+  if (!regPhotoDataUrl) {
+    errEl.textContent = "Please add your photo before creating your account.";
+    errEl.style.display = 'block';
+    return;
+  }
   if (!zoneId) {
     errEl.textContent = "Please select your zone.";
     errEl.style.display = 'block';
@@ -2122,9 +2262,11 @@ document.getElementById('reg-submit').addEventListener('click', async () => {
       services,
       zone: zoneId,
       zoneName: zone ? zone.name : '',
+      photo: regPhotoDataUrl,
       createdAt: Date.now(),
     };
     await set(ref(db, 'taxi_drivers/' + username), record);
+    regPhotoDataUrl = '';
     logInDriver(username, record);
   } catch (e) {
     errEl.textContent = "Couldn't create your account — check your connection and try again.";
@@ -2230,6 +2372,7 @@ function logInDriver(username, data) {
   document.getElementById('account-phone').value = data.phone || '';
   document.getElementById('account-zone').value = data.zoneName || '';
   renderAccountServiceToggle();
+  renderAccountPhoto(data.photo || '');
 
   try {
     const savedOnline = localStorage.getItem('nesh_driver_online_' + username);
@@ -2261,6 +2404,52 @@ function logInDriver(username, data) {
 
   registerForOrderPushNotifications();
 }
+
+// ---------- Account: photo ----------
+function renderAccountPhoto(photoDataUrl) {
+  setPhotoAvatarPreview(document.getElementById('account-photo-avatar'), photoDataUrl);
+  document.getElementById('account-photo-camera-btn').textContent = photoDataUrl ? '📷 Retake' : '📷 Take photo';
+  document.getElementById('account-photo-hint').style.display = photoDataUrl ? 'none' : 'block';
+}
+document.getElementById('account-photo-camera-btn').addEventListener('click', () => {
+  document.getElementById('account-photo-camera-input').click();
+});
+document.getElementById('account-photo-gallery-btn').addEventListener('click', () => {
+  document.getElementById('account-photo-gallery-input').click();
+});
+async function handleAccountPhotoFile(file) {
+  if (!file) return;
+  const camBtn = document.getElementById('account-photo-camera-btn');
+  const galBtn = document.getElementById('account-photo-gallery-btn');
+  camBtn.disabled = true; galBtn.disabled = true;
+  const prevCam = camBtn.textContent;
+  camBtn.textContent = 'Processing…'; galBtn.textContent = 'Processing…';
+  try {
+    const dataUrl = await compressPhotoFile(file);
+    setPhotoAvatarPreview(document.getElementById('account-photo-avatar'), dataUrl);
+    if (state.driver) state.driver.photo = dataUrl;
+    try { localStorage.setItem('nesh_driver_data', JSON.stringify(state.driver)); } catch (err) {}
+    const { db, ref, update } = window.fb;
+    await update(ref(db, 'taxi_drivers/' + state.username), { photo: dataUrl });
+    document.getElementById('account-photo-hint').style.display = 'none';
+    camBtn.textContent = '📷 Retake'; galBtn.textContent = '🖼️ Gallery';
+  } catch (err) {
+    camBtn.textContent = prevCam; galBtn.textContent = '🖼️ Gallery';
+    alert("Couldn't save that photo — check your connection and try again.");
+  } finally {
+    camBtn.disabled = false; galBtn.disabled = false;
+  }
+}
+document.getElementById('account-photo-camera-input').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  handleAccountPhotoFile(file);
+  e.target.value = '';
+});
+document.getElementById('account-photo-gallery-input').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  handleAccountPhotoFile(file);
+  e.target.value = '';
+});
 
 // ---------- Account: editable work type (taxi / delivery / both) ----------
 // Lets drivers created before the services picker existed (who default to
@@ -2337,6 +2526,14 @@ function updateOnlineLabel() {
   document.getElementById('online-toggle-label').textContent = state.isOnline ? "You're online" : "You're offline";
 }
 document.getElementById('online-toggle-input').addEventListener('change', (e) => {
+  // Photo is mandatory — customers see it in their driver-match card, so a
+  // driver with no photo on file can't go online until they add one.
+  if (e.target.checked && (!state.driver || !state.driver.photo)) {
+    e.target.checked = false;
+    alert("Please add your profile photo first — go to Account and tap \"Add your photo\".");
+    showScreen('account');
+    return;
+  }
   state.isOnline = e.target.checked;
   updateOnlineLabel();
   try { localStorage.setItem('nesh_driver_online_' + state.username, state.isOnline ? '1' : '0'); } catch (err) {}
