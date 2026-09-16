@@ -986,21 +986,14 @@ jobs:
           # materialize the SAME jar (e.g. bcprov-jdk18on, pulled in by
           # capgo-background-geolocation) into the module cache at once,
           # one loses the race and the whole build fails with
-          # "Failed to create Jar file ... ExecutionException". The cache
-          # path is deterministic per library version, so it's always the
-          # same jar that trips it — but the race itself is timing-
-          # dependent, so a clean retry (each with a fresh Gradle daemon)
-          # almost always succeeds. Stop the daemon between attempts so
-          # the retry isn't just replaying the same broken in-memory state.
-          for attempt in 1 2 3; do
-            if ./gradlew assembleDebug; then
-              exit 0
-            fi
-            echo "::warning::Gradle build failed (attempt $attempt/3) — likely the known artifact-cache race condition. Retrying with a fresh daemon..."
-            ./gradlew --stop || true
-          done
-          echo "::error::Gradle build failed 3 times in a row — this is no longer the usual transient race, see the log above for the real error."
-          exit 1
+          # "Failed to create Jar file ... ExecutionException". Retrying
+          # alone isn't reliable — this project's dependency graph hits
+          # the same race deterministically on this runner's core count,
+          # so all 3 retries failed the exact same way. --max-workers=1
+          # forces every transform through one worker, one at a time, so
+          # there's never a second thread to race against — this removes
+          # the failure at the source rather than hoping a retry dodges it.
+          ./gradlew assembleDebug --max-workers=1
 
       - name: Upload the built APK (for you to download from the Actions tab)
         uses: actions/upload-artifact@v4
