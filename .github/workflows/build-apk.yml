@@ -98,6 +98,23 @@ jobs:
           echo "---- AGP version in use ----"
           grep -rE "com\.android\.(application|tools\.build:gradle)" build.gradle settings.gradle 2>/dev/null || true
 
+      # androidx.work:work-runtime:2.11.2 (pulled in by
+      # @capgo/background-geolocation) requires compileSdk 35+ and AGP
+      # 8.6.0+. Capacitor's default template ships AGP 8.2.1 / compileSdk
+      # 34, which fails the ":app:checkDebugAarMetadata" task with a clear
+      # "requires libraries... to compile against version 35" error.
+      # Bumping both here fixes it.
+      - name: Bump AGP and compileSdk/targetSdk (fixes work-runtime AAR metadata error)
+        working-directory: android
+        run: |
+          sed -i "s#com\.android\.tools\.build:gradle:[0-9.]*#com.android.tools.build:gradle:8.6.0#" build.gradle
+          sed -i "s/compileSdkVersion [0-9]*/compileSdkVersion 35/" variables.gradle
+          sed -i "s/targetSdkVersion [0-9]*/targetSdkVersion 35/" variables.gradle
+          echo "---- variables.gradle after bump ----"
+          cat variables.gradle
+          echo "---- AGP version after bump ----"
+          grep "com.android.tools.build" build.gradle
+
       # @capgo/background-geolocation needs this Capacitor config flag on
       # Android, otherwise location updates from the WebView still halt
       # after ~5 minutes in the background — the exact bug this plugin
