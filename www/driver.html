@@ -133,9 +133,14 @@
   }
   .switch input:checked + .switch-track{ background:#1BA672; }
   .switch input:checked + .switch-track::before{ transform:translateX(20px); }
+  .switch input:disabled + .switch-track{ opacity:.55; cursor:not-allowed; }
 
   .section-row{ padding:24px 24px 0; display:flex; align-items:center; justify-content:space-between; }
   .section-title{ color:var(--cloud); font-family:'Fraunces',serif; font-size:18px; font-weight:700; margin:0; }
+  .section-row-toggle{ width:100%; background:none; border:none; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .section-chevron{ transition:transform .15s; }
+  .section-chevron.open{ transform:rotate(180deg); }
+  .section-collapse.hidden{ display:none; }
   .empty-text{ color:var(--muted-2); font-size:14px; padding:0 24px; }
 
   .home-orders-list{ padding:16px 24px 4px; display:flex; flex-direction:column; gap:12px; }
@@ -554,20 +559,18 @@
       <button class="bg-location-warning-btn" id="bg-location-warning-btn" type="button">Open settings</button>
     </div>
 
-    <div class="availability-note">
-      <p class="availability-note-title">Availability status</p>
-      <p class="availability-note-text">നിലവിൽ വേറെ ഓർഡർ കൈകാര്യം ചെയ്യാത്ത, ആപ്പിൽ "ഓൺലൈൻ/ഫ്രീ" ആയിട്ടുള്ള പാർട്ണർമാർക്കാണ് മുൻഗണന.</p>
-    </div>
-
     <div id="home-current-ride-wrap"></div>
     <div id="home-current-delivery-wrap"></div>
 
     <div id="home-rides-section">
-      <div class="section-row">
+      <button class="section-row section-row-toggle" id="home-recent-rides-toggle" type="button">
         <h2 class="section-title">Recent rides</h2>
+        <svg class="section-chevron" id="home-recent-rides-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="section-collapse hidden" id="home-recent-rides-body">
+        <div class="home-orders-list" id="home-orders-list"></div>
+        <p class="empty-text" id="home-empty-text" style="padding:16px 24px 0;">No rides yet — completed and cancelled rides will show up here.</p>
       </div>
-      <div class="home-orders-list" id="home-orders-list"></div>
-      <p class="empty-text" id="home-empty-text" style="padding:16px 24px 0;">No rides yet — completed and cancelled rides will show up here.</p>
     </div>
 
     <div id="home-deliveries-section">
@@ -1080,14 +1083,24 @@ function hasBackgroundGeolocationPlugin() {
 function handleDriverLocationFix(latitude, longitude) {
   state.myLocation = { lat: latitude, lng: longitude, updatedAt: Date.now() };
   renderHomeLists();
+  // Bail out BEFORE touching lastLocationWriteAt when we can't actually
+  // write yet (e.g. a GPS fix arrives before login/Firebase are ready) —
+  // otherwise this "spends" the 10s throttle window on a fix that never
+  // reached Firebase, so the driver marker on the customer's tracking map
+  // can sit frozen for another 10s+ even though a fresh fix just came in.
+  if (!state.username || !window.fb) return;
   const now = Date.now();
   if (now - lastLocationWriteAt < LOCATION_WRITE_MIN_INTERVAL_MS) return;
   lastLocationWriteAt = now;
-  if (!state.username || !window.fb) return;
   const { db, ref, update } = window.fb;
   update(ref(db, 'taxi_drivers/' + state.username), {
     location: { lat: latitude, lng: longitude, updatedAt: now },
-  }).catch(() => {});
+  }).catch((e) => {
+    // Surfaced instead of swallowed — a permission-denied write here (e.g.
+    // a database-rules issue) used to fail silently, which looks exactly
+    // like "the driver marker just isn't moving" with nothing to go on.
+    console.warn('Location write to taxi_drivers failed:', e);
+  });
 }
 
 function startBrowserLocationWatch() {
@@ -2521,7 +2534,24 @@ document.getElementById('logout-btn').addEventListener('click', () => {
   location.reload();
 });
 
+// Recent rides is collapsed by default — the Rides screen should read as
+// "what's happening now" (the in-progress ride card above), with the
+// history one tap away instead of always taking up the screen.
+document.getElementById('home-recent-rides-toggle').addEventListener('click', () => {
+  document.getElementById('home-recent-rides-body').classList.toggle('hidden');
+  document.getElementById('home-recent-rides-chevron').classList.toggle('open');
+});
+
 // ---------- Online / offline ----------
+// True while this driver has a ride actively assigned to them
+// (accepted/arriving/ontrip) — used to stop them going offline mid-ride,
+// which would otherwise strand a customer with an assigned driver who's
+// no longer trackable/reachable through the normal flow.
+function hasActiveRide() {
+  return Object.values(ridesCache).some(r =>
+    r.driverId === state.username && ['accepted', 'arriving', 'ontrip'].includes(normalizeRideStatus(r.status))
+  );
+}
 function updateOnlineLabel() {
   document.getElementById('online-toggle-label').textContent = state.isOnline ? "You're online" : "You're offline";
 }
@@ -2532,6 +2562,13 @@ document.getElementById('online-toggle-input').addEventListener('change', (e) =>
     e.target.checked = false;
     alert("Please add your profile photo first — go to Account and tap \"Add your photo\".");
     showScreen('account');
+    return;
+  }
+  // Can't go offline mid-ride — a customer is currently relying on this
+  // driver being trackable and reachable through the normal ride flow.
+  if (!e.target.checked && hasActiveRide()) {
+    e.target.checked = true;
+    alert("You can't go offline while a ride is in progress. Complete or hand off the current ride first.");
     return;
   }
   state.isOnline = e.target.checked;
@@ -2594,6 +2631,15 @@ function renderHomeLists() {
 
   // A ride actively assigned to this driver (accepted/arriving/ontrip)
   const current = all.find(r => r.driverId === state.username && ['accepted', 'arriving', 'ontrip'].includes(normalizeRideStatus(r.status)));
+  // Lock the online toggle for the duration — reflects the same rule the
+  // toggle's own change handler enforces, so it's visibly disabled instead
+  // of just silently snapping back if tapped.
+  const toggleInput = document.getElementById('online-toggle-input');
+  const toggleSub = document.querySelector('.online-toggle-sub');
+  toggleInput.disabled = !!current;
+  if (toggleSub) toggleSub.textContent = current
+    ? "Can't go offline while a ride is in progress"
+    : 'Go online to start receiving ride requests';
   const wrap = document.getElementById('home-current-ride-wrap');
   wrap.innerHTML = '';
   if (current) {
