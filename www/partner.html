@@ -2300,7 +2300,12 @@ async function loadBuffer(url) {
   return await ctx.decodeAudioData(arrBuf);
 }
 
-function playCancelAlert() {
+// maxMs (optional): cap playback length — used when an order is cancelled
+// by the customer while still ringing for this restaurant, so the chime
+// gives a clear short notice instead of running the alert clip out to its
+// full length. Omitted (as from the restaurant's own cancel action below)
+// it just plays the clip once, same as before.
+function playCancelAlert(maxMs) {
   try {
     const ctx = getAudioCtx();
     if (!cancelBuffer) return; // not loaded yet — silently skip rather than error
@@ -2308,6 +2313,9 @@ function playCancelAlert() {
     src.buffer = cancelBuffer;
     src.connect(ctx.destination);
     src.start(0);
+    if (maxMs) {
+      setTimeout(() => { try { src.stop(0); } catch (e) {} }, maxMs);
+    }
   } catch (e) {}
 }
 
@@ -4660,15 +4668,36 @@ function goToSelectedOrders() {
     });
 }
 
+// Order ids that were actually shown (ringing) in the popup on the
+// previous snapshot — compared against each new one so an order the
+// customer cancels mid-ring can be told apart from one the restaurant
+// itself accepted or rejected.
+let lastPendingOrderIds = new Set();
+
+// Cuts the ring short (web + native) so an order the customer pulled back
+// mid-ring doesn't just keep ringing out its normal ~30s timeout on this
+// restaurant's phone for an order that no longer exists. No chime played
+// here on purpose — the native side's own cancel_ring FCM handler
+// (AlertFcmService, in build-apk.yml) fires in parallel, even while the
+// app is open, and already posts its own brief cancel notice+sound; if
+// this also played playCancelAlert() the two would overlap into a double
+// sound. The native one is the single source of the cancel sound now.
+function notifyOfferCancelled() {
+  stopRinging();
+  clearDeliveredNotifications(); // stops the native RingingService too
+}
+
 function listenOrdersBadge() {
   const { db, ref, onValue } = window.fb;
   onValue(ref(db, 'restaurants/' + state.restId + '/orders'), snap => {
     const pendingList = [];
     const inProgressList = [];
     let openOrder = null;
+    const allOrders = {}; // every order's current status, for the cancel-check below
     snap.forEach(child => {
       const o = child.val();
       const status = o.status || 'pending';
+      allOrders[child.key] = o;
       if (status === 'pending') pendingList.push({ _id: child.key, ...o });
       if (status === 'preparing' || status === 'ready') inProgressList.push({ _id: child.key, ...o });
       if (state.selectedOrderId && child.key === state.selectedOrderId) openOrder = { _id: child.key, ...o };
@@ -4684,6 +4713,17 @@ function listenOrdersBadge() {
     // Keep an open order-detail screen live (e.g. status changing from
     // another device) without the user needing to back out and re-enter.
     if (openOrder) renderOrderDetail(openOrder);
+
+    // Anything that was ringing on the last snapshot but has now dropped
+    // out — if that's because the customer cancelled it (not us accepting
+    // or rejecting it), cut the ring short with the capped chime above.
+    const currentPendingIds = new Set(pendingList.map(o => o._id));
+    lastPendingOrderIds.forEach(id => {
+      if (currentPendingIds.has(id)) return;
+      const o = allOrders[id];
+      if (o && o.status === 'cancelled') notifyOfferCancelled();
+    });
+    lastPendingOrderIds = currentPendingIds;
 
     // Always reflects the full set of currently-pending orders, so all of
     // them show together in one popup instead of queuing one after another.

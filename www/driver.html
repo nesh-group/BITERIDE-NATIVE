@@ -105,6 +105,11 @@
   .availability-note{ margin:10px 24px 0; padding:12px 14px; border-radius:12px; background:rgba(47,128,237,0.10); border:1px solid rgba(47,128,237,0.35); }
   .availability-note-title{ color:var(--marigold); font-weight:700; font-size:12px; margin:0 0 4px; font-family:'IBM Plex Mono',monospace; letter-spacing:0.5px; text-transform:uppercase; }
   .availability-note-text{ color:var(--muted); font-size:12px; line-height:1.5; margin:0; }
+  .bg-location-warning{ margin:10px 24px 0; padding:12px 14px; border-radius:12px; background:rgba(229,72,77,0.12); border:1px solid rgba(229,72,77,0.4); }
+  .bg-location-warning.hidden{ display:none; }
+  .bg-location-warning-title{ color:var(--chili); font-weight:700; font-size:12px; margin:0 0 4px; font-family:'IBM Plex Mono',monospace; letter-spacing:0.5px; text-transform:uppercase; }
+  .bg-location-warning-text{ color:var(--muted); font-size:12px; line-height:1.5; margin:0 0 10px; }
+  .bg-location-warning-btn{ padding:9px 14px; border:none; border-radius:8px; background:var(--chili); color:#fff; font-weight:700; font-size:12px; cursor:pointer; font-family:'Inter',sans-serif; }
   .switch{ position:relative; width:46px; height:26px; flex-shrink:0; }
   .switch input{ opacity:0; width:0; height:0; }
   .switch-track{
@@ -512,6 +517,16 @@
       </label>
     </div>
 
+    <!-- Shown only when Android's location permission is granted as "While
+         using the app" instead of "Allow all the time" — without the
+         latter, location stops updating the moment the driver backgrounds
+         the app or the screen turns off, even while marked online. -->
+    <div class="bg-location-warning hidden" id="bg-location-warning">
+      <p class="bg-location-warning-title">Background location is off</p>
+      <p class="bg-location-warning-text">Set location permission to "Allow all the time" so riders can still find you when the app is in the background or the screen is off.</p>
+      <button class="bg-location-warning-btn" id="bg-location-warning-btn" type="button">Open settings</button>
+    </div>
+
     <div class="availability-note">
       <p class="availability-note-title">Availability status</p>
       <p class="availability-note-text">നിലവിൽ വേറെ ഓർഡർ കൈകാര്യം ചെയ്യാത്ത, ആപ്പിൽ "ഓൺലൈൻ/ഫ്രീ" ആയിട്ടുള്ള പാർട്ണർമാർക്കാണ് മുൻഗണന.</p>
@@ -752,7 +767,16 @@
   (function () {
     if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
     const CapApp = window.Capacitor.Plugins.App;
-    CapApp.addListener('pause', () => { try { goOffline(db); } catch (e) {} });
+    // Skip goOffline() while background location tracking is running
+    // (driver is online) — @capgo/background-geolocation keeps this app's
+    // foreground service alive after the user backgrounds it specifically
+    // so the periodic taxi_drivers/.../location writes above can still
+    // reach Firebase; dropping the socket here would silently swallow
+    // every one of those writes until the driver reopens the app.
+    CapApp.addListener('pause', () => {
+      if (window.driverBgLocationActive) return;
+      try { goOffline(db); } catch (e) {}
+    });
     CapApp.addListener('resume', () => { try { goOnline(db); } catch (e) {} });
   })();
 
@@ -986,36 +1010,133 @@ const LOCATION_STALE_MS = 3 * 60 * 1000;
 const NEAR_OVERRIDE_KM = 0.5; // within this distance, candidates are compared by order count (see rankAmongCandidates)
 
 // ---------- Live location tracking (while online) ----------
+// Same background-capable tracking as the Bus portal: inside the native
+// (Capacitor) app, @capgo/background-geolocation keeps sending fixes with
+// the screen off or the app swiped to the background (Android keeps it
+// alive via a persistent foreground-service notification — that's the
+// "NESH Driver — Online" notification the driver will see while online).
+// In a plain browser tab (no Capacitor) this plugin isn't available, so it
+// falls back to the original foreground-only navigator.geolocation watch —
+// same as before, nothing changes there.
 let locationWatchId = null;
 let lastLocationWriteAt = 0;
 const LOCATION_WRITE_MIN_INTERVAL_MS = 10 * 1000; // throttle Firebase writes
 
-function startLocationTracking() {
+// Exposed on window (rather than a bare top-level `let`) so the Firebase
+// connection-lifecycle listener up in the <script type="module"> block —
+// a separate top-level scope — can see whether background tracking is
+// active and knows not to drop the realtime socket while backgrounded.
+window.driverBgLocationActive = false;
+
+function hasBackgroundGeolocationPlugin() {
+  return !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation);
+}
+
+// Shared by both tracking paths below — writes the fix into local state
+// (for any "X km away" chips) and, throttled, up to Firebase.
+function handleDriverLocationFix(latitude, longitude) {
+  state.myLocation = { lat: latitude, lng: longitude, updatedAt: Date.now() };
+  renderHomeLists();
+  const now = Date.now();
+  if (now - lastLocationWriteAt < LOCATION_WRITE_MIN_INTERVAL_MS) return;
+  lastLocationWriteAt = now;
+  if (!state.username || !window.fb) return;
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'taxi_drivers/' + state.username), {
+    location: { lat: latitude, lng: longitude, updatedAt: now },
+  }).catch(() => {});
+}
+
+function startBrowserLocationWatch() {
   if (locationWatchId != null || !navigator.geolocation) return;
   locationWatchId = navigator.geolocation.watchPosition(
-    (pos) => {
-      const { latitude, longitude } = pos.coords;
-      state.myLocation = { lat: latitude, lng: longitude, updatedAt: Date.now() };
-      renderHomeLists(); // so any "X km away" chips reflect the fresh fix
-      const now = Date.now();
-      if (now - lastLocationWriteAt < LOCATION_WRITE_MIN_INTERVAL_MS) return;
-      lastLocationWriteAt = now;
-      if (!state.username || !window.fb) return;
-      const { db, ref, update } = window.fb;
-      update(ref(db, 'taxi_drivers/' + state.username), {
-        location: { lat: latitude, lng: longitude, updatedAt: now },
-      }).catch(() => {});
-    },
+    (pos) => handleDriverLocationFix(pos.coords.latitude, pos.coords.longitude),
     (err) => { console.warn('Location watch error:', err); },
     { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
   );
 }
 
+function startLocationTracking() {
+  if (!hasBackgroundGeolocationPlugin()) { startBrowserLocationWatch(); return; }
+  if (window.driverBgLocationActive) return;
+  window.driverBgLocationActive = true;
+  const { BackgroundGeolocation } = window.Capacitor.Plugins;
+  BackgroundGeolocation.start(
+    {
+      backgroundMessage: 'Sharing your location so riders can be matched with you.',
+      backgroundTitle: 'NESH Driver — Online',
+      requestPermissions: true,
+      stale: false,
+      distanceFilter: 15, // metres — filters out GPS jitter while stopped
+    },
+    (location, error) => {
+      if (error) { console.warn('Background location error:', error); return; }
+      if (!location) return;
+      handleDriverLocationFix(location.latitude, location.longitude);
+    }
+  ).then(() => {
+    checkBackgroundLocationPermission();
+  }).catch((err) => {
+    // e.g. permission denied — fall back to the foreground-only watch so
+    // the driver isn't left with no tracking at all.
+    console.warn('BackgroundGeolocation start failed, falling back:', err);
+    window.driverBgLocationActive = false;
+    startBrowserLocationWatch();
+    checkBackgroundLocationPermission();
+  });
+}
+
+// ---------- "Allow all the time" permission check ----------
+// Android splits location into two tiers — "While using the app" and
+// "Allow all the time" — and only the second keeps updates flowing once
+// this app is backgrounded or the screen is off. start()'s own permission
+// request commonly only secures the first tier (that's an OS/Play-policy
+// restriction on requesting both at once, not something this plugin
+// controls), so this checks the actual granted tier afterwards and — if
+// it's still "while in use" only — shows a banner pointing the driver at
+// Settings instead of leaving tracking silently broken in the background.
+const bgLocationWarningEl = document.getElementById('bg-location-warning');
+const bgLocationWarningBtn = document.getElementById('bg-location-warning-btn');
+
+async function checkBackgroundLocationPermission() {
+  if (!bgLocationWarningEl || !hasBackgroundGeolocationPlugin()) return;
+  try {
+    const status = await window.Capacitor.Plugins.BackgroundGeolocation.checkPermissions();
+    const bg = status && status.backgroundLocation;
+    const grantedAllTheTime = bg === 'granted' || bg === 'always';
+    bgLocationWarningEl.classList.toggle('hidden', !state.isOnline || grantedAllTheTime);
+  } catch (e) {
+    // Can't determine status — leave whatever the banner was already showing.
+  }
+}
+
+if (bgLocationWarningBtn) {
+  bgLocationWarningBtn.addEventListener('click', () => {
+    if (hasBackgroundGeolocationPlugin()) {
+      window.Capacitor.Plugins.BackgroundGeolocation.openSettings().catch(() => {});
+    }
+  });
+}
+
+// Re-check whenever the driver comes back to the app — covers the case
+// where they just changed the permission in system Settings and returned.
+(function () {
+  if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
+  window.Capacitor.Plugins.App.addListener('resume', () => {
+    if (state.isOnline) checkBackgroundLocationPermission();
+  });
+})();
+
 function stopLocationTracking() {
+  if (window.driverBgLocationActive) {
+    window.driverBgLocationActive = false;
+    window.Capacitor.Plugins.BackgroundGeolocation.stop().catch(() => {});
+  }
   if (locationWatchId != null) {
     navigator.geolocation.clearWatch(locationWatchId);
     locationWatchId = null;
   }
+  if (bgLocationWarningEl) bgLocationWarningEl.classList.add('hidden');
 }
 
 function listenDrivers() {
@@ -1127,7 +1248,12 @@ async function loadBuffer(url) {
   const arrBuf = await res.arrayBuffer();
   return await ctx.decodeAudioData(arrBuf);
 }
-function playCancelAlert() {
+// maxMs (optional): cap playback length — used when a ride was cancelled by
+// the customer while still ringing for this driver, so the chime gives a
+// clear short notice instead of running the alert clip out to its full
+// length. Omitted (as from the driver's own cancel confirmation below) it
+// just plays the clip once, same as before.
+function playCancelAlert(maxMs) {
   try {
     const ctx = getAudioCtx();
     if (!cancelBuffer) return;
@@ -1135,6 +1261,9 @@ function playCancelAlert() {
     src.buffer = cancelBuffer;
     src.connect(ctx.destination);
     src.start(0);
+    if (maxMs) {
+      setTimeout(() => { try { src.stop(0); } catch (e) {} }, maxMs);
+    }
   } catch (e) {}
 }
 
@@ -1740,6 +1869,31 @@ function syncBusyStatus() {
   update(ref(db, 'taxi_drivers/' + state.username), { isBusy: busy }).catch(() => {});
 }
 
+// Ride/delivery ids that were actually shown (ringing) in the popup on the
+// previous render — compared against the new list each time so a ride the
+// customer cancels mid-ring can be told apart from one that simply got
+// accepted by another driver or skipped by us.
+let lastPendingIds = new Set();
+const CANCEL_ALERT_MAX_MS = 5000;
+
+// Cuts the ring short (web + native) and plays a brief "cancelled" chime —
+// capped to 5s — so a request the customer pulled back mid-ring doesn't
+// just keep ringing out its normal ~30s timeout on this driver's phone for
+// a ride that no longer exists. Unlike the partner app's order-cancel path,
+// the customer app's ride-cancel button (taxiCancelBtn in index-10.html)
+// doesn't yet send a cancel_ring push to the Cloudflare Worker, so there's
+// no native-side sound to double up with here — this chime stays as the
+// only cancel feedback until that Worker/customer-app wiring exists. If it
+// gets added later, drop this call the same way notifyOfferCancelled() in
+// partner.html had its playCancelAlert() removed, to avoid a double sound.
+function notifyOfferCancelled() {
+  stopRinging();
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RingControl) {
+    window.Capacitor.Plugins.RingControl.stopRinging().catch(() => {});
+  }
+  playCancelAlert(CANCEL_ALERT_MAX_MS);
+}
+
 function refreshRidePopupFromCache() {
   syncBusyStatus();
   const amIBusy = state.isBusy;
@@ -1774,6 +1928,17 @@ function refreshRidePopupFromCache() {
     const db_ = b._distanceKm == null || b._distanceKm === Infinity ? Infinity : b._distanceKm;
     return da - db_;
   });
+
+  // Anything that was ringing on the last render but has now dropped out —
+  // if that's because the customer cancelled it (not accepted elsewhere,
+  // not us skipping it), cut the ring short with the capped chime above.
+  const currentIds = new Set(sorted.map(x => x._id));
+  lastPendingIds.forEach(id => {
+    if (currentIds.has(id)) return;
+    const r = ridesCache[id];
+    if (r && normalizeRideStatus(r.status) === 'cancelled') notifyOfferCancelled();
+  });
+  lastPendingIds = currentIds;
 
   renderOrderPopup(sorted);
 }
