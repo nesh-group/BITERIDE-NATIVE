@@ -103,10 +103,12 @@ jobs:
             sed -i '/<manifest /a\    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' "$MANIFEST"
           fi
 
-          # Added for the Bus operator portal — lets bus.html keep sending
-          # location every ~20s with the screen off or the app swiped away
-          # (driver.html and partner.html don't request these, so they're
-          # unaffected and stay foreground-only as before).
+          # Needed by bus.html (lets it keep sending location every ~20s
+          # with the screen off or the app swiped away) AND by driver.html
+          # (its @capgo/background-geolocation tracking, above — a driver
+          # who's online keeps reporting position the same way). partner.html
+          # doesn't request these, so it's unaffected and stays
+          # foreground-only as before.
           if ! grep -q "ACCESS_BACKGROUND_LOCATION" "$MANIFEST"; then
             sed -i '/<manifest /a\    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />' "$MANIFEST"
           fi
@@ -508,14 +510,8 @@ jobs:
           cat > "$PKG_PATH/AlertFcmService.java" << 'EOF'
           package com.yourcompany.neshapp;
 
-          import android.app.Notification;
-          import android.app.NotificationChannel;
-          import android.app.NotificationManager;
           import android.content.Intent;
-          import android.os.Build;
           import androidx.annotation.NonNull;
-          import androidx.core.app.NotificationCompat;
-          import androidx.core.app.NotificationManagerCompat;
           import androidx.core.content.ContextCompat;
           import com.google.firebase.messaging.FirebaseMessagingService;
           import com.google.firebase.messaging.RemoteMessage;
@@ -537,25 +533,11 @@ jobs:
           //                    on "::" to get restId/orderId back out)
           //   new_order    -> data.orderId                        (plain)
           public class AlertFcmService extends FirebaseMessagingService {
-              private static final int CANCEL_NOTIF_ID = 4322;
-
               @Override
               public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
                   super.onMessageReceived(remoteMessage);
                   Map<String, String> data = remoteMessage.getData();
                   String type = data.get("type");
-
-                  // Order was cancelled — kill the looping alarm sound /
-                  // vibration / full-screen ring immediately (this is the
-                  // ONLY type that stops RingingService instead of
-                  // starting it). Swap in a short, silent, auto-dismissing
-                  // notice instead — NOT the order_alert ring sound, and
-                  // it never lingers: gone on its own after 5s.
-                  if ("cancel_ring".equals(type)) {
-                      stopService(new Intent(this, RingingService.class));
-                      showCancelNotice(data.get("title"), data.get("body"));
-                      return;
-                  }
 
                   String kind;
                   String id;
@@ -587,35 +569,6 @@ jobs:
                   serviceIntent.putExtra("title", data.get("title"));
                   serviceIntent.putExtra("body", data.get("body"));
                   ContextCompat.startForegroundService(this, serviceIntent);
-              }
-
-              // Plain notice that the order got cancelled — deliberately
-              // NOT run through RingingService: no loop, no alarm sound,
-              // no full-screen intent, no "ongoing" flag. setTimeoutAfter
-              // makes the system auto-cancel it 5s after it's posted, so
-              // it never needs a matching cancel() call anywhere else.
-              private void showCancelNotice(String title, String body) {
-                  String channelId = "order_cancel_notice";
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      NotificationManager manager = getSystemService(NotificationManager.class);
-                      if (manager.getNotificationChannel(channelId) == null) {
-                          NotificationChannel channel = new NotificationChannel(
-                              channelId, "Order Cancelled", NotificationManager.IMPORTANCE_DEFAULT
-                          );
-                          manager.createNotificationChannel(channel);
-                      }
-                  }
-
-                  Notification notification = new NotificationCompat.Builder(this, channelId)
-                      .setSmallIcon(android.R.drawable.ic_menu_close_clear_cancel)
-                      .setContentTitle(title != null ? title : "Order Cancelled")
-                      .setContentText(body != null ? body : "The customer cancelled this order.")
-                      .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                      .setAutoCancel(true)
-                      .setTimeoutAfter(5000)
-                      .build();
-
-                  NotificationManagerCompat.from(this).notify(CANCEL_NOTIF_ID, notification);
               }
           }
           EOF
@@ -1026,7 +979,28 @@ jobs:
           NESH_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           NESH_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           NESH_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: chmod +x gradlew && ./gradlew assembleDebug
+        run: |
+          chmod +x gradlew
+          # Gradle has a known race condition in its dependency-artifact-
+          # transform cache: when multiple worker threads try to
+          # materialize the SAME jar (e.g. bcprov-jdk18on, pulled in by
+          # capgo-background-geolocation) into the module cache at once,
+          # one loses the race and the whole build fails with
+          # "Failed to create Jar file ... ExecutionException". The cache
+          # path is deterministic per library version, so it's always the
+          # same jar that trips it — but the race itself is timing-
+          # dependent, so a clean retry (each with a fresh Gradle daemon)
+          # almost always succeeds. Stop the daemon between attempts so
+          # the retry isn't just replaying the same broken in-memory state.
+          for attempt in 1 2 3; do
+            if ./gradlew assembleDebug; then
+              exit 0
+            fi
+            echo "::warning::Gradle build failed (attempt $attempt/3) — likely the known artifact-cache race condition. Retrying with a fresh daemon..."
+            ./gradlew --stop || true
+          done
+          echo "::error::Gradle build failed 3 times in a row — this is no longer the usual transient race, see the log above for the real error."
+          exit 1
 
       - name: Upload the built APK (for you to download from the Actions tab)
         uses: actions/upload-artifact@v4
