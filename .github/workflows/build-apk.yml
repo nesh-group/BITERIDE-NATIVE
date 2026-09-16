@@ -54,7 +54,10 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          # @capgo/background-geolocation's Android module is compiled
+          # with sourceCompatibility 21, so Java 17 fails with "invalid
+          # source release: 21". Bumped to 21 to match.
+          java-version: '21'
 
       # android-actions/setup-android@v3 used to be here, but it calls the
       # legacy `sdkmanager ... tools` command — Google discontinued that
