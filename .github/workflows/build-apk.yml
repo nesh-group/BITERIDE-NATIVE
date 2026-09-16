@@ -54,17 +54,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          # Must be 21+, not 17: bcprov-jdk18on-1.79.jar (pulled in by
-          # capgo-background-geolocation) is a Multi-Release JAR with
-          # class files under META-INF/versions/21/ targeting Java 21.
-          # JDK 17 can't parse those entries, so Gradle's own classpath
-          # instrumentation step fails on that exact jar every time with
-          # "Failed to create Jar file ... bcprov-jdk18on-1.79.jar" — a
-          # deterministic JDK/jar mismatch, not a flaky race (confirmed:
-          # retries and --max-workers=1 didn't help, because there was
-          # never a race to lose). JDK 21 can read those entries, and
-          # both Gradle 8.2.1 and the AGP version here run fine on it.
-          java-version: '21'
+          java-version: '17'
 
       # android-actions/setup-android@v3 used to be here, but it calls the
       # legacy `sdkmanager ... tools` command — Google discontinued that
@@ -84,6 +74,29 @@ jobs:
             npx cap init "NESH" "com.yourcompany.neshapp" --web-dir www
             npx cap add android
           fi
+
+      # This repo's build has repeatedly hit a well-documented, long-
+      # standing Gradle bug (gradle/gradle#25953, #28940, #29381, and
+      # many duplicates — same "Failed to create Jar file ...
+      # ExecutionException" signature reported against totally different
+      # jars: jackson-core, tink, h2, kotlin-daemon-embeddable, and our
+      # own bcprov-jdk18on) where Gradle's own classpath-instrumentation
+      # step fails to repackage a plugin/buildscript-classpath jar. It's
+      # not tied to one specific dependency, JDK version, or a race
+      # condition (confirmed here: retries, --max-workers=1, and a JDK
+      # bump all failed identically) — it's a bug in Gradle 8.2.1 itself.
+      # One confirmed real-world fix for this exact error signature was
+      # upgrading the Gradle version, so bump the wrapper here. Printing
+      # the AGP version alongside it so if THIS also fails with a new
+      # "requires Gradle version X" error, the real fix is a one-line
+      # change instead of another guess.
+      - name: Bump Gradle wrapper (works around a known Gradle 8.2.1 bug)
+        working-directory: android
+        run: |
+          sed -i 's#distributionUrl=.*#distributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-all.zip#' gradle/wrapper/gradle-wrapper.properties
+          cat gradle/wrapper/gradle-wrapper.properties
+          echo "---- AGP version in use ----"
+          grep -rE "com\.android\.(application|tools\.build:gradle)" build.gradle settings.gradle 2>/dev/null || true
 
       # @capgo/background-geolocation needs this Capacitor config flag on
       # Android, otherwise location updates from the WebView still halt
