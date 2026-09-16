@@ -108,8 +108,8 @@ jobs:
         working-directory: android
         run: |
           sed -i "s#com\.android\.tools\.build:gradle:[0-9.]*#com.android.tools.build:gradle:8.6.0#" build.gradle
-          sed -i "s/compileSdkVersion [0-9]*/compileSdkVersion 35/" variables.gradle
-          sed -i "s/targetSdkVersion [0-9]*/targetSdkVersion 35/" variables.gradle
+          sed -i -E "s/compileSdkVersion( *=)? *[0-9]+/compileSdkVersion = 35/" variables.gradle
+          sed -i -E "s/targetSdkVersion( *=)? *[0-9]+/targetSdkVersion = 35/" variables.gradle
           echo "---- variables.gradle after bump ----"
           cat variables.gradle
           echo "---- AGP version after bump ----"
