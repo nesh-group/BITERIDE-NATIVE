@@ -206,8 +206,8 @@ jobs:
           <package android:name="com.oneplus.security" />
           <package android:name="com.lenovo.powersetting" />
           <package android:name="com.meizu.safe" />
-      </queries>
-      '''
+          </queries>
+          '''
           content = content.replace('<application', queries_block + '    <application', 1)
           with open(path, 'w') as f:
               f.write(content)
