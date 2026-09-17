@@ -304,6 +304,21 @@
   .reason-modal-btns .btn-danger{ flex:1; padding:12px; }
   .reason-modal-btns .btn-primary{ flex:1; padding:12px; }
 
+  /* Background-location modal — blocking version of bg-location-warning,
+     shown right after going online so the "Allow all the time" step isn't
+     something the driver can miss by not noticing a banner. */
+  .bg-location-steps{ margin:0 0 14px; padding-left:20px; color:var(--muted); font-size:13px; line-height:1.7; }
+  .bg-location-steps b{ color:var(--cloud); }
+
+  /* Autostart confirmation modal — there's no Android API to detect this
+     (OEM-specific, e.g. MIUI/Vivo/Oppo autostart managers), so instead of
+     a permission check this is a manual self-attestation checkbox the
+     driver has to tick before going online. */
+  .autostart-check-row{ display:flex; align-items:flex-start; gap:10px; margin:14px 0 4px; padding:12px; border-radius:10px; background:var(--field-bg); border:1px solid var(--field-border); cursor:pointer; }
+  .autostart-check-row input[type="checkbox"]{ margin-top:2px; width:18px; height:18px; flex-shrink:0; accent-color:var(--marigold); }
+  .autostart-check-row span{ color:var(--cloud); font-size:13px; line-height:1.5; }
+  #autostart-modal-settings-btn:disabled{ opacity:0.45; cursor:not-allowed; }
+
   /* OTP modal — ask the rider for the 4-digit pickup code before starting a trip */
   .otp-modal-input{
     width:100%; padding:14px; border-radius:10px; background:var(--field-bg);
@@ -417,6 +432,71 @@
     </div>
   </div>
 
+  <!-- BACKGROUND LOCATION MODAL — Android never shows an in-app popup for
+       "Allow all the time" (removed from the OS on API 30+), so this walks
+       the driver to Settings themselves right after they go online, instead
+       of relying on them to notice the passive bg-location-warning banner. -->
+  <div class="reason-modal-overlay" id="bg-location-modal-overlay">
+    <div class="reason-modal-card">
+      <p class="reason-modal-title">Turn on background location</p>
+      <p class="reason-modal-sub">Riders need to see you moving even when the app is in the background or the screen is off. Android needs this set manually — no popup for it, just these steps:</p>
+      <ol class="bg-location-steps">
+        <li>Tap <b>Open settings</b> below</li>
+        <li>Tap <b>Permissions</b> → <b>Location</b></li>
+        <li>Choose <b>"Allow all the time"</b></li>
+      </ol>
+      <p class="reason-modal-error" id="bg-location-modal-error">Still showing "While using the app" — go back into settings and choose "Allow all the time".</p>
+      <div class="reason-modal-btns">
+        <button class="btn-danger" id="bg-location-modal-later-btn" type="button">Not now</button>
+        <button class="btn-primary" id="bg-location-modal-settings-btn" type="button">Open settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BATTERY OPTIMIZATION MODAL — blocking version of battery-warning.
+       Shown after location is confirmed but before the driver actually
+       goes online, so this step can't be missed the way the passive
+       banner can. -->
+  <div class="reason-modal-overlay" id="battery-modal-overlay">
+    <div class="reason-modal-card">
+      <p class="reason-modal-title">Allow background battery use</p>
+      <p class="reason-modal-sub">Android's battery saver can stop your location and ride alerts a while after you swipe the app away. Tap below and choose "Allow" / "Don't optimize" for this app.</p>
+      <p class="reason-modal-error" id="battery-modal-error">Still showing as optimized — open settings again and choose "Allow" / "Don't optimize".</p>
+      <div class="reason-modal-btns">
+        <button class="btn-danger" id="battery-modal-later-btn" type="button">Not now</button>
+        <button class="btn-primary" id="battery-modal-settings-btn" type="button">Open settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUTOSTART CONFIRMATION MODAL — there is no Android API to verify
+       whether autostart is actually granted (MIUI/Vivo/Oppo/Realme etc.),
+       so this can't be gated like the two modals above. The "Open
+       settings" button uses @squareetlabs/capacitor-dont-kill-my-app to
+       jump straight to the right phone-brand screen when that plugin is
+       available; the driver still has to manually flip the switch there
+       and tick the box below to confirm it, since nothing can read the
+       result back. -->
+  <div class="reason-modal-overlay" id="autostart-modal-overlay">
+    <div class="reason-modal-card">
+      <p class="reason-modal-title">Turn on Auto-start</p>
+      <p class="reason-modal-sub">On many phones (Xiaomi/Vivo/Oppo/Realme and others), Auto-start has to be turned on manually — otherwise the OS can kill ride tracking after you swipe the app away.</p>
+      <p class="reason-modal-sub" id="autostart-modal-manual-hint">Tap <b>Open settings</b> below, then find and enable Auto-start for this app.</p>
+      <div class="reason-modal-btns">
+        <button class="btn-primary" id="autostart-modal-open-settings-btn" type="button" style="flex:1;">Open settings</button>
+      </div>
+      <label class="autostart-check-row" for="autostart-modal-checkbox">
+        <input type="checkbox" id="autostart-modal-checkbox" />
+        <span>I've turned on Auto-start for this app in my phone's Settings.</span>
+      </label>
+      <div class="reason-modal-btns">
+        <button class="btn-danger" id="autostart-modal-later-btn" type="button">Not now</button>
+        <button class="btn-primary" id="autostart-modal-settings-btn" type="button" disabled>Continue</button>
+      </div>
+    </div>
+  </div>
+
+
   <!-- LOGIN -->
   <section class="screen active" id="screen-login">
     <div class="header">
@@ -435,14 +515,14 @@
       </div>
       <p class="error-text" id="login-error" style="display:none;"></p>
       <button class="btn-primary" id="login-submit">Login</button>
-      <button class="btn-link" onclick="showScreen('register')">New driver? Create an account</button>
+      <button class="btn-link" onclick="startFreshRegister()">New driver? Create an account</button>
     </div>
   </section>
 
   <!-- REGISTER -->
   <section class="screen" id="screen-register">
     <div class="px" style="padding-top:32px;">
-      <button class="btn-back" onclick="showScreen('login')">
+      <button class="btn-back" onclick="regBackClick()">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
     </div>
@@ -527,6 +607,32 @@
     </div>
   </section>
 
+  <!-- PENDING APPROVAL -->
+  <section class="screen" id="screen-pending">
+    <div class="header">
+      <p class="eyebrow">ACCOUNT REVIEW</p>
+      <h1 class="title">Waiting for approval</h1>
+    </div>
+    <div class="px stack">
+      <p class="subtitle">Your driver account is waiting for the operator to approve it. You'll be able to go online as soon as it's approved — no need to do anything else right now.</p>
+      <button class="btn-danger" id="pending-logout-btn">Log out</button>
+    </div>
+  </section>
+
+  <!-- REJECTED / NEEDS CHANGES -->
+  <section class="screen" id="screen-rejected">
+    <div class="header">
+      <p class="eyebrow">ACCOUNT REVIEW</p>
+      <h1 class="title">Changes needed</h1>
+    </div>
+    <div class="px stack">
+      <p class="subtitle">The operator could not approve your account for this reason:</p>
+      <p class="error-text" id="rejected-reason-text" style="display:block; position:static; background:rgba(220,38,38,.08); border:1px solid rgba(220,38,38,.25); border-radius:10px; padding:12px;"></p>
+      <button class="btn-primary" id="rejected-edit-btn">Edit &amp; resend request</button>
+      <button class="btn-danger" id="rejected-logout-btn">Log out</button>
+    </div>
+  </section>
+
   <!-- HOME -->
   <section class="screen screen-with-tabs" id="screen-home">
     <div class="top-row">
@@ -557,6 +663,17 @@
       <p class="bg-location-warning-title">Background location is off</p>
       <p class="bg-location-warning-text">Set location permission to "Allow all the time" so riders can still find you when the app is in the background or the screen is off.</p>
       <button class="bg-location-warning-btn" id="bg-location-warning-btn" type="button">Open settings</button>
+    </div>
+
+    <!-- Shown when Android's battery optimizer is still allowed to manage
+         this app — on many phones (Xiaomi/Vivo/Oppo/Realme especially)
+         that means the background location service (and ride alerts) can
+         get killed a while after the driver swipes the app away from
+         Recents, even though they're still marked online. -->
+    <div class="bg-location-warning hidden" id="battery-warning">
+      <p class="bg-location-warning-title">Battery saver may stop ride alerts</p>
+      <p class="bg-location-warning-text">Allow this app to ignore battery optimization so it keeps tracking your location and ringing for new rides, even if you swipe it away while online.</p>
+      <button class="bg-location-warning-btn" id="battery-warning-btn" type="button">Allow</button>
     </div>
 
     <div id="home-current-ride-wrap"></div>
@@ -1050,7 +1167,7 @@ function applyFriendlyLocationLabel(el, pos) {
 // gets to see it in their popup. Mirrors NEAREST_TIMEOUT_MS in the worker,
 // but is enforced here too (independent of push delivery) so the in-app
 // popup never lags behind by the worker's minute-level Cron granularity.
-const NEAREST_WINDOW_MS = 10 * 1000;
+const NEAREST_WINDOW_MS = 25 * 1000;
 const MAX_MATCH_RADIUS_KM = 12;
 const LOCATION_STALE_MS = 3 * 60 * 1000;
 const NEAR_OVERRIDE_KM = 0.5; // within this distance, candidates are compared by order count (see rankAmongCandidates)
@@ -1065,6 +1182,7 @@ const NEAR_OVERRIDE_KM = 0.5; // within this distance, candidates are compared b
 // falls back to the original foreground-only navigator.geolocation watch —
 // same as before, nothing changes there.
 let locationWatchId = null;
+let locationHeartbeatInterval = null;
 let lastLocationWriteAt = 0;
 const LOCATION_WRITE_MIN_INTERVAL_MS = 10 * 1000; // throttle Firebase writes
 
@@ -1112,7 +1230,35 @@ function startBrowserLocationWatch() {
   );
 }
 
+// Both tracking paths above only fire on a fresh GPS reading — the native
+// plugin's distanceFilter (15m) means a driver who is parked/stationary
+// (very normal while waiting for a ride) simply gets no new fixes, so
+// taxi_drivers/{id}.location.updatedAt stops advancing. Since matching
+// treats anything older than LOCATION_STALE_MS (3 min) as "no location"
+// and silently drops that driver from the candidate pool, a stationary
+// online driver would otherwise vanish from ride matching after a few
+// minutes even though they're right there. This heartbeat re-writes the
+// LAST KNOWN fix with a fresh timestamp every 60s regardless of movement,
+// so staying still never makes a driver invisible to matching.
+function startLocationHeartbeat() {
+  if (locationHeartbeatInterval) return;
+  locationHeartbeatInterval = setInterval(() => {
+    if (!state.isOnline || !state.myLocation || !state.username || !window.fb) return;
+    const { db, ref, update } = window.fb;
+    const now = Date.now();
+    state.myLocation.updatedAt = now;
+    lastLocationWriteAt = now;
+    update(ref(db, 'taxi_drivers/' + state.username), {
+      location: { lat: state.myLocation.lat, lng: state.myLocation.lng, updatedAt: now },
+    }).catch((e) => { console.warn('Location heartbeat write failed:', e); });
+  }, 60 * 1000);
+}
+function stopLocationHeartbeat() {
+  if (locationHeartbeatInterval) { clearInterval(locationHeartbeatInterval); locationHeartbeatInterval = null; }
+}
+
 function startLocationTracking() {
+  startLocationHeartbeat();
   if (!hasBackgroundGeolocationPlugin()) { startBrowserLocationWatch(); return; }
   if (window.driverBgLocationActive) return;
   window.driverBgLocationActive = true;
@@ -1132,6 +1278,7 @@ function startLocationTracking() {
     }
   ).then(() => {
     checkBackgroundLocationPermission();
+    checkBatteryOptimization();
   }).catch((err) => {
     // e.g. permission denied — fall back to the foreground-only watch so
     // the driver isn't left with no tracking at all.
@@ -1139,6 +1286,7 @@ function startLocationTracking() {
     window.driverBgLocationActive = false;
     startBrowserLocationWatch();
     checkBackgroundLocationPermission();
+    checkBatteryOptimization();
   });
 }
 
@@ -1148,11 +1296,77 @@ function startLocationTracking() {
 // this app is backgrounded or the screen is off. start()'s own permission
 // request commonly only secures the first tier (that's an OS/Play-policy
 // restriction on requesting both at once, not something this plugin
-// controls), so this checks the actual granted tier afterwards and — if
-// it's still "while in use" only — shows a banner pointing the driver at
-// Settings instead of leaving tracking silently broken in the background.
+// controls — Android 11+ never shows an in-app popup for the "all the
+// time" tier at all), so this checks the actual granted tier afterwards
+// and, if it's still "while in use" only, both keeps a banner up AND
+// (once per online session) pops a blocking modal that walks the driver
+// to Settings — a passive banner alone is too easy to miss, and a driver
+// who never grants this effectively goes invisible the moment they swipe
+// the app away, without any obvious reason why rides stopped coming in.
 const bgLocationWarningEl = document.getElementById('bg-location-warning');
 const bgLocationWarningBtn = document.getElementById('bg-location-warning-btn');
+const bgLocationModalEl = document.getElementById('bg-location-modal-overlay');
+const bgLocationModalErrorEl = document.getElementById('bg-location-modal-error');
+const bgLocationModalSettingsBtn = document.getElementById('bg-location-modal-settings-btn');
+const bgLocationModalLaterBtn = document.getElementById('bg-location-modal-later-btn');
+let bgLocationModalShownThisSession = false; // reset each time the driver goes online (see toggle handler + logInDriver)
+let bgLocationModalWasOpened = false; // true once Settings has actually been opened from the modal — used to show the "still not set" hint on return instead of the first-time copy
+
+// Set while we've asked the driver to go online but don't yet know the
+// permission result — checkBackgroundLocationPermission() consumes this
+// flag once the check resolves, either finishing the "go online" or
+// bouncing them back to offline. keepExistingOnlineSince is only true for
+// the app-reopen restore path, where a previously-running online session's
+// queue position (onlineSince) shouldn't be reset just because the app
+// reloaded.
+let awaitingBgLocationGrant = false;
+let awaitingBgLocationGrantKeepOnlineSince = false;
+
+function openBgLocationModal() {
+  if (!bgLocationModalEl || bgLocationModalEl.classList.contains('show')) return;
+  bgLocationModalShownThisSession = true;
+  if (bgLocationModalErrorEl) bgLocationModalErrorEl.style.display = bgLocationModalWasOpened ? 'block' : 'none';
+  bgLocationModalEl.classList.add('show');
+}
+function closeBgLocationModal() {
+  if (bgLocationModalEl) bgLocationModalEl.classList.remove('show');
+}
+
+// Actually marks the driver online — writes isOnline:true to Firebase and
+// (re)starts tracking. Only ever called once "Allow all the time" is
+// confirmed granted (see checkBackgroundLocationPermission), so a driver
+// can't be online without it.
+function finalizeGoOnline(opts) {
+  const keepExistingOnlineSince = !!(opts && opts.keepExistingOnlineSince);
+  state.isOnline = true;
+  document.getElementById('online-toggle-input').checked = true;
+  updateOnlineLabel();
+  try { localStorage.setItem('nesh_driver_online_' + state.username, '1'); } catch (err) {}
+  renderHomeLists();
+  try {
+    const { db, ref, update } = window.fb;
+    const updates = { isOnline: true };
+    if (!keepExistingOnlineSince || !(state.driver && state.driver.onlineSince)) updates.onlineSince = Date.now();
+    update(ref(db, 'taxi_drivers/' + state.username), updates).catch(() => {});
+  } catch (err) {}
+  startLocationTracking(); // idempotent — already running for the gated (native) path; starts fresh for the browser-fallback path
+}
+
+// Bounces the toggle back to offline — used when a driver tried to go
+// online but doesn't have "Allow all the time" granted.
+function revertOnlineToggle() {
+  state.isOnline = false;
+  document.getElementById('online-toggle-input').checked = false;
+  updateOnlineLabel();
+  try { localStorage.setItem('nesh_driver_online_' + state.username, '0'); } catch (err) {}
+  stopLocationTracking();
+  refreshRidePopupFromCache();
+  renderHomeLists();
+  try {
+    const { db, ref, update } = window.fb;
+    update(ref(db, 'taxi_drivers/' + state.username), { isOnline: false, onlineSince: null }).catch(() => {});
+  } catch (err) {}
+}
 
 async function checkBackgroundLocationPermission() {
   if (!bgLocationWarningEl || !hasBackgroundGeolocationPlugin()) return;
@@ -1161,8 +1375,36 @@ async function checkBackgroundLocationPermission() {
     const bg = status && status.backgroundLocation;
     const grantedAllTheTime = bg === 'granted' || bg === 'always';
     bgLocationWarningEl.classList.toggle('hidden', !state.isOnline || grantedAllTheTime);
+
+    // A pending "go online" attempt (or app-reopen restore) is waiting on
+    // this exact result — resolve it one way or the other, once.
+    if (awaitingBgLocationGrant) {
+      awaitingBgLocationGrant = false;
+      if (grantedAllTheTime) {
+        // Location is step 1 of 3 — hand off to the battery-optimization
+        // gate next, rather than going online yet.
+        proceedToAutostartGate(awaitingBgLocationGrantKeepOnlineSince);
+      } else {
+        revertOnlineToggle();
+        openBgLocationModal();
+      }
+      awaitingBgLocationGrantKeepOnlineSince = false;
+      return;
+    }
+
+    if (grantedAllTheTime) {
+      if (bgLocationModalEl && bgLocationModalEl.classList.contains('show')) {
+        closeBgLocationModal();
+        showToast('Background location turned on ✓');
+      }
+      return;
+    }
+    // Not a pending attempt (e.g. a resume-recheck while already online,
+    // or permission got revoked mid-session) — surface it, but don't
+    // force the driver offline mid-session on our own.
+    if (state.isOnline && !bgLocationModalShownThisSession) openBgLocationModal();
   } catch (e) {
-    // Can't determine status — leave whatever the banner was already showing.
+    // Can't determine status — leave whatever the banner/modal were already showing.
   }
 }
 
@@ -1173,17 +1415,267 @@ if (bgLocationWarningBtn) {
     }
   });
 }
+if (bgLocationModalSettingsBtn) {
+  bgLocationModalSettingsBtn.addEventListener('click', () => {
+    bgLocationModalWasOpened = true;
+    if (hasBackgroundGeolocationPlugin()) {
+      window.Capacitor.Plugins.BackgroundGeolocation.openSettings().catch(() => {});
+    }
+  });
+}
+if (bgLocationModalLaterBtn) {
+  bgLocationModalLaterBtn.addEventListener('click', closeBgLocationModal);
+}
 
 // Re-check whenever the driver comes back to the app — covers the case
-// where they just changed the permission in system Settings and returned.
+// where they just changed the permission in system Settings and returned
+// (this is what closes the modal automatically once it's actually granted).
 (function () {
   if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
   window.Capacitor.Plugins.App.addListener('resume', () => {
     if (state.isOnline) checkBackgroundLocationPermission();
+    if (state.isOnline) checkBatteryOptimization();
   });
 })();
 
+// ---------- Battery optimization exemption check ----------
+// Even with "Allow all the time" location granted, Android's Doze/App
+// Standby battery optimizer can still pause background work a while
+// after the driver swipes the app away from Recents — and several OEMs
+// (Xiaomi/Vivo/Oppo/Realme especially) are far more aggressive about
+// killing background apps than stock Android. Getting the driver to tap
+// "Allow" on the standard system exemption dialog is the one thing that
+// actually helps here (it doesn't fix OEM-specific "autostart" managers,
+// but it's the real, documented Android API for this — the closest
+// there is to a universal fix, short of the driver never swiping the
+// app away while online).
+const batteryWarningEl = document.getElementById('battery-warning');
+const batteryWarningBtn = document.getElementById('battery-warning-btn');
+const batteryModalEl = document.getElementById('battery-modal-overlay');
+const batteryModalErrorEl = document.getElementById('battery-modal-error');
+const batteryModalSettingsBtn = document.getElementById('battery-modal-settings-btn');
+const batteryModalLaterBtn = document.getElementById('battery-modal-later-btn');
+let batteryModalShownThisSession = false; // reset each time we enter the battery gate
+let batteryModalWasOpened = false; // true once Settings has actually been opened from the modal
+function hasBatteryOptimizationPlugin() {
+  return !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BatteryOptimization);
+}
+
+// Set while we've asked the driver to go online and are waiting to know
+// whether battery-optimization exemption is granted — mirrors
+// awaitingBgLocationGrant, just for step 2 of the 3-step chain.
+let awaitingBatteryGrant = false;
+let awaitingBatteryGrantKeepOnlineSince = false;
+
+function openBatteryModal() {
+  if (!batteryModalEl || batteryModalEl.classList.contains('show')) return;
+  batteryModalShownThisSession = true;
+  if (batteryModalErrorEl) batteryModalErrorEl.style.display = batteryModalWasOpened ? 'block' : 'none';
+  batteryModalEl.classList.add('show');
+}
+function closeBatteryModal() {
+  if (batteryModalEl) batteryModalEl.classList.remove('show');
+}
+
+// Step 3 of the go-online chain (last) — called once location and
+// autostart are both confirmed. Checks/requests battery-optimization
+// exemption before letting the driver actually go online.
+function proceedToBatteryGate(keepExistingOnlineSince) {
+  if (!hasBatteryOptimizationPlugin()) {
+    // No plugin available (e.g. browser/testing) — nothing to gate on here.
+    finalizeGoOnline({ keepExistingOnlineSince });
+    return;
+  }
+  awaitingBatteryGrant = true;
+  awaitingBatteryGrantKeepOnlineSince = keepExistingOnlineSince;
+  batteryModalShownThisSession = false;
+  checkBatteryOptimization();
+}
+
+async function checkBatteryOptimization() {
+  if (!hasBatteryOptimizationPlugin()) {
+    if (awaitingBatteryGrant) {
+      awaitingBatteryGrant = false;
+      finalizeGoOnline({ keepExistingOnlineSince: awaitingBatteryGrantKeepOnlineSince });
+      awaitingBatteryGrantKeepOnlineSince = false;
+    }
+    return;
+  }
+  try {
+    const result = await window.Capacitor.Plugins.BatteryOptimization.isBatteryOptimizationEnabled();
+    const exempted = !result.enabled;
+    if (batteryWarningEl) batteryWarningEl.classList.toggle('hidden', !state.isOnline || exempted);
+
+    // A pending "go online" attempt is waiting on this exact result —
+    // resolve it one way or the other, once.
+    if (awaitingBatteryGrant) {
+      awaitingBatteryGrant = false;
+      if (exempted) {
+        finalizeGoOnline({ keepExistingOnlineSince: awaitingBatteryGrantKeepOnlineSince });
+      } else {
+        revertOnlineToggle();
+        openBatteryModal();
+      }
+      awaitingBatteryGrantKeepOnlineSince = false;
+      return;
+    }
+
+    if (exempted) {
+      if (batteryModalEl && batteryModalEl.classList.contains('show')) {
+        closeBatteryModal();
+        showToast('Battery optimization turned off ✓');
+      }
+      return;
+    }
+    // Not a pending attempt (e.g. a resume-recheck while already online,
+    // or the exemption got revoked mid-session) — surface it, but don't
+    // force the driver offline mid-session on our own.
+    if (state.isOnline && !batteryModalShownThisSession) openBatteryModal();
+  } catch (e) {
+    // Can't determine status — leave whatever the banner/modal were already showing.
+  }
+}
+if (batteryWarningBtn) {
+  batteryWarningBtn.addEventListener('click', () => {
+    if (!hasBatteryOptimizationPlugin()) return;
+    window.Capacitor.Plugins.BatteryOptimization.requestIgnoreBatteryOptimization().catch(() => {
+      // Some OEMs/Android versions reject the direct request dialog —
+      // fall back to the settings page so the driver can still find it.
+      window.Capacitor.Plugins.BatteryOptimization.openBatteryOptimizationSettings().catch(() => {});
+    });
+  });
+}
+if (batteryModalSettingsBtn) {
+  batteryModalSettingsBtn.addEventListener('click', () => {
+    batteryModalWasOpened = true;
+    if (!hasBatteryOptimizationPlugin()) return;
+    window.Capacitor.Plugins.BatteryOptimization.requestIgnoreBatteryOptimization().catch(() => {
+      window.Capacitor.Plugins.BatteryOptimization.openBatteryOptimizationSettings().catch(() => {});
+    });
+  });
+}
+if (batteryModalLaterBtn) {
+  batteryModalLaterBtn.addEventListener('click', () => {
+    closeBatteryModal();
+    revertOnlineToggle();
+  });
+}
+
+// ---------- Autostart confirmation (step 3) ----------
+// Android has no API to check or request OEM "autostart manager"
+// permission (MIUI/Vivo/Oppo/Realme etc.), so unlike the two gates above
+// this can't be verified automatically. Instead the driver has to
+// manually enable it in their phone's Settings and then tick a checkbox
+// confirming they've done so — that confirmation is remembered per driver
+// per device so they aren't asked again every single time they go online.
+const autostartModalEl = document.getElementById('autostart-modal-overlay');
+const autostartModalManualHintEl = document.getElementById('autostart-modal-manual-hint');
+const autostartModalOpenSettingsBtn = document.getElementById('autostart-modal-open-settings-btn');
+const autostartModalCheckbox = document.getElementById('autostart-modal-checkbox');
+const autostartModalSettingsBtn = document.getElementById('autostart-modal-settings-btn');
+const autostartModalLaterBtn = document.getElementById('autostart-modal-later-btn');
+let awaitingAutostartConfirm = false;
+let awaitingAutostartConfirmKeepOnlineSince = false;
+
+function hasAutoStartPlugin() {
+  return !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DontKillMyApp);
+}
+if (autostartModalOpenSettingsBtn) {
+  autostartModalOpenSettingsBtn.addEventListener('click', () => {
+    if (hasAutoStartPlugin()) {
+      // Jumps straight to this phone brand's own Auto-start manager
+      // screen (Xiaomi/Vivo/Oppo/Huawei/Samsung/etc.) when supported.
+      window.Capacitor.Plugins.DontKillMyApp.requestAutoStart().catch(() => {
+        // Brand not recognised / screen not found — fall back to the
+        // generic app-info settings page so the driver has somewhere to go.
+        window.Capacitor.Plugins.DontKillMyApp.openAppInfo().catch(() => {});
+      });
+      return;
+    }
+    // No native plugin available (browser/testing, or this build hasn't
+    // added the plugin yet) — nothing to open automatically; the manual
+    // hint text above already tells the driver where to look themselves.
+  });
+}
+
+function autostartConfirmedKey() {
+  return 'nesh_driver_autostart_confirmed_' + state.username;
+}
+function openAutostartModal() {
+  if (!autostartModalEl || autostartModalEl.classList.contains('show')) return;
+  if (autostartModalCheckbox) autostartModalCheckbox.checked = false;
+  if (autostartModalSettingsBtn) autostartModalSettingsBtn.disabled = true;
+  if (autostartModalManualHintEl) {
+    autostartModalManualHintEl.innerHTML = hasAutoStartPlugin()
+      ? 'Tap <b>Open settings</b> below, then find and enable Auto-start for this app.'
+      : 'Go to your phone\'s <b>Settings → Apps → NESH Driver → Auto-start / Autostart manager</b> and turn it on.';
+  }
+  autostartModalEl.classList.add('show');
+}
+function closeAutostartModal() {
+  if (autostartModalEl) autostartModalEl.classList.remove('show');
+}
+
+// Step 1 of the go-online chain — the very first thing checked when the
+// Step 2 of the go-online chain — called once location ("Allow all the
+// time") is confirmed. Skips straight to the battery gate if the driver
+// has already confirmed autostart on this device before.
+function proceedToAutostartGate(keepExistingOnlineSince) {
+  let alreadyConfirmed = false;
+  try { alreadyConfirmed = localStorage.getItem(autostartConfirmedKey()) === '1'; } catch (e) {}
+  if (alreadyConfirmed) {
+    proceedToBatteryGate(keepExistingOnlineSince);
+    return;
+  }
+  awaitingAutostartConfirm = true;
+  awaitingAutostartConfirmKeepOnlineSince = keepExistingOnlineSince;
+  openAutostartModal();
+}
+if (autostartModalCheckbox) {
+  autostartModalCheckbox.addEventListener('change', (e) => {
+    if (autostartModalSettingsBtn) autostartModalSettingsBtn.disabled = !e.target.checked;
+  });
+}
+if (autostartModalSettingsBtn) {
+  autostartModalSettingsBtn.addEventListener('click', () => {
+    if (autostartModalSettingsBtn.disabled) return;
+    try { localStorage.setItem(autostartConfirmedKey(), '1'); } catch (e) {}
+    closeAutostartModal();
+    if (awaitingAutostartConfirm) {
+      awaitingAutostartConfirm = false;
+      proceedToBatteryGate(awaitingAutostartConfirmKeepOnlineSince);
+      awaitingAutostartConfirmKeepOnlineSince = false;
+    }
+  });
+}
+if (autostartModalLaterBtn) {
+  autostartModalLaterBtn.addEventListener('click', () => {
+    closeAutostartModal();
+    awaitingAutostartConfirm = false;
+    awaitingAutostartConfirmKeepOnlineSince = false;
+    revertOnlineToggle();
+  });
+}
+
+// Step 1 of the go-online chain (first) — the very first thing checked
+// when the driver taps online. Kicks off the location ("Allow all the
+// time") permission check/request; checkBackgroundLocationPermission()
+// resolves this via proceedToAutostartGate() (step 2) or bounces back via
+// revertOnlineToggle().
+function proceedToLocationGate(keepExistingOnlineSince) {
+  if (!hasBackgroundGeolocationPlugin()) {
+    // No native plugin available — nothing to gate on here, skip to autostart.
+    proceedToAutostartGate(keepExistingOnlineSince);
+    return;
+  }
+  awaitingBgLocationGrant = true;
+  awaitingBgLocationGrantKeepOnlineSince = keepExistingOnlineSince;
+  bgLocationModalShownThisSession = false;
+  startLocationTracking();
+}
+
 function stopLocationTracking() {
+  stopLocationHeartbeat();
   if (window.driverBgLocationActive) {
     window.driverBgLocationActive = false;
     window.Capacitor.Plugins.BackgroundGeolocation.stop().catch(() => {});
@@ -1193,6 +1685,7 @@ function stopLocationTracking() {
     locationWatchId = null;
   }
   if (bgLocationWarningEl) bgLocationWarningEl.classList.add('hidden');
+  if (batteryWarningEl) batteryWarningEl.classList.add('hidden');
 }
 
 function listenDrivers() {
@@ -1214,9 +1707,9 @@ function listenDrivers() {
 // picks one from this live list; a driver can never change it themselves
 // afterwards (that's operator-only, from the Operator Panel). Also carries
 // each zone's drawn boundary (bounds), if the operator has set one — used
-// to match zone-priority drivers to orders actually inside their area
-// (see findZoneHoldDriver below); zones without a boundary fall back to
-// plain distance-based matching.
+// to restrict order matching to only the drivers assigned to the zone a
+// pickup actually falls inside (see zoneForPickup below); zones without a
+// boundary drawn yet fall back to plain distance-based matching.
 let zonesCache = []; // [{ _id, name, bounds? }]
 function listenZonesForRegistration() {
   const { db, ref, onValue } = window.fb;
@@ -1458,6 +1951,41 @@ function renderOrderPopup(pendingList) {
 // around (e.g. after being skipped by everyone) without re-querying anyone.
 const skippedRideIds = new Set();
 
+// ---------- Choice Driver — 25s no-response auto-stop ----------
+// A ride offered to us via chosenDriverId (index.html's Choice Driver
+// flow — the customer hand-picked this driver, not the system) must
+// never sit ringing forever unanswered, but critically it must also
+// never rotate to another driver if we don't respond in time — per spec
+// it just stops, and index.html sends the customer back to the driver
+// list to pick again. Mirrors TAXI_CHOICE_WINDOW_MS in index.html.
+const TAXI_CHOICE_WINDOW_MS = 25 * 1000;
+const choiceDriverOfferTimers = new Map(); // rideId -> setTimeout handle
+function clearChoiceDriverOfferTimer(rideId) {
+  const t = choiceDriverOfferTimers.get(rideId);
+  if (t) { clearTimeout(t); choiceDriverOfferTimers.delete(rideId); }
+}
+// Starts the 25s countdown the first time a chosenDriverId ride for us
+// shows up in the popup; a no-op if it's already ticking for this ride.
+function ensureChoiceDriverOfferTimer(rideId) {
+  if (choiceDriverOfferTimers.has(rideId)) return;
+  const timer = setTimeout(() => {
+    choiceDriverOfferTimers.delete(rideId);
+    const ride = ridesCache[rideId];
+    // Only stop it if it's still exactly the state we offered it in — if
+    // we already accepted/skipped it (or the customer cancelled) in the
+    // meantime, there's nothing to do here.
+    if (!ride || ride.status !== 'searching' || ride.chosenDriverId !== state.username) return;
+    skippedRideIds.add(rideId);
+    const { db, ref, update } = window.fb;
+    update(ref(db, 'rides/' + rideId), {
+      chosenDriverId: null,
+      chosenDriverStatus: 'timeout',
+    }).catch(() => {});
+    refreshRidePopupFromCache();
+  }, TAXI_CHOICE_WINDOW_MS);
+  choiceDriverOfferTimers.set(rideId, timer);
+}
+
 // Same idea, for delivery jobs. Delivery jobs live nested under
 // restaurants/{restId}/orders/{orderId} rather than a flat node, so each
 // job is tracked with a composite id "restId::orderId".
@@ -1550,25 +2078,30 @@ async function handlePopupRideAction(rideId, action) {
   if (action === 'reject') {
     skippedRideIds.add(rideId);
     clearDeliveredNotifications();
-    // If we're a zone-priority driver, release our exclusive hold right
-    // away so every other driver's rotation opens up immediately instead
-    // of waiting out the full NEAREST_WINDOW_MS window. Harmless no-op if
-    // this job wasn't actually being held for us.
-    if (state.driver && state.driver.zonePriority === true) {
-      const { db, ref, update } = window.fb;
-      update(ref(db, 'rides/' + rideId), { zoneHoldReleasedAt: Date.now() }).catch(() => {});
-    }
+    const rideInCache = ridesCache[rideId];
     // If the customer specifically approved me as the candidate for this
     // ride (see index.html's driver-candidate approval flow), skipping it
     // must hand it back rather than let it quietly vanish — clear the
     // routing and record the decline so the customer's app moves on to
     // the next-nearest driver instead of this one being offered again.
-    const rideInCache = ridesCache[rideId];
     if (rideInCache && rideInCache.candidateDriverId === state.username) {
       const { db, ref, update } = window.fb;
       update(ref(db, 'rides/' + rideId), {
         candidateDriverId: null,
         ['declinedDriverIds/' + state.username]: true,
+      }).catch(() => {});
+    }
+    // If the customer hand-picked me for this ride (Choice Driver flow —
+    // index.html's chosenDriverId), skipping it must NOT hand it to
+    // anyone else — the customer chose me specifically, nobody else. Just
+    // clear the routing and record that I declined; the ride simply stops
+    // there, and index.html sends the customer back to pick again.
+    if (rideInCache && rideInCache.chosenDriverId === state.username) {
+      clearChoiceDriverOfferTimer(rideId);
+      const { db, ref, update } = window.fb;
+      update(ref(db, 'rides/' + rideId), {
+        chosenDriverId: null,
+        chosenDriverStatus: 'declined',
       }).catch(() => {});
     }
     refreshRidePopupFromCache();
@@ -1585,6 +2118,7 @@ async function handlePopupRideAction(rideId, action) {
       refreshRidePopupFromCache();
       return;
     }
+    clearChoiceDriverOfferTimer(rideId);
     await update(ref(db, 'rides/' + rideId), {
       status: 'accepted',
       driverId: state.username,
@@ -1604,12 +2138,6 @@ async function handlePopupDeliveryAction(compositeId, action) {
   if (action === 'reject') {
     skippedDeliveryIds.add(compositeId);
     clearDeliveredNotifications();
-    // Same instant zone-priority release as the ride case above.
-    if (state.driver && state.driver.zonePriority === true) {
-      const [rId, oId] = compositeId.split('::');
-      const { db, ref, update } = window.fb;
-      update(ref(db, 'restaurants/' + rId + '/orders/' + oId), { zoneHoldReleasedAt: Date.now() }).catch(() => {});
-    }
     refreshRidePopupFromCache();
     return;
   }
@@ -1689,39 +2217,26 @@ function driverOnlineSince(driverId) {
 // busy, see includeBusy). When includeBusy is false, busy drivers (isBusy on
 // their taxi_drivers record) — including this one, via amIBusy — are left
 // out of the pool entirely, so free drivers always get first claim on a job.
-// Zone-aware candidate search order for a pickup point: the zone the point
-// actually falls inside comes first (if any), then every other drawn zone
-// nearest-centroid-first, and finally null (meaning "ignore zones, just use
-// radius") as a last-resort safety net. rankAmongCandidates walks this list
-// and stops at the first zone that actually has a matching candidate, so:
-//   - pickup inside a zone, drivers there  -> that zone's drivers only
-//   - pickup inside a zone, nobody there   -> nearest OTHER zone's drivers
-//   - pickup inside no drawn zone at all   -> nearest zone's drivers
-//   - no zone anywhere has a match         -> old radius-only behavior
-function zoneCentroid(zone) {
-  const pts = zone.bounds;
-  return {
-    lat: pts.reduce((s, p) => s + p.lat, 0) / pts.length,
-    lng: pts.reduce((s, p) => s + p.lng, 0) / pts.length
-  };
-}
-function orderedZoneIdsByProximity(pickup) {
+// Which zone a pickup point actually falls inside, by the zone's drawn
+// boundary (driver_zones/{zoneId}.bounds). Returns the zone's _id, or null
+// if the point isn't inside any drawn zone (nothing drawn yet, or the
+// pickup is genuinely outside every drawn area) — null means "no zone
+// restriction", the old plain-radius behavior, used ONLY as a safety net
+// for that edge case, never to widen out of a zone that DOES contain the
+// pickup.
+function zoneForPickup(pickup) {
   const drawn = zonesCache.filter(z => z.bounds && z.bounds.length >= 3);
-  if (!drawn.length) return [null];
   const containing = drawn.find(z => isPointInZoneBounds(pickup, z.bounds));
-  const rest = drawn
-    .filter(z => !containing || z._id !== containing._id)
-    .map(z => ({ id: z._id, distanceKm: haversineKm(pickup.lat, pickup.lng, zoneCentroid(z).lat, zoneCentroid(z).lng) }))
-    .sort((a, b) => a.distanceKm - b.distanceKm)
-    .map(z => z.id);
-  const ordered = containing ? [containing._id, ...rest] : rest;
-  ordered.push(null); // final safety net: ignore zones entirely
-  return ordered;
+  return containing ? containing._id : null;
 }
-// Builds the raw candidate list for ONE zone (or, when zoneId is null, the
-// old zone-agnostic radius search). Split out of rankAmongCandidates so it
-// can be tried once per zone in proximity order.
-function candidatesForZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, zoneId) {
+// Builds the raw candidate list for the pickup's zone ONLY (or, when zoneId
+// is null because the pickup isn't inside any drawn zone, the old
+// zone-agnostic radius search as a fallback). No widening to other zones —
+// if a pickup is inside a drawn zone and that zone currently has nobody
+// matching (free, or busy when includeBusy), the candidate list is simply
+// empty and the job goes unoffered rather than leaking to another zone's
+// drivers.
+function candidatesInZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, zoneId) {
   const candidates = [];
   if ((!amIBusy || includeBusy) && (!zoneId || (state.driver && state.driver.zone === zoneId))) {
     candidates.push({ id: state.username, distanceKm: myDistanceKm });
@@ -1739,19 +2254,33 @@ function candidatesForZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, 
   });
   return candidates;
 }
-function rankAmongCandidates(pickup, matchFn, myDistanceKm, amIBusy, includeBusy) {
-  let candidates = [];
-  for (const zoneId of orderedZoneIdsByProximity(pickup)) {
-    candidates = candidatesForZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, zoneId);
-    if (candidates.length) break;
+// Deterministic "coin flip" used only as the last tiebreak, when two
+// candidates are in the same 500m cluster with the same order count AND
+// the same onlineSince. Must give the EXACT same answer on every driver's
+// phone for the exact same job (that's what keeps the rotation to one
+// person at a time), so it can't use Math.random() — instead it hashes the
+// job's createdAt together with the driver id into a stable, arbitrary-
+// looking number. Same inputs -> same output, everywhere, always.
+function stableTieBreakKey(createdAt, driverId) {
+  const str = String(createdAt || 0) + '|' + String(driverId || '');
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
   }
+  return h;
+}
+function rankAmongCandidates(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, createdAt) {
+  const zoneId = zoneForPickup(pickup);
+  const candidates = candidatesInZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, zoneId);
   // Distance-first: sort everyone by raw distance to the pickup, nearest
   // first. Then pull out the "cluster" — every candidate within
   // NEAR_OVERRIDE_KM of whoever's nearest — since a few hundred metres
   // shouldn't be the deciding factor among drivers who are all basically
   // right there. Within that cluster, order count decides (fewest orders
-  // so far wins), then onlineSince, then raw distance as a final tiebreak.
-  // Anyone farther than the cluster keeps their plain distance ranking.
+  // so far wins), then onlineSince (longest-waiting session first), then a
+  // stable arbitrary tiebreak so ties are still settled, and settled the
+  // same way on every device. Anyone farther than the cluster keeps their
+  // plain distance ranking.
   const byDistance = candidates.slice().sort((a, b) => a.distanceKm - b.distanceKm);
   if (!byDistance.length) return { rank: -1, total: 0 };
   const minDistanceKm = byDistance[0].distanceKm;
@@ -1762,7 +2291,7 @@ function rankAmongCandidates(pickup, matchFn, myDistanceKm, amIBusy, includeBusy
     if (countDiff !== 0) return countDiff;
     const onlineDiff = driverOnlineSince(a.id) - driverOnlineSince(b.id);
     if (onlineDiff !== 0) return onlineDiff;
-    return a.distanceKm - b.distanceKm;
+    return stableTieBreakKey(createdAt, a.id) - stableTieBreakKey(createdAt, b.id);
   });
   const pool = [...cluster, ...rest];
   return { rank: pool.findIndex(c => c.id === state.username), total: pool.length };
@@ -1772,79 +2301,36 @@ function myDistanceToPickup(pickup) {
   return haversineKm(pickup.lat, pickup.lng, state.myLocation.lat, state.myLocation.lng);
 }
 
-// Zone-priority hold: the operator can flag a driver (taxi_drivers/{id}.
-// zonePriority === true) from the Operator Panel as the go-to driver for
-// their working area. While that hold is active on a job, it's offered
-// ONLY to them — nobody else sees it, bypassing the nearest/fairness
-// rotation below entirely. A driver's "area" is their assigned zone's
-// drawn boundary (driver_zones/{zoneId}.bounds) when the operator has
-// drawn one — matched by whether the pickup point actually falls inside
-// it — and falls back to the old plain-radius approximation for any zone
-// that doesn't have a boundary set yet. Finds whichever online, free,
-// matching, zone-priority driver applies (normally just one relevant
-// candidate; if more than one somehow qualifies, nearest wins). Returns
-// null if no zone-priority driver currently applies.
-function isZonePriorityMatch(pickup, driverZoneId, distanceKm) {
-  const zone = driverZoneId && zonesCache.find(z => z._id === driverZoneId);
-  if (zone && zone.bounds) return isPointInZoneBounds(pickup, zone.bounds);
-  // No boundary drawn for this driver's zone yet — fall back to the
-  // simple "somewhere within normal matching radius" approximation.
-  return distanceKm <= MAX_MATCH_RADIUS_KM;
-}
-function findZoneHoldDriver(pickup, matchFn, myDistanceKm, amIBusy) {
-  const candidates = [];
-  if (!amIBusy && state.driver && state.driver.zonePriority === true && isZonePriorityMatch(pickup, state.driver.zone, myDistanceKm)) {
-    candidates.push({ id: state.username, distanceKm: myDistanceKm });
-  }
-  Object.entries(driversCache).forEach(([id, d]) => {
-    if (!d || id === state.username || !matchFn(d) || d.zonePriority !== true || d.isBusy) return;
-    const loc = d.location;
-    if (!loc || typeof loc.lat !== 'number' || !loc.updatedAt) return;
-    if (Date.now() - loc.updatedAt > LOCATION_STALE_MS) return;
-    const distanceKm = haversineKm(pickup.lat, pickup.lng, loc.lat, loc.lng);
-    if (!isZonePriorityMatch(pickup, d.zone, distanceKm)) return;
-    candidates.push({ id, distanceKm });
-  });
-  if (!candidates.length) return null;
-  candidates.sort((a, b) => a.distanceKm - b.distanceKm);
-  return candidates[0].id;
-}
-
 // Decides whether THIS driver should be shown a given ride/delivery right
 // now. Only ONE driver is ever offered a job at a time — never two people
-// at once. Candidates within MAX_MATCH_RADIUS_KM are ranked nearest-first;
-// the nearest driver gets the first turn, and if they don't accept within
-// NEAREST_WINDOW_MS the offer rotates to the next-nearest driver, then the
-// next, and so on — one person, then a different person, never together.
-// Once the rotation reaches the farthest candidate it stays with them, so
-// the job is never left with no one seeing it.
+// at once. Candidates are restricted to whichever zone the pickup point
+// actually falls inside (by assigned taxi_drivers.zone, matched against the
+// zone's drawn boundary) — a pickup in Zone A is only ever offered to Zone
+// A's drivers, never to a nearby driver from Zone B. If nobody in that zone
+// matches, the job simply isn't offered to anyone (no cross-zone leakage).
+// Within the zone, candidates are ranked nearest-first; the nearest driver
+// gets the first turn, and if they don't accept within NEAREST_WINDOW_MS
+// the offer rotates to the next-nearest driver, then the next, and so on —
+// one person, then a different person, never together. Once the rotation
+// reaches the farthest candidate it stays with them, so the job is never
+// left with no one seeing it.
 //
 // Free (non-busy) drivers always get first claim. Only if NO free driver
-// exists anywhere within radius does the pool widen to include busy
-// drivers too (including this one) — so a job never goes completely
-// unoffered just because everyone nearby is already on something.
-//
-// holdReleasedAt is the job's zoneHoldReleasedAt field (set the instant a
-// zone-priority driver skips it) — while it's unset and the job is under
-// NEAREST_WINDOW_MS old, a zone-priority driver (if any applies) holds it
-// exclusively; past that window, or once released, it opens up to the
-// normal rotation below for everyone, priority driver included.
-function shouldOfferToMe(pickup, createdAt, matchFn, amIBusy, holdReleasedAt) {
+// exists in that zone does the pool widen to include busy drivers in that
+// SAME zone too (including this one) — still never crossing into another
+// zone — so a job never goes completely unoffered just because everyone
+// nearby is already on something.
+function shouldOfferToMe(pickup, createdAt, matchFn, amIBusy) {
   if (!pickup) return true; // no pickup coords on record — can't rank, so don't withhold it
   const distanceKm = myDistanceToPickup(pickup);
   if (distanceKm === Infinity) return false; // we don't know where we are yet
   if (distanceKm > MAX_MATCH_RADIUS_KM) return false; // outside matching radius — never offered
 
-  const elapsedForHold = Date.now() - (createdAt || 0);
-  if (!holdReleasedAt && elapsedForHold < NEAREST_WINDOW_MS) {
-    const heldBy = findZoneHoldDriver(pickup, matchFn, distanceKm, amIBusy);
-    if (heldBy) return heldBy === state.username;
-  }
-
-  let { rank, total } = rankAmongCandidates(pickup, matchFn, distanceKm, amIBusy, false);
+  let { rank, total } = rankAmongCandidates(pickup, matchFn, distanceKm, amIBusy, false, createdAt);
   if (total === 0) {
-    // Nobody free nearby — widen to busy drivers so it isn't left unoffered.
-    ({ rank, total } = rankAmongCandidates(pickup, matchFn, distanceKm, amIBusy, true));
+    // Nobody free in this zone — widen to busy drivers in the SAME zone
+    // only, so it isn't left unoffered.
+    ({ rank, total } = rankAmongCandidates(pickup, matchFn, distanceKm, amIBusy, true, createdAt));
   }
   if (rank < 0) return false;
   const elapsed = Date.now() - (createdAt || 0);
@@ -1921,6 +2407,31 @@ function listenDriverDue() {
   });
 }
 
+// Customer-submitted ratings land one-at-a-time at
+// taxi_drivers/{username}/pendingRatings/{rideKey} (written by index.html
+// right after a customer rates a completed trip). Each one is meant to be
+// shown to the driver exactly once — a toast here — and then deleted, per
+// the "driver sees it once, then it's gone" requirement. Ratings still
+// count toward the running ratingSum/ratingCount average on this driver's
+// own record even after this notification is gone; only the one-time
+// pending copy is removed, never the average.
+const shownRatingIds = new Set(); // guards against acting twice on the same onValue fire's initial snapshot vs. a later re-fire before the delete round-trips
+function listenDriverRatings() {
+  const { db, ref, onValue, remove } = window.fb;
+  onValue(ref(db, 'taxi_drivers/' + state.username + '/pendingRatings'), snap => {
+    snap.forEach(child => {
+      const id = child.key;
+      if (shownRatingIds.has(id)) return;
+      shownRatingIds.add(id);
+      const r = child.val() || {};
+      const stars = Number(r.stars) || 0;
+      const starStr = '★'.repeat(stars) + '☆'.repeat(Math.max(0, 5 - stars));
+      showToast((r.customerName || 'A customer') + ' rated you ' + starStr + (r.comment ? ' — "' + r.comment + '"' : ''));
+      remove(ref(db, 'taxi_drivers/' + state.username + '/pendingRatings/' + id)).catch(() => {});
+    });
+  });
+}
+
 let lastSyncedBusy = null;
 
 // True while this driver has a ride actively assigned to them (accepted/
@@ -1954,14 +2465,15 @@ const CANCEL_ALERT_MAX_MS = 5000;
 
 // Cuts the ring short (web + native) and plays a brief "cancelled" chime —
 // capped to 5s — so a request the customer pulled back mid-ring doesn't
-// just keep ringing out its normal ~30s timeout on this driver's phone for
-// a ride that no longer exists. Unlike the partner app's order-cancel path,
-// the customer app's ride-cancel button (taxiCancelBtn in index-10.html)
-// doesn't yet send a cancel_ring push to the Cloudflare Worker, so there's
-// no native-side sound to double up with here — this chime stays as the
-// only cancel feedback until that Worker/customer-app wiring exists. If it
-// gets added later, drop this call the same way notifyOfferCancelled() in
-// partner.html had its playCancelAlert() removed, to avoid a double sound.
+// just keep ringing out its normal ~25s AUTO_STOP_MS timeout on this
+// driver's phone for a ride that no longer exists. The customer app's
+// ride-cancel flow (taxiCancelBtn in index.html) now also sends a
+// cancel_ring push through the Cloudflare Worker, so if the app is fully
+// closed the native RingingService is stopped directly (see
+// AlertFcmService's cancel_ring handling in build-apk.yml) — that stop is
+// silent (no sound of its own), so this local chime stays here as the only
+// audible cancel feedback, foreground or background, with nothing to
+// double up against.
 function notifyOfferCancelled() {
   stopRinging();
   if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RingControl) {
@@ -1978,18 +2490,25 @@ function refreshRidePopupFromCache() {
     ? Object.keys(ridesCache)
         .map(id => Object.assign({ _id: id, _kind: 'ride' }, ridesCache[id]))
         .filter(r => r.status === 'searching' && !skippedRideIds.has(r._id))
-        // Operator-assigned rides, and rides the customer has specifically
+        // Operator-assigned rides, rides the customer has specifically
         // approved this driver for (candidateDriverId — see index.html's
-        // driver-candidate approval flow): only that one driver ever sees
-        // it (bypassing vehicle-type match and the nearest-first ranking
+        // driver-candidate approval flow), and rides the customer picked
+        // this exact driver for by hand (chosenDriverId — index.html's
+        // Choice Driver flow): only that one driver ever sees it
+        // (bypassing vehicle-type match and the nearest-first ranking
         // below) — anyone else's app filters it out entirely.
         .filter(r => {
-          const forcedTo = r.assignedDriverId || r.candidateDriverId;
+          const forcedTo = r.assignedDriverId || r.candidateDriverId || r.chosenDriverId;
           return forcedTo ? forcedTo === state.username : r.vehicleType === state.driver.vehicleType;
         })
-        .filter(r => r.assignedDriverId === state.username || r.candidateDriverId === state.username || shouldOfferToMe(r.pickup, r.createdAt, rideMatchFn, amIBusy, r.zoneHoldReleasedAt))
+        .filter(r => r.assignedDriverId === state.username || r.candidateDriverId === state.username || r.chosenDriverId === state.username || shouldOfferToMe(r.pickup, r.createdAt, rideMatchFn, amIBusy))
         .map(r => Object.assign({}, r, { _distanceKm: r.pickup ? myDistanceToPickup(r.pickup) : null }))
     : [];
+
+  // Any chosen-driver ride now showing in our popup starts its 25s
+  // no-response clock (a no-op if it's already ticking) — see
+  // ensureChoiceDriverOfferTimer above.
+  pendingRides.forEach(r => { if (r.chosenDriverId === state.username) ensureChoiceDriverOfferTimer(r._id); });
 
   const deliveryMatchFn = d => d.isOnline === true && d.vehicleType === 'bike' && (!d.services || d.services.delivery !== false);
   const pendingDeliveries = driverDoesDelivery()
@@ -1999,7 +2518,7 @@ function refreshRidePopupFromCache() {
         .filter(o => !skippedDeliveryIds.has(o._id))
         // Same operator-assignment bypass as rides, above.
         .filter(o => o.assignedDriverId ? o.assignedDriverId === state.username : true)
-        .filter(o => o.assignedDriverId === state.username || shouldOfferToMe(parseLatLngStr(o._restLocation), o.createdAt, deliveryMatchFn, amIBusy, o.zoneHoldReleasedAt))
+        .filter(o => o.assignedDriverId === state.username || shouldOfferToMe(parseLatLngStr(o._restLocation), o.createdAt, deliveryMatchFn, amIBusy))
         .map(o => Object.assign({}, o, { _distanceKm: (() => { const p = parseLatLngStr(o._restLocation); return p ? myDistanceToPickup(p) : null; })() }))
     : [];
 
@@ -2228,7 +2747,87 @@ function getSelectedRegServices() {
   return services;
 }
 
-document.getElementById('reg-submit').addEventListener('click', async () => {
+// New drivers wait for operator approval before they can go online (see
+// logInDriver). regEditMode/regEditId let this same register screen double
+// as the "fix & resend" form a rejected driver uses to edit details and put
+// themselves back in the approval queue, instead of creating a second
+// account. Zone stays locked in edit mode — only the operator changes it.
+let regEditMode = false;
+let regEditId = null;
+
+function setRegServiceToggle(services) {
+  document.querySelectorAll('#reg-service-toggle .type-opt').forEach(el => {
+    el.classList.toggle('active', !!(services && services[el.dataset.service]));
+  });
+}
+function setRegVehicleType(type) {
+  selectedRegType = type || 'bike';
+  document.querySelectorAll('#reg-type-toggle .type-opt').forEach(el => {
+    el.classList.toggle('active', el.dataset.type === selectedRegType);
+  });
+  applyRegVehicleServiceRestriction();
+}
+
+function startFreshRegister() {
+  regEditMode = false;
+  regEditId = null;
+  document.getElementById('reg-name').value = '';
+  document.getElementById('reg-phone').value = '';
+  document.getElementById('reg-vehicle-number').value = '';
+  document.getElementById('reg-username').value = '';
+  document.getElementById('reg-username').readOnly = false;
+  document.getElementById('reg-password').value = '';
+  const zoneSel = document.getElementById('reg-zone');
+  zoneSel.value = '';
+  zoneSel.disabled = false;
+  regPhotoDataUrl = '';
+  setPhotoAvatarPreview(document.getElementById('reg-photo-avatar'), '');
+  document.getElementById('reg-photo-camera-btn').textContent = '📷 Take photo';
+  setRegServiceToggle({ taxi: true, delivery: true });
+  setRegVehicleType('bike');
+  document.getElementById('reg-error').style.display = 'none';
+  const section = document.getElementById('screen-register');
+  section.querySelector('.eyebrow').textContent = 'NEW DRIVER';
+  section.querySelector('.title').textContent = 'Set up your profile';
+  document.getElementById('reg-submit').textContent = 'Create account';
+  showScreen('register');
+}
+
+function startEditResubmit() {
+  const data = state.driver || {};
+  regEditMode = true;
+  regEditId = state.username;
+  document.getElementById('reg-name').value = data.name || '';
+  document.getElementById('reg-phone').value = data.phone || '';
+  document.getElementById('reg-vehicle-number').value = data.vehicleNumber || '';
+  document.getElementById('reg-username').value = regEditId || '';
+  document.getElementById('reg-username').readOnly = true;
+  document.getElementById('reg-password').value = data.password || '';
+  const zoneSel = document.getElementById('reg-zone');
+  zoneSel.value = data.zone || '';
+  zoneSel.disabled = true; // only the operator can change a driver's zone
+  regPhotoDataUrl = data.photo || '';
+  setPhotoAvatarPreview(document.getElementById('reg-photo-avatar'), regPhotoDataUrl);
+  document.getElementById('reg-photo-camera-btn').textContent = regPhotoDataUrl ? '📷 Retake' : '📷 Take photo';
+  setRegServiceToggle(data.services || { taxi: true, delivery: true });
+  setRegVehicleType(data.vehicleType || 'bike');
+  document.getElementById('reg-error').style.display = 'none';
+  const section = document.getElementById('screen-register');
+  section.querySelector('.eyebrow').textContent = 'UPDATE YOUR PROFILE';
+  section.querySelector('.title').textContent = 'Fix the issue & resend';
+  document.getElementById('reg-submit').textContent = 'Resend for approval';
+  showScreen('register');
+}
+
+function regBackClick() {
+  if (regEditMode) {
+    showScreen('rejected');
+  } else {
+    showScreen('login');
+  }
+}
+
+async function doRegisterDriver() {
   const name = document.getElementById('reg-name').value.trim();
   const phone = document.getElementById('reg-phone').value.trim();
   const vehicleNumber = document.getElementById('reg-vehicle-number').value.trim();
@@ -2262,7 +2861,27 @@ document.getElementById('reg-submit').addEventListener('click', async () => {
   const btn = document.getElementById('reg-submit');
   btn.disabled = true;
   try {
-    const { db, ref, get, set } = window.fb;
+    const { db, ref, get, set, update } = window.fb;
+
+    if (regEditMode) {
+      const updates = {
+        name, phone, vehicleNumber, password,
+        vehicleType: selectedRegType,
+        services,
+        photo: regPhotoDataUrl,
+        approvalStatus: 'pending',
+        rejectionReason: null,
+        resubmittedAt: Date.now(),
+      };
+      await update(ref(db, 'taxi_drivers/' + regEditId), updates);
+      const fresh = Object.assign({}, state.driver, updates);
+      const editedId = regEditId;
+      regEditMode = false;
+      regEditId = null;
+      logInDriver(editedId, fresh);
+      return;
+    }
+
     const existing = await get(ref(db, 'taxi_drivers/' + username));
     if (existing.exists()) {
       errEl.textContent = "That username is already taken.";
@@ -2276,6 +2895,7 @@ document.getElementById('reg-submit').addEventListener('click', async () => {
       zone: zoneId,
       zoneName: zone ? zone.name : '',
       photo: regPhotoDataUrl,
+      approvalStatus: 'pending',
       createdAt: Date.now(),
     };
     await set(ref(db, 'taxi_drivers/' + username), record);
@@ -2287,7 +2907,8 @@ document.getElementById('reg-submit').addEventListener('click', async () => {
   } finally {
     btn.disabled = false;
   }
-});
+}
+document.getElementById('reg-submit').addEventListener('click', doRegisterDriver);
 
 async function doLogin() {
   const username = document.getElementById('login-username').value.trim();
@@ -2337,7 +2958,7 @@ function checkAndShowAppVideo(configKey, storagePrefix) {
     const { db, ref, get } = window.fb;
     get(ref(db, 'app_config/' + configKey)).then(snap => {
       const data = snap.val();
-      if (!data || !data.url) return;
+      if (!data || !data.url || data.enabled === false) return;
       const seenKey = storagePrefix + '_' + (data.updatedAt || data.url);
       let seen = false;
       try { seen = localStorage.getItem(seenKey) === '1'; } catch (e) {}
@@ -2370,11 +2991,58 @@ function showAppVideo(url, seenKey) {
   video.play().catch(() => { closeBtn.style.display = 'inline-block'; });
 }
 
+let driverApprovalListenerAttached = false;
+// Live-watches only the small approvalStatus field on this driver's own
+// record while pending/rejected — NOT the whole driver node (which can
+// carry ride/settlement history and would re-download that every time any
+// of it changes). Moves the app into the dashboard the moment the operator
+// approves it, fetching the full record just that once. Torn down as soon
+// as it's approved.
+function listenOwnApprovalStatus(id) {
+  if (driverApprovalListenerAttached) return;
+  driverApprovalListenerAttached = true;
+  try {
+    const { db, ref, onValue, get } = window.fb;
+    const unsub = onValue(ref(db, 'taxi_drivers/' + id + '/approvalStatus'), snap => {
+      const status = snap.val();
+      if (status === 'pending') return; // nothing changed yet
+      if (status === 'rejected') {
+        get(ref(db, 'taxi_drivers/' + id + '/rejectionReason')).then(rSnap => {
+          document.getElementById('rejected-reason-text').textContent = rSnap.val() || 'No reason given.';
+          if (!document.getElementById('screen-rejected').classList.contains('active')) showScreen('rejected');
+        }).catch(() => {});
+        return;
+      }
+      driverApprovalListenerAttached = false;
+      if (typeof unsub === 'function') unsub();
+      get(ref(db, 'taxi_drivers/' + id)).then(fullSnap => {
+        if (fullSnap.exists()) logInDriver(id, fullSnap.val());
+      }).catch(() => {});
+    });
+  } catch (e) { driverApprovalListenerAttached = false; }
+}
+
 function logInDriver(username, data) {
   state.username = username;
   state.driver = data;
   localStorage.setItem('nesh_driver_id', username);
   try { localStorage.setItem('nesh_driver_data', JSON.stringify(data)); } catch (e) {}
+
+  // New drivers wait for operator approval before they can go online.
+  // approvalStatus is unset on accounts created before this feature
+  // existed — treat missing/'approved' as approved so nothing changes for
+  // drivers who were already live.
+  if (data.approvalStatus === 'pending') {
+    showScreen('pending');
+    listenOwnApprovalStatus(username);
+    return;
+  }
+  if (data.approvalStatus === 'rejected') {
+    document.getElementById('rejected-reason-text').textContent = data.rejectionReason || 'No reason given.';
+    showScreen('rejected');
+    listenOwnApprovalStatus(username);
+    return;
+  }
 
   document.getElementById('home-driver-name').textContent = data.name || username;
   document.getElementById('home-driver-vehicle').textContent = data.vehicleNumber || '';
@@ -2393,14 +3061,29 @@ function logInDriver(username, data) {
   } catch (e) {}
   document.getElementById('online-toggle-input').checked = state.isOnline;
   updateOnlineLabel();
-  try {
-    const { db, ref, update } = window.fb;
-    // Only stamp onlineSince if it isn't already set — a page reload while
-    // already online shouldn't reset the driver's place in the queue.
-    const updates = { isOnline: state.isOnline };
-    if (state.isOnline && !data.onlineSince) updates.onlineSince = Date.now();
-    update(ref(db, 'taxi_drivers/' + username), updates).catch(() => {});
-  } catch (e) {}
+
+  if (state.isOnline && hasBackgroundGeolocationPlugin()) {
+    // Was online in a previous session — re-confirm "Allow all the time" is
+    // still actually granted (it can be revoked, or reset by the OS,
+    // between app opens) before trusting that and writing isOnline:true to
+    // Firebase again. proceedToLocationGate() -> checkBackgroundLocationPermission()
+    // resolves this via proceedToBatteryGate()/finalizeGoOnline() or
+    // revertOnlineToggle(). Goes straight to the location step, not back
+    // through the autostart modal — that was already confirmed once (it's
+    // remembered per device) and re-asking on every app reopen would be
+    // needless friction.
+    proceedToLocationGate(true); // true: don't reset queue position just because the app reloaded
+  } else {
+    try {
+      const { db, ref, update } = window.fb;
+      // Only stamp onlineSince if it isn't already set — a page reload while
+      // already online shouldn't reset the driver's place in the queue.
+      const updates = { isOnline: state.isOnline };
+      if (state.isOnline && !data.onlineSince) updates.onlineSince = Date.now();
+      update(ref(db, 'taxi_drivers/' + username), updates).catch(() => {});
+    } catch (e) {}
+    if (state.isOnline) startLocationTracking(); // browser/testing fallback — no gate possible without the native plugin
+  }
 
   showScreen('home');
 
@@ -2410,10 +3093,9 @@ function logInDriver(username, data) {
     listenDeliveryJobs();
     listenDrivers();
     listenDriverDue();
+    listenDriverRatings();
     checkAndShowAppVideo('driverAppVideo', 'nesh_driver_video_seen');
   }
-
-  if (state.isOnline) startLocationTracking();
 
   registerForOrderPushNotifications();
 }
@@ -2534,6 +3216,18 @@ document.getElementById('logout-btn').addEventListener('click', () => {
   location.reload();
 });
 
+document.getElementById('pending-logout-btn').addEventListener('click', () => {
+  localStorage.removeItem('nesh_driver_id');
+  localStorage.removeItem('nesh_driver_data');
+  location.reload();
+});
+document.getElementById('rejected-logout-btn').addEventListener('click', () => {
+  localStorage.removeItem('nesh_driver_id');
+  localStorage.removeItem('nesh_driver_data');
+  location.reload();
+});
+document.getElementById('rejected-edit-btn').addEventListener('click', startEditResubmit);
+
 // Recent rides is collapsed by default — the Rides screen should read as
 // "what's happening now" (the in-progress ride card above), with the
 // history one tap away instead of always taking up the screen.
@@ -2571,11 +3265,35 @@ document.getElementById('online-toggle-input').addEventListener('change', (e) =>
     alert("You can't go offline while a ride is in progress. Complete or hand off the current ride first.");
     return;
   }
-  state.isOnline = e.target.checked;
+
+  if (e.target.checked) {
+    if (hasBackgroundGeolocationPlugin()) {
+      // Gated: the driver only actually goes online — and becomes visible
+      // to riders — once "Allow all the time" location, autostart, AND
+      // battery-optimization exemption are all confirmed, in that order.
+      // Uncheck for now; the three-step chain (proceedToLocationGate ->
+      // proceedToAutostartGate -> proceedToBatteryGate) calls
+      // finalizeGoOnline() once all three pass, or bounces this back via
+      // revertOnlineToggle() the moment any one of them fails.
+      e.target.checked = false;
+      proceedToLocationGate(false);
+      return;
+    }
+    // No native background-location plugin (plain browser / testing) —
+    // nothing to gate on, go online the old way.
+    finalizeGoOnline();
+    return;
+  }
+
+  // Going offline.
+  state.isOnline = false;
   updateOnlineLabel();
-  try { localStorage.setItem('nesh_driver_online_' + state.username, state.isOnline ? '1' : '0'); } catch (err) {}
-  if (state.isOnline) startLocationTracking();
-  else { stopLocationTracking(); refreshRidePopupFromCache(); } // drops the popup if it's open — going offline means no new rides
+  try { localStorage.setItem('nesh_driver_online_' + state.username, '0'); } catch (err) {}
+  stopLocationTracking();
+  closeBgLocationModal();
+  closeBatteryModal();
+  closeAutostartModal();
+  refreshRidePopupFromCache(); // drops the popup if it's open — going offline means no new rides
   renderHomeLists();
   try {
     const { db, ref, update } = window.fb;
@@ -2583,8 +3301,7 @@ document.getElementById('online-toggle-input').addEventListener('change', (e) =>
     // drivers who haven't had an order yet by who's been waiting longest,
     // instead of by distance. Cleared on going offline so the next session
     // starts fresh.
-    const updates = { isOnline: state.isOnline, onlineSince: state.isOnline ? Date.now() : null };
-    update(ref(db, 'taxi_drivers/' + state.username), updates).catch(() => {});
+    update(ref(db, 'taxi_drivers/' + state.username), { isOnline: false, onlineSince: null }).catch(() => {});
   } catch (err) {}
 });
 

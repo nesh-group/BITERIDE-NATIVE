@@ -667,14 +667,14 @@
       </div>
       <p class="error-text" id="login-error" style="display:none;"></p>
       <button class="btn-primary" id="login-submit">Login</button>
-      <button class="btn-link" onclick="showScreen('register')">New restaurant? Create an account</button>
+      <button class="btn-link" onclick="startFreshRegister()">New restaurant? Create an account</button>
     </div>
   </section>
 
   <!-- REGISTER -->
   <section class="screen" id="screen-register">
     <div class="px" style="padding-top:32px;">
-      <button class="btn-back" onclick="showScreen('login')">
+      <button class="btn-back" onclick="regBackClick()">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
     </div>
@@ -737,6 +737,32 @@
       <div style="padding-top:8px;">
         <button class="btn-primary" id="reg-submit">Create account</button>
       </div>
+    </div>
+  </section>
+
+  <!-- PENDING APPROVAL -->
+  <section class="screen" id="screen-pending">
+    <div class="header">
+      <p class="eyebrow">ACCOUNT REVIEW</p>
+      <h1 class="title">Waiting for approval</h1>
+    </div>
+    <div class="px stack">
+      <p class="subtitle">Your shop account is waiting for the operator to approve it. You'll be able to use the app as soon as it's approved — no need to do anything else right now.</p>
+      <button class="btn-danger" id="pending-logout-btn">Log out</button>
+    </div>
+  </section>
+
+  <!-- REJECTED / NEEDS CHANGES -->
+  <section class="screen" id="screen-rejected">
+    <div class="header">
+      <p class="eyebrow">ACCOUNT REVIEW</p>
+      <h1 class="title">Changes needed</h1>
+    </div>
+    <div class="px stack">
+      <p class="subtitle">The operator could not approve your account for this reason:</p>
+      <p class="error-text" id="rejected-reason-text" style="display:block; position:static; background:rgba(220,38,38,.08); border:1px solid rgba(220,38,38,.25); border-radius:10px; padding:12px;"></p>
+      <button class="btn-primary" id="rejected-edit-btn">Edit &amp; resend request</button>
+      <button class="btn-danger" id="rejected-logout-btn">Log out</button>
     </div>
   </section>
 
@@ -1422,9 +1448,10 @@
         <div class="op-home-card" onclick="opOpenSection('app-videos')">
           <div class="op-home-icon">🎬</div>
           <h3>App Videos</h3>
-          <p>Set a one-time welcome/promo video for the Shop app and the Driver app</p>
+          <p>Set a one-time welcome/promo video for the Shop app, the Driver app, and the customer app's Bus feature</p>
         </div>
-        <div class="op-home-card" onclick="opOpenSection('partners')">
+        <div class="op-home-card" onclick="opOpenSection('partners')" style="position:relative;">
+          <span class="op-home-badge" id="op-partners-home-badge" style="display:none;"></span>
           <div class="op-home-icon">🏬</div>
           <h3>Restaurant Partners</h3>
           <p>View, suspend or remove restaurant accounts</p>
@@ -1449,7 +1476,8 @@
           <h3>Taxi Orders</h3>
           <p>View all taxi rides — in progress, completed or cancelled, filterable by zone</p>
         </div>
-        <div class="op-home-card" onclick="opOpenSection('drivers')">
+        <div class="op-home-card" onclick="opOpenSection('drivers')" style="position:relative;">
+          <span class="op-home-badge" id="op-drivers-home-badge" style="display:none;"></span>
           <div class="op-home-icon">🚖</div>
           <h3>Drivers</h3>
           <p>View drivers, set their zone, and assign a pending order directly to a driver</p>
@@ -1624,21 +1652,51 @@
       <h2>App Videos</h2>
     </div>
     <div class="op-section-body">
-      <p class="op-note">Paste a direct video link (.mp4 works best). It plays once automatically the next time that app opens — once someone closes or finishes it, it won't show again on their phone, even after closing and reopening the app. Uploading a new link here makes it play again for everyone. Leave blank and save to turn a video off.</p>
+      <p class="op-note">Paste a direct video link (.mp4 works best). It plays once automatically the next time that app opens — once someone closes or finishes it, it won't show again on their phone, even after closing and reopening the app. Uploading a new link here makes it play again for everyone. Use the "Enabled" checkbox to turn playback off/on without losing the saved link.</p>
 
       <h3 style="color:#33ff66; font-size:14px; margin:18px 0 6px;">🏬 Shop / Partner App video</h3>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+        <input type="checkbox" id="op-shop-video-enabled" checked style="width:16px; height:16px;">
+        <span class="op-note">Enabled (uncheck to stop it playing, keeps the link saved)</span>
+      </label>
       <div class="op-search-box" style="margin-bottom:10px;">
         <input type="text" id="op-shop-video-input" placeholder="https://example.com/shop-video.mp4">
       </div>
-      <button type="button" class="op-btn op-btn-push" onclick="opSaveAppVideo('shopAppVideo','op-shop-video-input','op-shop-video-status')">💾 Save shop app video</button>
+      <button type="button" class="op-btn op-btn-push" onclick="opSaveAppVideo('shopAppVideo','op-shop-video-input','op-shop-video-status','op-shop-video-enabled')">💾 Save shop app video</button>
       <p class="op-note" id="op-shop-video-status" style="margin-top:8px;"></p>
 
       <h3 style="color:#33ff66; font-size:14px; margin:22px 0 6px;">🚖 Driver App video</h3>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+        <input type="checkbox" id="op-driver-video-enabled" checked style="width:16px; height:16px;">
+        <span class="op-note">Enabled (uncheck to stop it playing, keeps the link saved)</span>
+      </label>
       <div class="op-search-box" style="margin-bottom:10px;">
         <input type="text" id="op-driver-video-input" placeholder="https://example.com/driver-video.mp4">
       </div>
-      <button type="button" class="op-btn op-btn-push" onclick="opSaveAppVideo('driverAppVideo','op-driver-video-input','op-driver-video-status')">💾 Save driver app video</button>
+      <button type="button" class="op-btn op-btn-push" onclick="opSaveAppVideo('driverAppVideo','op-driver-video-input','op-driver-video-status','op-driver-video-enabled')">💾 Save driver app video</button>
       <p class="op-note" id="op-driver-video-status" style="margin-top:8px;"></p>
+
+      <h3 style="color:#33ff66; font-size:14px; margin:22px 0 6px;">🚌 Customer App — Bus feature videos</h3>
+      <p class="op-note">Shown to customers a set number of seconds after they open the Bus section. Add one or more videos — they play back to back, in the order listed. The ✕ skip button on each video is locked for the seconds you set below, then unlocks. Saving here (even just reordering/removing) makes the whole playlist play again for everyone.</p>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+        <input type="checkbox" id="op-bus-video-enabled" checked style="width:16px; height:16px;">
+        <span class="op-note">Enabled (uncheck to stop them playing, keeps the links saved)</span>
+      </label>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin:10px 0;">
+        <label style="flex:1; min-width:140px;">
+          <span class="op-note" style="display:block; margin-bottom:4px;">Delay after opening Bus (seconds)</span>
+          <div class="op-search-box"><input type="number" min="0" id="op-bus-video-delay" placeholder="0"></div>
+        </label>
+        <label style="flex:1; min-width:140px;">
+          <span class="op-note" style="display:block; margin-bottom:4px;">✕ skip unlocks after (seconds)</span>
+          <div class="op-search-box"><input type="number" min="0" id="op-bus-video-skip-delay" placeholder="10"></div>
+        </label>
+      </div>
+      <div id="op-bus-video-rows"></div>
+      <button type="button" class="op-btn" onclick="opAddBusVideoRow('')" style="margin-top:6px;">+ Add video</button>
+      <br>
+      <button type="button" class="op-btn op-btn-push" onclick="opSaveBusVideos()" style="margin-top:12px;">💾 Save bus feature videos</button>
+      <p class="op-note" id="op-bus-video-status" style="margin-top:8px;"></p>
     </div>
   </div>
 
@@ -1731,6 +1789,17 @@
       </div>
       <button type="button" class="op-btn op-btn-push" onclick="opAddZone()">➕ Add zone</button>
       <p class="op-note" id="op-zone-add-status" style="margin-top:8px;"></p>
+
+      <h2 style="margin-top:22px;">Zone Groups</h2>
+      <p class="op-note">Group zones together (e.g. all zones inside one town). In "Choice Driver" mode, a customer standing in any zone of a group can see and pick a driver from every other zone in that same group.</p>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="text" id="op-zone-group-name-input" placeholder="New group name (e.g. Kottayam District)">
+      </div>
+      <button type="button" class="op-btn op-btn-push" onclick="opAddZoneGroup()">➕ Add group</button>
+      <p class="op-note" id="op-zone-group-add-status" style="margin-top:8px;"></p>
+      <div id="op-zone-groups-list" style="margin-top:16px;"></div>
+
+      <h2 style="margin-top:22px;">Zones</h2>
       <div id="op-zones-list" style="margin-top:16px;"></div>
     </div>
   </div>
@@ -1804,6 +1873,18 @@
       <div class="op-mc-row"><b>Address:</b> <span id="op-pm-address"></span></div>
       <div class="op-mc-row"><b>UPI ID:</b> <span id="op-pm-gpay"></span></div>
       <div class="op-mc-row"><b>Status:</b> <span id="op-pm-status"></span></div>
+      <div id="op-pm-approval-block" style="display:none; margin-bottom:12px; padding:10px; border:1px solid #124a24;">
+        <div class="op-mc-row"><b>Approval:</b> <span id="op-pm-approval-status"></span></div>
+        <div class="op-mc-row" id="op-pm-approval-reason-row" style="display:none;"><b>Rejection reason sent:</b> <span id="op-pm-approval-reason"></span></div>
+        <button type="button" class="op-btn op-btn-push" id="op-pm-approve-btn" onclick="opApprovePartner()">✅ Approve</button>
+        <button type="button" class="op-btn op-btn-danger" id="op-pm-reject-open-btn" onclick="opShowPartnerRejectBox()">❌ Reject</button>
+        <div id="op-pm-reject-box" style="display:none; margin-top:8px;">
+          <textarea id="op-pm-reject-reason" rows="3" placeholder="Reason for rejecting — the shop will see this exact text"></textarea>
+          <button type="button" class="op-btn op-btn-danger" onclick="opRejectPartner()">Send rejection</button>
+          <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-pm-reject-box').style.display='none';">Cancel</button>
+        </div>
+        <p class="op-note" id="op-pm-approval-status-msg" style="margin-top:6px;"></p>
+      </div>
       <div class="op-mc-row"><b>Due amount:</b> <span id="op-pm-due">—</span></div>
       <div style="margin-top:10px;">
         <div class="op-search-box" style="margin-bottom:6px;">
@@ -1899,16 +1980,23 @@
       <div class="op-mc-row"><b>Phone:</b> <span id="op-dm-phone"></span></div>
       <div class="op-mc-row"><b>Vehicle:</b> <span id="op-dm-vehicle"></span></div>
       <div class="op-mc-row"><b>Status:</b> <span id="op-dm-status"></span></div>
+      <div id="op-dm-approval-block" style="display:none; margin-bottom:12px; padding:10px; border:1px solid #124a24;">
+        <div class="op-mc-row"><b>Approval:</b> <span id="op-dm-approval-status"></span></div>
+        <div class="op-mc-row" id="op-dm-approval-reason-row" style="display:none;"><b>Rejection reason sent:</b> <span id="op-dm-approval-reason"></span></div>
+        <button type="button" class="op-btn op-btn-push" id="op-dm-approve-btn" onclick="opApproveDriver()">✅ Approve</button>
+        <button type="button" class="op-btn op-btn-danger" id="op-dm-reject-open-btn" onclick="opShowDriverRejectBox()">❌ Reject</button>
+        <div id="op-dm-reject-box" style="display:none; margin-top:8px;">
+          <textarea id="op-dm-reject-reason" rows="3" placeholder="Reason for rejecting — the driver will see this exact text"></textarea>
+          <button type="button" class="op-btn op-btn-danger" onclick="opRejectDriver()">Send rejection</button>
+          <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-dm-reject-box').style.display='none';">Cancel</button>
+        </div>
+        <p class="op-note" id="op-dm-approval-status-msg" style="margin-top:6px;"></p>
+      </div>
       <div class="op-mc-row"><b>Zone:</b> <span id="op-dm-zone">—</span></div>
       <div style="margin-top:10px;">
         <select id="op-dm-zone-select" style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
         <button type="button" class="op-btn op-btn-push" onclick="opSaveDriverZone()">💾 Save zone</button>
         <p class="op-note" id="op-dm-zone-status" style="margin-top:6px;"></p>
-      </div>
-      <div style="margin-top:14px; border-top:1px solid #124a24; padding-top:12px;">
-        <p class="op-note" style="margin-bottom:6px;">Zone Priority: while ON, every new order/ride in this driver's area goes to them ONLY, first — everyone else only sees it if this driver skips it, or 25 seconds pass with no response.</p>
-        <div class="op-mc-row"><b>Priority status:</b> <span id="op-dm-priority-status">—</span></div>
-        <button type="button" class="op-btn op-btn-push" id="op-dm-priority-btn" onclick="opToggleZonePriority()" style="margin-top:8px;"></button>
       </div>
       <div style="margin-top:14px; border-top:1px solid #124a24; padding-top:12px;">
         <div class="op-mc-row"><b>Platform due:</b> <span id="op-dm-due">—</span></div>
@@ -2564,6 +2652,21 @@ function init() {
   document.getElementById('reg-submit').addEventListener('click', doRegister);
   document.getElementById('reg-gps-btn').addEventListener('click', useGps);
 
+  // Pending approval / rejected screens
+  document.getElementById('pending-logout-btn').addEventListener('click', () => {
+    localStorage.removeItem('asfood_partner_id');
+    localStorage.removeItem('asfood_partner_data');
+    localStorage.removeItem('asfood_last_screen');
+    location.reload();
+  });
+  document.getElementById('rejected-logout-btn').addEventListener('click', () => {
+    localStorage.removeItem('asfood_partner_id');
+    localStorage.removeItem('asfood_partner_data');
+    localStorage.removeItem('asfood_last_screen');
+    location.reload();
+  });
+  document.getElementById('rejected-edit-btn').addEventListener('click', startEditResubmit);
+
   // Logout
   document.getElementById('logout-btn').addEventListener('click', async () => {
     // Clear this shop's push-notification token and active-session marker
@@ -2756,7 +2859,7 @@ function checkAndShowAppVideo(configKey, storagePrefix) {
     const { db, ref, get } = window.fb;
     get(ref(db, 'app_config/' + configKey)).then(snap => {
       const data = snap.val();
-      if (!data || !data.url) return;
+      if (!data || !data.url || data.enabled === false) return;
       const seenKey = storagePrefix + '_' + (data.updatedAt || data.url);
       let seen = false;
       try { seen = localStorage.getItem(seenKey) === '1'; } catch (e) {}
@@ -2823,11 +2926,62 @@ function forceLoggedOutElsewhere() {
   location.reload();
 }
 
+let restApprovalListenerAttached = false;
+// Live-watches only the small approvalStatus field on this shop's own
+// record while pending/rejected — NOT the whole restaurant node (which
+// carries menu/orders/chats and would re-download that every time any of
+// it changes, same download-usage trap already fixed elsewhere for the
+// logged-in dashboard). Moves the app into the dashboard the moment the
+// operator approves it, fetching the full record just that once. Torn
+// down as soon as it's approved.
+function listenOwnApprovalStatus(id) {
+  if (restApprovalListenerAttached) return;
+  restApprovalListenerAttached = true;
+  try {
+    const { db, ref, onValue, get } = window.fb;
+    const unsub = onValue(ref(db, 'restaurants/' + id + '/approvalStatus'), snap => {
+      const status = snap.val();
+      if (status === 'pending') return; // nothing changed yet
+      if (status === 'rejected') {
+        get(ref(db, 'restaurants/' + id + '/rejectionReason')).then(rSnap => {
+          document.getElementById('rejected-reason-text').textContent = rSnap.val() || 'No reason given.';
+          if (!document.getElementById('screen-rejected').classList.contains('active')) showScreen('rejected');
+        }).catch(() => {});
+        return;
+      }
+      // Approved (or the field was cleared) — drop this listener and load
+      // the full record once to enter the dashboard.
+      restApprovalListenerAttached = false;
+      if (typeof unsub === 'function') unsub();
+      get(ref(db, 'restaurants/' + id)).then(fullSnap => {
+        if (fullSnap.exists()) logInRestaurant(id, fullSnap.val());
+      }).catch(() => {});
+    });
+  } catch (e) { restApprovalListenerAttached = false; }
+}
+
 function logInRestaurant(id, data) {
   state.restId = id;
   state.restaurant = data;
   localStorage.setItem('asfood_partner_id', id);
   try { localStorage.setItem('asfood_partner_data', JSON.stringify(data)); } catch (e) {}
+
+  // New accounts need operator approval before they can use the app.
+  // approvalStatus is left unset on old accounts created before this
+  // feature existed — treat missing/'approved' as approved, so nothing
+  // changes for shops that were already live.
+  if (data.approvalStatus === 'pending') {
+    showScreen('pending');
+    listenOwnApprovalStatus(id);
+    return;
+  }
+  if (data.approvalStatus === 'rejected') {
+    document.getElementById('rejected-reason-text').textContent = data.rejectionReason || 'No reason given.';
+    showScreen('rejected');
+    listenOwnApprovalStatus(id);
+    return;
+  }
+
   document.getElementById('home-rest-name').textContent = data.restaurantName || id;
   document.getElementById('home-rest-address').textContent = data.address || "";
   document.getElementById('home-type-badge').textContent = data.businessType === 'groceries' ? 'Groceries' : data.businessType === 'online_shop' ? 'Other Shop' : 'Hotel';
@@ -3386,6 +3540,67 @@ document.getElementById('reg-type-toggle').addEventListener('click', (e) => {
   document.getElementById('reg-shop-category-wrap').style.display = regBusinessType === 'online_shop' ? "flex" : "none";
 });
 
+// New accounts go to 'pending' and wait for the operator's approval before
+// they can use the app (see logInRestaurant). regEditMode/regEditId let the
+// same register screen double as the "fix & resend" form a rejected shop
+// uses to edit its details and put itself back in the approval queue,
+// instead of creating a second account.
+let regEditMode = false;
+let regEditId = null;
+
+function startFreshRegister() {
+  regEditMode = false;
+  regEditId = null;
+  document.getElementById('reg-name').value = '';
+  document.getElementById('reg-address').value = '';
+  document.getElementById('reg-location').value = '';
+  document.getElementById('reg-gst').value = '';
+  document.getElementById('reg-shop-category').value = '';
+  document.getElementById('reg-username').value = '';
+  document.getElementById('reg-username').readOnly = false;
+  document.getElementById('reg-password').value = '';
+  regBusinessType = 'hotel';
+  document.querySelectorAll('#reg-type-toggle .type-opt').forEach(el => el.classList.toggle('active', el.dataset.type === 'hotel'));
+  document.getElementById('reg-shop-category-wrap').style.display = 'none';
+  document.getElementById('reg-error').style.display = 'none';
+  const section = document.getElementById('screen-register');
+  section.querySelector('.eyebrow').textContent = 'NEW RESTAURANT';
+  section.querySelector('.title').textContent = 'Set up your shop';
+  document.getElementById('reg-submit').textContent = 'Create account';
+  showScreen('register');
+}
+
+function startEditResubmit() {
+  const data = state.restaurant || {};
+  regEditMode = true;
+  regEditId = state.restId;
+  document.getElementById('reg-name').value = data.restaurantName || '';
+  document.getElementById('reg-address').value = data.address || '';
+  document.getElementById('reg-location').value = data.location || '';
+  document.getElementById('reg-gst').value = data.gst || '';
+  document.getElementById('reg-shop-category').value = data.opCategory || '';
+  document.getElementById('reg-username').value = regEditId || '';
+  document.getElementById('reg-username').readOnly = true;
+  document.getElementById('reg-password').value = data.password || '';
+  regBusinessType = data.businessType || 'hotel';
+  document.querySelectorAll('#reg-type-toggle .type-opt').forEach(el => el.classList.toggle('active', el.dataset.type === regBusinessType));
+  document.getElementById('reg-shop-category-wrap').style.display = regBusinessType === 'online_shop' ? 'flex' : 'none';
+  document.getElementById('reg-error').style.display = 'none';
+  const section = document.getElementById('screen-register');
+  section.querySelector('.eyebrow').textContent = 'UPDATE YOUR SHOP';
+  section.querySelector('.title').textContent = 'Fix the issue & resend';
+  document.getElementById('reg-submit').textContent = 'Resend for approval';
+  showScreen('register');
+}
+
+function regBackClick() {
+  if (regEditMode) {
+    showScreen('rejected');
+  } else {
+    showScreen('login');
+  }
+}
+
 async function doRegister() {
   const businessType = regBusinessType;
   const name = document.getElementById('reg-name').value.trim();
@@ -3407,7 +3622,28 @@ async function doRegister() {
   const btn = document.getElementById('reg-submit');
   btn.disabled = true;
   try {
-    const { db, ref, get, set } = window.fb;
+    const { db, ref, get, set, update } = window.fb;
+
+    if (regEditMode) {
+      const updates = {
+        restaurantName: name,
+        address, location, gst,
+        password,
+        businessType,
+        approvalStatus: 'pending',
+        rejectionReason: null,
+        resubmittedAt: Date.now(),
+      };
+      if (businessType === 'online_shop' && shopCategory) updates.opCategory = shopCategory;
+      await update(ref(db, 'restaurants/' + regEditId), updates);
+      const fresh = Object.assign({}, state.restaurant, updates);
+      const editedId = regEditId;
+      regEditMode = false;
+      regEditId = null;
+      logInRestaurant(editedId, fresh);
+      return;
+    }
+
     const snap = await get(ref(db, 'restaurants/' + username));
     if (snap.exists()) {
       errEl.textContent = "This username is already taken";
@@ -3420,6 +3656,7 @@ async function doRegister() {
       username, password,
       businessType,
       status: "active",
+      approvalStatus: "pending",
       createdAt: Date.now()
     };
     if (businessType === 'online_shop' && shopCategory) {
@@ -5298,6 +5535,7 @@ function opEnterPanel() {
   opOpenSection('home');
   opListenPartners();
   opListenZones();
+  opListenZoneGroups();
   opListenDrivers();
   opListenRides();
   opListenBuses();
@@ -5318,7 +5556,7 @@ function opOpenSection(name) {
   if (name === 'partners') { opPopulatePartnersAreaFilter(); opRenderPartnersList(); }
   if (name === 'drivers') { opPopulateDriversZoneFilter(); opRenderDriversList(); }
   if (name === 'taxi-orders') { opPopulateRidesZoneFilter(); opRenderRidesList(); }
-  if (name === 'app-videos') opLoadAppVideos();
+  if (name === 'app-videos') { opLoadAppVideos(); opLoadBusVideos(); }
   if (name === 'zones') opRenderZonesList();
   if (name === 'category-order') opRenderCategoryOrder();
   if (name === 'shop-categories') opRenderShopCategoriesList();
@@ -5402,23 +5640,87 @@ function opLoadAppVideos() {
   get(ref(db, 'app_config/shopAppVideo')).then(snap => {
     const data = snap.val();
     document.getElementById('op-shop-video-input').value = (data && data.url) || '';
+    document.getElementById('op-shop-video-enabled').checked = !(data && data.enabled === false);
   }).catch(() => {});
   get(ref(db, 'app_config/driverAppVideo')).then(snap => {
     const data = snap.val();
     document.getElementById('op-driver-video-input').value = (data && data.url) || '';
+    document.getElementById('op-driver-video-enabled').checked = !(data && data.enabled === false);
   }).catch(() => {});
 }
-function opSaveAppVideo(configKey, inputId, statusId) {
+function opSaveAppVideo(configKey, inputId, statusId, enabledId) {
   const input = document.getElementById(inputId);
   const status = document.getElementById(statusId);
+  const enabled = document.getElementById(enabledId).checked;
   const url = input.value.trim();
   status.textContent = 'Saving...';
   const { db, ref, set } = window.fb;
   set(ref(db, 'app_config/' + configKey), {
     url,
+    enabled,
     updatedAt: Date.now()
   }).then(() => {
-    status.textContent = url ? 'Saved! It will play once for everyone the next time they open the app.' : 'Video turned off.';
+    status.textContent = !url ? 'No link saved — nothing to play.'
+      : !enabled ? 'Saved, but turned OFF — it will not play until you re-check Enabled.'
+      : 'Saved! It will play once for everyone the next time they open the app.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+/* ---- Bus feature videos (customer app) ----
+   Stored at app_config/busVideos = { delaySeconds, skipDelaySeconds,
+   videos: [{url}, ...], updatedAt }. updatedAt doubles as the "seen"
+   version the customer app keys its localStorage flag off of — saving
+   here (new links, reordering, or just the delay numbers) bumps
+   updatedAt, so the whole playlist plays again for everyone even if
+   they'd already watched a previous version. */
+function opAddBusVideoRow(url) {
+  const wrap = document.getElementById('op-bus-video-rows');
+  const row = document.createElement('div');
+  row.className = 'op-bus-video-row';
+  row.style.cssText = 'display:flex; gap:8px; margin-bottom:8px; align-items:center;';
+  row.innerHTML =
+    '<div class="op-search-box" style="flex:1; padding:0;"><input type="text" class="op-bus-video-url" placeholder="https://example.com/bus-video.mp4" value="' +
+    (url ? String(url).replace(/"/g, '&quot;') : '') + '"></div>' +
+    '<button type="button" class="op-btn" style="padding:8px 12px; margin:0;" onclick="this.parentElement.remove()">✕</button>';
+  wrap.appendChild(row);
+}
+function opLoadBusVideos() {
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'app_config/busVideos')).then(snap => {
+    const data = snap.val();
+    document.getElementById('op-bus-video-delay').value = (data && data.delaySeconds != null) ? data.delaySeconds : 0;
+    document.getElementById('op-bus-video-skip-delay').value = (data && data.skipDelaySeconds != null) ? data.skipDelaySeconds : 10;
+    document.getElementById('op-bus-video-enabled').checked = !(data && data.enabled === false);
+    const wrap = document.getElementById('op-bus-video-rows');
+    wrap.innerHTML = '';
+    const videos = (data && Array.isArray(data.videos)) ? data.videos : [];
+    if (videos.length) {
+      videos.forEach(v => opAddBusVideoRow(v && v.url ? v.url : ''));
+    } else {
+      opAddBusVideoRow('');
+    }
+  }).catch(() => {});
+}
+function opSaveBusVideos() {
+  const status = document.getElementById('op-bus-video-status');
+  const delaySeconds = Math.max(0, Number(document.getElementById('op-bus-video-delay').value) || 0);
+  const skipDelaySeconds = Math.max(0, Number(document.getElementById('op-bus-video-skip-delay').value) || 0);
+  const enabled = document.getElementById('op-bus-video-enabled').checked;
+  const urls = Array.from(document.querySelectorAll('#op-bus-video-rows .op-bus-video-url'))
+    .map(inp => inp.value.trim())
+    .filter(Boolean);
+  status.textContent = 'Saving...';
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'app_config/busVideos'), {
+    delaySeconds,
+    skipDelaySeconds,
+    enabled,
+    videos: urls.map(url => ({ url })),
+    updatedAt: Date.now()
+  }).then(() => {
+    status.textContent = !urls.length ? 'Saved — no videos set, so nothing will play.'
+      : !enabled ? 'Saved, but turned OFF — it will not play until you re-check Enabled.'
+      : 'Saved! ' + urls.length + ' video(s) will play in order for everyone next time they open Bus.';
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
@@ -5538,6 +5840,7 @@ function opListenPartners() {
     opRenderChatConvList();
     opRenderOrdersList();
     opUpdateOrdersHomeBadge();
+    opUpdatePartnersHomeBadge();
     const reportDetail = document.getElementById('op-section-report-detail');
     if (reportDetail && reportDetail.classList.contains('active')) opRenderReportOrders();
     const shopOrderSec = document.getElementById('op-section-shop-order');
@@ -5769,21 +6072,33 @@ function opRenderZonesList() {
   const wrap = document.getElementById('op-zones-list');
   if (!wrap) return;
   if (!opAllZones.length) { wrap.innerHTML = '<div class="op-empty">No zones yet — add one above.</div>'; return; }
+  const groupOptions = opAllZoneGroups.map(g => `<option value="${g._id}">${escapeHtml(g.name || '')}</option>`).join('');
   wrap.innerHTML = opAllZones.map(z => {
     const hasBounds = Array.isArray(z.bounds) && z.bounds.length >= 3;
     return `
-    <div class="op-partner-item" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+    <div class="op-partner-item" style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
       <div>
         <span class="op-partner-name">${escapeHtml(z.name || '')}</span>
         <div class="op-partner-sub">${hasBounds ? '📍 Boundary set' : '⚠️ No boundary — using distance fallback'}</div>
       </div>
-      <div style="display:flex; gap:6px; flex-shrink:0;">
+      <div style="display:flex; gap:6px; flex-shrink:0; align-items:center;">
+        <select onchange="opSetZoneGroup('${z._id}', this.value)" style="padding:6px 8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.72rem;">
+          <option value="">No group</option>
+          ${groupOptions}
+        </select>
         <button type="button" class="op-btn op-btn-push" style="padding:6px 10px; margin:0;" onclick="opOpenZoneBoundaryModal('${z._id}')">🗺️ ${hasBounds ? 'Edit' : 'Draw'}</button>
         <button type="button" class="op-btn op-btn-danger" style="padding:6px 10px; margin:0;" onclick="opDeleteZone('${z._id}')">🗑</button>
       </div>
     </div>
   `;
   }).join('');
+  // Reflect each zone's current groupId as the select's chosen option,
+  // now that the <select> markup (with its <option>s) actually exists in
+  // the DOM — setting .value in the template string above wouldn't stick.
+  opAllZones.forEach(z => {
+    const sel = wrap.querySelector(`select[onchange="opSetZoneGroup('${z._id}', this.value)"]`);
+    if (sel) sel.value = z.groupId || '';
+  });
 }
 function opAddZone() {
   const input = document.getElementById('op-zone-name-input');
@@ -5800,6 +6115,71 @@ function opDeleteZone(id) {
   if (!confirm('Delete zone "' + (z ? z.name : id) + '"? Drivers currently set to this zone will keep the old name until you reassign them.')) return;
   const { db, ref, remove } = window.fb;
   remove(ref(db, 'driver_zones/' + id)).catch(err => alert('Error: ' + err.message));
+}
+function opSetZoneGroup(zoneId, groupId) {
+  const { db, ref, update, remove } = window.fb;
+  if (groupId) {
+    update(ref(db, 'driver_zones/' + zoneId), { groupId }).catch(err => alert('Error: ' + err.message));
+  } else {
+    remove(ref(db, 'driver_zones/' + zoneId + '/groupId')).catch(err => alert('Error: ' + err.message));
+  }
+}
+
+/* ---- Zone GROUPS — named clusters of zones, used by the customer app's
+   "Choice Driver" mode to list every zone a customer might want to pick a
+   driver from. Stored at zone_groups/{groupId} = { name, createdAt }. ---- */
+let opAllZoneGroups = [];
+function opListenZoneGroups() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'zone_groups'), snap => {
+    const list = [];
+    snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    opAllZoneGroups = list;
+    opRenderZoneGroupsList();
+    opRenderZonesList(); // zone rows' group dropdowns need the fresh option list
+  });
+}
+function opRenderZoneGroupsList() {
+  const wrap = document.getElementById('op-zone-groups-list');
+  if (!wrap) return;
+  if (!opAllZoneGroups.length) { wrap.innerHTML = '<div class="op-empty">No groups yet — add one above.</div>'; return; }
+  wrap.innerHTML = opAllZoneGroups.map(g => {
+    const memberCount = opAllZones.filter(z => z.groupId === g._id).length;
+    return `
+    <div class="op-partner-item" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <div>
+        <span class="op-partner-name">${escapeHtml(g.name || '')}</span>
+        <div class="op-partner-sub">${memberCount} zone${memberCount === 1 ? '' : 's'}</div>
+      </div>
+      <button type="button" class="op-btn op-btn-danger" style="padding:6px 10px; margin:0;" onclick="opDeleteZoneGroup('${g._id}')">🗑</button>
+    </div>
+  `;
+  }).join('');
+}
+function opAddZoneGroup() {
+  const input = document.getElementById('op-zone-group-name-input');
+  const status = document.getElementById('op-zone-group-add-status');
+  const name = (input.value || '').trim();
+  if (!name) { status.textContent = 'Enter a group name first.'; return; }
+  const { db, ref, push } = window.fb;
+  push(ref(db, 'zone_groups'), { name, createdAt: Date.now() })
+    .then(() => { input.value = ''; status.textContent = 'Group added.'; })
+    .catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opDeleteZoneGroup(id) {
+  const g = opAllZoneGroups.find(x => x._id === id);
+  if (!confirm('Delete group "' + (g ? g.name : id) + '"? Zones in this group keep their name but lose the group link.')) return;
+  const { db, ref, remove, update } = window.fb;
+  remove(ref(db, 'zone_groups/' + id))
+    .then(() => {
+      // Clear the groupId off every zone that pointed at this group, so
+      // they don't silently reference a group that no longer exists.
+      const updates = {};
+      opAllZones.filter(z => z.groupId === id).forEach(z => { updates['driver_zones/' + z._id + '/groupId'] = null; });
+      if (Object.keys(updates).length) update(ref(db, '/'), updates).catch(() => {});
+    })
+    .catch(err => alert('Error: ' + err.message));
 }
 
 /* ---- Driver zone BOUNDARY editor (draw a polygon on a map, like a
@@ -6404,6 +6784,7 @@ function opListenDrivers() {
     snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
     opAllDrivers = list;
     opRenderDriversList();
+    opUpdateDriversHomeBadge();
     if (opCurrentDriverId && document.getElementById('op-driver-modal').classList.contains('show')) {
       opShowDriverDetail(opCurrentDriverId, true);
     }
@@ -6426,14 +6807,22 @@ function opRenderDriversList() {
     const matchesZone = !zoneFilter || d.zone === zoneFilter;
     return matchesQuery && matchesZone;
   });
+  filtered.sort((a, b) => {
+    const aPending = a.approvalStatus === 'pending' ? 1 : 0;
+    const bPending = b.approvalStatus === 'pending' ? 1 : 0;
+    if (aPending !== bPending) return bPending - aPending;
+    return 0;
+  });
   if (!filtered.length) { wrap.innerHTML = '<div class="op-empty">No drivers found.</div>'; return; }
   wrap.innerHTML = filtered.map(d => `
-    <div class="op-partner-item" onclick="opShowDriverDetail('${d._id}')">
+    <div class="op-partner-item" onclick="opShowDriverDetail('${d._id}')" ${d.approvalStatus === 'pending' ? 'style="border-color:#f0a02c;"' : d.approvalStatus === 'rejected' ? 'style="border-color:#dc2626;"' : ''}>
       <div class="op-partner-top">
-        <span class="op-partner-name">${d.zonePriority === true ? '⭐ ' : ''}${escapeHtml(d.name || d._id)}</span>
+        <span class="op-partner-name">${escapeHtml(d.name || d._id)}</span>
         <span class="op-partner-type">${d.isOnline ? '🟢 Online' : '⚪ Offline'}</span>
       </div>
       <div class="op-partner-sub">${escapeHtml(OP_VEHICLE_LABEL[d.vehicleType] || d.vehicleType || '')} · ${d.zoneName ? escapeHtml(d.zoneName) : '⚠️ No zone set'}</div>
+      ${d.approvalStatus === 'pending' ? '<div class="op-partner-sub" style="color:#f0a02c;">⏳ Waiting for approval</div>' : ''}
+      ${d.approvalStatus === 'rejected' ? '<div class="op-partner-sub" style="color:#f87171;">❌ Rejected — waiting for driver to resend</div>' : ''}
     </div>
   `).join('');
 }
@@ -6488,13 +6877,8 @@ function opShowDriverDetail(id, silentRefresh) {
   document.getElementById('op-dm-vehicle').textContent = OP_VEHICLE_LABEL[d.vehicleType] || d.vehicleType || '—';
   document.getElementById('op-dm-status').textContent = d.isOnline ? 'Online' : 'Offline';
   document.getElementById('op-dm-zone').textContent = d.zoneName || 'Not set';
+  opRenderDriverApprovalBlock(d);
   opPopulateDriverZoneSelect();
-  const isPriority = d.zonePriority === true;
-  document.getElementById('op-dm-priority-status').textContent = isPriority ? '🟢 ON' : '⚪ OFF';
-  const priorityBtn = document.getElementById('op-dm-priority-btn');
-  priorityBtn.textContent = isPriority ? '🚫 Turn off Zone Priority' : '⭐ Make Zone Priority Driver';
-  priorityBtn.style.borderColor = isPriority ? '#ff4444' : '';
-  priorityBtn.style.color = isPriority ? '#ff4444' : '';
   document.getElementById('op-dm-due').textContent = '₹' + opComputeDriverDue(id);
   if (!silentRefresh) {
     document.getElementById('op-dm-zone-status').textContent = '';
@@ -6504,6 +6888,54 @@ function opShowDriverDetail(id, silentRefresh) {
     opPopulateDriverOrderSelect();
     document.getElementById('op-driver-modal').classList.add('show');
   }
+}
+// Same treatment as opRenderPartnerApprovalBlock, for drivers.
+function opRenderDriverApprovalBlock(d) {
+  const block = document.getElementById('op-dm-approval-block');
+  document.getElementById('op-dm-reject-box').style.display = 'none';
+  document.getElementById('op-dm-reject-reason').value = '';
+  document.getElementById('op-dm-approval-status-msg').textContent = '';
+  if (!d.approvalStatus || d.approvalStatus === 'approved') {
+    block.style.display = 'none';
+    return;
+  }
+  block.style.display = 'block';
+  const statusEl = document.getElementById('op-dm-approval-status');
+  const reasonRow = document.getElementById('op-dm-approval-reason-row');
+  if (d.approvalStatus === 'pending') {
+    statusEl.textContent = '⏳ Waiting for approval';
+    reasonRow.style.display = 'none';
+  } else if (d.approvalStatus === 'rejected') {
+    statusEl.textContent = '❌ Rejected';
+    document.getElementById('op-dm-approval-reason').textContent = d.rejectionReason || '—';
+    reasonRow.style.display = 'block';
+  }
+}
+function opApproveDriver() {
+  if (!opCurrentDriverId) return;
+  const { db, ref, update } = window.fb;
+  const msg = document.getElementById('op-dm-approval-status-msg');
+  msg.textContent = 'Approving...';
+  update(ref(db, 'taxi_drivers/' + opCurrentDriverId), { approvalStatus: 'approved', rejectionReason: null })
+    .then(() => { msg.textContent = 'Approved.'; })
+    .catch(err => { msg.textContent = 'Error: ' + err.message; });
+}
+function opShowDriverRejectBox() {
+  document.getElementById('op-dm-reject-box').style.display = 'block';
+}
+function opRejectDriver() {
+  if (!opCurrentDriverId) return;
+  const reason = document.getElementById('op-dm-reject-reason').value.trim();
+  const msg = document.getElementById('op-dm-approval-status-msg');
+  if (!reason) { msg.textContent = 'Enter a reason for the driver to see.'; return; }
+  const { db, ref, update } = window.fb;
+  msg.textContent = 'Sending...';
+  update(ref(db, 'taxi_drivers/' + opCurrentDriverId), { approvalStatus: 'rejected', rejectionReason: reason })
+    .then(() => {
+      msg.textContent = 'Rejected — the driver can now edit and resend.';
+      document.getElementById('op-dm-reject-box').style.display = 'none';
+    })
+    .catch(err => { msg.textContent = 'Error: ' + err.message; });
 }
 // Sums platformFee on every one of this driver's completed rides (see
 // app_config/taxiFare on the Taxi Fare screen — that's what tags each new
@@ -6549,15 +6981,6 @@ function opSettleDriverDue() {
     document.getElementById('op-dm-due').textContent = '₹' + Math.max(0, currentDue - amount);
     input.value = '';
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
-}
-function opToggleZonePriority() {
-  if (!opCurrentDriverId) return;
-  const d = opAllDrivers.find(x => x._id === opCurrentDriverId);
-  const next = !(d && d.zonePriority === true);
-  const { db, ref, update } = window.fb;
-  update(ref(db, 'taxi_drivers/' + opCurrentDriverId), { zonePriority: next }).catch(err => alert('Error: ' + err.message));
-  // opListenDrivers' onValue listener will refresh the modal once the
-  // write lands, so no need to hand-update the button state here.
 }
 function opSaveDriverZone() {
   if (!opCurrentDriverId) return;
@@ -6780,6 +7203,20 @@ function opUpdateOrdersHomeBadge() {
   const now = Date.now();
   const lateCount = opFlattenAllOrders().filter(o => opOrderIsLate(o, now)).length;
   if (lateCount > 0) { badge.style.display = 'inline-block'; badge.textContent = lateCount + ' late'; }
+  else { badge.style.display = 'none'; }
+}
+function opUpdatePartnersHomeBadge() {
+  const badge = document.getElementById('op-partners-home-badge');
+  if (!badge) return;
+  const pendingCount = opAllPartners.filter(p => p.approvalStatus === 'pending').length;
+  if (pendingCount > 0) { badge.style.display = 'inline-block'; badge.textContent = pendingCount + ' waiting'; }
+  else { badge.style.display = 'none'; }
+}
+function opUpdateDriversHomeBadge() {
+  const badge = document.getElementById('op-drivers-home-badge');
+  if (!badge) return;
+  const pendingCount = opAllDrivers.filter(d => d.approvalStatus === 'pending').length;
+  if (pendingCount > 0) { badge.style.display = 'inline-block'; badge.textContent = pendingCount + ' waiting'; }
   else { badge.style.display = 'none'; }
 }
 function opSwitchOrdersTab(tab) {
@@ -7106,14 +7543,24 @@ function opRenderPartnersList() {
     const matchesArea = !areaFilter || p.area === areaFilter;
     return matchesQuery && matchesArea;
   });
+  // Pending-approval shops need operator attention first — show them above
+  // everyone else, newest request first.
+  filtered.sort((a, b) => {
+    const aPending = a.approvalStatus === 'pending' ? 1 : 0;
+    const bPending = b.approvalStatus === 'pending' ? 1 : 0;
+    if (aPending !== bPending) return bPending - aPending;
+    return 0;
+  });
   if (!filtered.length) { wrap.innerHTML = '<div class="op-empty">No restaurant partners found.</div>'; return; }
   wrap.innerHTML = filtered.map(p => `
-    <div class="op-partner-item" onclick="opShowPartnerDetail('${p._id}')">
+    <div class="op-partner-item" onclick="opShowPartnerDetail('${p._id}')" ${p.approvalStatus === 'pending' ? 'style="border-color:#f0a02c;"' : p.approvalStatus === 'rejected' ? 'style="border-color:#dc2626;"' : ''}>
       <div class="op-partner-top">
         <span class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</span>
         <span class="op-partner-type">${opTypeLabel(p.businessType)}</span>
       </div>
       <div class="op-partner-sub">${escapeHtml(p.address || '')}${p.areaName ? ' · 📍 ' + escapeHtml(p.areaName) : ''} ${p.status === 'suspended' ? ' · ⛔ SUSPENDED' : ''} · Due ₹${opComputeDue(p)}</div>
+      ${p.approvalStatus === 'pending' ? '<div class="op-partner-sub" style="color:#f0a02c;">⏳ Waiting for approval</div>' : ''}
+      ${p.approvalStatus === 'rejected' ? '<div class="op-partner-sub" style="color:#f87171;">❌ Rejected — waiting for shop to resend</div>' : ''}
     </div>
   `).join('');
 }
@@ -7153,7 +7600,60 @@ function opShowPartnerDetail(id) {
   document.getElementById('op-pm-status').textContent = suspended ? 'Suspended' : 'Active';
   const toggleBtn = document.getElementById('op-pm-toggle-btn');
   toggleBtn.textContent = suspended ? '✅ Reactivate Account' : '⛔ Suspend Account';
+  opRenderPartnerApprovalBlock(p);
   document.getElementById('op-partner-modal').classList.add('show');
+}
+// Shows the Approve/Reject controls whenever this shop isn't already
+// approved (pending, rejected, or — belt and braces — anything that isn't
+// literally 'approved'). Accounts created before this feature existed have
+// no approvalStatus at all and are treated as already-approved, so the
+// block stays hidden for them.
+function opRenderPartnerApprovalBlock(p) {
+  const block = document.getElementById('op-pm-approval-block');
+  document.getElementById('op-pm-reject-box').style.display = 'none';
+  document.getElementById('op-pm-reject-reason').value = '';
+  document.getElementById('op-pm-approval-status-msg').textContent = '';
+  if (!p.approvalStatus || p.approvalStatus === 'approved') {
+    block.style.display = 'none';
+    return;
+  }
+  block.style.display = 'block';
+  const statusEl = document.getElementById('op-pm-approval-status');
+  const reasonRow = document.getElementById('op-pm-approval-reason-row');
+  if (p.approvalStatus === 'pending') {
+    statusEl.textContent = '⏳ Waiting for approval';
+    reasonRow.style.display = 'none';
+  } else if (p.approvalStatus === 'rejected') {
+    statusEl.textContent = '❌ Rejected';
+    document.getElementById('op-pm-approval-reason').textContent = p.rejectionReason || '—';
+    reasonRow.style.display = 'block';
+  }
+}
+function opApprovePartner() {
+  if (!opCurrentPartnerId) return;
+  const { db, ref, update } = window.fb;
+  const msg = document.getElementById('op-pm-approval-status-msg');
+  msg.textContent = 'Approving...';
+  update(ref(db, 'restaurants/' + opCurrentPartnerId), { approvalStatus: 'approved', rejectionReason: null })
+    .then(() => { msg.textContent = 'Approved.'; })
+    .catch(err => { msg.textContent = 'Error: ' + err.message; });
+}
+function opShowPartnerRejectBox() {
+  document.getElementById('op-pm-reject-box').style.display = 'block';
+}
+function opRejectPartner() {
+  if (!opCurrentPartnerId) return;
+  const reason = document.getElementById('op-pm-reject-reason').value.trim();
+  const msg = document.getElementById('op-pm-approval-status-msg');
+  if (!reason) { msg.textContent = 'Enter a reason for the shop to see.'; return; }
+  const { db, ref, update } = window.fb;
+  msg.textContent = 'Sending...';
+  update(ref(db, 'restaurants/' + opCurrentPartnerId), { approvalStatus: 'rejected', rejectionReason: reason })
+    .then(() => {
+      msg.textContent = 'Rejected — the shop can now edit and resend.';
+      document.getElementById('op-pm-reject-box').style.display = 'none';
+    })
+    .catch(err => { msg.textContent = 'Error: ' + err.message; });
 }
 function opSettleDue() {
   const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
