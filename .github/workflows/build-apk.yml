@@ -70,6 +70,18 @@ jobs:
         run: |
           npm install --legacy-peer-deps
           npm install @capgo/background-geolocation --legacy-peer-deps
+          # Lets driver.html prompt the driver to exempt the app from
+          # Android's Doze/App-Standby battery optimization — on top of
+          # OEM "clean up" managers (Xiaomi/Vivo/Oppo/Realme), this is
+          # what actually keeps the background location service (and the
+          # ride-alert ringing) from getting killed after the driver
+          # swipes the app away from Recents while still online.
+          npm install @capawesome-team/capacitor-android-battery-optimization --legacy-peer-deps
+          # Lets driver.html open the phone brand's own Auto-start manager
+          # screen (Xiaomi/Vivo/Oppo/Realme/Huawei/Samsung/etc.) directly
+          # from the "Turn on Auto-start" modal, instead of only giving the
+          # driver generic text instructions to find it themselves.
+          npm install @squareetlabs/capacitor-dont-kill-my-app --legacy-peer-deps
 
       - name: Generate native Android project (if not already present)
         run: |
@@ -156,6 +168,50 @@ jobs:
           # foreground-only as before.
           if ! grep -q "ACCESS_BACKGROUND_LOCATION" "$MANIFEST"; then
             sed -i '/<manifest /a\    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />' "$MANIFEST"
+          fi
+
+          # Lets driver.html show the system "Allow this app to ignore
+          # battery optimizations?" dialog (via @capawesome-team/
+          # capacitor-android-battery-optimization, above) — a driver who
+          # taps Allow there is far less likely to have Android kill the
+          # background location service after swiping the app away while
+          # online.
+          if ! grep -q "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" "$MANIFEST"; then
+            sed -i '/<manifest /a\    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />' "$MANIFEST"
+          fi
+
+          # Lets @squareetlabs/capacitor-dont-kill-my-app (above) detect and
+          # open each OEM's own Auto-start manager app from driver.html's
+          # "Turn on Auto-start" modal — without these <queries> entries,
+          # Android 11+'s package-visibility restrictions hide these apps
+          # from this app even if they're installed, and requestAutoStart()
+          # silently fails to find the right screen to open.
+          if ! grep -q "com.miui.securitycenter" "$MANIFEST"; then
+            python3 - "$MANIFEST" << 'PYEOF'
+          import sys
+          path = sys.argv[1]
+          with open(path) as f:
+              content = f.read()
+          queries_block = '''    <queries>
+          <package android:name="com.asus.mobilemanager" />
+          <package android:name="com.miui.securitycenter" />
+          <package android:name="com.letv.android.letvsafe" />
+          <package android:name="com.huawei.systemmanager" />
+          <package android:name="com.coloros.safecenter" />
+          <package android:name="com.oppo.safe" />
+          <package android:name="com.iqoo.secure" />
+          <package android:name="com.vivo.permissionmanager" />
+          <package android:name="com.evenwell.powersaving.g3" />
+          <package android:name="com.samsung.android.lool" />
+          <package android:name="com.oneplus.security" />
+          <package android:name="com.lenovo.powersetting" />
+          <package android:name="com.meizu.safe" />
+      </queries>
+      '''
+          content = content.replace('<application', queries_block + '    <application', 1)
+          with open(path, 'w') as f:
+              f.write(content)
+          PYEOF
           fi
 
           if ! grep -q "android.permission.VIBRATE" "$MANIFEST"; then
@@ -584,6 +640,18 @@ jobs:
                   Map<String, String> data = remoteMessage.getData();
                   String type = data.get("type");
 
+                  // "cancel_ring" (sent by the Cloudflare Worker's
+                  // cancel_ring handler) doesn't start a new alert — it
+                  // tells RingingService to stop the CURRENT one, but only
+                  // if it's still ringing for this exact kind+id. Without
+                  // that match check, a cancel meant for an old, already-
+                  // superseded ride could wrongly silence a brand-new one
+                  // that started ringing in between.
+                  if ("cancel_ring".equals(type)) {
+                      RingingService.cancelIfMatches(this, data.get("kind"), data.get("id"));
+                      return;
+                  }
+
                   String kind;
                   String id;
                   if ("new_ride".equals(type)) {
@@ -660,12 +728,34 @@ jobs:
               private final Handler timeoutHandler = new Handler(Looper.getMainLooper());
               private Runnable timeoutRunnable;
 
+              // What this service is currently ringing for, if anything —
+              // checked by cancelIfMatches() so a stray/late cancel_ring
+              // push for an OLD ride/order can never silence a NEW one
+              // that happens to already be ringing by the time it arrives.
+              private static volatile String currentKind;
+              private static volatile String currentId;
+
+              // Called from AlertFcmService when a "cancel_ring" data push
+              // arrives. Only stops the service if it's ringing for this
+              // exact kind+id right now — a no-op otherwise (e.g. already
+              // stopped, already moved on to a different alert, or this
+              // cancel arrived for something this device was never
+              // ringing for in the first place).
+              public static void cancelIfMatches(android.content.Context ctx, String kind, String id) {
+                  if (kind == null || id == null) return;
+                  if (kind.equals(currentKind) && id.equals(currentId)) {
+                      ctx.stopService(new Intent(ctx, RingingService.class));
+                  }
+              }
+
               @Override
               public int onStartCommand(Intent intent, int flags, int startId) {
                   String kind = intent.getStringExtra("kind");
                   String id = intent.getStringExtra("id");
                   String title = intent.getStringExtra("title");
                   String body = intent.getStringExtra("body");
+                  currentKind = kind;
+                  currentId = id;
 
                   // If a second ride/order/delivery arrives while the first
                   // one is still ringing (unanswered), this service gets
@@ -779,6 +869,8 @@ jobs:
                       timeoutHandler.removeCallbacks(timeoutRunnable);
                       timeoutRunnable = null;
                   }
+                  currentKind = null;
+                  currentId = null;
               }
 
               private void stopRingLoop() {
