@@ -1283,6 +1283,9 @@ function startLocationTracking() {
     // e.g. permission denied — fall back to the foreground-only watch so
     // the driver isn't left with no tracking at all.
     console.warn('BackgroundGeolocation start failed, falling back:', err);
+    // TEMP DEBUG: surface on-screen so it can be diagnosed without a
+    // laptop/USB debugger. Remove once root-caused.
+    alert('DEBUG BackgroundGeolocation.start failed: ' + (err && err.message ? err.message : err));
     window.driverBgLocationActive = false;
     startBrowserLocationWatch();
     checkBackgroundLocationPermission();
@@ -1404,7 +1407,14 @@ async function checkBackgroundLocationPermission() {
     // force the driver offline mid-session on our own.
     if (state.isOnline && !bgLocationModalShownThisSession) openBgLocationModal();
   } catch (e) {
-    // Can't determine status — leave whatever the banner/modal were already showing.
+    // TEMP DEBUG: surface the swallowed error on-screen so it can be
+    // diagnosed without a laptop/USB debugger. Remove once root-caused.
+    alert('DEBUG checkBackgroundLocationPermission failed: ' + (e && e.message ? e.message : e));
+    if (awaitingBgLocationGrant) {
+      awaitingBgLocationGrant = false;
+      awaitingBgLocationGrantKeepOnlineSince = false;
+      revertOnlineToggle();
+    }
   }
 }
 
@@ -1532,7 +1542,14 @@ async function checkBatteryOptimization() {
     // force the driver offline mid-session on our own.
     if (state.isOnline && !batteryModalShownThisSession) openBatteryModal();
   } catch (e) {
-    // Can't determine status — leave whatever the banner/modal were already showing.
+    // TEMP DEBUG: surface the swallowed error on-screen so it can be
+    // diagnosed without a laptop/USB debugger. Remove once root-caused.
+    alert('DEBUG checkBatteryOptimization failed: ' + (e && e.message ? e.message : e));
+    if (awaitingBatteryGrant) {
+      awaitingBatteryGrant = false;
+      awaitingBatteryGrantKeepOnlineSince = false;
+      revertOnlineToggle();
+    }
   }
 }
 if (batteryWarningBtn) {
@@ -3250,6 +3267,7 @@ function updateOnlineLabel() {
   document.getElementById('online-toggle-label').textContent = state.isOnline ? "You're online" : "You're offline";
 }
 document.getElementById('online-toggle-input').addEventListener('change', (e) => {
+  try {
   // Photo is mandatory — customers see it in their driver-match card, so a
   // driver with no photo on file can't go online until they add one.
   if (e.target.checked && (!state.driver || !state.driver.photo)) {
@@ -3303,6 +3321,12 @@ document.getElementById('online-toggle-input').addEventListener('change', (e) =>
     // starts fresh.
     update(ref(db, 'taxi_drivers/' + state.username), { isOnline: false, onlineSince: null }).catch(() => {});
   } catch (err) {}
+  } catch (outerErr) {
+    // TEMP DEBUG: surface any uncaught error from the toggle handler itself
+    // on-screen so it can be diagnosed without a laptop/USB debugger.
+    // Remove once root-caused.
+    alert('DEBUG online-toggle handler crashed: ' + (outerErr && outerErr.message ? outerErr.message : outerErr));
+  }
 });
 
 // ---------- Rides ----------
