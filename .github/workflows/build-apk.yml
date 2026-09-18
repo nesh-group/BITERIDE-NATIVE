@@ -69,21 +69,25 @@ jobs:
       - name: Install project dependencies
         run: |
           npm install --legacy-peer-deps
-          # Pinned to an exact version instead of letting npm resolve
-          # "latest" on every single build. Unpinned installs meant the
-          # exact plugin build could silently change from one build to
-          # the next, which is how this app ended up on a build where
-          # BackgroundGeolocation.start()/.stop()/.openSettings() didn't
-          # return real Promises (".then/.catch is not a function"
-          # crashes) even though driver.html's code never changed.
-          # 8.0.43 is confirmed to exist (it's the version the plugin's
-          # own docs cite as introducing checkPermissions()/
-          # requestPermissions() with the backgroundLocation status
-          # field — the exact API driver.html already calls).
-          # `npm ls` right after prints the resolved version into the
-          # build log so a future mismatch is visible immediately
-          # instead of showing up as a silent runtime crash.
-          npm install @capgo/background-geolocation@8.0.43 --legacy-peer-deps --save-exact
+          # Pinned to an exact version instead of letting npm silently pick
+          # up a different build on every run — that's how this app once
+          # ended up on a build where BackgroundGeolocation.start()/.stop()/
+          # .openSettings() didn't return real Promises (".then/.catch is
+          # not a function" crashes) even though driver.html's code never
+          # changed. Originally this pinned a literal version number
+          # (8.0.43), but that exact version was later removed from the
+          # npm registry — pinning a hardcoded number that can vanish out
+          # from under the build isn't safe. So instead: resolve whatever
+          # version is CURRENTLY published as "latest" at build time, then
+          # pin the install to that exact resolved version (still
+          # `--save-exact`, so within this one build nothing can silently
+          # drift between the install and later steps). The resolved
+          # version is echoed AND `npm ls` prints it again right after, so
+          # a version change between builds is visible in the log instead
+          # of showing up as a silent runtime crash.
+          BGEO_VERSION=$(npm view @capgo/background-geolocation dist-tags.latest)
+          echo "Resolved @capgo/background-geolocation version: $BGEO_VERSION"
+          npm install @capgo/background-geolocation@$BGEO_VERSION --legacy-peer-deps --save-exact
           npm ls @capgo/background-geolocation --depth=0 || true
           # Lets driver.html prompt the driver to exempt the app from
           # Android's Doze/App-Standby battery optimization — on top of
