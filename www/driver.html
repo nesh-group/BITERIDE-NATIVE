@@ -2167,6 +2167,20 @@ async function handlePopupRideAction(rideId, action) {
     });
     showToast("Ride accepted");
     clearDeliveredNotifications();
+    // Fire-and-forget: let the customer know who's coming, via a real
+    // OS-level push (same Cloudflare Worker used for ride/delivery alerts).
+    if (ride.customerNumber) {
+      fetch('https://broad-paper-6445.raise3715.workers.dev', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'customer',
+          customerPhone: ride.customerNumber,
+          title: 'Driver assigned!',
+          body: state.driver.name + ' is on the way to pick you up.',
+        }),
+      }).catch(() => {});
+    }
   } catch (e) {
     alert("Couldn't accept this ride — check your connection and try again.");
   }
@@ -2200,6 +2214,20 @@ async function handlePopupDeliveryAction(compositeId, action) {
     });
     showToast("Delivery accepted");
     clearDeliveredNotifications();
+    // Fire-and-forget: let the customer know who's picking up their order.
+    if (order.customerPhone) {
+      fetch('https://broad-paper-6445.raise3715.workers.dev', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'customer',
+          customerPhone: order.customerPhone,
+          title: 'Driver assigned!',
+          body: state.driver.name + ' is picking up your order.',
+          orderId, restId,
+        }),
+      }).catch(() => {});
+    }
   } catch (e) {
     alert("Couldn't accept this delivery — check your connection and try again.");
   }
@@ -3631,6 +3659,22 @@ async function updateRideStatus(rideId, newStatus) {
     const { db, ref, update } = window.fb;
     await update(ref(db, 'rides/' + rideId), { status: newStatus });
     showToast('Ride marked as ' + newStatus);
+    // Fire-and-forget: let the customer know via a real OS-level push,
+    // for the two moments they most want to know about — driver reaching
+    // the pickup point, and the trip wrapping up.
+    const ride = ridesCache[rideId];
+    const customerNumber = ride && ride.customerNumber;
+    if (customerNumber && (newStatus === 'arriving' || newStatus === 'completed')) {
+      const title = newStatus === 'arriving' ? 'Driver has arrived' : 'Trip completed';
+      const msgBody = newStatus === 'arriving'
+        ? (state.driver.name + ' has reached the pickup point.')
+        : 'Your trip has ended. Thanks for riding with us!';
+      fetch('https://broad-paper-6445.raise3715.workers.dev', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'customer', customerPhone: customerNumber, title, body: msgBody }),
+      }).catch(() => {});
+    }
   } catch (e) {
     alert("Couldn't update this ride — check your connection and try again.");
   }

@@ -1618,6 +1618,7 @@
       <p class="op-note">This sends a real push notification (works even if the app is closed) to every customer device that has notifications enabled. Use it for offers, announcements, or downtime notices — not for individual order updates, which already go out automatically.</p>
       <input type="text" id="op-notify-title-input" placeholder="Title (e.g. 🎉 20% off today!)" maxlength="60" style="width:100%;padding:10px;background:#0b0f19;color:#e2e8f0;border:1px solid #334155;font-size:.85rem;margin-bottom:10px;">
       <textarea id="op-notify-body-input" placeholder="Message body..." style="height:100px;" maxlength="150"></textarea>
+      <input type="text" id="op-notify-image-input" placeholder="Image URL (optional — shown as a big picture in the notification)" style="width:100%;padding:10px;background:#0b0f19;color:#e2e8f0;border:1px solid #334155;font-size:.85rem;margin-top:10px;">
       <div>
         <button type="button" class="op-btn op-btn-push" onclick="opSendBroadcastNotification()">📢 Send to all customers</button>
       </div>
@@ -4619,6 +4620,7 @@ async function updateOrderStatus(id, newStatus, orderData) {
     if (newStatus === 'cancelled') playCancelAlert();
     if (newStatus === 'ready') broadcastDeliveryJobToDrivers(id, orderData || {});
     if (newStatus === 'preparing') notifyCustomerOrderStatus(orderData || {}, id, 'Order confirmed!', (state.restaurant && state.restaurant.name || 'Restaurant') + ' is preparing your order.');
+    if (newStatus === 'delivered') notifyCustomerOrderStatus(orderData || {}, id, 'Order delivered!', 'Your order from ' + (state.restaurant && state.restaurant.name || 'the restaurant') + ' has been delivered. Enjoy your meal!');
   } catch (e) {
     alert("Couldn't update order — check your connection and try again.");
   }
@@ -5579,21 +5581,24 @@ function opOpenSection(name) {
 function opSendBroadcastNotification() {
   const titleEl = document.getElementById('op-notify-title-input');
   const bodyEl = document.getElementById('op-notify-body-input');
+  const imageEl = document.getElementById('op-notify-image-input');
   const status = document.getElementById('op-notify-status');
   const title = titleEl.value.trim();
   const body = bodyEl.value.trim();
+  const image = imageEl.value.trim();
   if (!title || !body) { status.textContent = 'Please fill in both title and message.'; return; }
   status.textContent = 'Sending...';
   fetch('https://broad-paper-6445.raise3715.workers.dev', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'broadcast', title, body }),
+    body: JSON.stringify(image ? { type: 'broadcast', title, body, image } : { type: 'broadcast', title, body }),
   })
     .then(res => res.json().catch(() => ({})))
     .then(() => {
       status.textContent = 'Sent! ✅';
       titleEl.value = '';
       bodyEl.value = '';
+      imageEl.value = '';
     })
     .catch(() => { status.textContent = 'Failed to send — check your connection and try again.'; });
 }
