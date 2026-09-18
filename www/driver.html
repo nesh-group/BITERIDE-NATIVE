@@ -1263,19 +1263,27 @@ function startLocationTracking() {
   if (window.driverBgLocationActive) return;
   window.driverBgLocationActive = true;
   const { BackgroundGeolocation } = window.Capacitor.Plugins;
-  BackgroundGeolocation.start(
-    {
-      backgroundMessage: 'Sharing your location so riders can be matched with you.',
-      backgroundTitle: 'NESH Driver — Online',
-      requestPermissions: true,
-      stale: false,
-      distanceFilter: 15, // metres — filters out GPS jitter while stopped
-    },
-    (location, error) => {
-      if (error) { console.warn('Background location error:', error); return; }
-      if (!location) return;
-      handleDriverLocationFix(location.latitude, location.longitude);
-    }
+  // NOTE: the installed plugin build has been observed to NOT return a
+  // real Promise from start() (it can return undefined depending on the
+  // installed version/native build). Wrapping in Promise.resolve() makes
+  // this safe either way — if it's already a promise, this just adopts
+  // it; if it's undefined, .then() below still fires normally instead of
+  // throwing "start(...).then is not a function".
+  Promise.resolve(
+    BackgroundGeolocation.start(
+      {
+        backgroundMessage: 'Sharing your location so riders can be matched with you.',
+        backgroundTitle: 'NESH Driver — Online',
+        requestPermissions: true,
+        stale: false,
+        distanceFilter: 15, // metres — filters out GPS jitter while stopped
+      },
+      (location, error) => {
+        if (error) { console.warn('Background location error:', error); return; }
+        if (!location) return;
+        handleDriverLocationFix(location.latitude, location.longitude);
+      }
+    )
   ).then(() => {
     checkBackgroundLocationPermission();
     checkBatteryOptimization();
@@ -1283,9 +1291,6 @@ function startLocationTracking() {
     // e.g. permission denied — fall back to the foreground-only watch so
     // the driver isn't left with no tracking at all.
     console.warn('BackgroundGeolocation start failed, falling back:', err);
-    // TEMP DEBUG: surface on-screen so it can be diagnosed without a
-    // laptop/USB debugger. Remove once root-caused.
-    alert('DEBUG BackgroundGeolocation.start failed: ' + (err && err.message ? err.message : err));
     window.driverBgLocationActive = false;
     startBrowserLocationWatch();
     checkBackgroundLocationPermission();
@@ -1407,9 +1412,7 @@ async function checkBackgroundLocationPermission() {
     // force the driver offline mid-session on our own.
     if (state.isOnline && !bgLocationModalShownThisSession) openBgLocationModal();
   } catch (e) {
-    // TEMP DEBUG: surface the swallowed error on-screen so it can be
-    // diagnosed without a laptop/USB debugger. Remove once root-caused.
-    alert('DEBUG checkBackgroundLocationPermission failed: ' + (e && e.message ? e.message : e));
+    // Can't determine status — leave whatever the banner/modal were already showing.
     if (awaitingBgLocationGrant) {
       awaitingBgLocationGrant = false;
       awaitingBgLocationGrantKeepOnlineSince = false;
@@ -1421,7 +1424,7 @@ async function checkBackgroundLocationPermission() {
 if (bgLocationWarningBtn) {
   bgLocationWarningBtn.addEventListener('click', () => {
     if (hasBackgroundGeolocationPlugin()) {
-      window.Capacitor.Plugins.BackgroundGeolocation.openSettings().catch(() => {});
+      Promise.resolve(window.Capacitor.Plugins.BackgroundGeolocation.openSettings()).catch(() => {});
     }
   });
 }
@@ -1429,7 +1432,7 @@ if (bgLocationModalSettingsBtn) {
   bgLocationModalSettingsBtn.addEventListener('click', () => {
     bgLocationModalWasOpened = true;
     if (hasBackgroundGeolocationPlugin()) {
-      window.Capacitor.Plugins.BackgroundGeolocation.openSettings().catch(() => {});
+      Promise.resolve(window.Capacitor.Plugins.BackgroundGeolocation.openSettings()).catch(() => {});
     }
   });
 }
@@ -1542,9 +1545,7 @@ async function checkBatteryOptimization() {
     // force the driver offline mid-session on our own.
     if (state.isOnline && !batteryModalShownThisSession) openBatteryModal();
   } catch (e) {
-    // TEMP DEBUG: surface the swallowed error on-screen so it can be
-    // diagnosed without a laptop/USB debugger. Remove once root-caused.
-    alert('DEBUG checkBatteryOptimization failed: ' + (e && e.message ? e.message : e));
+    // Can't determine status — leave whatever the banner/modal were already showing.
     if (awaitingBatteryGrant) {
       awaitingBatteryGrant = false;
       awaitingBatteryGrantKeepOnlineSince = false;
@@ -1555,10 +1556,10 @@ async function checkBatteryOptimization() {
 if (batteryWarningBtn) {
   batteryWarningBtn.addEventListener('click', () => {
     if (!hasBatteryOptimizationPlugin()) return;
-    window.Capacitor.Plugins.BatteryOptimization.requestIgnoreBatteryOptimization().catch(() => {
+    Promise.resolve(window.Capacitor.Plugins.BatteryOptimization.requestIgnoreBatteryOptimization()).catch(() => {
       // Some OEMs/Android versions reject the direct request dialog —
       // fall back to the settings page so the driver can still find it.
-      window.Capacitor.Plugins.BatteryOptimization.openBatteryOptimizationSettings().catch(() => {});
+      Promise.resolve(window.Capacitor.Plugins.BatteryOptimization.openBatteryOptimizationSettings()).catch(() => {});
     });
   });
 }
@@ -1566,8 +1567,8 @@ if (batteryModalSettingsBtn) {
   batteryModalSettingsBtn.addEventListener('click', () => {
     batteryModalWasOpened = true;
     if (!hasBatteryOptimizationPlugin()) return;
-    window.Capacitor.Plugins.BatteryOptimization.requestIgnoreBatteryOptimization().catch(() => {
-      window.Capacitor.Plugins.BatteryOptimization.openBatteryOptimizationSettings().catch(() => {});
+    Promise.resolve(window.Capacitor.Plugins.BatteryOptimization.requestIgnoreBatteryOptimization()).catch(() => {
+      Promise.resolve(window.Capacitor.Plugins.BatteryOptimization.openBatteryOptimizationSettings()).catch(() => {});
     });
   });
 }
@@ -1602,10 +1603,10 @@ if (autostartModalOpenSettingsBtn) {
     if (hasAutoStartPlugin()) {
       // Jumps straight to this phone brand's own Auto-start manager
       // screen (Xiaomi/Vivo/Oppo/Huawei/Samsung/etc.) when supported.
-      window.Capacitor.Plugins.DontKillMyApp.requestAutoStart().catch(() => {
+      Promise.resolve(window.Capacitor.Plugins.DontKillMyApp.requestAutoStart()).catch(() => {
         // Brand not recognised / screen not found — fall back to the
         // generic app-info settings page so the driver has somewhere to go.
-        window.Capacitor.Plugins.DontKillMyApp.openAppInfo().catch(() => {});
+        Promise.resolve(window.Capacitor.Plugins.DontKillMyApp.openAppInfo()).catch(() => {});
       });
       return;
     }
@@ -1695,7 +1696,9 @@ function stopLocationTracking() {
   stopLocationHeartbeat();
   if (window.driverBgLocationActive) {
     window.driverBgLocationActive = false;
-    window.Capacitor.Plugins.BackgroundGeolocation.stop().catch(() => {});
+    // See the note in startLocationTracking() — this plugin build has
+    // been observed to not return a real Promise, so wrap defensively.
+    Promise.resolve(window.Capacitor.Plugins.BackgroundGeolocation.stop()).catch(() => {});
   }
   if (locationWatchId != null) {
     navigator.geolocation.clearWatch(locationWatchId);
@@ -2494,7 +2497,7 @@ const CANCEL_ALERT_MAX_MS = 5000;
 function notifyOfferCancelled() {
   stopRinging();
   if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RingControl) {
-    window.Capacitor.Plugins.RingControl.stopRinging().catch(() => {});
+    Promise.resolve(window.Capacitor.Plugins.RingControl.stopRinging()).catch(() => {});
   }
   playCancelAlert(CANCEL_ALERT_MAX_MS);
 }
@@ -3322,10 +3325,7 @@ document.getElementById('online-toggle-input').addEventListener('change', (e) =>
     update(ref(db, 'taxi_drivers/' + state.username), { isOnline: false, onlineSince: null }).catch(() => {});
   } catch (err) {}
   } catch (outerErr) {
-    // TEMP DEBUG: surface any uncaught error from the toggle handler itself
-    // on-screen so it can be diagnosed without a laptop/USB debugger.
-    // Remove once root-caused.
-    alert('DEBUG online-toggle handler crashed: ' + (outerErr && outerErr.message ? outerErr.message : outerErr));
+    console.warn('online-toggle handler error:', outerErr);
   }
 });
 
