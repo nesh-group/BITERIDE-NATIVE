@@ -69,7 +69,22 @@ jobs:
       - name: Install project dependencies
         run: |
           npm install --legacy-peer-deps
-          npm install @capgo/background-geolocation --legacy-peer-deps
+          # Pinned to an exact version instead of letting npm resolve
+          # "latest" on every single build. Unpinned installs meant the
+          # exact plugin build could silently change from one build to
+          # the next, which is how this app ended up on a build where
+          # BackgroundGeolocation.start()/.stop()/.openSettings() didn't
+          # return real Promises (".then/.catch is not a function"
+          # crashes) even though driver.html's code never changed.
+          # 8.0.43 is confirmed to exist (it's the version the plugin's
+          # own docs cite as introducing checkPermissions()/
+          # requestPermissions() with the backgroundLocation status
+          # field — the exact API driver.html already calls).
+          # `npm ls` right after prints the resolved version into the
+          # build log so a future mismatch is visible immediately
+          # instead of showing up as a silent runtime crash.
+          npm install @capgo/background-geolocation@8.0.43 --legacy-peer-deps --save-exact
+          npm ls @capgo/background-geolocation --depth=0 || true
           # Lets driver.html prompt the driver to exempt the app from
           # Android's Doze/App-Standby battery optimization — on top of
           # OEM "clean up" managers (Xiaomi/Vivo/Oppo/Realme), this is
@@ -1117,6 +1132,36 @@ jobs:
           NESH_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           NESH_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: chmod +x gradlew && ./gradlew assembleDebug
+
+      # ---- Diagnostic: find the exact <service> Android kills on swipe ----
+      # By default a foreground service is stopped the moment its app is
+      # swiped away from Recents — that's plain Android behaviour
+      # (android:stopWithTask defaults to true), not something OEM battery/
+      # autostart settings control. Apps like Swiggy's driver app survive a
+      # swipe because their location service is declared with
+      # android:stopWithTask="false" in the manifest.
+      # @capgo/background-geolocation's own service (inside its AAR) isn't
+      # visible in this repo's source AndroidManifest.xml — it only appears
+      # after Gradle's manifest merger runs during the build above. This
+      # step greps the merged manifest Gradle already produced and prints
+      # every <service> with foregroundServiceType="location", so the exact
+      # android:name can be read straight from the build log instead of
+      # guessed. Once we have that name, a matching <service ... tools:node
+      # ="merge" android:stopWithTask="false" /> entry can be added to this
+      # app's own AndroidManifest.xml (in the step above) to override it.
+      - name: Print merged manifest's location service (for stopWithTask fix)
+        working-directory: android
+        run: |
+          MERGED=$(find app/build/intermediates -iname "AndroidManifest.xml" -path "*merged_manifest*" -o -iname "AndroidManifest.xml" -path "*merged_manifests*" 2>/dev/null | head -1)
+          if [ -z "$MERGED" ]; then
+            echo "Could not locate the merged manifest under app/build/intermediates — listing what's there instead:"
+            find app/build/intermediates -iname "AndroidManifest.xml" 2>/dev/null
+          else
+            echo "Merged manifest: $MERGED"
+            echo "---- <service> entries with foregroundServiceType=\"location\" ----"
+            grep -B2 -A6 'foregroundServiceType="location"' "$MERGED" || echo "(none found — plugin may declare it without this attribute; showing all <service> entries instead)"
+            grep -B2 -A6 '<service' "$MERGED"
+          fi
 
       - name: Upload the built APK (for you to download from the Actions tab)
         uses: actions/upload-artifact@v4
