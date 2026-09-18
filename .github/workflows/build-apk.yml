@@ -336,6 +336,37 @@ jobs:
           PYEOF
           fi
 
+          # Lets BootCompletedReceiver (added further down) see the phone
+          # finish booting, so a driver who was online when the phone
+          # restarted doesn't have to notice and manually reopen the app —
+          # see BootCompletedReceiver.java for what it actually does on
+          # boot (launches MainActivity, which is the ONLY place that
+          # correctly knows how to call BackgroundGeolocation.start() with
+          # the right options — driver.html's own startup code already
+          # does this automatically when it finds nesh_driver_online_* set,
+          # so the receiver doesn't need to duplicate that logic).
+          if ! grep -q "RECEIVE_BOOT_COMPLETED" "$MANIFEST"; then
+            sed -i '/<manifest /a\    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />' "$MANIFEST"
+          fi
+          if ! grep -q "BootCompletedReceiver" "$MANIFEST"; then
+            python3 - "$MANIFEST" << 'PYEOF'
+          import sys
+          path = sys.argv[1]
+          with open(path) as f:
+              content = f.read()
+          injection = '''
+              <receiver android:name=".BootCompletedReceiver" android:exported="true">
+                  <intent-filter>
+                      <action android:name="android.intent.action.BOOT_COMPLETED" />
+                  </intent-filter>
+              </receiver>
+          </application>'''
+          content = content.replace('</application>', injection, 1)
+          with open(path, 'w') as f:
+              f.write(content)
+          PYEOF
+          fi
+
       - name: Generate app icon from resources/icon.png
         run: |
           npm install -D @capacitor/assets --legacy-peer-deps
@@ -359,6 +390,15 @@ jobs:
         run: |
           if ! grep -q "firebase-messaging" android/app/build.gradle; then
             sed -i "/dependencies {/a\\    implementation 'com.google.firebase:firebase-messaging:23.4.0'\n    implementation 'androidx.annotation:annotation:1.7.1'" android/app/build.gradle
+          fi
+          # WorkManager powers LocationHealthCheckWorker (see the native
+          # sources step below) — the periodic job that notices when
+          # BackgroundGeolocation's service has died (OEM battery killer,
+          # low-memory kill — the cases stopWithTask="false" alone doesn't
+          # cover) and prompts the driver to resume instead of silently
+          # sitting offline until they happen to reopen the app themselves.
+          if ! grep -q "androidx.work:work-runtime" android/app/build.gradle; then
+            sed -i "/dependencies {/a\\    implementation 'androidx.work:work-runtime:2.9.0'" android/app/build.gradle
           fi
 
       - name: Add custom alert sounds (order + ride)
@@ -394,6 +434,195 @@ jobs:
           }
           EOF
 
+          # Small SharedPreferences-backed store, written from driver.html
+          # (setOnlineState() on every online/offline toggle,
+          # recordHeartbeat() on every location fix) and read from
+          # LocationHealthCheckWorker/BootCompletedReceiver below. Plain
+          # SharedPreferences (not Firebase) on purpose — it has to be
+          # readable even when the app process was fully killed and there's
+          # no WebView/JS/network available yet to ask Firebase anything.
+          cat > "$PKG_PATH/DriverTrackingPlugin.java" << 'EOF'
+          package com.yourcompany.neshapp;
+
+          import android.content.SharedPreferences;
+          import androidx.work.ExistingPeriodicWorkPolicy;
+          import androidx.work.PeriodicWorkRequest;
+          import androidx.work.WorkManager;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+          import java.util.concurrent.TimeUnit;
+
+          // JS usage (see driver.html):
+          //   window.Capacitor.Plugins.DriverTrackingPlugin.setOnlineState({ online: true/false })
+          //   window.Capacitor.Plugins.DriverTrackingPlugin.recordHeartbeat()
+          @CapacitorPlugin(name = "DriverTrackingPlugin")
+          public class DriverTrackingPlugin extends Plugin {
+              public static final String PREFS_NAME = "nesh_driver_tracking";
+              public static final String KEY_ONLINE = "should_be_online";
+              public static final String KEY_HEARTBEAT = "last_heartbeat_ms";
+              private static final String HEALTH_CHECK_WORK_NAME = "nesh_location_health_check";
+
+              @PluginMethod
+              public void setOnlineState(PluginCall call) {
+                  boolean online = call.getBoolean("online", false);
+                  SharedPreferences prefs = getContext().getSharedPreferences(PREFS_NAME, 0 /* MODE_PRIVATE */);
+                  SharedPreferences.Editor editor = prefs.edit().putBoolean(KEY_ONLINE, online);
+                  if (online) editor.putLong(KEY_HEARTBEAT, System.currentTimeMillis());
+                  editor.apply();
+
+                  WorkManager workManager = WorkManager.getInstance(getContext());
+                  if (online) {
+                      // Minimum WorkManager periodic interval is 15 minutes —
+                      // this is a safety net for the rare case where the
+                      // foreground service itself got killed (OEM battery
+                      // manager, low memory), not the normal update path
+                      // (that's BackgroundGeolocation's own 60s heartbeat /
+                      // 15m distanceFilter, unaffected by this).
+                      PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(
+                          LocationHealthCheckWorker.class, 15, TimeUnit.MINUTES
+                      ).build();
+                      workManager.enqueueUniquePeriodicWork(
+                          HEALTH_CHECK_WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request
+                      );
+                  } else {
+                      workManager.cancelUniqueWork(HEALTH_CHECK_WORK_NAME);
+                  }
+                  call.resolve();
+              }
+
+              @PluginMethod
+              public void recordHeartbeat(PluginCall call) {
+                  getContext().getSharedPreferences(PREFS_NAME, 0)
+                      .edit().putLong(KEY_HEARTBEAT, System.currentTimeMillis()).apply();
+                  call.resolve();
+              }
+          }
+          EOF
+
+          # Runs roughly every 15 minutes (WorkManager's own minimum — see
+          # DriverTrackingPlugin above) while the driver should be online.
+          # Does NOT touch location itself — it only checks whether a fresh
+          # heartbeat has arrived recently and, if not (tracking silently
+          # died — OEM battery kill, low-memory kill), raises a normal
+          # notification asking the driver to reopen the app.
+          #
+          # Deliberately does NOT try to restart BackgroundGeolocation's
+          # service directly from here: Android blocks starting an Activity
+          # from a background Worker (no exemption applies here, unlike
+          # BOOT_COMPLETED below), and guessing at the plugin's internal
+          # Intent contract to poke its service directly — without its
+          # source available to confirm the extras it expects — risks a
+          # "restart" that either crashes or silently no-ops, which is
+          # worse than a driver getting a tap-to-resume notification. A
+          # tapped notification IS an Android-trusted trigger, so it can
+          # reliably launch MainActivity, and driver.html's own startup
+          # code already knows how to resume tracking correctly from there
+          # (same nesh_driver_online_* check used on every normal app open).
+          cat > "$PKG_PATH/LocationHealthCheckWorker.java" << 'EOF'
+          package com.yourcompany.neshapp;
+
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.os.Build;
+          import androidx.core.app.NotificationCompat;
+          import androidx.work.Worker;
+          import androidx.work.WorkerParameters;
+          import androidx.annotation.NonNull;
+
+          public class LocationHealthCheckWorker extends Worker {
+              private static final long STALE_THRESHOLD_MS = 4 * 60 * 1000; // 4 min — a bit above the 3-min matching threshold in driver.html so a driver isn't notified for a gap that hasn't actually cost them anything yet
+              private static final String CHANNEL_ID = "location_health_check";
+              private static final int NOTIFICATION_ID = 9101;
+
+              public LocationHealthCheckWorker(@NonNull Context context, @NonNull WorkerParameters params) {
+                  super(context, params);
+              }
+
+              @NonNull
+              @Override
+              public Result doWork() {
+                  Context context = getApplicationContext();
+                  SharedPreferences prefs = context.getSharedPreferences(DriverTrackingPlugin.PREFS_NAME, 0);
+                  boolean shouldBeOnline = prefs.getBoolean(DriverTrackingPlugin.KEY_ONLINE, false);
+                  if (!shouldBeOnline) return Result.success();
+
+                  long lastHeartbeat = prefs.getLong(DriverTrackingPlugin.KEY_HEARTBEAT, 0);
+                  long age = System.currentTimeMillis() - lastHeartbeat;
+                  if (age < STALE_THRESHOLD_MS) return Result.success(); // tracking is fine, nothing to do
+
+                  showResumeNotification(context);
+                  return Result.success();
+              }
+
+              private void showResumeNotification(Context context) {
+                  NotificationManager manager = context.getSystemService(NotificationManager.class);
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && manager != null) {
+                      NotificationChannel channel = new NotificationChannel(
+                          CHANNEL_ID, "Location Tracking", NotificationManager.IMPORTANCE_HIGH
+                      );
+                      manager.createNotificationChannel(channel);
+                  }
+
+                  Intent activityIntent = new Intent(context, MainActivity.class);
+                  activityIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                  int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
+                  PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, activityIntent, flags);
+
+                  NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+                      .setContentTitle("Location tracking paused")
+                      .setContentText("Tap to resume sharing your location and keep receiving orders.")
+                      .setPriority(NotificationCompat.PRIORITY_HIGH)
+                      .setAutoCancel(true)
+                      .setContentIntent(pendingIntent);
+                  // Uses the launcher icon as a safe default — swap in a
+                  // dedicated small icon resource later if you want one.
+                  builder.setSmallIcon(context.getApplicationInfo().icon);
+
+                  if (manager != null) manager.notify(NOTIFICATION_ID, builder.build());
+              }
+          }
+          EOF
+
+          # Relaunches MainActivity after a phone reboot if the driver was
+          # online when it restarted — BOOT_COMPLETED is one of the few
+          # background contexts Android explicitly allows starting an
+          # Activity from, so this (unlike the Worker above) CAN silently
+          # bring the app back without waiting for a notification tap.
+          # driver.html's own startup code (the nesh_driver_online_* check
+          # that already runs on every normal app open) is what actually
+          # resumes tracking once MainActivity/the WebView loads — this
+          # receiver's only job is getting that code to run again.
+          cat > "$PKG_PATH/BootCompletedReceiver.java" << 'EOF'
+          package com.yourcompany.neshapp;
+
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+
+          public class BootCompletedReceiver extends BroadcastReceiver {
+              @Override
+              public void onReceive(Context context, Intent intent) {
+                  if (intent == null || !Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) return;
+
+                  SharedPreferences prefs = context.getSharedPreferences(DriverTrackingPlugin.PREFS_NAME, 0);
+                  boolean shouldBeOnline = prefs.getBoolean(DriverTrackingPlugin.KEY_ONLINE, false);
+                  if (!shouldBeOnline) return;
+
+                  Intent launch = new Intent(context, MainActivity.class);
+                  launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                  context.startActivity(launch);
+              }
+          }
+          EOF
+
           cat > "$PKG_PATH/MainActivity.java" << 'EOF'
           package com.yourcompany.neshapp;
 
@@ -412,6 +641,7 @@ jobs:
               public void onCreate(Bundle savedInstanceState) {
                   registerPlugin(RingControlPlugin.class);
                   registerPlugin(ApkInstallerPlugin.class);
+                  registerPlugin(DriverTrackingPlugin.class);
                   super.onCreate(savedInstanceState);
 
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
