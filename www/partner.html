@@ -2541,9 +2541,19 @@ async function handlePopupOrderAction(orderId, action) {
     return;
   }
   try {
-    const { db, ref, update } = window.fb;
-    await update(ref(db, 'restaurants/' + state.restId + '/orders/' + orderId), { status: 'preparing' });
+    const { db, ref, update, get } = window.fb;
+    const orderRef = ref(db, 'restaurants/' + state.restId + '/orders/' + orderId);
+    await update(orderRef, { status: 'preparing' });
     clearDeliveredNotifications();
+    // Accepting here writes 'preparing' directly (skipping updateOrderStatus),
+    // so fire the "Order confirmed!" customer push ourselves — otherwise the
+    // customer's very first status notification was silently skipped and
+    // they only ever heard from us again at "delivered".
+    try {
+      const snap = await get(orderRef);
+      const orderData = snap.val() || {};
+      notifyCustomerOrderStatus(orderData, orderId, 'Order confirmed!', (state.restaurant && state.restaurant.name || 'Restaurant') + ' is preparing your order.');
+    } catch (e) {}
   } catch (e) {}
   showToast("Order accepted");
   // listenOrdersBadge's onValue listener will fire again and re-render the
