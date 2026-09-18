@@ -300,6 +300,42 @@ jobs:
           </paths>
           EOF
 
+          # Override the android:stopWithTask default (which is `true`) on
+          # @capgo/background-geolocation's own foreground-location service
+          # — confirmed via a build's merged manifest (see the diagnostic
+          # step at the end of this workflow) to be named
+          # com.capgo.capacitor_background_geolocation.BackgroundGeolocationService.
+          # Without this, Android stops that service — and with it, all
+          # location updates — the moment a driver swipes NESH Driver away
+          # from Recents while online, even though it's a proper foreground
+          # service with its own persistent notification. Apps like
+          # Swiggy's driver app survive a swipe for exactly this reason:
+          # their equivalent service is declared with stopWithTask="false".
+          # `tools:node="merge"` matches this <service> to the plugin's own
+          # declaration (matched by android:name) during Gradle's manifest
+          # merge and adds/overrides just this one attribute, leaving the
+          # plugin's own <service> otherwise untouched.
+          if ! grep -q 'xmlns:tools=' "$MANIFEST"; then
+            sed -i 's#<manifest xmlns:android="http://schemas.android.com/apk/res/android"#<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools"#' "$MANIFEST"
+          fi
+          if ! grep -q 'android:stopWithTask="false"' "$MANIFEST"; then
+            python3 - "$MANIFEST" << 'PYEOF'
+          import sys
+          path = sys.argv[1]
+          with open(path) as f:
+              content = f.read()
+          injection = '''
+              <service
+                  android:name="com.capgo.capacitor_background_geolocation.BackgroundGeolocationService"
+                  android:stopWithTask="false"
+                  tools:node="merge" />
+          </application>'''
+          content = content.replace('</application>', injection, 1)
+          with open(path, 'w') as f:
+              f.write(content)
+          PYEOF
+          fi
+
       - name: Generate app icon from resources/icon.png
         run: |
           npm install -D @capacitor/assets --legacy-peer-deps
