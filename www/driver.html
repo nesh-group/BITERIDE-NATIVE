@@ -1201,6 +1201,12 @@ function hasBackgroundGeolocationPlugin() {
 function handleDriverLocationFix(latitude, longitude) {
   state.myLocation = { lat: latitude, lng: longitude, updatedAt: Date.now() };
   renderHomeLists();
+  // Tell the native health-check Worker "tracking is alive right now" —
+  // see DriverTrackingPlugin.recordHeartbeat(). Safe no-op on web/if the
+  // plugin isn't registered (e.g. running outside the native app).
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DriverTrackingPlugin) {
+    Promise.resolve(window.Capacitor.Plugins.DriverTrackingPlugin.recordHeartbeat()).catch(() => {});
+  }
   // Bail out BEFORE touching lastLocationWriteAt when we can't actually
   // write yet (e.g. a GPS fix arrives before login/Firebase are ready) —
   // otherwise this "spends" the 10s throttle window on a fix that never
@@ -1269,15 +1275,16 @@ function startLocationTracking() {
   // this safe either way — if it's already a promise, this just adopts
   // it; if it's undefined, .then() below still fires normally instead of
   // throwing "start(...).then is not a function".
+  const bgOptions = {
+    backgroundMessage: 'Sharing your location so riders can be matched with you.',
+    backgroundTitle: 'NESH Driver — Online',
+    requestPermissions: true,
+    stale: false,
+    distanceFilter: 15, // metres — filters out GPS jitter while stopped
+  };
   Promise.resolve(
     BackgroundGeolocation.start(
-      {
-        backgroundMessage: 'Sharing your location so riders can be matched with you.',
-        backgroundTitle: 'NESH Driver — Online',
-        requestPermissions: true,
-        stale: false,
-        distanceFilter: 15, // metres — filters out GPS jitter while stopped
-      },
+      bgOptions,
       (location, error) => {
         if (error) { console.warn('Background location error:', error); return; }
         if (!location) return;
@@ -1340,6 +1347,16 @@ function closeBgLocationModal() {
   if (bgLocationModalEl) bgLocationModalEl.classList.remove('show');
 }
 
+// Tells the native side (DriverTrackingPlugin) whether the driver should
+// currently be tracked, so the WorkManager health-check knows what "should
+// be online" means and can schedule/cancel itself accordingly. Safe no-op
+// on web/outside the native app.
+function setNativeOnlineState(online) {
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DriverTrackingPlugin) {
+    Promise.resolve(window.Capacitor.Plugins.DriverTrackingPlugin.setOnlineState({ online: !!online })).catch(() => {});
+  }
+}
+
 // Actually marks the driver online — writes isOnline:true to Firebase and
 // (re)starts tracking. Only ever called once "Allow all the time" is
 // confirmed granted (see checkBackgroundLocationPermission), so a driver
@@ -1350,6 +1367,7 @@ function finalizeGoOnline(opts) {
   document.getElementById('online-toggle-input').checked = true;
   updateOnlineLabel();
   try { localStorage.setItem('nesh_driver_online_' + state.username, '1'); } catch (err) {}
+  setNativeOnlineState(true);
   renderHomeLists();
   try {
     const { db, ref, update } = window.fb;
@@ -1367,6 +1385,7 @@ function revertOnlineToggle() {
   document.getElementById('online-toggle-input').checked = false;
   updateOnlineLabel();
   try { localStorage.setItem('nesh_driver_online_' + state.username, '0'); } catch (err) {}
+  setNativeOnlineState(false);
   stopLocationTracking();
   refreshRidePopupFromCache();
   renderHomeLists();
@@ -3310,6 +3329,7 @@ document.getElementById('online-toggle-input').addEventListener('change', (e) =>
   state.isOnline = false;
   updateOnlineLabel();
   try { localStorage.setItem('nesh_driver_online_' + state.username, '0'); } catch (err) {}
+  setNativeOnlineState(false);
   stopLocationTracking();
   closeBgLocationModal();
   closeBatteryModal();
