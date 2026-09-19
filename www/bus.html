@@ -188,6 +188,20 @@
       <p style="margin:0; font-weight:700; color:var(--ink); font-size:15px;">Recorded points: <span id="route-point-count">0</span></p>
       <div id="route-status-pill" class="status-pill status-off" style="margin-top:8px;">● Not recording</div>
     </div>
+
+    <p class="section-label">DRAW ON MAP</p>
+    <p class="hint-text" style="margin:0 0 10px;">Tap the map to plot the route point by point, in order from start to end. Right after tapping a point, use "Add stop here" to place a bus stop at that exact spot.</p>
+    <div class="picker-map-wrap">
+      <div class="picker-map" id="route-draw-map"></div>
+    </div>
+    <p class="hint-text" style="margin:8px 2px 0;">Drawn (not yet saved): <span id="route-draw-count">0</span> point(s)</p>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <button class="btn-secondary" id="route-draw-undo-btn" style="margin-top:0; flex:1;">↩ Undo last point</button>
+      <button class="btn-secondary" id="route-draw-addstop-btn" style="margin-top:0; flex:1;" disabled>📍 Add stop here</button>
+    </div>
+    <button class="btn-primary" id="route-draw-save-btn" style="margin-top:10px;">💾 Save drawn route</button>
+
+    <p class="section-label">OR RECORD BY DRIVING</p>
     <button class="btn-primary" id="route-record-btn">▶ Start recording route</button>
     <button class="btn-danger-text" id="route-clear-btn" style="margin-top:14px;">🗑 Clear recorded route</button>
   </section>
@@ -286,6 +300,19 @@
   const SEND_INTERVAL_MS = 20000;
   const HEARTBEAT_MS = 60000;
 
+  // If the OS killed the app while it was supposed to be tracking (OEM
+  // battery kill, low-memory kill, or the health-check notification just
+  // reopened it), Firebase's onDisconnect already flipped onDuty to false —
+  // so we can't rely on Firebase to know the bus WANTED to be online.
+  // localStorage survives that and drives the resume, same as driver.html.
+  if (busId) {
+    try {
+      if (localStorage.getItem('nesh_bus_online_' + busId) === '1') {
+        setTimeout(() => startTracking(), 300);
+      }
+    } catch (e) {}
+  }
+
   function setStatusUI(onDuty) {
     statusPill.textContent = onDuty ? '● Live now' : '● Offline';
     statusPill.className = 'status-pill ' + (onDuty ? 'status-live' : 'status-off');
@@ -308,6 +335,13 @@
   }
 
   function sendLocation(lat, lng, speed) {
+    // Tell the native health-check Worker "tracking is alive right now" —
+    // same DriverTrackingPlugin used by the driver app, registered
+    // app-wide, so it also revives bus tracking if Android kills the
+    // background service while the app is closed.
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DriverTrackingPlugin) {
+      Promise.resolve(window.Capacitor.Plugins.DriverTrackingPlugin.recordHeartbeat()).catch(() => {});
+    }
     const now = Date.now();
     if (now - lastSentAt < SEND_INTERVAL_MS) return;
     lastSentAt = now;
@@ -329,6 +363,11 @@
     onDisconnect(ref(db, 'buses/' + busId + '/onDuty')).set(false);
     setStatusUI(true);
     startHeartbeat();
+    try { localStorage.setItem('nesh_bus_online_' + busId, '1'); } catch (e) {}
+
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DriverTrackingPlugin) {
+      Promise.resolve(window.Capacitor.Plugins.DriverTrackingPlugin.setOnlineState({ online: true })).catch(() => {});
+    }
 
     const BG = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation;
     if (BG) {
@@ -366,6 +405,10 @@
     if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
     const BG = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation;
     if (BG && bgWatcherId) { BG.removeWatcher({ id: bgWatcherId }); bgWatcherId = null; }
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DriverTrackingPlugin) {
+      Promise.resolve(window.Capacitor.Plugins.DriverTrackingPlugin.setOnlineState({ online: false })).catch(() => {});
+    }
+    try { if (busId) localStorage.setItem('nesh_bus_online_' + busId, '0'); } catch (e) {}
     stopHeartbeat();
     releaseWakeLock();
     if (busId) set(ref(db, 'buses/' + busId + '/onDuty'), false);
@@ -635,8 +678,86 @@
     showScreen('route');
     setRouteUI();
     watchRoutePointCount();
+    setTimeout(() => {
+      ensureRouteDrawMap();
+      routeDrawMap.invalidateSize();
+      centerRouteDrawMapOnGps();
+    }, 60);
   });
   document.getElementById('route-back-btn').addEventListener('click', () => showScreen('home'));
+
+  // ---------- Draw route on map (alternative to driving + GPS recording) ----------
+  // Operator taps the map to plot points in order; each tap both extends the
+  // route polyline AND can optionally be saved as a bus stop at that exact
+  // spot via "Add stop here". Saving writes to the same buses/{busId}/routePoints
+  // path the GPS recorder uses, so the rest of the app (live tracking line)
+  // doesn't need to know which method produced the route.
+  let routeDrawMap = null;
+  let routeDrawPoints = [];
+  let routeDrawMarkers = [];
+  let routeDrawPolyline = null;
+
+  function ensureRouteDrawMap() {
+    if (routeDrawMap) return;
+    routeDrawMap = L.map('route-draw-map', { zoomControl: true, attributionControl: false }).setView([10.5, 76.2], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(routeDrawMap);
+    routeDrawPolyline = L.polyline([], { color: '#C97F00', weight: 4 }).addTo(routeDrawMap);
+    routeDrawMap.on('click', (e) => {
+      routeDrawPoints.push({ lat: e.latlng.lat, lng: e.latlng.lng });
+      const marker = L.circleMarker(e.latlng, { radius: 6, color: '#C97F00', weight: 2, fillColor: '#F2B705', fillOpacity: 1 }).addTo(routeDrawMap);
+      routeDrawMarkers.push(marker);
+      routeDrawPolyline.setLatLngs(routeDrawPoints.map(p => [p.lat, p.lng]));
+      updateRouteDrawCount();
+    });
+  }
+
+  function centerRouteDrawMapOnGps() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(pos => {
+      routeDrawMap.setView([pos.coords.latitude, pos.coords.longitude], 15);
+    }, () => {}, { enableHighAccuracy: true, timeout: 15000 });
+  }
+
+  function updateRouteDrawCount() {
+    document.getElementById('route-draw-count').textContent = routeDrawPoints.length;
+    document.getElementById('route-draw-addstop-btn').disabled = routeDrawPoints.length === 0;
+  }
+
+  document.getElementById('route-draw-undo-btn').addEventListener('click', () => {
+    if (!routeDrawPoints.length) return;
+    routeDrawPoints.pop();
+    const m = routeDrawMarkers.pop();
+    if (m) routeDrawMap.removeLayer(m);
+    routeDrawPolyline.setLatLngs(routeDrawPoints.map(p => [p.lat, p.lng]));
+    updateRouteDrawCount();
+  });
+
+  document.getElementById('route-draw-addstop-btn').addEventListener('click', () => {
+    if (!routeDrawPoints.length) return;
+    const last = routeDrawPoints[routeDrawPoints.length - 1];
+    const name = prompt('Name this bus stop:');
+    if (!name || !name.trim()) return;
+    const stopsRef = ref(db, 'buses/' + busId + '/stops');
+    onValue(stopsRef, snap => {
+      const count = Object.keys(snap.val() || {}).length;
+      set(push(stopsRef), { name: name.trim(), lat: last.lat, lng: last.lng, order: count });
+    }, { onlyOnce: true });
+    const marker = routeDrawMarkers[routeDrawMarkers.length - 1];
+    if (marker) marker.setStyle({ fillColor: '#2B7A2B', radius: 8 });
+  });
+
+  document.getElementById('route-draw-save-btn').addEventListener('click', () => {
+    if (!routeDrawPoints.length) { alert('Tap the map to plot at least one point first.'); return; }
+    if (!confirm('Save this drawn route? It will replace any existing recorded route line.')) return;
+    remove(ref(db, 'buses/' + busId + '/routePoints')).then(() => {
+      const routeRef = ref(db, 'buses/' + busId + '/routePoints');
+      routeDrawPoints.forEach((p, i) => {
+        push(routeRef, { lat: p.lat, lng: p.lng, seq: i, ts: Date.now() });
+      });
+      routeSeq = routeDrawPoints.length;
+      alert('Route saved ✓');
+    });
+  });
 
   document.getElementById('route-record-btn').addEventListener('click', () => {
     if (!routeRecording) {
