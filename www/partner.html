@@ -1619,6 +1619,12 @@
       <input type="text" id="op-notify-title-input" placeholder="Title (e.g. 🎉 20% off today!)" maxlength="60" style="width:100%;padding:10px;background:#0b0f19;color:#e2e8f0;border:1px solid #334155;font-size:.85rem;margin-bottom:10px;">
       <textarea id="op-notify-body-input" placeholder="Message body..." style="height:100px;" maxlength="150"></textarea>
       <input type="text" id="op-notify-image-input" placeholder="Image URL (optional — shown as a big picture in the notification)" style="width:100%;padding:10px;background:#0b0f19;color:#e2e8f0;border:1px solid #334155;font-size:.85rem;margin-top:10px;">
+      <div style="margin-top:8px;display:flex;align-items:center;gap:10px;">
+        <input type="file" id="op-notify-image-file" accept="image/*" style="display:none;" onchange="opHandleNotifyImageUpload(event)">
+        <button type="button" class="op-btn" style="width:auto;padding:8px 14px;font-size:.8rem;" onclick="document.getElementById('op-notify-image-file').click()">📷 Upload photo</button>
+        <span id="op-notify-image-status" class="op-note" style="margin:0;"></span>
+      </div>
+      <img id="op-notify-image-preview" style="display:none;max-width:120px;max-height:120px;border-radius:6px;margin-top:8px;border:1px solid #334155;">
       <div>
         <button type="button" class="op-btn op-btn-push" onclick="opSendBroadcastNotification()">📢 Send to all customers</button>
       </div>
@@ -3481,6 +3487,26 @@ async function resizeImageToBlob(imgEl, maxDim, quality) {
   canvas.getContext('2d').drawImage(imgEl, 0, 0, w, h);
   return canvasToBlob(canvas, quality);
 }
+async function opHandleNotifyImageUpload(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('op-notify-image-status');
+  const preview = document.getElementById('op-notify-image-preview');
+  const urlInput = document.getElementById('op-notify-image-input');
+  status.textContent = 'Uploading…';
+  try {
+    const url = await uploadPhotoToCloudinary(file);
+    urlInput.value = url;
+    preview.src = url;
+    preview.style.display = 'block';
+    status.textContent = '✅ Uploaded';
+  } catch (err) {
+    status.textContent = '❌ Upload failed, try again';
+  } finally {
+    e.target.value = '';
+  }
+}
+
 async function uploadPhotoToCloudinary(blob) {
   const formData = new FormData();
   formData.append('file', blob);
