@@ -108,6 +108,8 @@
         <span class="slider"></span>
       </label>
     </div>
+    <button class="btn-secondary" id="fix-background-limits-btn">🔋 Fix background tracking limits</button>
+    <p class="hint-text" style="margin:4px 2px 14px;">Some phones (Realme, Oppo, Vivo, Xiaomi) stop location sharing when the app is swiped away, unless Auto-start is turned on for this app. Tap above to open that setting.</p>
     <button class="btn-secondary" id="manage-stops-btn">🚏 Manage Stops (<span id="stops-count">0</span>)</button>
     <button class="btn-secondary" id="manage-trips-btn">🕐 Trip Timings (<span id="trips-count">0</span>)</button>
     <button class="btn-secondary" id="manage-route-btn">🗺️ Route Line</button>
@@ -417,6 +419,22 @@
 
   toggle.addEventListener('change', () => {
     if (toggle.checked) startTracking(); else stopTracking();
+  });
+
+  // Jumps straight to this phone brand's own Auto-start manager screen
+  // (Xiaomi/Vivo/Oppo/Realme/Huawei/Samsung/etc.) when supported — same
+  // DontKillMyApp plugin driver.html uses, registered app-wide. Android has
+  // no API to check or request this permission, so this can only open the
+  // right settings screen; the operator still has to flip the switch there.
+  document.getElementById('fix-background-limits-btn').addEventListener('click', () => {
+    const DKMA = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DontKillMyApp;
+    if (DKMA) {
+      Promise.resolve(DKMA.requestAutoStart()).catch(() => {
+        Promise.resolve(DKMA.openAppInfo()).catch(() => {});
+      });
+    } else {
+      alert('Open Settings → Battery / Apps → NESH, and turn on Auto-start and "No restrictions" background activity.');
+    }
   });
 
   document.addEventListener('visibilitychange', () => {
