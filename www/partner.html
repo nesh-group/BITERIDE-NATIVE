@@ -196,6 +196,7 @@
   .pill-pending{ background:#F3D9AE; color:#8A5A0F; }
   .pill-preparing{ background:#CFE0D6; color:#2C4A37; }
   .pill-ready{ background:#BFE3F0; color:#1C5A70; }
+  .pill-picked_up{ background:#D8CFF0; color:#4A2C7A; }
   .pill-delivered{ background:#D6D0C4; color:#4A463D; }
   .pill-cancelled{ background:#EFC3BA; color:#7A2A1D; }
 
@@ -1487,6 +1488,11 @@
           <h3>Driver Zones</h3>
           <p>Create and manage the named zones drivers pick from at registration</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('go-series')">
+          <div class="op-home-icon">🚚</div>
+          <h3>Go Series</h3>
+          <p>Delivery charge &amp; shop list</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('taxi-fare')">
           <div class="op-home-icon">🛺</div>
           <h3>Taxi Fare</h3>
@@ -1833,6 +1839,44 @@
         <input type="text" id="op-buses-search" placeholder="Search buses…" oninput="opRenderBusesList()">
       </div>
       <div id="op-buses-list" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- GO SERIES — a separate delivery-charge (base fee + per-km) that applies
+       only to shops explicitly added to the Go Series list below. Any shop
+       NOT on this list keeps using its own Delivery Charges screen as before,
+       completely unaffected. Order assignment to a bike delivery driver
+       already happens the same way for every shop (see the Restaurant
+       Partners → Assigned delivery boy / normal nearest-free-bike matching
+       in driver.html) — Go Series only changes which delivery-fee numbers
+       are used for the shops on this list. -->
+  <div class="op-section" id="op-section-go-series">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Go Series</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Set one delivery charge (base fee + per-km rate) here that applies ONLY to shops you add to the Go Series list below. Every other shop keeps using its own Delivery Charges setting, unaffected.</p>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="number" id="op-goseries-basefee-input" placeholder="Fixed/base charge in ₹ (e.g. 20)" min="0" step="0.5">
+      </div>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="number" id="op-goseries-perkm-input" placeholder="Per-km rate in ₹ (e.g. 5)" min="0" step="0.5">
+      </div>
+      <div>
+        <button type="button" class="op-btn op-btn-push" onclick="opSaveGoSeriesFare()">💾 Save charge</button>
+      </div>
+      <p class="op-note" id="op-goseries-fare-status" style="margin-top:10px;"></p>
+
+      <h2 style="margin-top:22px;">Go Series Shops</h2>
+      <p class="op-note">Shops added here use the Go Series charge above instead of their own Delivery Charges — everything else about the shop (menu, orders, delivery-boy assignment) works exactly as before.</p>
+      <div class="op-search-box" style="margin-bottom:6px;">
+        <input type="text" id="op-goseries-shop-search" placeholder="Search shops to add..." oninput="opRenderGoSeriesShopPicker()">
+      </div>
+      <div id="op-goseries-shop-picker" style="max-height:220px; overflow-y:auto; margin-bottom:14px;"></div>
+
+      <h2 style="margin-top:18px;">Currently in Go Series</h2>
+      <div id="op-goseries-shop-list" style="margin-top:10px;"></div>
     </div>
   </div>
 
@@ -2559,6 +2603,12 @@ async function handlePopupOrderAction(orderId, action) {
       const snap = await get(orderRef);
       const orderData = snap.val() || {};
       notifyCustomerOrderStatus(orderData, orderId, 'Order confirmed!', (state.restaurant && state.restaurant.name || 'Restaurant') + ' is preparing your order.');
+      // Delivery boy is now searched for right away, the moment the shop
+      // accepts — same as a taxi ride starts looking for a driver the
+      // moment it's requested, instead of waiting until the order is
+      // physically ready. The driver can head toward the shop while the
+      // order is still being prepared.
+      routeAndBroadcastDelivery(orderId, orderData);
     } catch (e) {}
   } catch (e) {}
   showToast("Order accepted");
@@ -4616,8 +4666,22 @@ function renderOrderDetail(o) {
   actionsEl.innerHTML = "";
   const buttons = [];
   if (status === 'preparing') buttons.push({ label: 'Mark as ready', cls: 'ready', next: 'ready' });
-  if (status === 'ready') buttons.push({ label: 'Mark as delivered', cls: 'delivered', next: 'delivered' });
-  if (status !== 'delivered' && status !== 'cancelled' && status !== 'rejected' && status !== 'ready') {
+  // Once the shop marks an order ready, the rest of the journey (picked up,
+  // delivered) is handled entirely from the delivery boy's own app — the
+  // shop's job ends here.
+  // Go Series shops (flagged by the operator: restaurants/{id}.goSeries) do
+  // NOT get a shop-side "Mark as delivered" — every other shop does.
+  const isGoSeriesShop = !!(state.restaurant && state.restaurant.goSeries);
+  if (status === 'ready' || status === 'picked_up') {
+    const note = document.createElement('p');
+    note.className = 'op-note';
+    note.textContent = status === 'picked_up'
+      ? 'Picked up by the delivery boy — they\'ll mark it delivered once it reaches the customer.'
+      : 'Waiting for the delivery boy to pick this up.';
+    actionsEl.appendChild(note);
+    if (!isGoSeriesShop) buttons.push({ label: 'Mark as delivered', cls: 'delivered', next: 'delivered' });
+  }
+  if (status !== 'delivered' && status !== 'cancelled' && status !== 'rejected' && status !== 'ready' && status !== 'picked_up') {
     buttons.push({ label: 'Cancel order', cls: 'cancel', next: 'cancelled' });
   }
 
@@ -4640,13 +4704,13 @@ async function updateOrderStatus(id, newStatus, orderData) {
   try {
     const { db, ref, update } = window.fb;
     const updates = { status: newStatus };
-    // If this shop has a dedicated bike delivery boy (set by the operator
-    // in the Restaurant Partners screen), route this order to them only —
-    // same assignedDriverIds field the driver app already treats as an
-    // override for manually-assigned orders, so no driver-side change needed.
-    // A manual per-order assignment (see shopAssignDeliveryBoy, below)
-    // already set assignedDriverIds directly, so don't clobber that here.
-    if (newStatus === 'ready' && !orderData?.assignedDriverId && !orderData?.assignedDriverIds && state.restaurant && state.restaurant.dedicatedDriverId) {
+    // Delivery routing normally already happened when the shop accepted
+    // the order (see routeAndBroadcastDelivery, called from
+    // handlePopupOrderAction). This is only a fallback for orders that
+    // reach "ready" with no driver routed or claimed yet — e.g. older
+    // orders, or ones accepted before this feature existed.
+    const alreadyRouted = orderData?.assignedDriverId || orderData?.assignedDriverIds || orderData?.deliveryDriverId;
+    if (newStatus === 'ready' && !alreadyRouted && state.restaurant && state.restaurant.dedicatedDriverId) {
       const did = state.restaurant.dedicatedDriverId;
       updates.assignedDriverIds = { [did]: true };
       updates.assignedDriverNames = { [did]: state.restaurant.dedicatedDriverName || did };
@@ -4654,7 +4718,7 @@ async function updateOrderStatus(id, newStatus, orderData) {
     await update(ref(db, 'restaurants/' + state.restId + '/orders/' + id), updates);
     showToast("Order marked as " + newStatus);
     if (newStatus === 'cancelled') playCancelAlert();
-    if (newStatus === 'ready') broadcastDeliveryJobToDrivers(id, orderData || {});
+    if (newStatus === 'ready' && !alreadyRouted) broadcastDeliveryJobToDrivers(id, orderData || {});
     if (newStatus === 'preparing') notifyCustomerOrderStatus(orderData || {}, id, 'Order confirmed!', (state.restaurant && state.restaurant.name || 'Restaurant') + ' is preparing your order.');
     if (newStatus === 'delivered') notifyCustomerOrderStatus(orderData || {}, id, 'Order delivered!', 'Your order from ' + (state.restaurant && state.restaurant.name || 'the restaurant') + ' has been delivered. Enjoy your meal!');
   } catch (e) {
@@ -4688,7 +4752,7 @@ function listenShopBikeDrivers() {
 function renderAssignBlock(o) {
   const block = document.getElementById('od-assign-block');
   const status = o.status || 'pending';
-  if (status === 'delivered' || status === 'cancelled' || status === 'rejected') {
+  if (status === 'delivered' || status === 'cancelled' || status === 'rejected' || status === 'picked_up') {
     block.style.display = "none";
     return;
   }
@@ -4821,6 +4885,23 @@ function notifyCustomerOrderStatus(o, orderId, title, body) {
 // every online driver (any vehicle type) the same way ride requests are
 // broadcast in the driver app — whichever driver taps Accept first gets
 // the delivery. Never blocks or fails the "mark ready" action on this.
+// Routes the order to the shop's dedicated bike driver (if one is set and
+// nobody's been manually assigned already) and pings bike drivers with the
+// job. Called the moment the shop accepts the order (status -> 'preparing')
+// so a delivery boy starts heading over while the order is still being
+// made — not held back until it's physically ready.
+function routeAndBroadcastDelivery(orderId, orderData) {
+  const { db, ref, update } = window.fb;
+  if (!orderData?.assignedDriverId && !orderData?.assignedDriverIds && !orderData?.deliveryDriverId && state.restaurant && state.restaurant.dedicatedDriverId) {
+    const did = state.restaurant.dedicatedDriverId;
+    update(ref(db, 'restaurants/' + state.restId + '/orders/' + orderId), {
+      assignedDriverIds: { [did]: true },
+      assignedDriverNames: { [did]: state.restaurant.dedicatedDriverName || did },
+    }).catch(() => {});
+  }
+  broadcastDeliveryJobToDrivers(orderId, orderData || {});
+}
+
 function broadcastDeliveryJobToDrivers(orderId, o) {
   fetch('https://broad-paper-6445.raise3715.workers.dev', {
     method: 'POST',
@@ -4974,7 +5055,7 @@ function listenOrdersBadge() {
       const status = o.status || 'pending';
       allOrders[child.key] = o;
       if (status === 'pending') pendingList.push({ _id: child.key, ...o });
-      if (status === 'preparing' || status === 'ready') inProgressList.push({ _id: child.key, ...o });
+      if (status === 'preparing' || status === 'ready' || status === 'picked_up') inProgressList.push({ _id: child.key, ...o });
       if (state.selectedOrderId && child.key === state.selectedOrderId) openOrder = { _id: child.key, ...o };
     });
     pendingList.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
@@ -5016,7 +5097,7 @@ function listenOrdersBadge() {
 // gross due and settlements — are summed fresh from Firebase every time
 // either changes, so there's nothing to keep in sync by hand and no risk
 // of double-counting.
-const DUE_QUALIFYING_STATUSES = ['ready', 'out_for_delivery', 'out-for-delivery', 'dispatched', 'on_the_way', 'on-the-way', 'delivered', 'completed', 'done'];
+const DUE_QUALIFYING_STATUSES = ['ready', 'picked_up', 'out_for_delivery', 'out-for-delivery', 'dispatched', 'on_the_way', 'on-the-way', 'delivered', 'completed', 'done'];
 let dueGrossTotal = 0;
 let dueOrderCount = 0;
 let dueSettlements = [];
@@ -5603,6 +5684,7 @@ function opOpenSection(name) {
   if (name === 'support') opRenderChatConvList();
   if (name === 'pricing') opLoadExtraAmount();
   if (name === 'taxi-fare') opLoadTaxiFare();
+  if (name === 'go-series') opLoadGoSeries();
   if (name === 'report') opRenderReportShopList();
   if (name === 'orders') {
     opRenderOrdersList();
@@ -5805,6 +5887,115 @@ function opSaveTaxiFare() {
     const feeMsg = platformFee > 0 ? ('₹' + platformFee + ' platform fee/ride') : 'no platform fee (off)';
     status.textContent = 'Saved — ' + perKmMsg + ', ' + feeMsg + '.';
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+/* ---- Go Series: a separate delivery charge (base fee + per-km) that
+   applies ONLY to shops added to the Go Series list below. Charge is stored
+   at app_config/goSeriesDelivery = { baseFee, perKmFee, updatedAt }. Which
+   shops it applies to is stored per-shop as restaurants/{id}.goSeries=true —
+   the customer app's currentDeliveryFee() checks that flag and, if set,
+   uses this charge instead of the shop's own deliveryCharges. Any shop
+   without the flag is completely unaffected — same as before this feature
+   existed. Delivery-driver assignment (nearest-free-bike / dedicated
+   driver) is unchanged either way — see updateOrderStatus() and
+   driver.html's deliveryMatchFn. */
+function opLoadGoSeries() {
+  const status = document.getElementById('op-goseries-fare-status');
+  status.textContent = 'Loading current settings...';
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'app_config/goSeriesDelivery')).then(snap => {
+    const data = snap.val();
+    document.getElementById('op-goseries-basefee-input').value = (data && Number(data.baseFee)) || 0;
+    document.getElementById('op-goseries-perkm-input').value = (data && Number(data.perKmFee)) || 0;
+    status.textContent = data && data.updatedAt ? ('Last updated ' + data.updatedAt + '.') : 'Not set yet.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+  document.getElementById('op-goseries-shop-search').value = '';
+  opRenderGoSeriesShopPicker();
+  opRenderGoSeriesShopList();
+}
+function opSaveGoSeriesFare() {
+  const baseFeeInput = document.getElementById('op-goseries-basefee-input');
+  const perKmInput = document.getElementById('op-goseries-perkm-input');
+  const status = document.getElementById('op-goseries-fare-status');
+  const baseFee = Number(baseFeeInput.value);
+  const perKmFee = Number(perKmInput.value);
+  if (isNaN(baseFee) || baseFee < 0 || isNaN(perKmFee) || perKmFee < 0) {
+    status.textContent = 'Enter valid amounts (0 or more).';
+    return;
+  }
+  status.textContent = 'Saving...';
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'app_config/goSeriesDelivery'), {
+    baseFee,
+    perKmFee,
+    updatedAt: new Date().toLocaleString()
+  }).then(() => {
+    status.textContent = 'Saved — ₹' + baseFee + ' + ₹' + perKmFee + '/km for every Go Series shop.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+// Search-to-add picker: lists shops NOT currently in Go Series, filtered by
+// the search box, each with an "Add" button.
+function opRenderGoSeriesShopPicker() {
+  const wrap = document.getElementById('op-goseries-shop-picker');
+  if (!wrap) return;
+  const q = (document.getElementById('op-goseries-shop-search').value || '').trim().toLowerCase();
+  const shops = opAllPartners
+    .filter(p => !p.goSeries)
+    .filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q))
+    .sort((a, b) => (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id));
+  if (!shops.length) {
+    wrap.innerHTML = '<p class="op-note">' + (q ? 'No matching shops.' : 'Every shop is already in Go Series, or no shops yet.') + '</p>';
+    return;
+  }
+  wrap.innerHTML = shops.slice(0, 40).map(p => `
+    <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</div>
+        <div class="op-partner-sub">${escapeHtml(opTypeLabel(p.businessType))}</div>
+      </div>
+      <button type="button" class="op-btn op-btn-push" style="margin:0;" onclick="opAddShopToGoSeries('${p._id}')">➕ Add</button>
+    </div>
+  `).join('');
+}
+// Shops currently flagged goSeries=true, each with a "Remove" button.
+function opRenderGoSeriesShopList() {
+  const wrap = document.getElementById('op-goseries-shop-list');
+  if (!wrap) return;
+  const shops = opAllPartners
+    .filter(p => p.goSeries)
+    .sort((a, b) => (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id));
+  if (!shops.length) {
+    wrap.innerHTML = '<p class="op-note">No shops added yet.</p>';
+    return;
+  }
+  wrap.innerHTML = shops.map(p => `
+    <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</div>
+        <div class="op-partner-sub">${escapeHtml(opTypeLabel(p.businessType))}</div>
+      </div>
+      <button type="button" class="op-btn op-btn-danger" style="margin:0;" onclick="opRemoveShopFromGoSeries('${p._id}')">✕ Remove</button>
+    </div>
+  `).join('');
+}
+function opAddShopToGoSeries(id) {
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'restaurants/' + id), { goSeries: true }).then(() => {
+    const p = opAllPartners.find(x => x._id === id);
+    if (p) p.goSeries = true;
+    document.getElementById('op-goseries-shop-search').value = '';
+    opRenderGoSeriesShopPicker();
+    opRenderGoSeriesShopList();
+  }).catch(err => alert('Error: ' + err.message));
+}
+function opRemoveShopFromGoSeries(id) {
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'restaurants/' + id), { goSeries: null }).then(() => {
+    const p = opAllPartners.find(x => x._id === id);
+    if (p) p.goSeries = false;
+    opRenderGoSeriesShopPicker();
+    opRenderGoSeriesShopList();
+  }).catch(err => alert('Error: ' + err.message));
 }
 
 /* ---- Push App Update ---- */
@@ -6880,8 +7071,8 @@ function opPopulateDriverZoneSelect() {
   sel.innerHTML = '<option value="">— No zone —</option>' + opAllZones.map(z => `<option value="${z._id}" ${d && d.zone === z._id ? 'selected' : ''}>${escapeHtml(z.name || '')}</option>`).join('');
 }
 // Builds the "assign order" dropdown from currently pending/unclaimed work:
-// taxi rides still 'searching', and shop delivery orders that are 'ready'
-// but not yet claimed by any driver. Sourced from opAllPartners (which
+// taxi rides still 'searching', and shop delivery orders that are
+// 'preparing' or 'ready' but not yet claimed by any driver. Sourced from opAllPartners (which
 // already carries every restaurant's nested orders) and opAllRides.
 // Taxi rides show for any driver vehicle type (manual operator override).
 // Shop delivery orders are bike-only, no exceptions — never shown for an
@@ -6900,7 +7091,7 @@ function opPopulateDriverOrderSelect() {
       const orders = p.orders || {};
       Object.keys(orders).forEach(oid => {
         const o = orders[oid];
-        if (o.status === 'ready' && !o.deliveryDriverId) {
+        if (['preparing', 'ready'].includes(o.status) && !o.deliveryDriverId) {
           options.push(`<option value="delivery:${p._id}::${oid}">📦 Delivery (Bike) · ${escapeHtml(p.restaurantName || 'Shop')} · ${escapeHtml(o.orderNumber || oid)}</option>`);
         }
       });
