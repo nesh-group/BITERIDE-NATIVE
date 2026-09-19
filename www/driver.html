@@ -2197,12 +2197,12 @@ async function handlePopupDeliveryAction(compositeId, action) {
   const [restId, orderId] = compositeId.split('::');
   const { db, ref, get, update } = window.fb;
   try {
-    // Re-check the order is still unclaimed and still ready right before
-    // writing, to shrink the window where two drivers could both tap
-    // Accept on the same delivery.
+    // Re-check the order is still unclaimed and still open (accepted while
+    // preparing, or already ready) right before writing, to shrink the
+    // window where two drivers could both tap Accept on the same delivery.
     const snap = await get(ref(db, 'restaurants/' + restId + '/orders/' + orderId));
     const order = snap.val();
-    if (!order || order.status !== 'ready' || order.deliveryDriverId) {
+    if (!order || !['preparing', 'ready'].includes(order.status) || order.deliveryDriverId) {
       showToast("That delivery was already taken");
       refreshRidePopupFromCache();
       return;
@@ -2503,11 +2503,11 @@ let lastSyncedBusy = null;
 
 // True while this driver has a ride actively assigned to them (accepted/
 // arriving/ontrip) or a delivery they've accepted that hasn't been marked
-// delivered yet.
+// delivered yet (whether the shop's still preparing it or it's ready).
 function computeAmIBusy() {
   const busyRide = Object.values(ridesCache).some(r => r.driverId === state.username && ['accepted', 'arriving', 'ontrip'].includes(normalizeRideStatus(r.status)));
   if (busyRide) return true;
-  return deliveriesCache.some(o => o.deliveryDriverId === state.username && o.status === 'ready');
+  return deliveriesCache.some(o => o.deliveryDriverId === state.username && ['preparing', 'ready', 'picked_up'].includes(o.status));
 }
 
 // Keeps taxi_drivers/{username}.isBusy in sync so OTHER drivers' apps can
@@ -2580,7 +2580,7 @@ function refreshRidePopupFromCache() {
   const deliveryMatchFn = d => d.isOnline === true && d.vehicleType === 'bike' && (!d.services || d.services.delivery !== false);
   const pendingDeliveries = driverDoesDelivery()
     ? deliveriesCache
-        .filter(o => o.status === 'ready' && !o.deliveryDriverId)
+        .filter(o => ['preparing', 'ready'].includes(o.status) && !o.deliveryDriverId)
         .map(o => Object.assign({}, o, { _id: o._restId + '::' + o._orderId, _kind: 'delivery' }))
         .filter(o => !skippedDeliveryIds.has(o._id))
         // Same operator-assignment bypass as rides, above.
@@ -3485,19 +3485,28 @@ function renderHomeLists() {
   // ---- Delivery jobs (from deliveriesCache, nested under restaurants) ----
   const myDeliveries = deliveriesCache.filter(o => o.deliveryDriverId === state.username);
 
-  const currentDelivery = myDeliveries.find(o => o.status === 'ready');
+  const currentDelivery = myDeliveries.find(o => ['preparing', 'ready', 'picked_up'].includes(o.status));
   const dWrap = document.getElementById('home-current-delivery-wrap');
   dWrap.innerHTML = '';
   if (currentDelivery) {
+    const st = currentDelivery.status;
+    const pillLabel = st === 'picked_up' ? 'picked up' : st === 'ready' ? 'ready for pickup' : 'shop preparing';
     const items = (currentDelivery.items || []).map(it => `${it.qty}x ${it.name}`).join(', ');
     const card = document.createElement('div');
     card.className = 'order-chit';
     card.style.margin = '16px 24px 0';
     card.style.width = 'calc(100% - 48px)';
+    // Ready → driver picks it up from the shop; Picked up → driver hands it
+    // to the customer and marks delivered. Preparing → nothing to do yet.
+    const actionHtml = st === 'ready'
+      ? `<button class="btn-primary" style="margin-top:12px; width:100%;" data-pickup="${currentDelivery._restId}::${currentDelivery._orderId}">Picked up</button>`
+      : st === 'picked_up'
+      ? `<button class="btn-primary" style="margin-top:12px; width:100%;" data-mark-delivered="${currentDelivery._restId}::${currentDelivery._orderId}">Mark as delivered</button>`
+      : `<p class="hint-text" style="margin-top:10px;">Head to the shop — "Picked up" unlocks once they mark it ready.</p>`;
     card.innerHTML = `
       <div class="order-top">
         <p class="order-num">Current delivery${currentDelivery.orderNumber ? ' #' + currentDelivery.orderNumber : ''} · ${currentDelivery._restName || ''}</p>
-        <span class="pill pill-accepted">ready</span>
+        <span class="pill pill-accepted">${pillLabel}</span>
       </div>
       <div class="order-mid">
         <p class="order-cust">${currentDelivery.customerName || 'Customer'}</p>
@@ -3505,10 +3514,15 @@ function renderHomeLists() {
       </div>
       <p style="margin:8px 0 0; color:var(--muted); font-size:13px;">${items || ''}</p>
       <p style="margin:4px 0 0; color:var(--muted); font-size:13px;">${currentDelivery.customerAddress || ''}${currentDelivery.customerPhone ? ' · ' + currentDelivery.customerPhone : ''}</p>
-      <button class="btn-primary" style="margin-top:12px; width:100%;" data-mark-delivered="${currentDelivery._restId}::${currentDelivery._orderId}">Mark as delivered</button>
+      ${actionHtml}
     `;
     dWrap.appendChild(card);
-    card.querySelector('[data-mark-delivered]').addEventListener('click', (e) => {
+    const pickupBtn = card.querySelector('[data-pickup]');
+    if (pickupBtn) pickupBtn.addEventListener('click', (e) => {
+      markDeliveryPickedUp(e.target.dataset.pickup);
+    });
+    const markBtn = card.querySelector('[data-mark-delivered]');
+    if (markBtn) markBtn.addEventListener('click', (e) => {
       markDeliveryDelivered(e.target.dataset.markDelivered);
     });
   }
@@ -3538,6 +3552,33 @@ function renderHomeLists() {
     `;
     dListEl.appendChild(card);
   });
+}
+
+async function markDeliveryPickedUp(compositeId) {
+  const [restId, orderId] = compositeId.split('::');
+  const { db, ref, update, get } = window.fb;
+  try {
+    await update(ref(db, 'restaurants/' + restId + '/orders/' + orderId), { status: 'picked_up' });
+    showToast('Marked as picked up');
+    // Fire-and-forget: let the customer know their order is on the way.
+    get(ref(db, 'restaurants/' + restId + '/orders/' + orderId)).then((snap) => {
+      const o = snap.val() || {};
+      if (!o.customerPhone) return;
+      fetch('https://broad-paper-6445.raise3715.workers.dev', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'customer',
+          customerPhone: o.customerPhone,
+          title: 'Out for delivery!',
+          body: 'Your order has been picked up and is on the way.',
+          orderId, restId,
+        }),
+      }).catch(() => {});
+    }).catch(() => {});
+  } catch (e) {
+    alert("Couldn't update — check your connection and try again.");
+  }
 }
 
 async function markDeliveryDelivered(compositeId) {
