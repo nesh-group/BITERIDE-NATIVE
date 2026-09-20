@@ -519,6 +519,8 @@
   #operator-container .op-zone-search-item .op-zone-search-item-sub{ color:#1f7a3d; font-size:.68rem; margin-top:2px; }
   #operator-container .op-zone-pt-label{ background:none !important; border:none !important; box-shadow:none !important; color:#39ff14 !important; font-size:11px !important; font-weight:bold; }
   #operator-container .op-empty{ padding:24px 10px; text-align:center; color:#1f7a3d; font-size:.85rem; }
+  #operator-container .op-groceries-card{ margin-top:14px; padding:14px; border:1px solid #2d7a3a; background:#04120a; box-shadow:0 0 10px rgba(0,255,65,.08); }
+  #operator-container .op-groceries-card-title{ color:#39ff14; font-size:.85rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid #124a24; }
   /* Operator: Orders (all shops) */
   #operator-container .op-home-badge{ position:absolute; top:10px; right:10px; background:#dc2626; color:#fff; font-size:.66rem; font-weight:700; padding:2px 8px; border-radius:20px; }
   #operator-container .op-order-tabs{ display:flex; gap:8px; margin-bottom:12px; }
@@ -899,6 +901,11 @@
         ⚖️ Change unit for several stock items at once →
       </button>
     </p>
+    <p id="bulk-stock-btn-wrap" style="padding:4px 24px 0; margin:0;">
+      <button class="btn-link" id="bulk-stock-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;">
+        📦 Mark several items in/out of stock at once →
+      </button>
+    </p>
     <p style="padding:4px 24px 0; margin:0;">
       <button class="btn-link" id="indiv-price-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;">
         ✏️ Edit each item's price individually →
@@ -924,6 +931,13 @@
       <button class="add-item-btn" id="bulk-unit-apply-btn" type="button" style="padding:6px 12px; font-size:12px;">Apply to selected</button>
       <button class="btn-link" id="bulk-unit-cancel-btn" type="button" style="width:auto; padding:6px 4px; font-size:12px;">Cancel</button>
       <span id="bulk-unit-status" style="width:100%; font-size:11px; color:#6E8CAE; font-family:'Inter',sans-serif;"></span>
+    </div>
+    <div id="bulk-stock-bar" style="display:none; position:sticky; top:0; z-index:5; margin:6px 24px 0; padding:10px 12px; background:#FFF6E5; border:1px solid var(--marigold); border-radius:10px; align-items:center; gap:8px; flex-wrap:wrap;">
+      <span id="bulk-stock-count" style="font-size:12px; font-family:'Inter',sans-serif; color:#0B2545; font-weight:600;">0 selected</span>
+      <button class="add-item-btn" id="bulk-stock-available-btn" type="button" style="padding:6px 12px; font-size:12px; background:var(--leaf); border-color:var(--leaf); color:#fff;">Mark in stock</button>
+      <button class="add-item-btn" id="bulk-stock-unavailable-btn" type="button" style="padding:6px 12px; font-size:12px; background:var(--chili); border-color:var(--chili); color:#fff;">Mark out of stock</button>
+      <button class="btn-link" id="bulk-stock-cancel-btn" type="button" style="width:auto; padding:6px 4px; font-size:12px;">Cancel</button>
+      <span id="bulk-stock-status" style="width:100%; font-size:11px; color:#6E8CAE; font-family:'Inter',sans-serif;"></span>
     </div>
     <div id="indiv-price-bar" style="display:none; position:sticky; top:0; z-index:5; margin:6px 24px 0; padding:10px 12px; background:#FFF6E5; border:1px solid var(--marigold); border-radius:10px; align-items:center; gap:8px; flex-wrap:wrap;">
       <span style="font-size:12px; font-family:'Inter',sans-serif; color:#0B2545; font-weight:600;">Edit each price, then save</span>
@@ -2242,6 +2256,22 @@
         <p class="op-note" id="op-pm-zone-status" style="margin-bottom:6px;">—</p>
         <button type="button" class="op-btn op-btn-push" id="op-pm-zone-btn" onclick="opOpenShopZoneModal(opCurrentPartnerId)">🗺️ Draw delivery zone</button>
       </div>
+      <div class="op-groceries-card" id="op-pm-groceries-card">
+        <h4 class="op-groceries-card-title">🛒 NESH Store — Groceries Stock</h4>
+        <div style="margin-top:0;" id="op-pm-stockadd-wrap">
+        <p class="op-note" style="margin-bottom:4px;">Let this shop add its own stock — when ON, this shop can add, bulk-import, and re-photo its own items from its own Stock screen (same as Hotel/Other Shop partners), on top of items you add below. When OFF (default for groceries), only you can add new stock items for this shop.</p>
+        <button type="button" class="op-btn op-btn-push" id="op-pm-stockadd-toggle-btn" onclick="opToggleStockAddPermission()"></button>
+        <p class="op-note" id="op-pm-stockadd-status" style="margin-top:4px;"></p>
+      </div>
+      <div style="margin-top:14px;" id="op-pm-availability-wrap">
+        <p class="op-note" style="margin-bottom:4px;">Item availability — mark any item in this shop unavailable (hidden from customers) or available again, without needing the shop's login.</p>
+        <div class="op-search-box" style="margin-bottom:6px;">
+          <input type="text" id="op-pm-avail-search" placeholder="Search item name..." autocomplete="off" oninput="opRenderAvailabilityList()">
+        </div>
+        <button type="button" class="op-btn op-btn-push" id="op-pm-avail-refresh-btn" onclick="opLoadShopItemsForAvailability()">🔄 Load items</button>
+        <p class="op-note" id="op-pm-avail-status" style="margin-top:4px;"></p>
+        <div id="op-pm-avail-list" style="margin-top:8px; max-height:280px; overflow-y:auto;"></div>
+      </div>
       <div style="margin-top:14px;" id="op-pm-add-item-wrap">
         <p class="op-note" style="margin-bottom:4px;">Add item — for groceries partners: the operator only adds the stock item itself (name, photo, unit) to this shop's menu. No price is set here — the shop sets its own price (and marks it available) from its own Stock screen. The customer-facing price is automatically the highest price any shop charges for that item.</p>
         <div class="op-search-box" style="margin-bottom:6px;">
@@ -2260,6 +2290,7 @@
         <button type="button" class="op-btn op-btn-push" onclick="opAddGroceryItem()">➕ Add stock item to this shop</button>
         <p class="op-note" id="op-pm-add-item-status" style="margin-top:4px; display:none;"></p>
         <p class="op-note" style="margin-top:10px;">Added items start priced at ₹0 and marked unavailable, so they never show to customers until the shop opens its Stock screen, sets a real price, and marks the item available.</p>
+      </div>
       </div>
       <div style="margin-top:14px;">
         <p class="op-note" style="margin-bottom:4px;">Bulk import stock — Excel/CSV with Name, Discription, Price, Unit (optional), Photo link (optional). Adds items to this shop's menu.</p>
@@ -2619,7 +2650,7 @@
 
 <script>
 // ---------- State ----------
-let state = { restId: null, restaurant: null, editingItemId: null, photoDataUrl: "", menuItems: [], bulkPriceMode: false, bulkPriceSelected: new Set(), indivPriceMode: false, indivPriceValues: {}, selectedUnit: "piece", bulkUnitMode: false, bulkUnitSelected: new Set() };
+let state = { restId: null, restaurant: null, editingItemId: null, photoDataUrl: "", menuItems: [], bulkPriceMode: false, bulkPriceSelected: new Set(), indivPriceMode: false, indivPriceValues: {}, selectedUnit: "piece", bulkUnitMode: false, bulkUnitSelected: new Set(), bulkStockMode: false, bulkStockSelected: new Set() };
 
 // ---------- STOCK ITEM UNIT (piece / gram / kg) ----------
 // Lets a seller price an item as a flat per-piece price, or as a rate per
@@ -3070,6 +3101,10 @@ function init() {
   document.getElementById('indiv-price-btn').addEventListener('click', enterIndivPriceMode);
   document.getElementById('indiv-price-cancel-btn').addEventListener('click', exitIndivPriceMode);
   document.getElementById('indiv-price-save-btn').addEventListener('click', saveIndivPrices);
+  document.getElementById('bulk-stock-btn').addEventListener('click', enterBulkStockMode);
+  document.getElementById('bulk-stock-cancel-btn').addEventListener('click', exitBulkStockMode);
+  document.getElementById('bulk-stock-available-btn').addEventListener('click', () => applyBulkStock(true));
+  document.getElementById('bulk-stock-unavailable-btn').addEventListener('click', () => applyBulkStock(false));
 
   // Restaurant photo
   document.getElementById('rest-photo-upload-wrap').addEventListener('click', () => document.getElementById('rest-photo-input').click());
@@ -3361,6 +3396,11 @@ function logInRestaurant(id, data) {
   const groceriesShop = isGroceriesShop();
   const bulkUnitBtnWrap = document.getElementById('bulk-unit-btn-wrap');
   if (bulkUnitBtnWrap) bulkUnitBtnWrap.style.display = groceriesShop ? "block" : "none";
+  // "In stock / out of stock" is also a groceries-only concept (see the
+  // per-item "Mark available/unavailable" button below), so the bulk
+  // version of it is hidden for Hotel / Other Shop partners too.
+  const bulkStockBtnWrap = document.getElementById('bulk-stock-btn-wrap');
+  if (bulkStockBtnWrap) bulkStockBtnWrap.style.display = groceriesShop ? "block" : "none";
   // Groceries shops don't set their own delivery charge any more — it's the
   // operator's Go Series charge — so hide that option for them.
   // Groceries shops DO set their own item prices (the operator only adds new
@@ -3372,19 +3412,25 @@ function logInRestaurant(id, data) {
   });
   const dcNavCard = document.getElementById('delivery-charges-nav-card');
   if (dcNavCard) dcNavCard.style.display = groceriesShop ? "none" : "";
-  // Groceries items are added by the operator panel only (NESH Store's
-  // shared catalog) — the shop itself can't add, bulk-import, re-photo, or
-  // re-unit an item, but it DOES set its own price for each item (the
-  // operator's job is only to add the stock item; pricing is the shop's).
+  // Groceries items are normally added by the operator panel only (NESH
+  // Store's shared catalog) — the shop itself can't add, bulk-import,
+  // re-photo, or re-unit an item, but it DOES set its own price for each
+  // item (the operator's job is only to add the stock item; pricing is the
+  // shop's). The operator can flip `allowStockAdd` on for an individual
+  // shop (Operator Panel → that shop → "Let this shop add its own stock")
+  // to lift this restriction just for them, same as Hotel/Other Shop
+  // partners always have it.
+  const canAddOwnStock = !groceriesShop || !!state.restaurant?.allowStockAdd;
   // Hide every item-adding entry point and the per-item edit pencil (which
-  // also edits name/photo/unit) for groceries partners; the "Change price"
-  // and "Edit each item's price individually" tools below stay visible so
-  // the shop can price what the operator has added.
+  // also edits name/photo/unit) unless this shop is allowed to add its own
+  // stock; the "Change price" and "Edit each item's price individually"
+  // tools below stay visible either way so the shop can price what the
+  // operator (or the shop itself) has added.
   const addItemActions = document.getElementById('menu-add-item-actions');
-  if (addItemActions) addItemActions.style.display = groceriesShop ? "none" : "flex";
+  if (addItemActions) addItemActions.style.display = canAddOwnStock ? "flex" : "none";
   const bulkPhotoBtn = document.getElementById('bulk-photo-btn');
-  if (bulkPhotoBtn) bulkPhotoBtn.style.display = groceriesShop ? "none" : "block";
-  if (bulkUnitBtnWrap && groceriesShop) bulkUnitBtnWrap.style.display = "none";
+  if (bulkPhotoBtn) bulkPhotoBtn.style.display = canAddOwnStock ? "block" : "none";
+  if (bulkUnitBtnWrap && groceriesShop && !canAddOwnStock) bulkUnitBtnWrap.style.display = "none";
   const groceriesItemNote = document.getElementById('menu-groceries-item-note');
   if (groceriesItemNote) groceriesItemNote.style.display = groceriesShop ? "block" : "none";
   const importColumnsHint = document.getElementById('bulk-import-columns-hint');
@@ -4104,6 +4150,7 @@ function listenMenu() {
 function enterBulkPriceMode() {
   if (state.indivPriceMode) exitIndivPriceMode();
   if (state.bulkUnitMode) exitBulkUnitMode();
+  if (state.bulkStockMode) exitBulkStockMode();
   state.bulkPriceMode = true;
   state.bulkPriceSelected = new Set();
   document.getElementById('bulk-price-bar').style.display = "flex";
@@ -4168,6 +4215,7 @@ async function applyBulkPrice() {
 function enterBulkUnitMode() {
   if (state.indivPriceMode) exitIndivPriceMode();
   if (state.bulkPriceMode) exitBulkPriceMode();
+  if (state.bulkStockMode) exitBulkStockMode();
   state.bulkUnitMode = true;
   state.bulkUnitSelected = new Set();
   document.getElementById('bulk-unit-bar').style.display = "flex";
@@ -4218,6 +4266,64 @@ async function applyBulkUnit() {
   }
 }
 
+// Bulk stock change: same pattern as bulk price/unit (select several stock
+// items, then apply "in stock" or "out of stock" to all of them in a
+// single multi-path update), instead of tapping "Mark available" on each
+// item one at a time.
+function enterBulkStockMode() {
+  if (state.indivPriceMode) exitIndivPriceMode();
+  if (state.bulkPriceMode) exitBulkPriceMode();
+  if (state.bulkUnitMode) exitBulkUnitMode();
+  state.bulkStockMode = true;
+  state.bulkStockSelected = new Set();
+  document.getElementById('bulk-stock-bar').style.display = "flex";
+  document.getElementById('bulk-stock-status').textContent = "";
+  updateBulkStockCount();
+  filterMenuBySearch();
+}
+
+function exitBulkStockMode() {
+  state.bulkStockMode = false;
+  state.bulkStockSelected = new Set();
+  document.getElementById('bulk-stock-bar').style.display = "none";
+  filterMenuBySearch();
+}
+
+function updateBulkStockCount() {
+  const n = state.bulkStockSelected.size;
+  document.getElementById('bulk-stock-count').textContent = n + (n === 1 ? " selected" : " selected");
+}
+
+async function applyBulkStock(makeAvailable) {
+  const statusEl = document.getElementById('bulk-stock-status');
+  const ids = Array.from(state.bulkStockSelected);
+  if (ids.length === 0) {
+    statusEl.textContent = "Select at least one stock item first.";
+    return;
+  }
+  const availBtn = document.getElementById('bulk-stock-available-btn');
+  const unavailBtn = document.getElementById('bulk-stock-unavailable-btn');
+  availBtn.disabled = true;
+  unavailBtn.disabled = true;
+  statusEl.textContent = "Updating " + ids.length + " item(s)…";
+  try {
+    const { db, ref, update } = window.fb;
+    // Single multi-path update — one write for every selected item's
+    // availability, instead of ids.length separate round-trips.
+    const updates = {};
+    ids.forEach(id => { updates['restaurants/' + state.restId + '/menu/' + id + '/unavailable'] = !makeAvailable; });
+    await update(ref(db), updates);
+    statusEl.textContent = "Marked " + ids.length + " item(s) " + (makeAvailable ? "in stock." : "out of stock.");
+    exitBulkStockMode();
+  } catch (e) {
+    console.error('applyBulkStock error:', e);
+    statusEl.textContent = "Something went wrong — please try again.";
+  } finally {
+    availBtn.disabled = false;
+    unavailBtn.disabled = false;
+  }
+}
+
 // Individual price edit mode: unlike bulk price (one price applied to every
 // selected item), this shows an editable price box next to every item so
 // each item can be given its own new price, then all changed items are
@@ -4225,6 +4331,7 @@ async function applyBulkUnit() {
 function enterIndivPriceMode() {
   if (state.bulkPriceMode) exitBulkPriceMode();
   if (state.bulkUnitMode) exitBulkUnitMode();
+  if (state.bulkStockMode) exitBulkStockMode();
   state.indivPriceMode = true;
   state.indivPriceValues = {};
   document.getElementById('indiv-price-bar').style.display = "flex";
@@ -4310,6 +4417,7 @@ function renderMenu(items, isSearchFiltered) {
       if (it.unavailable) card.style.opacity = "0.6";
       const isSelected = state.bulkPriceMode && state.bulkPriceSelected.has(it.id);
       const isUnitSelected = state.bulkUnitMode && state.bulkUnitSelected.has(it.id);
+      const isStockSelected = state.bulkStockMode && state.bulkStockSelected.has(it.id);
       const indivVal = state.indivPriceMode ? (it.id in state.indivPriceValues ? state.indivPriceValues[it.id] : it.price) : null;
       const priceHtml = state.indivPriceMode
         ? `<span style="display:inline-flex; align-items:center; gap:5px; margin-top:2px;"><input type="number" inputmode="decimal" class="indiv-price-input" data-id="${it.id}" value="${indivVal}" style="width:90px; padding:5px 7px; border:1px solid var(--field-border); border-radius:6px; background:var(--field-bg); color:var(--cloud); font-size:13px; font-family:'Inter',sans-serif;" />${UNIT_SUFFIX[it.unit] ? `<span class="hint-text" style="margin:0;">${UNIT_SUFFIX[it.unit]}</span>` : ''}</span>`
@@ -4318,14 +4426,15 @@ function renderMenu(items, isSearchFiltered) {
         <div class="menu-row">
           ${state.bulkPriceMode ? `<input type="checkbox" class="bulk-price-checkbox" data-id="${it.id}" ${isSelected ? 'checked' : ''} style="width:20px; height:20px; margin-right:4px; flex-shrink:0;" />` : ''}
           ${state.bulkUnitMode ? `<input type="checkbox" class="bulk-unit-checkbox" data-id="${it.id}" ${isUnitSelected ? 'checked' : ''} style="width:20px; height:20px; margin-right:4px; flex-shrink:0;" />` : ''}
+          ${state.bulkStockMode ? `<input type="checkbox" class="bulk-stock-checkbox" data-id="${it.id}" ${isStockSelected ? 'checked' : ''} style="width:20px; height:20px; margin-right:4px; flex-shrink:0;" />` : ''}
           ${it.photo ? `<img class="menu-photo" src="${it.photo}" />` : `<div class="menu-photo"></div>`}
           <div class="menu-info">
             <p class="menu-name">${it.name}${it.unavailable ? ' <span class="nav-badge" style="background:var(--chili); font-size:9px; vertical-align:middle;">Unavailable</span>' : ''}</p>
             <p class="menu-desc">${it.desc || ""}</p>
             ${priceHtml}
           </div>
-          ${(groceriesShop && !(state.bulkPriceMode || state.indivPriceMode || state.bulkUnitMode)) ? `<button type="button" class="menu-avail-btn" data-id="${it.id}" style="flex-shrink:0; padding:7px 10px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; border:1.5px solid ${it.unavailable ? 'var(--leaf)' : 'var(--chili)'}; background:transparent; color:${it.unavailable ? 'var(--leaf)' : 'var(--chili)'};">${it.unavailable ? 'Mark available' : 'Mark unavailable'}</button>` : ''}
-          <button class="menu-edit-btn" data-id="${it.id}" ${(state.bulkPriceMode || state.indivPriceMode || state.bulkUnitMode || groceriesShop) ? 'style="display:none;"' : ''}>
+          ${(groceriesShop && !(state.bulkPriceMode || state.indivPriceMode || state.bulkUnitMode || state.bulkStockMode)) ? `<button type="button" class="menu-avail-btn" data-id="${it.id}" style="flex-shrink:0; padding:7px 10px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; border:1.5px solid ${it.unavailable ? 'var(--leaf)' : 'var(--chili)'}; background:transparent; color:${it.unavailable ? 'var(--leaf)' : 'var(--chili)'};">${it.unavailable ? 'Mark available' : 'Mark unavailable'}</button>` : ''}
+          <button class="menu-edit-btn" data-id="${it.id}" ${(state.bulkPriceMode || state.indivPriceMode || state.bulkUnitMode || state.bulkStockMode || groceriesShop) ? 'style="display:none;"' : ''}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4A6B8A" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
           </button>
         </div>
@@ -4348,6 +4457,17 @@ function renderMenu(items, isSearchFiltered) {
           if (state.bulkUnitSelected.has(it.id)) state.bulkUnitSelected.delete(it.id);
           else state.bulkUnitSelected.add(it.id);
           updateBulkUnitCount();
+          renderMenu(items, isSearchFiltered);
+        };
+        cb.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
+        card.addEventListener('click', toggle);
+      } else if (state.bulkStockMode) {
+        if (isStockSelected) card.style.background = "#FFF6E5";
+        const cb = card.querySelector('.bulk-stock-checkbox');
+        const toggle = () => {
+          if (state.bulkStockSelected.has(it.id)) state.bulkStockSelected.delete(it.id);
+          else state.bulkStockSelected.add(it.id);
+          updateBulkStockCount();
           renderMenu(items, isSearchFiltered);
         };
         cb.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
@@ -6112,6 +6232,7 @@ function sendPartnerSupportMessage() {
    OPERATOR PANEL
    ========================================================= */
 let opCurrentPartnerId = null;
+let opAvailItems = []; // this shop's menu items, loaded on demand for the Operator Panel's per-shop availability list
 let opAllPartners = [];
 let opChatUnsub = {};
 let opActiveChatId = null;
@@ -9411,10 +9532,19 @@ function opShowPartnerDetail(id) {
   opRenderShopZoneStatus(p);
   document.getElementById('op-pm-bulk-import-status').textContent = '';
   document.getElementById('op-pm-bulk-import-status').style.display = 'none';
-  // "Add item" is only for groceries partners — NESH Store's shared
-  // catalog. Other business types keep adding their own items as before.
-  const addItemWrap = document.getElementById('op-pm-add-item-wrap');
-  if (addItemWrap) addItemWrap.style.display = (p.businessType === 'groceries') ? 'block' : 'none';
+  // "Add item", "Let this shop add its own stock", and the per-item
+  // availability list are groceries-only controls, grouped into one
+  // "NESH Store — Groceries Stock" card. Other business types can already
+  // add/manage their own items and availability from their own app.
+  const groceriesCard = document.getElementById('op-pm-groceries-card');
+  if (groceriesCard) groceriesCard.style.display = (p.businessType === 'groceries') ? 'block' : 'none';
+  const stockAddBtn = document.getElementById('op-pm-stockadd-toggle-btn');
+  if (stockAddBtn) stockAddBtn.textContent = p.allowStockAdd ? '✅ Shop CAN add own stock (tap to turn OFF)' : '🔒 Shop cannot add own stock (tap to turn ON)';
+  document.getElementById('op-pm-stockadd-status').textContent = '';
+  document.getElementById('op-pm-avail-search').value = '';
+  document.getElementById('op-pm-avail-status').textContent = '';
+  document.getElementById('op-pm-avail-list').innerHTML = '';
+  opAvailItems = [];
   document.getElementById('op-pm-item-name').value = '';
   document.getElementById('op-pm-item-desc').value = '';
   document.getElementById('op-pm-item-unit').value = 'piece';
@@ -9491,6 +9621,74 @@ function opRejectPartner() {
       document.getElementById('op-pm-reject-box').style.display = 'none';
     })
     .catch(err => { msg.textContent = 'Error: ' + err.message; });
+}
+// Toggles `restaurants/{id}.allowStockAdd` — when true, a groceries shop
+// gets its own Add item/Bulk import/Bulk photo tools back (see
+// canAddOwnStock in logInRestaurant's menu setup), overriding the default
+// operator-only stock-adding restriction just for this one shop.
+function opToggleStockAddPermission() {
+  const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
+  if (!p) return;
+  const { db, ref, update } = window.fb;
+  const next = !p.allowStockAdd;
+  const status = document.getElementById('op-pm-stockadd-status');
+  const btn = document.getElementById('op-pm-stockadd-toggle-btn');
+  status.textContent = 'Saving...';
+  update(ref(db, 'restaurants/' + opCurrentPartnerId), { allowStockAdd: next })
+    .then(() => {
+      p.allowStockAdd = next;
+      btn.textContent = next ? '✅ Shop CAN add own stock (tap to turn OFF)' : '🔒 Shop cannot add own stock (tap to turn ON)';
+      status.textContent = next ? 'Saved — the shop can now add its own stock (from their next login/reload).' : 'Saved — only the operator can add stock for this shop now.';
+    })
+    .catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+// Loads this shop's full menu once (on demand, so it doesn't add to
+// Firebase download usage just from opening the modal) so the operator can
+// mark any item available/unavailable directly, without the shop's login.
+function opLoadShopItemsForAvailability() {
+  if (!opCurrentPartnerId) return;
+  const { db, ref, get } = window.fb;
+  const status = document.getElementById('op-pm-avail-status');
+  const btn = document.getElementById('op-pm-avail-refresh-btn');
+  status.textContent = 'Loading...';
+  btn.disabled = true;
+  get(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu')).then(snap => {
+    const menu = snap.val() || {};
+    opAvailItems = Object.keys(menu).map(id => ({ id, ...menu[id] })).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    status.textContent = opAvailItems.length ? (opAvailItems.length + ' items loaded.') : 'This shop has no stock items yet.';
+    opRenderAvailabilityList();
+  }).catch(err => {
+    status.textContent = 'Error: ' + err.message;
+  }).finally(() => { btn.disabled = false; });
+}
+function opRenderAvailabilityList() {
+  const wrap = document.getElementById('op-pm-avail-list');
+  if (!wrap) return;
+  const q = (document.getElementById('op-pm-avail-search').value || '').trim().toLowerCase();
+  const items = q ? opAvailItems.filter(it => String(it.name || '').toLowerCase().includes(q)) : opAvailItems;
+  if (!items.length) {
+    wrap.innerHTML = opAvailItems.length ? '<div class="op-empty">No items match.</div>' : '';
+    return;
+  }
+  wrap.innerHTML = items.map(it => `
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid #1f2937;">
+      <span style="flex:1; font-size:.8rem; color:#e2e8f0;">${escapeHtml(it.name || '(unnamed)')}${it.unavailable ? ' <span style="color:#f87171;">(unavailable)</span>' : ''}</span>
+      <button type="button" class="op-btn ${it.unavailable ? 'op-btn-push' : 'op-btn-danger'}" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opToggleItemAvailability('${it.id}')">${it.unavailable ? 'Mark available' : 'Mark unavailable'}</button>
+    </div>
+  `).join('');
+}
+function opToggleItemAvailability(itemId) {
+  const item = opAvailItems.find(it => it.id === itemId);
+  if (!item || !opCurrentPartnerId) return;
+  const { db, ref, update } = window.fb;
+  const next = !item.unavailable;
+  update(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu/' + itemId), { unavailable: next })
+    .then(() => {
+      item.unavailable = next;
+      opRenderAvailabilityList();
+      document.getElementById('op-pm-avail-status').textContent = (next ? 'Marked unavailable: ' : 'Marked available: ') + (item.name || itemId);
+    })
+    .catch(err => { document.getElementById('op-pm-avail-status').textContent = 'Error: ' + err.message; });
 }
 function opSettleDue() {
   const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
