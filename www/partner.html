@@ -799,6 +799,7 @@
       <span id="home-route-count">0 selected</span>
       <button class="btn-primary" id="home-route-btn" style="width:auto; padding:8px 14px; font-size:13px;" onclick="goToSelectedOrders()">Go</button>
       <button class="btn-primary" id="home-bulk-assign-btn" style="width:auto; padding:8px 14px; font-size:13px; background:#3A8FB0;" onclick="openBulkAssignPanel()">Assign</button>
+      <button class="btn-primary" id="home-whatsapp-btn" style="width:auto; padding:8px 14px; font-size:13px; background:#25D366;" onclick="shareSelectedOrdersOnWhatsApp()">💬 WhatsApp</button>
     </div>
     <div class="route-panel" id="home-route-panel" style="display:none;"></div>
     <div class="route-panel" id="home-bulk-assign-panel" style="display:none;"></div>
@@ -829,6 +830,7 @@
       <p class="detail-label" id="od-landmark-label" style="display:none;">Landmark</p>
       <p class="detail-value" id="od-cust-landmark" style="display:none;"></p>
       <button class="detail-map-btn" id="od-map-btn" style="display:none;">📍 Open location on map</button>
+      <button class="detail-map-btn" id="od-whatsapp-btn" style="display:none; margin-top:8px; background:#25D366; color:#fff; border-color:#25D366;">💬 Share order on WhatsApp</button>
     </div>
 
     <div class="detail-block">
@@ -864,7 +866,7 @@
     </div>
     <div class="section-row">
       <h2 class="section-title">Menu items</h2>
-      <div style="display:flex; gap:8px;">
+      <div style="display:flex; gap:8px;" id="menu-add-item-actions">
         <button class="bulk-import-btn" id="bulk-import-btn" type="button">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--marigold)" stroke-width="2.5"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>
           Bulk import
@@ -878,6 +880,9 @@
     <input type="file" id="bulk-import-input" accept=".xlsx,.xls,.csv" style="display:none;" />
     <p class="hint-text" id="bulk-import-columns-hint" style="padding:6px 24px 0; margin:0; font-size:11px; color:#6E8CAE; font-family:'Inter',sans-serif;">
       Excel columns: <b>Name</b>, <b>Discription</b> (or Description), <b>Price</b>, <b>Unit</b> (optional — Piece/Gram/Kg, defaults to Piece), <b>Photo</b> (optional — image link)
+    </p>
+    <p id="menu-groceries-item-note" style="display:none; padding:6px 24px 0; margin:0; font-size:12px; color:#6E8CAE; font-family:'Inter',sans-serif;">
+      🛒 Items here are added by NESH Store — set your own price for each one below, then mark it available.
     </p>
     <p style="padding:6px 24px 0; margin:0;">
       <button class="btn-link" id="bulk-photo-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;">
@@ -1083,6 +1088,16 @@
           Delivery Charges Earned
         </span>
         <span class="nav-badge" id="delivery-earnings-status-badge" style="background:#fff;color:#2F80ED;">₹0</span>
+      </a>
+    </div>
+
+    <div class="px" style="margin-top:12px;">
+      <a class="nav-card" id="daily-earnings-nav-card" href="#" onclick="openDailyEarningsScreen(); return false;" style="margin:0; background:#1BA672;">
+        <span class="nav-card-left" style="color:#fff;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-7"/></svg>
+          Daily Total Earnings
+        </span>
+        <span class="nav-badge" id="daily-earnings-status-badge" style="background:#fff;color:#1BA672;">₹0</span>
       </a>
     </div>
 
@@ -1318,6 +1333,13 @@
       </div>
       <p class="hint-text" style="margin:4px 0 0;">Orders within this distance get the base fee waived — no delivery charge at all.</p>
 
+      <p class="loc-field-label" style="margin-top:16px;">Free delivery on orders of (₹) and above — optional</p>
+      <div class="field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M9 9.5h4.5a2 2 0 0 1 0 4H9.5a2 2 0 0 0 0 4H15"/></svg>
+        <input id="delivery-free-above" type="number" min="0" step="1" inputmode="decimal" placeholder="e.g. 500 (leave blank to disable)" />
+      </div>
+      <p class="hint-text" style="margin:4px 0 0;">When a customer's item total reaches this amount, they pay no delivery charge — the app shows it struck out and marked FREE.</p>
+
       <div class="pay-pending-card" style="margin-top:18px; border-color:var(--leaf);">
         <p class="hint-text" style="margin:0 0 4px;">Preview</p>
         <p style="color:#fff; font-family:'Fraunces',serif; font-size:20px; font-weight:700; margin:0;" id="delivery-charge-preview">₹20 + ₹5/km</p>
@@ -1351,6 +1373,29 @@
       <p class="hint-text" style="margin-top:14px;">This is the delivery charge portion collected from customers across all your orders — separate from the item total and platform fee. It's yours to keep; it never counts toward your platform due.</p>
       <h2 class="section-title" style="margin-top:20px; font-size:16px;">Recent orders with delivery charge</h2>
       <div id="delivery-earnings-list" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+  </section>
+
+  <!-- DAILY TOTAL EARNINGS -->
+  <section class="screen screen-with-tabs" id="screen-daily-earnings">
+    <div class="px" style="padding-top:32px;">
+      <button class="btn-back" onclick="showScreen('account')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1BA672" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+    </div>
+    <div class="header">
+      <p class="eyebrow">DAILY TOTAL EARNINGS</p>
+      <h1 class="title">Today's completed sales</h1>
+    </div>
+    <div class="px">
+      <div class="pay-pending-card" style="border-color:#1BA672;">
+        <p class="hint-text" style="margin:0 0 4px;">Today's total earnings</p>
+        <p style="color:#fff; font-family:'Fraunces',serif; font-size:32px; font-weight:700; margin:0;" id="daily-earnings-total">₹0</p>
+        <p class="hint-text" style="margin-top:6px;" id="daily-earnings-order-count">From 0 orders</p>
+      </div>
+      <p class="hint-text" style="margin-top:14px;" id="daily-earnings-note">This is your sale amount from today's orders — item total minus any shop discount, not counting the platform fee or delivery charge. For groceries / Go Series orders it's added the moment you mark the order "ready"; for orders you deliver yourself, it's added once you mark the order "delivered".</p>
+      <h2 class="section-title" style="margin-top:20px; font-size:16px;">Today's completed orders</h2>
+      <div id="daily-earnings-list" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
     </div>
   </section>
 
@@ -1419,6 +1464,32 @@
           <div class="op-home-icon">🧾</div>
           <h3>Orders</h3>
           <p>All orders from every shop — Delivered, In Progress, Cancelled</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('groceries-queue')" style="position:relative;">
+          <span class="op-home-badge" id="op-groceries-queue-home-badge" style="display:none;"></span>
+          <div class="op-home-icon">🛒</div>
+          <h3>NESH Store Orders</h3>
+          <p>Groceries orders waiting to be assigned to a shop, with price comparison and profit</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('groceries-catalog')">
+          <div class="op-home-icon">📋</div>
+          <h3>Groceries Catalog</h3>
+          <p>Every item across every groceries shop — each shop's own price, when they last updated it, and the resulting customer price</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('nesh-item-order')">
+          <div class="op-home-icon">🥇</div>
+          <h3>NESH Store Item Order</h3>
+          <p>Pick which item shows first in the customer app's merged NESH Store groceries catalog</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('nesh-sections')">
+          <div class="op-home-icon">🗂️</div>
+          <h3>NESH Store Sections</h3>
+          <p>Group groceries shops into sections (Supermarket, Chicken Store…) and add stock to a whole section at once</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('nesh-categories')">
+          <div class="op-home-icon">🥬</div>
+          <h3>NESH Store Categories</h3>
+          <p>Group items into categories (Vegetables, Fruits…) — shown as tabs at the top of the customer app's NESH Store</p>
         </div>
         <div class="op-home-card" onclick="opOpenSection('buses')" style="position:relative;">
           <span class="op-home-badge" id="op-buses-home-badge" style="display:none;"></span>
@@ -1493,6 +1564,11 @@
           <h3>Go Series</h3>
           <p>Delivery charge &amp; shop list</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('shop-zones')">
+          <div class="op-home-icon">🗺️</div>
+          <h3>Shop Zones</h3>
+          <p>Draw zones and choose which shops serve each zone</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('taxi-fare')">
           <div class="op-home-icon">🛺</div>
           <h3>Taxi Fare</h3>
@@ -1528,6 +1604,170 @@
       <div id="op-orders-list"></div>
     </div>
   </div>
+
+  <!-- NESH STORE ORDER QUEUE (groceries orders awaiting shop assignment) -->
+  <div class="op-section" id="op-section-groceries-queue">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>NESH Store Orders</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note" style="margin-bottom:10px;">Customer orders from the merged "NESH Store" groceries catalog. Pick which shop actually fulfills each one — you'll see every candidate shop's price and your profit before deciding.</p>
+      <div id="op-groceries-queue-list"></div>
+    </div>
+  </div>
+
+  <!-- GROCERIES CATALOG (every item, every shop's own price, last update time, computed customer price) -->
+  <div class="op-section" id="op-section-groceries-catalog">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Groceries Catalog</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note" style="margin-bottom:10px;">Every stock item across every groceries shop. Each shop sets its own price from its own Stock screen — the customer price shown in NESH Store is always the highest price any shop currently has it available at (⭐ marks that shop below).</p>
+      <div class="op-search-box"><input type="text" id="op-groc-catalog-search" placeholder="Search items..." oninput="opRenderGroceriesCatalog()"></div>
+      <div id="op-groc-catalog-list"></div>
+    </div>
+  </div>
+
+  <!-- NESH STORE ITEM ORDER (which item shows first in the customer app's merged groceries catalog) -->
+  <div class="op-section" id="op-section-nesh-item-order">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>NESH Store Item Order</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note" style="margin-bottom:10px;">Pick which item shows first in the customer app's merged NESH Store groceries catalog. This only reorders items in that merged view — it doesn't touch any shop's own menu, price, or availability.</p>
+      <div id="op-nesh-item-order-list"></div>
+      <button type="button" class="op-btn op-btn-push" onclick="opSaveNeshItemOrder()" style="margin-top:12px;">💾 Save order</button>
+      <p class="op-note" id="op-nesh-item-order-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- NESH STORE SECTIONS (group groceries shops, e.g. Supermarket / Chicken Store; add a stock item to every shop in a section at once) -->
+  <div class="op-section" id="op-section-nesh-sections">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>NESH Store Sections</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note" style="margin-bottom:14px;">Group your existing groceries shops into sections (e.g. Supermarket, Chicken Store). Pick a section, add a stock item, and it's added to every shop in that section.</p>
+
+      <div style="margin-bottom:22px;">
+        <p class="op-note" style="margin-bottom:6px;">Add stock item to a section — only the item itself (name, photo, unit) is added, at ₹0 and marked unavailable. Each shop sets its own price and marks it available from its own Stock screen. A shop that already has the same item (same name and unit) is skipped.</p>
+        <select id="op-sec-add-select" onchange="opUpdateSectionAddHint()" style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:6px;"></select>
+        <p class="op-note" id="op-sec-add-hint" style="margin-bottom:8px;"></p>
+        <div class="op-search-box" style="margin-bottom:0;">
+          <input type="text" id="op-sec-item-name" placeholder="Item name" autocomplete="off">
+        </div>
+        <div class="op-search-box" style="margin-bottom:0;">
+          <input type="text" id="op-sec-item-desc" placeholder="Description (optional)" autocomplete="off">
+        </div>
+        <select id="op-sec-item-unit" style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;">
+          <option value="piece">Piece</option>
+          <option value="gram">Gram</option>
+          <option value="kg">Kg</option>
+        </select>
+        <input type="file" id="op-sec-item-photo-input" accept="image/*" style="display:none;" onchange="opHandleSectionItemPhoto(event)" />
+        <button type="button" class="op-btn op-btn-push" onclick="document.getElementById('op-sec-item-photo-input').click()">📷 <span id="op-sec-item-photo-label">Add photo (optional)</span></button>
+        <button type="button" class="op-btn op-btn-push" onclick="opAddStockToSection()">➕ Add stock item to this section</button>
+        <p class="op-note" id="op-sec-add-status" style="margin-top:4px; display:none;"></p>
+      </div>
+
+      <p class="op-note" style="margin-bottom:6px;">Sections</p>
+      <button type="button" class="op-btn op-btn-push" onclick="opOpenSectionEditor(null)">➕ New section</button>
+      <div id="op-sec-list"></div>
+    </div>
+  </div>
+
+  <!-- Section editor modal (create / rename + pick which shops are in the section) -->
+  <div class="op-modal-overlay" id="op-section-editor-modal">
+    <div class="op-modal-card op-modal-card-wide">
+      <h3 id="op-sec-editor-title">New section</h3>
+      <div class="op-search-box">
+        <input type="text" id="op-sec-editor-name" placeholder="Section name (e.g. Supermarket, Chicken Store)" maxlength="40" autocomplete="off">
+      </div>
+      <p class="op-note" style="margin-bottom:6px;">Select the shops in this section (groceries shops only)</p>
+      <div class="op-search-box">
+        <input type="text" id="op-sec-editor-search" placeholder="Search shops..." oninput="opRenderSectionEditorShops()" autocomplete="off">
+      </div>
+      <div id="op-sec-editor-shops" style="max-height:38vh; overflow-y:auto; margin-bottom:8px;"></div>
+      <p class="op-note" id="op-sec-editor-count" style="margin-bottom:10px;"></p>
+      <button type="button" class="op-btn op-btn-push" onclick="opSaveSectionEditor()">💾 Save section</button>
+      <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-section-editor-modal').classList.remove('show')">Cancel</button>
+      <p class="op-note" id="op-sec-editor-status" style="margin-top:4px; display:none;"></p>
+    </div>
+  </div>
+
+  <!-- NESH STORE CATEGORIES (item groups shown as tabs at the top of the customer app's NESH Store) -->
+  <div class="op-section" id="op-section-nesh-categories">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>NESH Store Categories</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note" style="margin-bottom:10px;">Make a category (e.g. Vegetables), tick every item that belongs in it and save. Customers see it as a tab at the top of NESH Store — tapping it shows only those items. Use ▲ ▼ to set the tab order. An item can be in more than one category, and it still shows under "All".</p>
+      <button type="button" class="op-btn op-btn-push" onclick="opOpenCategoryEditor(null)">➕ New category</button>
+      <div id="op-cat-list"></div>
+    </div>
+  </div>
+
+  <!-- Category editor modal (name + which items) -->
+  <div class="op-modal-overlay" id="op-category-editor-modal">
+    <div class="op-modal-card op-modal-card-wide">
+      <h3 id="op-cat-editor-title">New category</h3>
+      <div class="op-search-box">
+        <input type="text" id="op-cat-editor-name" placeholder="Category name (e.g. Vegetables)" maxlength="30" autocomplete="off">
+      </div>
+      <p class="op-note" style="margin-bottom:6px;">Select the items in this category</p>
+      <div class="op-search-box" style="padding-bottom:6px;">
+        <input type="text" id="op-cat-editor-search" placeholder="Search items..." oninput="opRenderCategoryEditorItems()" autocomplete="off">
+      </div>
+      <div style="margin-bottom:6px;">
+        <button type="button" class="op-btn" style="padding:6px 10px; margin-bottom:0;" onclick="opCategorySelectShown(true)">Select all shown</button>
+        <button type="button" class="op-btn" style="padding:6px 10px; margin-bottom:0;" onclick="opCategorySelectShown(false)">Clear shown</button>
+      </div>
+      <div id="op-cat-editor-items" style="max-height:38vh; overflow-y:auto; margin-bottom:8px;"></div>
+      <p class="op-note" id="op-cat-editor-count" style="margin-bottom:10px;"></p>
+      <button type="button" class="op-btn op-btn-push" onclick="opSaveCategoryEditor()">💾 Save category</button>
+      <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-category-editor-modal').classList.remove('show')">Cancel</button>
+      <p class="op-note" id="op-cat-editor-status" style="margin-top:4px; display:none;"></p>
+    </div>
+  </div>
+
+  <!-- Customer price modal (operator-set NESH Store price for one item) -->
+  <div class="op-modal-overlay" id="op-cprice-modal">
+    <div class="op-modal-card">
+      <h3 id="op-cp-title">Customer price</h3>
+      <p class="op-note" id="op-cp-info" style="margin-bottom:10px;"></p>
+      <div class="op-search-box" style="padding-bottom:4px;">
+        <input type="number" id="op-cp-input" min="0" step="any" inputmode="decimal" placeholder="Customer price (₹)">
+      </div>
+      <p class="op-note" id="op-cp-unit" style="margin-bottom:10px;"></p>
+      <button type="button" class="op-btn op-btn-push" onclick="opSaveCustomerPrice()">💾 Save customer price</button>
+      <button type="button" class="op-btn" id="op-cp-reset-btn" style="display:none;" onclick="opClearCustomerPrice(opCpEditingEnc, true)">↩ Use automatic price</button>
+      <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-cprice-modal').classList.remove('show')">Cancel</button>
+      <p class="op-note" id="op-cp-status" style="margin-top:4px; display:none;"></p>
+    </div>
+  </div>
+
+  <!-- Groceries order assignment modal -->
+  <div class="op-modal-overlay" id="op-groceries-assign-modal">
+    <div class="op-modal">
+      <div class="op-modal-header">
+        <h3 id="op-ga-title">Assign order</h3>
+        <button class="op-modal-close" onclick="document.getElementById('op-groceries-assign-modal').classList.remove('show')">&times;</button>
+      </div>
+      <div class="op-modal-body">
+        <p class="op-note" id="op-ga-customer" style="margin-bottom:10px;"></p>
+        <div id="op-ga-items" style="margin-bottom:14px;"></div>
+        <p class="op-note" style="margin-bottom:6px;">Candidate shops (only shops stocking every item in this order are shown), sorted by highest profit first:</p>
+        <div id="op-ga-candidates"></div>
+        <p class="op-note" id="op-ga-status" style="margin-top:8px; display:none;"></p>
+      </div>
+    </div>
+  </div>
+
 
   <!-- TAXI ORDERS (rides) -->
   <div class="op-section" id="op-section-taxi-orders">
@@ -1856,12 +2096,26 @@
       <h2>Go Series</h2>
     </div>
     <div class="op-section-body">
-      <p class="op-note">Set one delivery charge (base fee + per-km rate) here that applies ONLY to shops you add to the Go Series list below. Every other shop keeps using its own Delivery Charges setting, unaffected.</p>
+      <p class="op-note">Set a delivery charge (base fee + per-km rate), a platform fee, and a per-item profit amount here that apply ONLY to shops you add to the Go Series list below. The profit amount is added straight into each item's price in the customer app (it shows up as the price itself, not a separate line). Every other shop keeps using its own Delivery Charges, item prices, and the app-wide platform fee, unaffected.</p>
       <div class="op-search-box" style="margin-bottom:10px;">
         <input type="number" id="op-goseries-basefee-input" placeholder="Fixed/base charge in ₹ (e.g. 20)" min="0" step="0.5">
       </div>
       <div class="op-search-box" style="margin-bottom:10px;">
         <input type="number" id="op-goseries-perkm-input" placeholder="Per-km rate in ₹ (e.g. 5)" min="0" step="0.5">
+      </div>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="number" id="op-goseries-platformfee-input" placeholder="Platform fee in ₹ (0 = no platform fee for Go Series)" min="0" step="0.5">
+      </div>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="number" id="op-goseries-itemmarkup-input" placeholder="Profit amount added to each item's price in ₹ (e.g. 5)" min="0" step="0.5">
+      </div>
+      <p class="op-note" style="margin-bottom:6px;">Free delivery — orders whose item total is at least this ₹ amount get no delivery charge (customers see it struck out and marked FREE). 0 = off. Applies to NESH Store and every Go Series shop.</p>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="number" id="op-goseries-freeabove-input" placeholder="Free delivery on orders of ₹ and above (0 = off, e.g. 500)" min="0" step="1">
+      </div>
+      <p class="op-note" style="margin-bottom:6px;">Free delivery by distance — deliveries shorter than this many km (shop to the customer's pin) are free. 0 = off. Works alongside the amount above: an order is free if EITHER one is met. For NESH Store the distance is measured from the shop that would fulfil that cart.</p>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="number" id="op-goseries-freekm-input" placeholder="Free delivery under __ km (0 = off, e.g. 2)" min="0" step="0.1">
       </div>
       <div>
         <button type="button" class="op-btn op-btn-push" onclick="opSaveGoSeriesFare()">💾 Save charge</button>
@@ -1869,7 +2123,7 @@
       <p class="op-note" id="op-goseries-fare-status" style="margin-top:10px;"></p>
 
       <h2 style="margin-top:22px;">Go Series Shops</h2>
-      <p class="op-note">Shops added here use the Go Series charge above instead of their own Delivery Charges — everything else about the shop (menu, orders, delivery-boy assignment) works exactly as before.</p>
+      <p class="op-note">Every Groceries shop is in Go Series automatically (no shop-set delivery charge). Other shops added here use the Go Series charge above instead of their own Delivery Charges — everything else about the shop (menu, orders, delivery-boy assignment) works exactly as before.</p>
       <div class="op-search-box" style="margin-bottom:6px;">
         <input type="text" id="op-goseries-shop-search" placeholder="Search shops to add..." oninput="opRenderGoSeriesShopPicker()">
       </div>
@@ -1877,6 +2131,23 @@
 
       <h2 style="margin-top:18px;">Currently in Go Series</h2>
       <div id="op-goseries-shop-list" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- SHOP ZONES -->
+  <div class="op-section" id="op-section-shop-zones">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Shop Zones</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Draw a zone on the map, then add the shops that serve it. A customer whose location is inside a zone sees and orders from ONLY that zone's shops. A location outside every zone gets "not available in your area". While no zone exists, nothing is restricted.</p>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="text" id="op-sz-name-input" placeholder="New zone name (e.g. Kottayam Town)">
+      </div>
+      <button type="button" class="op-btn op-btn-push" onclick="opAddShopZone()">➕ Add zone</button>
+      <p class="op-note" id="op-sz-add-status" style="margin-top:8px;"></p>
+      <div id="op-sz-list" style="margin-top:16px;"></div>
     </div>
   </div>
 
@@ -1971,11 +2242,24 @@
         <p class="op-note" id="op-pm-zone-status" style="margin-bottom:6px;">—</p>
         <button type="button" class="op-btn op-btn-push" id="op-pm-zone-btn" onclick="opOpenShopZoneModal(opCurrentPartnerId)">🗺️ Draw delivery zone</button>
       </div>
-      <div style="margin-top:14px;">
-        <p class="op-note" style="margin-bottom:4px;">Assigned delivery boy — a bike driver dedicated to this shop. Once set, every order this shop marks "ready" goes straight to this driver only, instead of the usual nearest-free-bike matching.</p>
-        <select id="op-pm-driver-select" style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
-        <button type="button" class="op-btn op-btn-push" onclick="opSavePartnerDeliveryBoy()">💾 Save delivery boy</button>
-        <p class="op-note" id="op-pm-driver-status" style="margin-top:4px;"></p>
+      <div style="margin-top:14px;" id="op-pm-add-item-wrap">
+        <p class="op-note" style="margin-bottom:4px;">Add item — for groceries partners: the operator only adds the stock item itself (name, photo, unit) to this shop's menu. No price is set here — the shop sets its own price (and marks it available) from its own Stock screen. The customer-facing price is automatically the highest price any shop charges for that item.</p>
+        <div class="op-search-box" style="margin-bottom:6px;">
+          <input type="text" id="op-pm-item-name" placeholder="Item name" autocomplete="off">
+        </div>
+        <div class="op-search-box" style="margin-bottom:6px;">
+          <input type="text" id="op-pm-item-desc" placeholder="Description (optional)" autocomplete="off">
+        </div>
+        <select id="op-pm-item-unit" style="width:100%; margin-bottom:6px; padding:10px; border-radius:8px; border:1px solid #CBB68B; font-size:14px; font-family:'Inter',sans-serif;">
+          <option value="piece">Piece</option>
+          <option value="gram">Gram</option>
+          <option value="kg">Kg</option>
+        </select>
+        <input type="file" id="op-pm-item-photo-input" accept="image/*" style="display:none;" onchange="opHandleAddItemPhoto(event)" />
+        <button type="button" class="op-btn op-btn-push" onclick="document.getElementById('op-pm-item-photo-input').click()" style="margin-bottom:6px;">📷 <span id="op-pm-item-photo-label">Add photo (optional)</span></button>
+        <button type="button" class="op-btn op-btn-push" onclick="opAddGroceryItem()">➕ Add stock item to this shop</button>
+        <p class="op-note" id="op-pm-add-item-status" style="margin-top:4px; display:none;"></p>
+        <p class="op-note" style="margin-top:10px;">Added items start priced at ₹0 and marked unavailable, so they never show to customers until the shop opens its Stock screen, sets a real price, and marks the item available.</p>
       </div>
       <div style="margin-top:14px;">
         <p class="op-note" style="margin-bottom:4px;">Bulk import stock — Excel/CSV with Name, Discription, Price, Unit (optional), Photo link (optional). Adds items to this shop's menu.</p>
@@ -2395,7 +2679,7 @@ function showScreen(id) {
   }
 
   const tabBar = document.getElementById('bottom-tab-bar');
-  const tabScreens = { home: 'tab-shop-details', stock: 'tab-stock', 'item-form': 'tab-stock', account: 'tab-account', zone: 'tab-account', 'delivery-charges': 'tab-account', 'delivery-earnings': 'tab-account', due: 'tab-account' };
+  const tabScreens = { home: 'tab-shop-details', stock: 'tab-stock', 'item-form': 'tab-stock', account: 'tab-account', zone: 'tab-account', 'delivery-charges': 'tab-account', 'delivery-earnings': 'tab-account', 'daily-earnings': 'tab-account', due: 'tab-account' };
   if (id in tabScreens) {
     tabBar.classList.add('show');
     document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
@@ -3028,6 +3312,12 @@ function listenOwnApprovalStatus(id) {
 }
 
 function logInRestaurant(id, data) {
+  // Every groceries shop is always in Go Series (operator-set delivery
+  // charge, bike delivery boys) — flag it automatically, no manual step.
+  if (data && data.businessType === 'groceries' && !data.goSeries) {
+    data.goSeries = true;
+    try { const { db, ref, update } = window.fb; update(ref(db, 'restaurants/' + id), { goSeries: true }).catch(() => {}); } catch (e) {}
+  }
   state.restId = id;
   state.restaurant = data;
   localStorage.setItem('asfood_partner_id', id);
@@ -3071,11 +3361,36 @@ function logInRestaurant(id, data) {
   const groceriesShop = isGroceriesShop();
   const bulkUnitBtnWrap = document.getElementById('bulk-unit-btn-wrap');
   if (bulkUnitBtnWrap) bulkUnitBtnWrap.style.display = groceriesShop ? "block" : "none";
+  // Groceries shops don't set their own delivery charge any more — it's the
+  // operator's Go Series charge — so hide that option for them.
+  // Groceries shops DO set their own item prices (the operator only adds new
+  // stock items themselves) — so the price-editing tools stay visible for
+  // every business type, groceries included.
+  ['bulk-price-btn', 'indiv-price-btn'].forEach(bid => {
+    const b = document.getElementById(bid);
+    if (b && b.parentElement) b.parentElement.style.display = "";
+  });
+  const dcNavCard = document.getElementById('delivery-charges-nav-card');
+  if (dcNavCard) dcNavCard.style.display = groceriesShop ? "none" : "";
+  // Groceries items are added by the operator panel only (NESH Store's
+  // shared catalog) — the shop itself can't add, bulk-import, re-photo, or
+  // re-unit an item, but it DOES set its own price for each item (the
+  // operator's job is only to add the stock item; pricing is the shop's).
+  // Hide every item-adding entry point and the per-item edit pencil (which
+  // also edits name/photo/unit) for groceries partners; the "Change price"
+  // and "Edit each item's price individually" tools below stay visible so
+  // the shop can price what the operator has added.
+  const addItemActions = document.getElementById('menu-add-item-actions');
+  if (addItemActions) addItemActions.style.display = groceriesShop ? "none" : "flex";
+  const bulkPhotoBtn = document.getElementById('bulk-photo-btn');
+  if (bulkPhotoBtn) bulkPhotoBtn.style.display = groceriesShop ? "none" : "block";
+  if (bulkUnitBtnWrap && groceriesShop) bulkUnitBtnWrap.style.display = "none";
+  const groceriesItemNote = document.getElementById('menu-groceries-item-note');
+  if (groceriesItemNote) groceriesItemNote.style.display = groceriesShop ? "block" : "none";
   const importColumnsHint = document.getElementById('bulk-import-columns-hint');
   if (importColumnsHint) {
-    importColumnsHint.innerHTML = groceriesShop
-      ? "Excel columns: <b>Name</b>, <b>Discription</b> (or Description), <b>Price</b>, <b>Unit</b> (optional — Piece/Gram/Kg, defaults to Piece), <b>Photo</b> (optional — image link)"
-      : "Excel columns: <b>Name</b>, <b>Discription</b> (or Description), <b>Price</b>, <b>Photo</b> (optional — image link)";
+    importColumnsHint.style.display = groceriesShop ? "none" : "block";
+    importColumnsHint.innerHTML = "Excel columns: <b>Name</b>, <b>Discription</b> (or Description), <b>Price</b>, <b>Photo</b> (optional — image link)";
   }
   let restoreScreen = 'home';
   try {
@@ -3095,6 +3410,7 @@ function logInRestaurant(id, data) {
     listenPaymentPending();
     listenDueAmount();
     listenDeliveryEarnings();
+    listenDailyEarnings();
     listenPartnerSupportMessages();
     registerForOrderPushNotifications();
     listenShopBikeDrivers();
@@ -3379,10 +3695,12 @@ document.getElementById('shop-discount-save-btn').addEventListener('click', asyn
 });
 
 function openDeliveryChargesScreen() {
+  if (isGroceriesShop()) return; // groceries use the operator's Go Series delivery charge
   const dc = state.restaurant?.deliveryCharges || {};
   document.getElementById('delivery-base-fee').value = dc.baseFee ?? '';
   document.getElementById('delivery-per-km-fee').value = dc.perKmFee ?? '';
   document.getElementById('delivery-free-under-km').value = dc.freeUnderKm ?? '';
+  document.getElementById('delivery-free-above').value = dc.freeAbove ?? '';
   document.getElementById('delivery-charges-error').style.display = "none";
   updateDeliveryChargePreview();
   showScreen('delivery-charges');
@@ -3722,6 +4040,7 @@ async function doRegister() {
         resubmittedAt: Date.now(),
       };
       if (businessType === 'online_shop' && shopCategory) updates.opCategory = shopCategory;
+      if (businessType === 'groceries') updates.goSeries = true;
       await update(ref(db, 'restaurants/' + regEditId), updates);
       const fresh = Object.assign({}, state.restaurant, updates);
       const editedId = regEditId;
@@ -3749,6 +4068,7 @@ async function doRegister() {
     if (businessType === 'online_shop' && shopCategory) {
       record.opCategory = shopCategory;
     }
+    if (businessType === 'groceries') record.goSeries = true;
     await set(ref(db, 'restaurants/' + username), record);
     logInRestaurant(username, record);
   } catch (e) {
@@ -3826,7 +4146,10 @@ async function applyBulkPrice() {
     // Single multi-path update — one write for every selected item's
     // price, instead of ids.length separate round-trips.
     const updates = {};
-    ids.forEach(id => { updates['restaurants/' + state.restId + '/menu/' + id + '/price'] = newPrice; });
+    ids.forEach(id => {
+      updates['restaurants/' + state.restId + '/menu/' + id + '/price'] = newPrice;
+      updates['restaurants/' + state.restId + '/menu/' + id + '/priceUpdatedAt'] = Date.now();
+    });
     await update(ref(db), updates);
     statusEl.textContent = "Updated " + ids.length + " item(s) to ₹" + newPrice + ".";
     exitBulkPriceMode();
@@ -3930,6 +4253,7 @@ async function saveIndivPrices() {
     if (isNaN(newPrice) || newPrice < 0) { hasInvalid = true; return; }
     if (newPrice === it.price) return; // unchanged
     updates['restaurants/' + state.restId + '/menu/' + it.id + '/price'] = newPrice;
+    updates['restaurants/' + state.restId + '/menu/' + it.id + '/priceUpdatedAt'] = Date.now();
     count++;
   });
   if (hasInvalid) {
@@ -3969,6 +4293,7 @@ function filterMenuBySearch() {
 function renderMenu(items, isSearchFiltered) {
   const listEl = document.getElementById('menu-list');
   listEl.innerHTML = "";
+  const groceriesShop = isGroceriesShop();
   if (items.length === 0) {
     const p = document.createElement('p');
     p.className = "empty-text";
@@ -3999,7 +4324,8 @@ function renderMenu(items, isSearchFiltered) {
             <p class="menu-desc">${it.desc || ""}</p>
             ${priceHtml}
           </div>
-          <button class="menu-edit-btn" data-id="${it.id}" ${(state.bulkPriceMode || state.indivPriceMode || state.bulkUnitMode) ? 'style="display:none;"' : ''}>
+          ${(groceriesShop && !(state.bulkPriceMode || state.indivPriceMode || state.bulkUnitMode)) ? `<button type="button" class="menu-avail-btn" data-id="${it.id}" style="flex-shrink:0; padding:7px 10px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; border:1.5px solid ${it.unavailable ? 'var(--leaf)' : 'var(--chili)'}; background:transparent; color:${it.unavailable ? 'var(--leaf)' : 'var(--chili)'};">${it.unavailable ? 'Mark available' : 'Mark unavailable'}</button>` : ''}
+          <button class="menu-edit-btn" data-id="${it.id}" ${(state.bulkPriceMode || state.indivPriceMode || state.bulkUnitMode || groceriesShop) ? 'style="display:none;"' : ''}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4A6B8A" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
           </button>
         </div>
@@ -4034,6 +4360,21 @@ function renderMenu(items, isSearchFiltered) {
         inp.addEventListener('click', (e) => e.stopPropagation());
       } else {
         card.querySelector('.menu-edit-btn').addEventListener('click', () => openItemForm(it));
+        const availBtn = card.querySelector('.menu-avail-btn');
+        if (availBtn) {
+          availBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            availBtn.disabled = true;
+            try {
+              const { db, ref, update } = window.fb;
+              await update(ref(db, 'restaurants/' + state.restId + '/menu/' + it.id), { unavailable: !it.unavailable });
+              showToast(it.unavailable ? 'Marked available' : 'Marked unavailable');
+            } catch (err) {
+              availBtn.disabled = false;
+              showToast("Couldn't update — check your connection");
+            }
+          });
+        }
       }
       listEl.appendChild(card);
     } catch (e) {
@@ -4043,6 +4384,11 @@ function renderMenu(items, isSearchFiltered) {
 }
 
 function openItemForm(item) {
+  // Groceries partners never add their own items — the operator panel's
+  // NESH Store catalog is the only place new groceries items get created
+  // (see opOpenGroceriesAddItem). Belt-and-braces guard in case anything
+  // else ever calls this in "new item" mode for a groceries shop.
+  if (!item && isGroceriesShop()) return;
   state.editingItemId = item ? item.id : null;
   state.photoDataUrl = item ? (item.photo || "") : "";
   document.getElementById('item-form-eyebrow').textContent = item ? "EDIT ITEM" : "NEW ITEM";
@@ -4593,6 +4939,40 @@ function buildMapUrl(o) {
   return null;
 }
 
+// Plain-text summary of one order — used both for the single-order and the
+// bulk WhatsApp share buttons. No wa.me phone number is set, so tapping
+// Send lets the shop pick whichever contact (their own delivery boy,
+// usually) from their own WhatsApp — the app never needs to know that
+// number.
+function buildOrderShareText(o) {
+  const itemCount = (o.items || []).reduce((s, it) => s + (it.qty || 0), 0);
+  const lines = [];
+  lines.push(`🧾 Order #${o.orderNumber || o._id}`);
+  lines.push(`👤 ${o.customerName || 'Guest'}${o.customerPhone ? ' — ' + o.customerPhone : ''}`);
+  const addr = [o.customerAddress, o.customerLocation].filter(Boolean).join(', ');
+  if (addr) lines.push(`📍 ${addr}`);
+  if (o.customerLandmark) lines.push(`🏷️ Landmark: ${o.customerLandmark}`);
+  const mapUrl = buildMapUrl(o);
+  if (mapUrl) lines.push(mapUrl);
+  lines.push('');
+  lines.push(`Items (${itemCount}):`);
+  (o.items || []).forEach(it => lines.push(`• ${it.qty} × ${it.name} — ₹${it.price * it.qty}`));
+  lines.push(`Total: ₹${o.total || 0}`);
+  return lines.join('\n');
+}
+
+function shareOrderOnWhatsApp(o) {
+  const text = buildOrderShareText(o);
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+}
+
+function shareSelectedOrdersOnWhatsApp() {
+  const selected = (state.homeOrdersCache || []).filter(o => selectedOrderIds.has(o._id));
+  if (!selected.length) { showToast('No orders selected'); return; }
+  const text = selected.map(buildOrderShareText).join('\n\n———\n\n');
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+}
+
 function openOrderDetail(id) {
   state.selectedOrderId = id;
   const o = (state.homeOrdersCache || []).find(x => x._id === id);
@@ -4637,6 +5017,10 @@ function renderOrderDetail(o) {
     mapBtn.onclick = null;
   }
 
+  const waBtn = document.getElementById('od-whatsapp-btn');
+  waBtn.style.display = "inline-flex";
+  waBtn.onclick = () => shareOrderOnWhatsApp(o);
+
   const itemsEl = document.getElementById('od-items');
   itemsEl.innerHTML = "";
   (o.items || []).forEach(it => {
@@ -4669,15 +5053,24 @@ function renderOrderDetail(o) {
   // Once the shop marks an order ready, the rest of the journey (picked up,
   // delivered) is handled entirely from the delivery boy's own app — the
   // shop's job ends here.
-  // Go Series shops (flagged by the operator: restaurants/{id}.goSeries) do
-  // NOT get a shop-side "Mark as delivered" — every other shop does.
+  // Go Series shops (flagged by the operator: restaurants/{id}.goSeries) get
+  // their orders routed to bike delivery boys — the delivery boy marks it
+  // delivered from their own app, so the shop does NOT get a "Mark as
+  // delivered" button. Every other (non-Go-Series) shop is NOT offered to
+  // delivery boys at all (see listenDeliveryJobs/refreshRidePopupFromCache
+  // in driver.html) — that shop arranges its own delivery, so it keeps a
+  // shop-side "Mark as delivered" button here.
   const isGoSeriesShop = !!(state.restaurant && state.restaurant.goSeries);
   if (status === 'ready' || status === 'picked_up') {
     const note = document.createElement('p');
     note.className = 'op-note';
-    note.textContent = status === 'picked_up'
-      ? 'Picked up by the delivery boy — they\'ll mark it delivered once it reaches the customer.'
-      : 'Waiting for the delivery boy to pick this up.';
+    if (isGoSeriesShop) {
+      note.textContent = status === 'picked_up'
+        ? 'Picked up by the delivery boy — they\'ll mark it delivered once it reaches the customer.'
+        : 'Waiting for the delivery boy to pick this up.';
+    } else {
+      note.textContent = 'Ready — arrange delivery yourself, then mark it delivered below.';
+    }
     actionsEl.appendChild(note);
     if (!isGoSeriesShop) buttons.push({ label: 'Mark as delivered', cls: 'delivered', next: 'delivered' });
   }
@@ -4707,18 +5100,16 @@ async function updateOrderStatus(id, newStatus, orderData) {
     // Delivery routing normally already happened when the shop accepted
     // the order (see routeAndBroadcastDelivery, called from
     // handlePopupOrderAction). This is only a fallback for orders that
-    // reach "ready" with no driver routed or claimed yet — e.g. older
-    // orders, or ones accepted before this feature existed.
-    const alreadyRouted = orderData?.assignedDriverId || orderData?.assignedDriverIds || orderData?.deliveryDriverId;
-    if (newStatus === 'ready' && !alreadyRouted && state.restaurant && state.restaurant.dedicatedDriverId) {
-      const did = state.restaurant.dedicatedDriverId;
-      updates.assignedDriverIds = { [did]: true };
-      updates.assignedDriverNames = { [did]: state.restaurant.dedicatedDriverName || did };
-    }
+    // reach "ready" with no driver routed or claimed yet.
     await update(ref(db, 'restaurants/' + state.restId + '/orders/' + id), updates);
     showToast("Order marked as " + newStatus);
     if (newStatus === 'cancelled') playCancelAlert();
-    if (newStatus === 'ready' && !alreadyRouted) broadcastDeliveryJobToDrivers(id, orderData || {});
+    // Native ring/notification to delivery boys goes out only once, the
+    // moment the shop accepts the order (see routeAndBroadcastDelivery,
+    // called from handlePopupOrderAction). Marking an order "ready" never
+    // fires another native alert to drivers, even if nobody has claimed
+    // the delivery yet — the driver app's own live Firebase listener
+    // already shows the order in their job list without needing a ring.
     if (newStatus === 'preparing') notifyCustomerOrderStatus(orderData || {}, id, 'Order confirmed!', (state.restaurant && state.restaurant.name || 'Restaurant') + ' is preparing your order.');
     if (newStatus === 'delivered') notifyCustomerOrderStatus(orderData || {}, id, 'Order delivered!', 'Your order from ' + (state.restaurant && state.restaurant.name || 'the restaurant') + ' has been delivered. Enjoy your meal!');
   } catch (e) {
@@ -4885,24 +5276,21 @@ function notifyCustomerOrderStatus(o, orderId, title, body) {
 // every online driver (any vehicle type) the same way ride requests are
 // broadcast in the driver app — whichever driver taps Accept first gets
 // the delivery. Never blocks or fails the "mark ready" action on this.
-// Routes the order to the shop's dedicated bike driver (if one is set and
-// nobody's been manually assigned already) and pings bike drivers with the
-// job. Called the moment the shop accepts the order (status -> 'preparing')
-// so a delivery boy starts heading over while the order is still being
-// made — not held back until it's physically ready.
+// Called the moment the shop accepts the order (status -> 'preparing') so
+// a delivery boy starts heading over while the order is still being made
+// — not held back until it's physically ready.
 function routeAndBroadcastDelivery(orderId, orderData) {
-  const { db, ref, update } = window.fb;
-  if (!orderData?.assignedDriverId && !orderData?.assignedDriverIds && !orderData?.deliveryDriverId && state.restaurant && state.restaurant.dedicatedDriverId) {
-    const did = state.restaurant.dedicatedDriverId;
-    update(ref(db, 'restaurants/' + state.restId + '/orders/' + orderId), {
-      assignedDriverIds: { [did]: true },
-      assignedDriverNames: { [did]: state.restaurant.dedicatedDriverName || did },
-    }).catch(() => {});
-  }
   broadcastDeliveryJobToDrivers(orderId, orderData || {});
 }
 
+// Fire-and-forget: sends the native push notification (rings/vibrates even
+// if the driver's app is closed) to online bike drivers. Only Go Series
+// shops route to bike delivery boys at all now (see driver.html's
+// pendingDeliveries filter on _restGoSeries) — so this only fires for a Go
+// Series shop; a non-Go-Series shop's order never rings a driver's phone,
+// consistent with it never appearing in their in-app job list either.
 function broadcastDeliveryJobToDrivers(orderId, o) {
+  if (!(state.restaurant && state.restaurant.goSeries)) return;
   fetch('https://broad-paper-6445.raise3715.workers.dev', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -5218,6 +5606,86 @@ function renderDeliveryEarningsUI() {
   });
 }
 
+// ---------- DAILY TOTAL EARNINGS (today's completed sales) ----------
+// What counts as "sold" differs by who delivers the order:
+//  - Groceries / Go Series shops never get a "Mark as delivered" button —
+//    their part of the job ends the moment they mark an order "ready", and
+//    a delivery boy takes it from there (see the status-button logic
+//    above). So for these shops the sale counts as soon as it's "ready".
+//  - Every other shop arranges delivery itself and marks "delivered" from
+//    this same app, so for them the sale only counts at that final step.
+function dailyEarningsQualifyingStatuses() {
+  const r = state.restaurant || {};
+  const isDriverFulfilled = !!(r.goSeries || r.businessType === 'groceries');
+  return isDriverFulfilled
+    ? ['ready', 'picked_up', 'out_for_delivery', 'out-for-delivery', 'dispatched', 'on_the_way', 'on-the-way', 'delivered', 'completed', 'done']
+    : ['delivered', 'completed', 'done'];
+}
+
+let dailyEarningsTotal = 0;
+let dailyEarningsOrderCount = 0;
+let dailyEarningsOrders = [];
+
+function listenDailyEarnings() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'restaurants/' + state.restId + '/orders'), snap => {
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+    const qualifying = dailyEarningsQualifyingStatuses();
+    let total = 0, count = 0;
+    const list = [];
+    snap.forEach(child => {
+      const o = child.val();
+      const status = (o.status || '').toLowerCase();
+      if (!qualifying.includes(status)) return;
+      if ((o.createdAt || 0) < startOfDay.getTime()) return;
+      // The shop's own sale amount: what the customer paid minus the
+      // platform fee and delivery charge portions of `total` — those go to
+      // the platform/delivery boy, never to the shop — and minus nothing
+      // else, since any shop discount is already netted out of `total`.
+      const earning = Math.max(0, (o.total || 0) - (o.platformFee || 0) - (o.deliveryFee || 0));
+      total += earning;
+      count++;
+      list.push({ _id: child.key, ...o, _earning: earning });
+    });
+    list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    dailyEarningsTotal = total;
+    dailyEarningsOrderCount = count;
+    dailyEarningsOrders = list.slice(0, 25);
+    renderDailyEarningsUI();
+    const badge = document.getElementById('daily-earnings-status-badge');
+    if (badge) badge.textContent = "₹" + total;
+  });
+}
+
+function openDailyEarningsScreen() {
+  showScreen('daily-earnings');
+  renderDailyEarningsUI();
+}
+
+function renderDailyEarningsUI() {
+  const totalEl = document.getElementById('daily-earnings-total');
+  const countEl = document.getElementById('daily-earnings-order-count');
+  const listEl = document.getElementById('daily-earnings-list');
+  if (!totalEl) return;
+  totalEl.textContent = "₹" + dailyEarningsTotal;
+  countEl.textContent = "From " + dailyEarningsOrderCount + " order" + (dailyEarningsOrderCount === 1 ? '' : 's');
+
+  listEl.innerHTML = "";
+  if (dailyEarningsOrders.length === 0) {
+    const p = document.createElement('p');
+    p.className = "hint-text";
+    p.textContent = "No completed sales yet today.";
+    listEl.appendChild(p);
+    return;
+  }
+  dailyEarningsOrders.forEach(o => {
+    const row = document.createElement('div');
+    row.className = "pay-pending-row";
+    row.innerHTML = `<span>${o.orderNumber || o._id}</span><span>₹${o._earning}</span>`;
+    listEl.appendChild(row);
+  });
+}
+
 // ---------- PAYMENT PENDING (GPay orders awaiting restaurant's confirmation) ----------
 // GPay orders land here first (status: 'awaiting_payment') instead of the
 // normal accept/reject popup, so nothing gets cooked before the restaurant
@@ -5331,9 +5799,13 @@ function updateDeliveryChargePreview() {
   if (freeUnderKm !== '' && Number(freeUnderKm) > 0) {
     sub += " · free under " + freeUnderKm + " km";
   }
+  const freeAboveRaw = document.getElementById('delivery-free-above').value;
+  if (freeAboveRaw !== '' && Number(freeAboveRaw) > 0) {
+    sub += " · free on orders of ₹" + freeAboveRaw + " and above";
+  }
   document.getElementById('delivery-charge-preview-sub').textContent = sub;
 }
-['delivery-base-fee', 'delivery-per-km-fee', 'delivery-free-under-km'].forEach(id => {
+['delivery-base-fee', 'delivery-per-km-fee', 'delivery-free-under-km', 'delivery-free-above'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('input', updateDeliveryChargePreview);
 });
@@ -5344,13 +5816,15 @@ document.getElementById('delivery-charges-save-btn').addEventListener('click', a
   const baseFee = Number(document.getElementById('delivery-base-fee').value) || 0;
   const perKmFee = Number(document.getElementById('delivery-per-km-fee').value) || 0;
   const freeUnderKmRaw = document.getElementById('delivery-free-under-km').value;
-  if (baseFee < 0 || perKmFee < 0 || (freeUnderKmRaw !== '' && Number(freeUnderKmRaw) < 0)) {
+  const freeAboveRaw = document.getElementById('delivery-free-above').value;
+  if (baseFee < 0 || perKmFee < 0 || (freeUnderKmRaw !== '' && Number(freeUnderKmRaw) < 0) || (freeAboveRaw !== '' && Number(freeAboveRaw) < 0)) {
     errEl.textContent = "Charges can't be negative.";
     errEl.style.display = "block";
     return;
   }
   const deliveryCharges = { baseFee, perKmFee };
   if (freeUnderKmRaw !== '') deliveryCharges.freeUnderKm = Number(freeUnderKmRaw);
+  if (freeAboveRaw !== '' && Number(freeAboveRaw) > 0) deliveryCharges.freeAbove = Number(freeAboveRaw); // blank / 0 = off (not stored)
 
   const btn = document.getElementById('delivery-charges-save-btn');
   btn.disabled = true;
@@ -5647,8 +6121,53 @@ const OP_ORDER_LATE_MS = 5 * 60 * 1000; // 5 minutes — shop hasn't accepted/re
 let opReportShopId = null;
 let opReportShopName = '';
 let opReportOrdersCache = []; // orders currently shown for the picked shop+date — used by the delete action
+let opQueueSeenIds = null; // pending queue order ids already seen (null until first snapshot)
+let opGroceriesQueue = []; // groceryOrderQueue entries, live from Firebase
+let opGroceriesAssignOrderId = null; // which queue order the assign modal is currently showing
+
+// ---- Operator device push (so the operator is alerted about new NESH Store
+// orders even when the app is closed). The device's FCM token is saved to
+// operator_devices/{key}; the Cloudflare Worker's type:'operator' alert
+// sends to every token there. ----
+let opPushRegistered = false;
+let opDeviceKey = null;
+async function opRegisterOperatorPush() {
+  if (opPushRegistered) return;
+  const PN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
+  if (!PN) return; // plain browser tab — nothing to register
+  opPushRegistered = true;
+  try {
+    let perm = await PN.checkPermissions();
+    if (perm.receive !== 'granted') perm = await PN.requestPermissions();
+    if (perm.receive !== 'granted') return;
+    PN.addListener('registration', async token => {
+      try {
+        const { db, ref, set } = window.fb;
+        opDeviceKey = String(token.value).replace(/[.$#\[\]\/]/g, '_');
+        await set(ref(db, 'operator_devices/' + opDeviceKey), { token: token.value, updatedAt: Date.now() });
+      } catch (e) {}
+    });
+    await PN.register();
+  } catch (e) {}
+}
+// Short two-tone beep for the panel when it's open in the foreground
+// (push notifications aren't shown while the app is in front).
+function opBeep() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC();
+    [0, 0.25].forEach((t, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = i ? 1046 : 784; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.25, ctx.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.22);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.23);
+    });
+  } catch (e) {}
+}
 
 function opEnterPanel() {
+  opRegisterOperatorPush();
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('operator-container').classList.add('show');
   opOpenSection('home');
@@ -5661,9 +6180,18 @@ function opEnterPanel() {
   opListenBusFeatureToggle();
   opListenCategoryOrder();
   opListenShopOrder();
+  opListenNeshItemOrder();
+  opListenNeshSections();
+  opListenNeshCategories();
+  opListenNeshPrices();
+  opListenGroceryQueue();
   setInterval(opUpdateOrdersHomeBadge, 30000); // keeps the "late" badge current even while sitting on the home screen
 }
 function opLogout() {
+  if (opDeviceKey) {
+    try { const { db, ref, remove } = window.fb; remove(ref(db, 'operator_devices/' + opDeviceKey)).catch(() => {}); } catch (e) {}
+    opDeviceKey = null;
+  }
   localStorage.removeItem('asfood_is_operator');
   document.getElementById('operator-container').classList.remove('show');
   showScreen('login');
@@ -5685,7 +6213,13 @@ function opOpenSection(name) {
   if (name === 'pricing') opLoadExtraAmount();
   if (name === 'taxi-fare') opLoadTaxiFare();
   if (name === 'go-series') opLoadGoSeries();
+  if (name === 'shop-zones') opRenderShopZones();
   if (name === 'report') opRenderReportShopList();
+  if (name === 'groceries-queue') opRenderGroceriesQueueList();
+  if (name === 'groceries-catalog') opRenderGroceriesCatalog();
+  if (name === 'nesh-item-order') opBuildNeshItemOrderWorking();
+  if (name === 'nesh-sections') opRenderNeshSections();
+  if (name === 'nesh-categories') opRenderNeshCategories();
   if (name === 'orders') {
     opRenderOrdersList();
     if (!opOrdersLateTimer) opOrdersLateTimer = setInterval(opRenderOrdersList, 30000);
@@ -5889,15 +6423,132 @@ function opSaveTaxiFare() {
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
-/* ---- Go Series: a separate delivery charge (base fee + per-km) that
-   applies ONLY to shops added to the Go Series list below. Charge is stored
-   at app_config/goSeriesDelivery = { baseFee, perKmFee, updatedAt }. Which
-   shops it applies to is stored per-shop as restaurants/{id}.goSeries=true —
-   the customer app's currentDeliveryFee() checks that flag and, if set,
-   uses this charge instead of the shop's own deliveryCharges. Any shop
-   without the flag is completely unaffected — same as before this feature
-   existed. Delivery-driver assignment (nearest-free-bike / dedicated
-   driver) is unchanged either way — see updateOrderStatus() and
+/* ---- Shop Zones: operator-drawn zones, each with its own list of shops.
+   Stored at app_config/shopZones/{zoneId} = { name, bounds:[{lat,lng}...],
+   shopIds:{shopId:true}, createdAt }. The customer app reads this: with any
+   zone present, a customer only sees/orders from the shops of the zone their
+   location is inside, and a location outside every zone is "not available". ---- */
+let opShopZones = [];
+let opShopZonesListening = false;
+let opSzOpenZoneId = null; // zone whose "Manage shops" panel is expanded
+let opSzSearch = '';
+function opListenShopZones() {
+  if (opShopZonesListening) return;
+  opShopZonesListening = true;
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'app_config/shopZones'), snap => {
+    const v = snap.val() || {};
+    opShopZones = Object.keys(v).map(id => Object.assign({ _id: id }, v[id]))
+      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    const sec = document.getElementById('op-section-shop-zones');
+    if (sec && sec.classList.contains('active')) opRenderShopZones();
+  });
+}
+function opSzBoundsOk(z) {
+  const b = Array.isArray(z.bounds) ? z.bounds : Object.values(z.bounds || {});
+  return b.length >= 3;
+}
+function opRenderShopZones() {
+  const wrap = document.getElementById('op-sz-list');
+  if (!wrap) return;
+  if (!opShopZones.length) { wrap.innerHTML = '<p class="op-note">No zones yet — add one above.</p>'; return; }
+  wrap.innerHTML = opShopZones.map(z => {
+    const count = Object.keys(z.shopIds || {}).filter(k => z.shopIds[k]).length;
+    const open = opSzOpenZoneId === z._id;
+    return `
+    <div class="op-partner-item" style="display:block; margin-bottom:12px;">
+      <div class="op-partner-name">${escapeHtml(z.name || z._id)}</div>
+      <div class="op-partner-sub">${opSzBoundsOk(z) ? '📍 Boundary set' : '⚠️ No boundary drawn yet (customers can\'t be matched to this zone)'} · ${count} shop${count === 1 ? '' : 's'}</div>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+        <button type="button" class="op-btn op-btn-push" style="margin:0;" onclick="opOpenShopZoneAreaModal('${z._id}')">🗺️ Draw boundary</button>
+        <button type="button" class="op-btn" style="margin:0;" onclick="opSzToggleManage('${z._id}')">${open ? '▲ Hide shops' : '🏪 Manage shops'}</button>
+        <button type="button" class="op-btn op-btn-danger" style="margin:0;" onclick="opDeleteShopZone('${z._id}')">🗑 Delete</button>
+      </div>
+      ${open ? `
+      <div style="margin-top:12px;">
+        <div class="op-search-box" style="margin-bottom:6px;">
+          <input type="text" id="op-sz-shop-search" placeholder="Search shops..." value="${escapeHtml(opSzSearch)}" oninput="opSzSearch=this.value; opRenderSzShopList('${z._id}')">
+        </div>
+        <div id="op-sz-shops-${z._id}" style="max-height:280px; overflow-y:auto;"></div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+  if (opSzOpenZoneId) opRenderSzShopList(opSzOpenZoneId);
+}
+function opSzToggleManage(zoneId) {
+  opSzOpenZoneId = (opSzOpenZoneId === zoneId) ? null : zoneId;
+  opSzSearch = '';
+  opRenderShopZones();
+}
+function opRenderSzShopList(zoneId) {
+  const box = document.getElementById('op-sz-shops-' + zoneId);
+  if (!box) return;
+  const z = opShopZones.find(x => x._id === zoneId);
+  if (!z) return;
+  const q = (opSzSearch || '').trim().toLowerCase();
+  const inZone = z.shopIds || {};
+  const shops = opAllPartners
+    .filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q))
+    .sort((a, b) => ((inZone[b._id] ? 1 : 0) - (inZone[a._id] ? 1 : 0)) || (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id));
+  if (!shops.length) { box.innerHTML = '<p class="op-note">No matching shops.</p>'; return; }
+  box.innerHTML = shops.slice(0, 80).map(p => `
+    <label class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+      <div>
+        <div class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</div>
+        <div class="op-partner-sub">${escapeHtml(opTypeLabel(p.businessType))}</div>
+      </div>
+      <input type="checkbox" ${inZone[p._id] ? 'checked' : ''} style="width:22px; height:22px;" onchange="opSzToggleShop('${zoneId}','${p._id}',this.checked)">
+    </label>
+  `).join('');
+}
+function opSzToggleShop(zoneId, shopId, checked) {
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'app_config/shopZones/' + zoneId + '/shopIds'), { [shopId]: checked ? true : null })
+    .catch(err => alert('Error: ' + err.message));
+}
+function opAddShopZone() {
+  const input = document.getElementById('op-sz-name-input');
+  const status = document.getElementById('op-sz-add-status');
+  const name = input.value.trim();
+  if (!name) { status.textContent = 'Please enter a zone name.'; return; }
+  const { db, ref, push, set } = window.fb;
+  const zRef = push(ref(db, 'app_config/shopZones'));
+  set(zRef, { name, createdAt: Date.now() }).then(() => {
+    input.value = '';
+    status.textContent = 'Zone added — now draw its boundary and add shops.';
+    opOpenShopZoneAreaModal(zRef.key);
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opDeleteShopZone(zoneId) {
+  const z = opShopZones.find(x => x._id === zoneId);
+  if (!confirm('Delete zone "' + ((z && z.name) || zoneId) + '"?')) return;
+  const { db, ref, remove } = window.fb;
+  remove(ref(db, 'app_config/shopZones/' + zoneId)).catch(err => alert('Error: ' + err.message));
+}
+// Same shared map modal as the driver-zone / shop-zone editors.
+function opOpenShopZoneAreaModal(zoneId) {
+  const z = opShopZones.find(x => x._id === zoneId) || { name: zoneId };
+  opZbTarget = { type: 'shopZoneArea', id: zoneId };
+  document.getElementById('op-zb-title').textContent = 'Shop zone — ' + (z.name || zoneId);
+  document.getElementById('op-zb-desc').textContent = 'Pan/zoom to find the spot, then press "Draw the zone" and drag across the map to outline this zone. Customers inside it can order only from the shops you add to it.';
+  document.getElementById('op-zb-error').style.display = 'none';
+  document.getElementById('op-zb-search').value = '';
+  opZbHideSearchResults();
+  const b = Array.isArray(z.bounds) ? z.bounds : Object.values(z.bounds || {});
+  opZbPoints = b.map(pt => ({ lat: pt.lat, lng: pt.lng }));
+  opZbShowMap();
+}
+
+/* ---- Go Series: a separate delivery charge (base fee + per-km) and a
+   separate platform fee that apply ONLY to shops added to the Go Series
+   list below. Both are stored at app_config/goSeriesDelivery = { baseFee,
+   perKmFee, platformFee, updatedAt }. Which shops it applies to is stored
+   per-shop as restaurants/{id}.goSeries=true — the customer app's
+   currentDeliveryFee()/currentPlatformFee() check that flag and, if set,
+   use these numbers instead of the shop's own deliveryCharges and the
+   app-wide platform fee. Any shop without the flag is completely
+   unaffected — same as before this feature existed. Delivery-driver
+   assignment is unchanged either way — see updateOrderStatus() and
    driver.html's deliveryMatchFn. */
 function opLoadGoSeries() {
   const status = document.getElementById('op-goseries-fare-status');
@@ -5907,6 +6558,10 @@ function opLoadGoSeries() {
     const data = snap.val();
     document.getElementById('op-goseries-basefee-input').value = (data && Number(data.baseFee)) || 0;
     document.getElementById('op-goseries-perkm-input').value = (data && Number(data.perKmFee)) || 0;
+    document.getElementById('op-goseries-platformfee-input').value = (data && Number(data.platformFee)) || 0;
+    document.getElementById('op-goseries-itemmarkup-input').value = (data && Number(data.itemMarkup)) || 0;
+    document.getElementById('op-goseries-freeabove-input').value = (data && Number(data.freeDeliveryAbove)) || 0;
+    document.getElementById('op-goseries-freekm-input').value = (data && Number(data.freeDeliveryWithinKm)) || 0;
     status.textContent = data && data.updatedAt ? ('Last updated ' + data.updatedAt + '.') : 'Not set yet.';
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
   document.getElementById('op-goseries-shop-search').value = '';
@@ -5916,10 +6571,24 @@ function opLoadGoSeries() {
 function opSaveGoSeriesFare() {
   const baseFeeInput = document.getElementById('op-goseries-basefee-input');
   const perKmInput = document.getElementById('op-goseries-perkm-input');
+  const platformFeeInput = document.getElementById('op-goseries-platformfee-input');
+  const itemMarkupInput = document.getElementById('op-goseries-itemmarkup-input');
   const status = document.getElementById('op-goseries-fare-status');
   const baseFee = Number(baseFeeInput.value);
   const perKmFee = Number(perKmInput.value);
-  if (isNaN(baseFee) || baseFee < 0 || isNaN(perKmFee) || perKmFee < 0) {
+  const platformFee = Number(platformFeeInput.value);
+  const itemMarkup = Number(itemMarkupInput.value);
+  const freeDeliveryAbove = Number(document.getElementById('op-goseries-freeabove-input').value);
+  if (isNaN(freeDeliveryAbove) || freeDeliveryAbove < 0) {
+    status.textContent = 'Enter a valid free-delivery amount (0 = off).';
+    return;
+  }
+  const freeDeliveryWithinKm = Number(document.getElementById('op-goseries-freekm-input').value);
+  if (isNaN(freeDeliveryWithinKm) || freeDeliveryWithinKm < 0) {
+    status.textContent = 'Enter a valid free-delivery distance in km (0 = off).';
+    return;
+  }
+  if (isNaN(baseFee) || baseFee < 0 || isNaN(perKmFee) || perKmFee < 0 || isNaN(platformFee) || platformFee < 0 || isNaN(itemMarkup) || itemMarkup < 0) {
     status.textContent = 'Enter valid amounts (0 or more).';
     return;
   }
@@ -5928,9 +6597,15 @@ function opSaveGoSeriesFare() {
   set(ref(db, 'app_config/goSeriesDelivery'), {
     baseFee,
     perKmFee,
+    platformFee,
+    itemMarkup,
+    freeDeliveryAbove,
+    freeDeliveryWithinKm,
     updatedAt: new Date().toLocaleString()
   }).then(() => {
-    status.textContent = 'Saved — ₹' + baseFee + ' + ₹' + perKmFee + '/km for every Go Series shop.';
+    status.textContent = 'Saved — ₹' + baseFee + ' + ₹' + perKmFee + '/km delivery, ₹' + platformFee + ' platform fee, ₹' + itemMarkup + ' profit per item for every Go Series shop.' +
+      (freeDeliveryAbove > 0 ? ' Free delivery on orders of ₹' + freeDeliveryAbove + ' and above.' : ' No free delivery by amount.') +
+      (freeDeliveryWithinKm > 0 ? ' Free delivery under ' + freeDeliveryWithinKm + ' km.' : ' No free delivery by distance.');
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 // Search-to-add picker: lists shops NOT currently in Go Series, filtered by
@@ -5940,7 +6615,7 @@ function opRenderGoSeriesShopPicker() {
   if (!wrap) return;
   const q = (document.getElementById('op-goseries-shop-search').value || '').trim().toLowerCase();
   const shops = opAllPartners
-    .filter(p => !p.goSeries)
+    .filter(p => !p.goSeries && p.businessType !== 'groceries')
     .filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q))
     .sort((a, b) => (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id));
   if (!shops.length) {
@@ -5974,7 +6649,9 @@ function opRenderGoSeriesShopList() {
         <div class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</div>
         <div class="op-partner-sub">${escapeHtml(opTypeLabel(p.businessType))}</div>
       </div>
-      <button type="button" class="op-btn op-btn-danger" style="margin:0;" onclick="opRemoveShopFromGoSeries('${p._id}')">✕ Remove</button>
+      ${p.businessType === 'groceries'
+        ? '<span class="op-partner-sub" style="margin:0;">Always in Go Series</span>'
+        : `<button type="button" class="op-btn op-btn-danger" style="margin:0;" onclick="opRemoveShopFromGoSeries('${p._id}')">✕ Remove</button>`}
     </div>
   `).join('');
 }
@@ -5989,6 +6666,8 @@ function opAddShopToGoSeries(id) {
   }).catch(err => alert('Error: ' + err.message));
 }
 function opRemoveShopFromGoSeries(id) {
+  const _p = opAllPartners.find(x => x._id === id);
+  if (_p && _p.businessType === 'groceries') return; // groceries shops are always in Go Series
   const { db, ref, update } = window.fb;
   update(ref(db, 'restaurants/' + id), { goSeries: null }).then(() => {
     const p = opAllPartners.find(x => x._id === id);
@@ -6063,11 +6742,28 @@ function opDeletePushedAppUpdate() {
 
 /* ---- Restaurant Partners list ---- */
 function opListenPartners() {
-  const { db, ref, onValue } = window.fb;
+  const { db, ref, onValue, update } = window.fb;
+  opListenShopZones();
   onValue(ref(db, 'restaurants'), snap => {
     const list = [];
     snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
     opAllPartners = list;
+    // Keep an open "assign groceries order" screen in sync when a shop marks
+    // an item unavailable/available (skipped while an assignment is running).
+    try {
+      const gaModal = document.getElementById('op-groceries-assign-modal');
+      const gaStatus = document.getElementById('op-ga-status');
+      if (opGroceriesAssignOrderId && gaModal && gaModal.classList.contains('show') && (!gaStatus || gaStatus.style.display === 'none')) {
+        opOpenGroceriesAssignModal(opGroceriesAssignOrderId);
+      }
+    } catch (e) {}
+    // Every groceries shop is always in Go Series — flag any that aren't yet.
+    list.forEach(p => {
+      if (p.businessType === 'groceries' && !p.goSeries) {
+        p.goSeries = true;
+        update(ref(db, 'restaurants/' + p._id), { goSeries: true }).catch(() => {});
+      }
+    });
     opRenderPartnersList();
     opRenderChatConvList();
     opRenderOrdersList();
@@ -6077,9 +6773,939 @@ function opListenPartners() {
     if (reportDetail && reportDetail.classList.contains('active')) opRenderReportOrders();
     const shopOrderSec = document.getElementById('op-section-shop-order');
     if (shopOrderSec && shopOrderSec.classList.contains('active')) opBuildShopOrderWorking();
+    const groceriesCatalogSec = document.getElementById('op-section-groceries-catalog');
+    if (groceriesCatalogSec && groceriesCatalogSec.classList.contains('active')) opRenderGroceriesCatalog();
+    const neshItemOrderSec = document.getElementById('op-section-nesh-item-order');
+    if (neshItemOrderSec && neshItemOrderSec.classList.contains('active')) opBuildNeshItemOrderWorking();
+    const neshSectionsSec = document.getElementById('op-section-nesh-sections');
+    if (neshSectionsSec && neshSectionsSec.classList.contains('active')) opRenderNeshSections();
+    const secEditorModal = document.getElementById('op-section-editor-modal');
+    if (secEditorModal && secEditorModal.classList.contains('show')) opRenderSectionEditorShops();
+    const neshCatSec = document.getElementById('op-section-nesh-categories');
+    if (neshCatSec && neshCatSec.classList.contains('active')) opRenderNeshCategories();
+    const catEditorModal = document.getElementById('op-category-editor-modal');
+    if (catEditorModal && catEditorModal.classList.contains('show')) opRenderCategoryEditorItems();
   });
 }
 function opTypeLabel(t) { return t === 'groceries' ? 'Groceries' : t === 'online_shop' ? 'Other Shop' : 'Hotel'; }
+
+/* ---- Groceries Catalog (operator view: every item, every shop's own price,
+   when that price was last changed, and the computed "customer price" —
+   the same highest-price-wins rule index.html's buildNeshStoreCatalog()
+   uses for the actual NESH Store display) ---- */
+function opGroceriesCatalogGroups() {
+  const shops = (opAllPartners || []).filter(p => p.businessType === 'groceries');
+  const groups = {};
+  const order = [];
+  shops.forEach(shop => {
+    const menu = shop.menu || {};
+    const shopSuspended = shop.status === 'suspended';
+    const shopOff = !!shop.shopUnavailable;
+    Object.keys(menu).forEach(itemId => {
+      const it = menu[itemId];
+      if (!it || !it.name) return;
+      const key = (it.name || '').trim().toLowerCase() + '|' + (it.unit || 'piece');
+      if (!groups[key]) {
+        groups[key] = { name: it.name, unit: it.unit || 'piece', shops: [] };
+        order.push(key);
+      }
+      groups[key].shops.push({
+        shopId: shop._id,
+        shopName: shop.restaurantName || shop._id,
+        price: Number(it.price) || 0,
+        unavailable: !!it.unavailable,
+        priceUpdatedAt: it.priceUpdatedAt || null,
+        shopSuspended,
+        shopOff
+      });
+    });
+  });
+  return order.map(key => groups[key]).sort((a, b) => a.name.localeCompare(b.name));
+}
+function opRenderGroceriesCatalog() {
+  const wrap = document.getElementById('op-groc-catalog-list');
+  if (!wrap) return;
+  const q = (document.getElementById('op-groc-catalog-search').value || '').trim().toLowerCase();
+  const groups = opGroceriesCatalogGroups().filter(g => !q || g.name.toLowerCase().includes(q));
+  if (!groups.length) { wrap.innerHTML = '<div class="op-empty">No groceries stock items yet.</div>'; return; }
+  const suffix = { gram: ' /g', kg: ' /kg' };
+  wrap.innerHTML = groups.map(g => {
+    // Customer price = highest price among shops that currently have this
+    // item priced & marked available, AND the shop itself is active (not
+    // suspended) and not toggled "shop unavailable" — the exact rule
+    // rebuildRestaurantsFromSnapshot()/buildNeshStoreCatalog() in index.html
+    // use for what the customer actually sees and pays. A suspended or
+    // shop-unavailable shop drops out of NESH Store entirely, so it drops
+    // out of this calculation too — but it still shows below, grayed out
+    // and labelled, so you can see it's there without it winning.
+    const eligible = g.shops.filter(s => !s.unavailable && s.price > 0 && !s.shopSuspended && !s.shopOff);
+    const maxPrice = eligible.length ? Math.max(...eligible.map(s => s.price)) : null;
+    const shopRows = g.shops.slice().sort((a, b) => b.price - a.price).map(s => {
+      const isWinner = maxPrice != null && !s.unavailable && !s.shopSuspended && !s.shopOff && s.price === maxPrice;
+      const updatedText = s.priceUpdatedAt ? timeAgo(s.priceUpdatedAt) : 'never updated';
+      const tags = [
+        s.shopSuspended ? '<span style="color:#f87171;">(shop suspended)</span>' : '',
+        (!s.shopSuspended && s.shopOff) ? '<span style="color:#f87171;">(shop unavailable)</span>' : '',
+        s.unavailable ? '<span style="color:#f87171;">(item unavailable)</span>' : ''
+      ].filter(Boolean).join(' ');
+      const dim = s.shopSuspended || s.shopOff;
+      return `
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:5px 0; border-top:1px solid #124a24; opacity:${dim ? '0.55' : '1'};">
+          <span style="font-size:.82rem; color:${isWinner ? '#39ff14' : '#a3b3a8'};">${isWinner ? '⭐ ' : ''}${escapeHtml(s.shopName)}${tags ? ' ' + tags : ''}</span>
+          <span style="font-size:.78rem; color:#1f7a3d; text-align:right; white-space:nowrap;">₹${s.price} · ${escapeHtml(updatedText)}</span>
+        </div>`;
+    }).join('');
+    return `
+      <div class="op-partner-item" style="cursor:default;">
+        <div class="op-partner-top">
+          <span class="op-partner-name">${escapeHtml(g.name)}</span>
+          <span class="op-partner-sub">per ${escapeHtml(g.unit)}${suffix[g.unit] || ''}</span>
+        </div>
+        ${opCustomerPriceLineHtml(g, maxPrice)}
+        ${shopRows}
+      </div>
+    `;
+  }).join('');
+}
+
+/* ==================================================================
+   NESH STORE ITEM ORDER — which item shows first in the customer app's
+   merged NESH Store groceries catalog (Operator Panel → NESH Store Item
+   Order). Stored as an ordered array of item keys (name+unit, lowercased
+   — the same key opGroceriesCatalogGroups()/buildNeshStoreCatalog() group
+   items by) at app_config/neshStoreItemOrder. An item not yet in the
+   saved array (brand new, or the operator has never touched this screen)
+   is appended at the end automatically, same pattern as Shop Order.
+   ================================================================== */
+let opNeshItemOrderSaved = []; // last known-saved order, from Firebase
+let opNeshItemOrderWorking = []; // {key, name, unit} objects, in the order currently being edited
+function opListenNeshItemOrder() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'app_config/neshStoreItemOrder'), snap => {
+    opNeshItemOrderSaved = Array.isArray(snap.val()) ? snap.val().slice() : [];
+    const sec = document.getElementById('op-section-nesh-item-order');
+    if (sec && sec.classList.contains('active')) opBuildNeshItemOrderWorking();
+  });
+}
+function opBuildNeshItemOrderWorking() {
+  const groups = opGroceriesCatalogGroups().map(g => ({
+    key: g.name.trim().toLowerCase() + '|' + g.unit, name: g.name, unit: g.unit
+  }));
+  const byKey = {};
+  groups.forEach(g => { byKey[g.key] = g; });
+  const ordered = opNeshItemOrderSaved.filter(k => byKey[k]).map(k => byKey[k]);
+  const orderedKeys = new Set(ordered.map(g => g.key));
+  const remaining = groups.filter(g => !orderedKeys.has(g.key));
+  opNeshItemOrderWorking = ordered.concat(remaining);
+  opRenderNeshItemOrderList();
+}
+function opRenderNeshItemOrderList() {
+  const wrap = document.getElementById('op-nesh-item-order-list');
+  if (!wrap) return;
+  if (!opNeshItemOrderWorking.length) {
+    wrap.innerHTML = '<p class="op-note">No groceries stock items yet.</p>';
+    return;
+  }
+  const suffix = { gram: ' /g', kg: ' /kg' };
+  wrap.innerHTML = opNeshItemOrderWorking.map((g, i) => `
+    <div class="op-partner-item" style="display:flex; align-items:center; justify-content:space-between;">
+      <span class="op-partner-name">${escapeHtml(g.name)} <span class="op-partner-sub">per ${escapeHtml(g.unit)}${suffix[g.unit] || ''}</span></span>
+      <span>
+        <button type="button" class="op-btn" style="padding:6px 10px; margin:0 0 0 6px;" onclick="opMoveNeshItemOrder(${i}, -1)" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button type="button" class="op-btn" style="padding:6px 10px; margin:0 0 0 6px;" onclick="opMoveNeshItemOrder(${i}, 1)" ${i === opNeshItemOrderWorking.length - 1 ? 'disabled' : ''}>▼</button>
+      </span>
+    </div>
+  `).join('');
+}
+function opMoveNeshItemOrder(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= opNeshItemOrderWorking.length) return;
+  [opNeshItemOrderWorking[i], opNeshItemOrderWorking[j]] = [opNeshItemOrderWorking[j], opNeshItemOrderWorking[i]];
+  opRenderNeshItemOrderList();
+}
+function opSaveNeshItemOrder() {
+  const { db, ref, set } = window.fb;
+  const status = document.getElementById('op-nesh-item-order-status');
+  status.textContent = 'Saving...';
+  const keys = opNeshItemOrderWorking.map(g => g.key);
+  set(ref(db, 'app_config/neshStoreItemOrder'), keys)
+    .then(() => { status.textContent = 'Saved — the customer app will pick this up live.'; })
+    .catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+/* ==================================================================
+   NESH STORE SECTIONS (Operator Panel → NESH Store Sections)
+   A section is just a named group of existing groceries shops (e.g.
+   "Supermarket", "Chicken Store"), stored at
+   app_config/neshStoreSections/{sectionId} = { name, createdAt,
+   shops: { shopId: true } }. Picking a section and adding a stock item
+   writes that item (price 0, unavailable:true — same record shape as
+   opAddGroceryItem()) into restaurants/{shopId}/menu for EVERY shop in
+   the section. A shop can be in more than one section; a shop that
+   already has the same item (name + unit) is skipped, so nothing is
+   ever duplicated. Deleting a section only removes the grouping — stock
+   already added to shops stays put.
+   ================================================================== */
+let opNeshSections = []; // [{ id, name, shopIds: [...], createdAt }], live from Firebase
+let opSectionEditingId = null; // null while creating a new section
+let opSectionPickSet = new Set(); // shop ids ticked in the editor modal
+let opSecItemPhotoUrl = '';
+
+function opListenNeshSections() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'app_config/neshStoreSections'), snap => {
+    const list = [];
+    snap.forEach(child => {
+      const v = child.val() || {};
+      list.push({ id: child.key, name: v.name || '(unnamed)', shopIds: Object.keys(v.shops || {}), createdAt: v.createdAt || 0 });
+    });
+    list.sort((a, b) => (a.createdAt - b.createdAt) || a.name.localeCompare(b.name));
+    opNeshSections = list;
+    const sec = document.getElementById('op-section-nesh-sections');
+    if (sec && sec.classList.contains('active')) opRenderNeshSections();
+  });
+}
+
+// The section's shops that still exist and are still groceries shops.
+function opSectionShops(sec) {
+  const ids = new Set(sec.shopIds);
+  return (opAllPartners || []).filter(p => p.businessType === 'groceries' && ids.has(p._id));
+}
+function opShopLabel(p) { return p.restaurantName || p._id; }
+
+function opRenderNeshSections() {
+  const wrap = document.getElementById('op-sec-list');
+  const sel = document.getElementById('op-sec-add-select');
+  if (!wrap || !sel) return;
+  if (!opNeshSections.length) {
+    wrap.innerHTML = '<div class="op-empty">No sections yet. Tap "New section" to make one — e.g. Supermarket or Chicken Store.</div>';
+  } else {
+    wrap.innerHTML = opNeshSections.map(s => {
+      const names = opSectionShops(s).map(opShopLabel).sort((a, b) => a.localeCompare(b));
+      return `
+        <div class="op-partner-item" style="cursor:default;">
+          <div class="op-partner-top">
+            <span class="op-partner-name">${escapeHtml(s.name)}</span>
+            <span class="op-partner-sub">${names.length} shop${names.length === 1 ? '' : 's'}</span>
+          </div>
+          <div class="op-partner-sub" style="margin:6px 0 10px;">${names.length ? escapeHtml(names.join(', ')) : 'No shops selected yet'}</div>
+          <button type="button" class="op-btn op-btn-push" style="padding:6px 10px; margin-bottom:0;" onclick="opOpenSectionEditor('${s.id}')">✏️ Edit name &amp; shops</button>
+          <button type="button" class="op-btn op-btn-danger" style="padding:6px 10px; margin-bottom:0;" onclick="opDeleteSection('${s.id}')">🗑️ Delete</button>
+        </div>`;
+    }).join('');
+  }
+  // Only touch the dropdown when its options actually changed, so a
+  // background shop update never closes it while the operator is choosing.
+  const optionsHtml = opNeshSections.length
+    ? '<option value="">Select a section…</option>' + opNeshSections.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')
+    : '<option value="">No sections yet — create one below</option>';
+  if (sel.dataset.sig !== optionsHtml) {
+    const prev = sel.value;
+    sel.innerHTML = optionsHtml;
+    sel.dataset.sig = optionsHtml;
+    if (prev && opNeshSections.some(s => s.id === prev)) sel.value = prev;
+  }
+  opUpdateSectionAddHint();
+}
+
+function opUpdateSectionAddHint() {
+  const hint = document.getElementById('op-sec-add-hint');
+  const sel = document.getElementById('op-sec-add-select');
+  if (!hint || !sel) return;
+  const s = opNeshSections.find(x => x.id === sel.value);
+  if (!s) { hint.textContent = ''; return; }
+  const names = opSectionShops(s).map(opShopLabel).sort((a, b) => a.localeCompare(b));
+  hint.textContent = names.length
+    ? `Will be added to ${names.length} shop${names.length === 1 ? '' : 's'}: ${names.join(', ')}`
+    : 'This section has no shops yet — use "Edit name & shops" below first.';
+}
+
+/* ---- Create / edit a section (name + which shops) ---- */
+function opOpenSectionEditor(id) {
+  const s = id ? opNeshSections.find(x => x.id === id) : null;
+  if (id && !s) return;
+  opSectionEditingId = s ? s.id : null;
+  opSectionPickSet = new Set(s ? s.shopIds : []);
+  document.getElementById('op-sec-editor-title').textContent = s ? 'Edit section' : 'New section';
+  document.getElementById('op-sec-editor-name').value = s ? s.name : '';
+  document.getElementById('op-sec-editor-search').value = '';
+  const st = document.getElementById('op-sec-editor-status');
+  st.style.display = 'none'; st.textContent = '';
+  opRenderSectionEditorShops();
+  document.getElementById('op-section-editor-modal').classList.add('show');
+}
+function opRenderSectionEditorShops() {
+  const wrap = document.getElementById('op-sec-editor-shops');
+  if (!wrap) return;
+  const q = (document.getElementById('op-sec-editor-search').value || '').trim().toLowerCase();
+  const all = (opAllPartners || []).filter(p => p.businessType === 'groceries')
+    .sort((a, b) => opShopLabel(a).localeCompare(opShopLabel(b)));
+  const shops = all.filter(p => !q || opShopLabel(p).toLowerCase().includes(q));
+  if (!shops.length) {
+    wrap.innerHTML = `<div class="op-empty">${all.length ? 'No shops match your search.' : 'No groceries shops found.'}</div>`;
+  } else {
+    wrap.innerHTML = shops.map(p => {
+      const others = opNeshSections.filter(s => s.id !== opSectionEditingId && s.shopIds.includes(p._id)).map(s => s.name);
+      return `
+        <label style="display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #124a24; cursor:pointer;">
+          <input type="checkbox" style="width:20px; height:20px; margin:0; accent-color:#33ff66;" ${opSectionPickSet.has(p._id) ? 'checked' : ''} onchange="opToggleSectionShop('${p._id}', this.checked)">
+          <span style="font-size:.85rem; color:#33ff66;">${escapeHtml(opShopLabel(p))}${others.length ? ` <span style="color:#1f7a3d; font-size:.72rem;">(also in ${escapeHtml(others.join(', '))})</span>` : ''}</span>
+        </label>`;
+    }).join('');
+  }
+  opUpdateSectionEditorCount();
+}
+function opToggleSectionShop(shopId, on) {
+  if (on) opSectionPickSet.add(shopId); else opSectionPickSet.delete(shopId);
+  opUpdateSectionEditorCount();
+}
+function opUpdateSectionEditorCount() {
+  const el = document.getElementById('op-sec-editor-count');
+  if (!el) return;
+  const valid = new Set((opAllPartners || []).filter(p => p.businessType === 'groceries').map(p => p._id));
+  let n = 0;
+  opSectionPickSet.forEach(id => { if (valid.has(id)) n++; });
+  el.textContent = n + ' shop' + (n === 1 ? '' : 's') + ' selected';
+}
+async function opSaveSectionEditor() {
+  const status = document.getElementById('op-sec-editor-status');
+  const say = (msg, color) => { status.style.display = 'block'; status.style.color = color || 'var(--chili)'; status.textContent = msg; };
+  const name = document.getElementById('op-sec-editor-name').value.trim();
+  if (!name) { say('Enter a section name.'); return; }
+  if (opNeshSections.some(s => s.id !== opSectionEditingId && s.name.trim().toLowerCase() === name.toLowerCase())) {
+    say('A section with this name already exists.'); return;
+  }
+  const validIds = new Set((opAllPartners || []).filter(p => p.businessType === 'groceries').map(p => p._id));
+  if (!validIds.size) { say('Shops are still loading — try again in a moment.'); return; }
+  const shops = {};
+  opSectionPickSet.forEach(id => { if (validIds.has(id)) shops[id] = true; });
+  const hasShops = Object.keys(shops).length > 0;
+  say('Saving…', 'var(--marigold)');
+  try {
+    const { db, ref, push, set, update } = window.fb;
+    if (opSectionEditingId) {
+      await update(ref(db, 'app_config/neshStoreSections/' + opSectionEditingId), { name, shops: hasShops ? shops : null });
+    } else {
+      const data = { name, createdAt: Date.now() };
+      if (hasShops) data.shops = shops;
+      await set(push(ref(db, 'app_config/neshStoreSections')), data);
+    }
+    document.getElementById('op-section-editor-modal').classList.remove('show');
+    showToast('Section saved');
+  } catch (err) {
+    say('Failed: ' + (err && err.message ? err.message : 'check your connection and try again.'));
+  }
+}
+async function opDeleteSection(id) {
+  const s = opNeshSections.find(x => x.id === id);
+  if (!s) return;
+  if (!confirm(`Delete the section "${s.name}"?\n\nStock already added to its shops stays where it is — only the section grouping is removed.`)) return;
+  try {
+    const { db, ref, remove } = window.fb;
+    await remove(ref(db, 'app_config/neshStoreSections/' + id));
+    showToast('Section deleted');
+  } catch (err) {
+    showToast("Couldn't delete — check your connection");
+  }
+}
+
+/* ---- Add a stock item to every shop in a section ---- */
+async function opHandleSectionItemPhoto(e) {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  const label = document.getElementById('op-sec-item-photo-label');
+  label.textContent = 'Uploading…';
+  try {
+    opSecItemPhotoUrl = await uploadPhotoToCloudinary(file);
+    label.textContent = 'Photo added ✓';
+  } catch (err) {
+    opSecItemPhotoUrl = '';
+    label.textContent = 'Upload failed — tap to retry';
+  }
+}
+async function opAddStockToSection() {
+  const status = document.getElementById('op-sec-add-status');
+  const say = (msg, color) => { status.style.display = 'block'; status.style.color = color || 'var(--chili)'; status.textContent = msg; };
+  const sec = opNeshSections.find(x => x.id === document.getElementById('op-sec-add-select').value);
+  if (!sec) { say('Select a section first.'); return; }
+  const name = document.getElementById('op-sec-item-name').value.trim();
+  const desc = document.getElementById('op-sec-item-desc').value.trim();
+  const unit = document.getElementById('op-sec-item-unit').value || 'piece';
+  if (!name) { say('Enter an item name.'); return; }
+  const shops = opSectionShops(sec);
+  if (!shops.length) { say('This section has no shops yet — use "Edit name & shops" first.'); return; }
+
+  // Skip shops that already carry this item (same name + unit — the same
+  // key the Groceries Catalog groups by), so re-adding never duplicates.
+  const key = name.toLowerCase();
+  const targets = [], skipped = [];
+  shops.forEach(shop => {
+    const has = Object.values(shop.menu || {}).some(it => it && (it.name || '').trim().toLowerCase() === key && (it.unit || 'piece') === unit);
+    (has ? skipped : targets).push(shop);
+  });
+  if (!targets.length) { say(`Every shop in "${sec.name}" already has "${name}" — nothing to add.`, 'var(--marigold)'); return; }
+  if (!confirm(`Add "${name}" to ${targets.length} shop${targets.length === 1 ? '' : 's'} in "${sec.name}"?` + (skipped.length ? `\n\n(${skipped.length} already ha${skipped.length === 1 ? 's' : 've'} it and will be skipped.)` : ''))) return;
+
+  say('Adding…', 'var(--marigold)');
+  const { db, ref, push, set } = window.fb;
+  const data = { name, desc, price: 0, unit, photo: opSecItemPhotoUrl || '', unavailable: true, sizes: [] };
+  const results = await Promise.allSettled(
+    targets.map(shop => set(push(ref(db, 'restaurants/' + shop._id + '/menu')), Object.assign({}, data)))
+  );
+  const failed = targets.filter((_, i) => results[i].status === 'rejected');
+  const okCount = targets.length - failed.length;
+  let msg = `Added "${name}" to ${okCount} shop${okCount === 1 ? '' : 's'} in "${sec.name}"`;
+  if (skipped.length) msg += ` (${skipped.length} skipped — already had it)`;
+  msg += ' — hidden from customers until each shop sets a price and marks it available.';
+  if (failed.length) {
+    msg = `Added to ${okCount}, but failed for: ${failed.map(opShopLabel).join(', ')}. Tap Add again to retry just those.`;
+    say(msg);
+  } else {
+    say(msg, '#33ff66');
+    document.getElementById('op-sec-item-name').value = '';
+    document.getElementById('op-sec-item-desc').value = '';
+    document.getElementById('op-sec-item-unit').value = 'piece';
+    opSecItemPhotoUrl = '';
+    document.getElementById('op-sec-item-photo-label').textContent = 'Add photo (optional)';
+  }
+  if (okCount) showToast(`Stock item added to ${okCount} shop${okCount === 1 ? '' : 's'}`);
+}
+
+/* ==================================================================
+   NESH STORE CATEGORIES (Operator Panel → NESH Store Categories)
+   A category is a named list of merged NESH Store items (e.g.
+   "Vegetables"), stored at app_config/neshStoreCategories/{id} =
+   { name, order, items: [itemKey, ...] }. itemKey is the same
+   name+unit lowercased key the merged catalog groups by (see
+   opGroceriesCatalogGroups() / buildNeshStoreCatalog()). The customer
+   app shows each category as a tab at the top of NESH Store; tapping it
+   filters the catalog to those items. An item can be in several
+   categories. Keys go in an array (not as object keys) because item
+   names can contain characters Firebase doesn't allow in keys.
+   ================================================================== */
+let opNeshCategories = []; // [{ id, name, order, itemKeys }], live from Firebase
+let opCatEditingId = null; // null while creating a new category
+let opCatPickSet = new Set(); // item keys ticked in the editor
+let opCatEditorGroups = []; // [{ key, name, unit }] — what the editor is currently listing
+
+function opNeshItemKey(g) { return (g.name || '').trim().toLowerCase() + '|' + (g.unit || 'piece'); }
+
+function opListenNeshCategories() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'app_config/neshStoreCategories'), snap => {
+    const list = [];
+    snap.forEach(child => {
+      const v = child.val() || {};
+      list.push({ id: child.key, name: v.name || '(unnamed)', order: Number(v.order) || 0, itemKeys: Object.values(v.items || {}) });
+    });
+    list.sort((a, b) => (a.order - b.order) || a.name.localeCompare(b.name));
+    opNeshCategories = list;
+    const sec = document.getElementById('op-section-nesh-categories');
+    if (sec && sec.classList.contains('active')) opRenderNeshCategories();
+  });
+}
+
+function opRenderNeshCategories() {
+  const wrap = document.getElementById('op-cat-list');
+  if (!wrap) return;
+  if (!opNeshCategories.length) {
+    wrap.innerHTML = '<div class="op-empty">No categories yet. Tap "New category" to make one — e.g. Vegetables or Fruits.</div>';
+    return;
+  }
+  const byKey = new Map(opGroceriesCatalogGroups().map(g => [opNeshItemKey(g), g]));
+  const suffix = { gram: ' /g', kg: ' /kg' };
+  wrap.innerHTML = opNeshCategories.map((c, i) => {
+    const items = c.itemKeys.map(k => byKey.get(k)).filter(Boolean);
+    const names = items.slice(0, 6).map(g => g.name + (suffix[g.unit] || ''));
+    const more = items.length > 6 ? ` +${items.length - 6} more` : '';
+    return `
+      <div class="op-partner-item" style="cursor:default;">
+        <div class="op-partner-top">
+          <span class="op-partner-name">${escapeHtml(c.name)}</span>
+          <span class="op-partner-sub">${items.length} item${items.length === 1 ? '' : 's'}</span>
+        </div>
+        <div class="op-partner-sub" style="margin:6px 0 10px;">${items.length ? escapeHtml(names.join(', ')) + more : 'No items found — edit to pick items'}</div>
+        <button type="button" class="op-btn" style="padding:6px 10px; margin-bottom:0;" onclick="opMoveNeshCategory('${c.id}', -1)" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button type="button" class="op-btn" style="padding:6px 10px; margin-bottom:0;" onclick="opMoveNeshCategory('${c.id}', 1)" ${i === opNeshCategories.length - 1 ? 'disabled' : ''}>▼</button>
+        <button type="button" class="op-btn op-btn-push" style="padding:6px 10px; margin-bottom:0;" onclick="opOpenCategoryEditor('${c.id}')">✏️ Edit</button>
+        <button type="button" class="op-btn op-btn-danger" style="padding:6px 10px; margin-bottom:0;" onclick="opDeleteNeshCategory('${c.id}')">🗑️ Delete</button>
+      </div>`;
+  }).join('');
+}
+
+function opOpenCategoryEditor(id) {
+  const c = id ? opNeshCategories.find(x => x.id === id) : null;
+  if (id && !c) return;
+  opCatEditingId = c ? c.id : null;
+  opCatPickSet = new Set(c ? c.itemKeys : []);
+  document.getElementById('op-cat-editor-title').textContent = c ? 'Edit category' : 'New category';
+  document.getElementById('op-cat-editor-name').value = c ? c.name : '';
+  document.getElementById('op-cat-editor-search').value = '';
+  const st = document.getElementById('op-cat-editor-status');
+  st.style.display = 'none'; st.textContent = '';
+  opRenderCategoryEditorItems();
+  document.getElementById('op-category-editor-modal').classList.add('show');
+}
+// Items the editor is currently showing (after the search filter), each
+// with its index into opCatEditorGroups so handlers never need the key
+// itself inside an inline onclick (item names can contain quotes).
+function opCategoryShownItems() {
+  const q = (document.getElementById('op-cat-editor-search').value || '').trim().toLowerCase();
+  const out = [];
+  opCatEditorGroups.forEach((g, i) => { if (!q || g.name.toLowerCase().includes(q)) out.push({ i, g }); });
+  return out;
+}
+function opRenderCategoryEditorItems() {
+  const wrap = document.getElementById('op-cat-editor-items');
+  if (!wrap) return;
+  opCatEditorGroups = opGroceriesCatalogGroups().map(g => ({ key: opNeshItemKey(g), name: g.name, unit: g.unit || 'piece' }));
+  const shown = opCategoryShownItems();
+  const suffix = { gram: ' /g', kg: ' /kg' };
+  if (!shown.length) {
+    wrap.innerHTML = `<div class="op-empty">${opCatEditorGroups.length ? 'No items match your search.' : 'No groceries stock items yet.'}</div>`;
+  } else {
+    wrap.innerHTML = shown.map(({ i, g }) => {
+      const others = opNeshCategories.filter(c => c.id !== opCatEditingId && c.itemKeys.includes(g.key)).map(c => c.name);
+      return `
+        <label style="display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #124a24; cursor:pointer;">
+          <input type="checkbox" style="width:20px; height:20px; margin:0; accent-color:#33ff66;" ${opCatPickSet.has(g.key) ? 'checked' : ''} onchange="opToggleCategoryItem(${i}, this.checked)">
+          <span style="font-size:.85rem; color:#33ff66;">${escapeHtml(g.name)} <span style="color:#1f7a3d; font-size:.72rem;">per ${escapeHtml(g.unit)}${suffix[g.unit] || ''}${others.length ? ' · also in ' + escapeHtml(others.join(', ')) : ''}</span></span>
+        </label>`;
+    }).join('');
+  }
+  opUpdateCategoryEditorCount();
+}
+function opToggleCategoryItem(i, on) {
+  const g = opCatEditorGroups[i];
+  if (!g) return;
+  if (on) opCatPickSet.add(g.key); else opCatPickSet.delete(g.key);
+  opUpdateCategoryEditorCount();
+}
+function opCategorySelectShown(on) {
+  opCategoryShownItems().forEach(({ g }) => { if (on) opCatPickSet.add(g.key); else opCatPickSet.delete(g.key); });
+  opRenderCategoryEditorItems();
+}
+function opUpdateCategoryEditorCount() {
+  const el = document.getElementById('op-cat-editor-count');
+  if (!el) return;
+  const valid = new Set(opCatEditorGroups.map(g => g.key));
+  let n = 0;
+  opCatPickSet.forEach(k => { if (valid.has(k)) n++; });
+  el.textContent = n + ' item' + (n === 1 ? '' : 's') + ' selected';
+}
+async function opSaveCategoryEditor() {
+  const status = document.getElementById('op-cat-editor-status');
+  const say = (msg, color) => { status.style.display = 'block'; status.style.color = color || 'var(--chili)'; status.textContent = msg; };
+  const name = document.getElementById('op-cat-editor-name').value.trim();
+  if (!name) { say('Enter a category name.'); return; }
+  if (opNeshCategories.some(c => c.id !== opCatEditingId && c.name.trim().toLowerCase() === name.toLowerCase())) {
+    say('A category with this name already exists.'); return;
+  }
+  const valid = new Set(opGroceriesCatalogGroups().map(opNeshItemKey));
+  if (!valid.size) { say('Items are still loading — try again in a moment.'); return; }
+  const keys = [];
+  opCatPickSet.forEach(k => { if (valid.has(k)) keys.push(k); });
+  if (!keys.length) { say('Select at least one item.'); return; }
+  say('Saving…', 'var(--marigold)');
+  try {
+    const { db, ref, push, set, update } = window.fb;
+    if (opCatEditingId) {
+      await update(ref(db, 'app_config/neshStoreCategories/' + opCatEditingId), { name, items: keys });
+    } else {
+      // New categories go to the end of the tab row (order = creation time).
+      await set(push(ref(db, 'app_config/neshStoreCategories')), { name, order: Date.now(), items: keys });
+    }
+    document.getElementById('op-category-editor-modal').classList.remove('show');
+    showToast('Category saved — live in the customer app');
+  } catch (err) {
+    say('Failed: ' + (err && err.message ? err.message : 'check your connection and try again.'));
+  }
+}
+async function opMoveNeshCategory(id, dir) {
+  const i = opNeshCategories.findIndex(c => c.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= opNeshCategories.length) return;
+  const arr = opNeshCategories.slice();
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  // Renumber everything by its new position so the order is always
+  // unambiguous (no two categories ever share an order value).
+  const updates = {};
+  arr.forEach((c, idx) => { updates[c.id + '/order'] = idx + 1; });
+  try {
+    const { db, ref, update } = window.fb;
+    await update(ref(db, 'app_config/neshStoreCategories'), updates);
+  } catch (err) {
+    showToast("Couldn't reorder — check your connection");
+  }
+}
+async function opDeleteNeshCategory(id) {
+  const c = opNeshCategories.find(x => x.id === id);
+  if (!c) return;
+  if (!confirm(`Delete the category "${c.name}"?\n\nThe items themselves aren't touched — only this tab is removed from the customer app.`)) return;
+  try {
+    const { db, ref, remove } = window.fb;
+    await remove(ref(db, 'app_config/neshStoreCategories/' + id));
+    showToast('Category deleted');
+  } catch (err) {
+    showToast("Couldn't delete — check your connection");
+  }
+}
+
+/* ==================================================================
+   NESH STORE CUSTOMER PRICE OVERRIDE (Operator Panel → Groceries Catalog
+   → "Set customer price" on any item)
+   By default the customer price of a merged NESH Store item is the
+   highest price any shop has it available at (+ the Go Series item
+   markup). Here the operator can pin an exact customer price for an
+   item instead. Stored at app_config/neshStorePrices/{encodedItemKey} =
+   price (in the item's own unit: per piece / per kg / per gram). The
+   key is the same name+unit lowercased item key the catalog groups by,
+   URI-encoded (with "." also encoded) so it's a legal Firebase key.
+   index.html's buildNeshStoreCatalog() applies it; removing it puts the
+   item back on the automatic price. It never creates an item — an item
+   still only shows once some shop has it available.
+   ================================================================== */
+let opNeshPrices = {}; // { encodedItemKey: price }, live from Firebase
+let opGoSeriesItemMarkup = 0; // ₹ per item baked into every groceries price the customer sees
+let opCpEditingEnc = null;
+
+function opNeshPriceKey(itemKey) { return encodeURIComponent(itemKey).replace(/\./g, '%2E'); }
+
+function opListenNeshPrices() {
+  const { db, ref, onValue } = window.fb;
+  const rerender = () => {
+    const sec = document.getElementById('op-section-groceries-catalog');
+    if (sec && sec.classList.contains('active')) opRenderGroceriesCatalog();
+  };
+  onValue(ref(db, 'app_config/neshStorePrices'), snap => {
+    const v = snap.val();
+    opNeshPrices = (v && typeof v === 'object') ? v : {};
+    rerender();
+  });
+  onValue(ref(db, 'app_config/goSeriesDelivery'), snap => {
+    const v = snap.val();
+    opGoSeriesItemMarkup = (v && Number(v.itemMarkup)) || 0;
+    rerender();
+  });
+  // Buttons inside the catalog list carry the encoded item key in a data
+  // attribute (item names can hold quotes, so never inline them in onclick).
+  const list = document.getElementById('op-groc-catalog-list');
+  if (list) list.addEventListener('click', e => {
+    const setBtn = e.target.closest('[data-cp]');
+    if (setBtn) { opOpenCustomerPriceModal(setBtn.dataset.cp); return; }
+    const resetBtn = e.target.closest('[data-cp-reset]');
+    if (resetBtn) opClearCustomerPrice(resetBtn.dataset.cpReset, false);
+  });
+}
+
+// The "Customer price: …" line + buttons at the top of each catalog item.
+// `maxPrice` is the highest eligible shop price (without the markup).
+function opCustomerPriceLineHtml(g, maxPrice) {
+  const enc = opNeshPriceKey(opNeshItemKey(g));
+  const auto = maxPrice != null ? Math.round((maxPrice + (opGoSeriesItemMarkup || 0)) * 100) / 100 : null;
+  const ov = Number(opNeshPrices[enc]) || 0;
+  let line;
+  if (ov > 0) {
+    line = `Customer price: ₹${ov} <span style="color:#a78bfa;">✍️ set by you</span>` +
+      (auto != null
+        ? ` <span style="color:#1f7a3d; font-weight:400;">· auto would be ₹${auto}</span>`
+        : ` <span style="color:#f87171; font-weight:400;">· hidden — no shop has it available</span>`);
+  } else {
+    line = `Customer price: ${auto != null ? '₹' + auto : '— no shop has it available'}`;
+  }
+  const btnStyle = 'padding:5px 9px; margin:0 6px 4px 0; font-size:.74rem;';
+  const btns = `<button type="button" class="op-btn op-btn-push" style="${btnStyle}" data-cp="${enc}">✏️ ${ov > 0 ? 'Change' : 'Set'} customer price</button>` +
+    (ov > 0 ? `<button type="button" class="op-btn" style="${btnStyle}" data-cp-reset="${enc}">↩ Use auto price</button>` : '');
+  return `<div style="margin:6px 0 6px; font-size:.85rem; font-weight:700; color:#39ff14;">${line}</div><div>${btns}</div>`;
+}
+
+function opOpenCustomerPriceModal(enc) {
+  const g = opGroceriesCatalogGroups().find(x => opNeshPriceKey(opNeshItemKey(x)) === enc);
+  if (!g) { showToast('That item is no longer in the catalog'); return; }
+  opCpEditingEnc = enc;
+  const ov = Number(opNeshPrices[enc]) || 0;
+  const eligible = g.shops.filter(s => !s.unavailable && s.price > 0 && !s.shopSuspended && !s.shopOff);
+  const maxPrice = eligible.length ? Math.max(...eligible.map(s => s.price)) : null;
+  const markup = opGoSeriesItemMarkup || 0;
+  const auto = maxPrice != null ? Math.round((maxPrice + markup) * 100) / 100 : null;
+  const per = { gram: 'per gram', kg: 'per kg' }[g.unit] || 'per piece';
+  document.getElementById('op-cp-title').textContent = g.name;
+  document.getElementById('op-cp-info').textContent = auto != null
+    ? `Automatic customer price right now: ₹${auto} (highest shop price ₹${maxPrice}${markup ? ' + ₹' + markup + ' item markup' : ''}).`
+    : "No shop has this item available right now, so customers can't see it yet — a price set here shows once a shop makes it available.";
+  document.getElementById('op-cp-unit').textContent = `Price is ${per}. Customers pay exactly this — the item markup is not added on top.`;
+  document.getElementById('op-cp-input').value = ov > 0 ? ov : '';
+  document.getElementById('op-cp-reset-btn').style.display = ov > 0 ? 'inline-block' : 'none';
+  const st = document.getElementById('op-cp-status');
+  st.style.display = 'none'; st.textContent = '';
+  document.getElementById('op-cprice-modal').classList.add('show');
+}
+async function opSaveCustomerPrice() {
+  const status = document.getElementById('op-cp-status');
+  const say = (msg, color) => { status.style.display = 'block'; status.style.color = color || 'var(--chili)'; status.textContent = msg; };
+  const enc = opCpEditingEnc;
+  if (!enc) return;
+  const val = Number(document.getElementById('op-cp-input').value);
+  if (!(val > 0)) { say('Enter a price above ₹0 — or tap "Use automatic price".'); return; }
+  const price = Math.round(val * 100) / 100;
+  say('Saving…', 'var(--marigold)');
+  try {
+    const { db, ref, set } = window.fb;
+    await set(ref(db, 'app_config/neshStorePrices/' + enc), price);
+    document.getElementById('op-cprice-modal').classList.remove('show');
+    showToast('Customer price set — live in the customer app');
+  } catch (err) {
+    say('Failed: ' + (err && err.message ? err.message : 'check your connection and try again.'));
+  }
+}
+async function opClearCustomerPrice(enc, fromModal) {
+  if (!enc) return;
+  if (!fromModal && !confirm('Go back to the automatic customer price for this item?')) return;
+  try {
+    const { db, ref, remove } = window.fb;
+    await remove(ref(db, 'app_config/neshStorePrices/' + enc));
+    if (fromModal) document.getElementById('op-cprice-modal').classList.remove('show');
+    showToast('Back to automatic price');
+  } catch (err) {
+    showToast("Couldn't update — check your connection");
+  }
+}
+
+/* ---- NESH Store grocery order queue (orders awaiting shop assignment) ---- */
+// Customer app's merged "NESH Store" groceries catalog can't tie an order to
+// one real shop at checkout time (the whole point is the customer never
+// picks a shop) — so those orders land here instead of under any
+// restaurants/{id}/orders, carrying each item's price at every shop that
+// stocks it. This operator screen is where a human actually decides who
+// fulfills it, seeing the price/profit trade-off first.
+function opListenGroceryQueue() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'groceryOrderQueue'), snap => {
+    const list = [];
+    snap.forEach(child => list.push(Object.assign({ _id: child.key }, child.val())));
+    // Beep + toast when a NEW unassigned order arrives while the panel is open.
+    const pendingIds = list.filter(o => o.status === 'pending_assignment').map(o => o._id);
+    if (opQueueSeenIds !== null && pendingIds.some(id => !opQueueSeenIds.has(id))) {
+      opBeep();
+      showToast('🛒 New NESH Store order waiting for a shop');
+    }
+    opQueueSeenIds = new Set(pendingIds);
+    opGroceriesQueue = list;
+    const activeSection = document.getElementById('op-section-groceries-queue');
+    if (activeSection && activeSection.classList.contains('active')) opRenderGroceriesQueueList();
+    opUpdateGroceriesQueueHomeBadge();
+    // Keep the assign modal in sync if it's open on an order that just
+    // changed (e.g. reopened on another device, or already assigned there).
+    if (opGroceriesAssignOrderId) {
+      const stillPending = opGroceriesQueue.find(o => o._id === opGroceriesAssignOrderId && o.status === 'pending_assignment');
+      if (!stillPending) document.getElementById('op-groceries-assign-modal').classList.remove('show');
+    }
+  });
+}
+function opUpdateGroceriesQueueHomeBadge() {
+  const badge = document.getElementById('op-groceries-queue-home-badge');
+  if (!badge) return;
+  const count = opGroceriesQueue.filter(o => o.status === 'pending_assignment').length;
+  badge.textContent = count > 0 ? String(count) : '';
+  badge.style.display = count > 0 ? 'flex' : 'none';
+}
+function opRenderGroceriesQueueList() {
+  const wrap = document.getElementById('op-groceries-queue-list');
+  if (!wrap) return;
+  const list = opGroceriesQueue.filter(o => o.status === 'pending_assignment').sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  if (!list.length) { wrap.innerHTML = '<div class="op-empty">No NESH Store orders waiting for assignment.</div>'; return; }
+  wrap.innerHTML = list.map(o => {
+    const itemCount = (o.items || []).reduce((s, it) => s + (it.qty || 0), 0);
+    return `
+      <div class="op-order-item" onclick="opOpenGroceriesAssignModal('${o._id}')">
+        <div class="op-order-top">
+          <span class="op-order-shop">#${escapeHtml(String(o.orderNumber || o._id))}</span>
+          <span class="op-order-status-pill op-order-status-pending">unassigned</span>
+        </div>
+        <div class="op-order-sub">${escapeHtml(o.customerName || 'Guest')} · ₹${o.total || 0} · ${itemCount} item${itemCount === 1 ? '' : 's'} · ${timeAgo(o.createdAt || Date.now())}</div>
+      </div>
+    `;
+  }).join('');
+}
+// For a queue order, works out — per candidate shop — how much of the
+// order that shop can actually cover, what it'd cost at that shop's own
+// prices, and the profit (what the customer is being charged for those
+// covered items, since the customer always pays NESH Store's displayed
+// price, minus what the shop actually charges). Shops covering every item
+// sort first; ties broken by highest profit.
+// Straight-line distance in km between two lat/lng points.
+function opKmBetween(lat1, lng1, lat2, lng2) {
+  const R = 6371, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function opCandidateShopsForOrder(order) {
+  const shopMap = {};
+  (order.items || []).forEach(it => {
+    (it.shopOptions || []).forEach(o => {
+      if (!shopMap[o.shopId]) shopMap[o.shopId] = { shopId: o.shopId, shopName: o.shopName, shopTotal: 0, coveredCount: 0, missing: [] };
+    });
+  });
+  // Live check against the shop's CURRENT menu: an item the shop has since
+  // marked unavailable (or removed) no longer counts as in stock.
+  const liveState = (shopId, itemId) => {
+    const p = opAllPartners.find(x => x._id === shopId);
+    if (!p || !p.menu || itemId == null) return 'ok'; // can't verify — trust the order snapshot
+    const m = p.menu[itemId];
+    if (!m) return 'removed';
+    return m.unavailable ? 'unavailable' : 'ok';
+  };
+  Object.keys(shopMap).forEach(shopId => {
+    (order.items || []).forEach(it => {
+      const opt = (it.shopOptions || []).find(o => o.shopId === shopId);
+      const live = opt ? liveState(shopId, opt.itemId) : 'ok';
+      if (opt && live !== 'ok') {
+        shopMap[shopId].missing.push(it.name + (live === 'unavailable' ? ' (marked unavailable)' : ' (removed)'));
+      } else if (opt) {
+        shopMap[shopId].shopTotal += (Number(opt.price) || 0) * (it.qty || 0);
+        shopMap[shopId].coveredCount += 1;
+      } else {
+        shopMap[shopId].missing.push(it.name);
+      }
+    });
+  });
+  const displayedItemsTotal = (order.items || []).reduce((s, it) => s + (Number(it.price) || 0) * (it.qty || 0), 0);
+  const list = Object.values(shopMap).map(s => Object.assign(s, {
+    fullCoverage: s.missing.length === 0,
+    profit: Math.round((displayedItemsTotal - s.shopTotal) * 100) / 100
+  }));
+  // Distance from each shop to the customer's pinned delivery spot.
+  const hasCust = typeof order.customerLat === 'number' && typeof order.customerLng === 'number';
+  list.forEach(c => {
+    c.km = null;
+    const p = opAllPartners.find(x => x._id === c.shopId);
+    const m = p && p.location ? String(p.location).trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/) : null;
+    if (hasCust && m) c.km = Math.round(opKmBetween(order.customerLat, order.customerLng, parseFloat(m[1]), parseFloat(m[2])) * 10) / 10;
+  });
+  list.sort((a, b) => (b.fullCoverage - a.fullCoverage) || (b.profit - a.profit));
+  // Marks: nearest shop and highest-profit shop (among shops that have every
+  // item, or among all shops if none does). Can be the same shop.
+  const pool = list.some(c => c.fullCoverage) ? list.filter(c => c.fullCoverage) : list;
+  const withKm = pool.filter(c => c.km != null);
+  const nearest = withKm.length ? withKm.reduce((m, c) => c.km < m.km ? c : m) : null;
+  const richest = pool.length ? pool.reduce((m, c) => c.profit > m.profit ? c : m) : null;
+  list.forEach(c => { c.isNearest = c === nearest; c.isBestProfit = c === richest; });
+  return list;
+}
+function opOpenGroceriesAssignModal(orderId) {
+  const order = opGroceriesQueue.find(o => o._id === orderId);
+  if (!order) return;
+  opGroceriesAssignOrderId = orderId;
+  document.getElementById('op-ga-title').textContent = '#' + (order.orderNumber || orderId);
+  document.getElementById('op-ga-customer').textContent = `${order.customerName || 'Guest'} · ${order.customerPhone || ''} · ${order.customerLocation || order.customerAddress || ''}`;
+  document.getElementById('op-ga-items').innerHTML = (order.items || []).map(it =>
+    `<div class="op-note" style="margin-bottom:4px;">${it.qty}× ${escapeHtml(it.name)} — ₹${it.price} each (NESH Store price)</div>`
+  ).join('');
+  const candidates = opCandidateShopsForOrder(order);
+  const candWrap = document.getElementById('op-ga-candidates');
+  if (!candidates.length) {
+    candWrap.innerHTML = '<div class="op-empty">No shop currently stocks any of these items.</div>';
+  } else {
+    candWrap.innerHTML = candidates.map(c => `
+      <div class="op-order-item" style="cursor:default;">
+        <div class="op-order-top">
+          <span class="op-order-shop">${escapeHtml(c.shopName || c.shopId)}</span>
+          <span style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+          ${c.isNearest ? '<span class="op-order-status-pill op-order-status-ready">📍 Nearest</span>' : ''}
+          ${c.isBestProfit ? '<span class="op-order-status-pill op-order-status-ready">💰 Best profit</span>' : ''}
+          <span class="op-order-status-pill op-order-status-${c.fullCoverage ? 'ready' : 'cancelled'}">${c.fullCoverage ? 'has all items' : (c.coveredCount + '/' + (order.items || []).length + ' items')}</span>
+          </span>
+        </div>
+        <div class="op-order-sub">${c.km != null ? '📍 ' + c.km + ' km from customer · ' : '📍 distance unknown · '}Shop total ₹${Math.round(c.shopTotal * 100) / 100} · Total profit ₹${c.profit}${c.missing.length ? ' · Missing: ' + c.missing.map(escapeHtml).join(', ') : ''}</div>
+        <button type="button" class="op-btn op-btn-push" style="margin-top:8px;" onclick="event.stopPropagation(); opAssignGroceryOrder('${order._id}','${c.shopId}')">Assign to this shop</button>
+      </div>
+    `).join('');
+  }
+  document.getElementById('op-ga-status').style.display = 'none';
+  document.getElementById('op-groceries-assign-modal').classList.add('show');
+}
+// Copies the queue order, unchanged (same items, same NESH-Store-displayed
+// prices and totals the customer already saw and agreed to pay at
+// checkout — the shop simply keeps whatever margin sits between that price
+// and their own, which is exactly the "profit" shown above), into
+// restaurants/{shopId}/orders/{orderId} using the SAME key the queue entry
+// already has. From there it's a completely normal order — the shop's own
+// dashboard, native alert, driver matching/notification, settlement due
+// amount, everything downstream works exactly as it does for any other
+// order, untouched by any of this. The queue entry itself is kept (not
+// deleted) and marked assigned, so the customer's tracking screen (which
+// starts out watching the queue entry) knows which shop to switch to.
+async function opAssignGroceryOrder(orderId, shopId) {
+  const order = opGroceriesQueue.find(o => o._id === orderId);
+  const shop = opAllPartners.find(p => p._id === shopId);
+  const status = document.getElementById('op-ga-status');
+  status.style.display = 'block';
+  if (!order || !shop) { status.style.color = 'var(--chili)'; status.textContent = 'Order or shop not found.'; return; }
+  status.style.color = 'var(--marigold)';
+  status.textContent = 'Assigning…';
+  try {
+    const { db, ref, set, update } = window.fb;
+    const orderPayload = {
+      orderNumber: order.orderNumber,
+      status: 'pending',
+      createdAt: order.createdAt,
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      customerAddress: order.customerAddress,
+      customerLocation: order.customerLocation,
+      customerPlace: order.customerPlace,
+      customerLandmark: order.customerLandmark,
+      customerDeviceId: order.customerDeviceId,
+      items: order.items.map(it => ({ name: it.name, desc: it.desc || '', price: it.price, qty: it.qty, unit: it.unit })),
+      total: order.total,
+      platformFee: order.platformFee,
+      platformDue: order.platformFee,
+      deliveryFee: order.deliveryFee,
+      ...(order.freeDelivery ? { freeDelivery: true, deliveryFeeWaived: order.deliveryFeeWaived || 0 } : {}),
+      shopDiscountApplied: 0,
+      paymentMethod: 'Cash on Delivery',
+      fromNeshStoreQueue: true
+    };
+    if (typeof order.customerLat === 'number' && typeof order.customerLng === 'number') {
+      orderPayload.customerLat = order.customerLat;
+      orderPayload.customerLng = order.customerLng;
+    }
+    if (order.deliveryDistanceKm != null) {
+      orderPayload.deliveryDistanceKm = order.deliveryDistanceKm;
+      orderPayload.deliveryDistanceIsRoadRoute = order.deliveryDistanceIsRoadRoute;
+    }
+    await set(ref(db, 'restaurants/' + shopId + '/orders/' + orderId), orderPayload);
+    await update(ref(db, 'groceryOrderQueue/' + orderId), { status: 'assigned', assignedShopId: shopId, assignedShopName: shop.restaurantName || shopId });
+
+    // Same fire-and-forget shop alert the customer app sends at normal
+    // order placement — since this order is only reaching a real shop now
+    // (at assignment time, not at checkout time), it has to be sent here.
+    fetch('https://broad-paper-6445.raise3715.workers.dev', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restId: shopId,
+        orderId: orderId,
+        orderNumber: order.orderNumber,
+        itemsSummary: (order.items || []).map(it => `${it.qty}x ${it.name}`).join(', '),
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        customerAddress: order.customerLocation || order.customerAddress || '',
+        totalAmount: order.total,
+      }),
+    }).catch(() => {});
+
+    status.style.color = '#2C4A37';
+    status.textContent = 'Assigned to ' + (shop.restaurantName || shopId) + '.';
+    showToast('Order #' + order.orderNumber + ' assigned to ' + (shop.restaurantName || shopId));
+    setTimeout(() => { document.getElementById('op-groceries-assign-modal').classList.remove('show'); }, 800);
+  } catch (err) {
+    status.style.color = 'var(--chili)';
+    status.textContent = 'Failed: ' + (err && err.message ? err.message : 'check your connection and try again.');
+  }
+}
 
 /* ==================================================================
    HOME CATEGORY ORDER — controls the order Food / Groceries /
@@ -6602,7 +8228,10 @@ function opSaveZoneBoundary() {
   if (!opZbTarget) return;
   const { db, ref, update } = window.fb;
   const isShopZone = opZbTarget.type === 'shopZone';
-  const path = isShopZone ? 'restaurants/' + opZbTarget.id : 'driver_zones/' + opZbTarget.id;
+  const isShopZoneArea = opZbTarget.type === 'shopZoneArea';
+  const path = isShopZone ? 'restaurants/' + opZbTarget.id
+    : isShopZoneArea ? 'app_config/shopZones/' + opZbTarget.id
+    : 'driver_zones/' + opZbTarget.id;
   const field = isShopZone ? 'deliveryZone' : 'bounds';
   update(ref(db, path), { [field]: opZbPoints })
     .then(() => {
@@ -7020,11 +8649,6 @@ function opListenDrivers() {
     if (opCurrentDriverId && document.getElementById('op-driver-modal').classList.contains('show')) {
       opShowDriverDetail(opCurrentDriverId, true);
     }
-    // Keep the shop modal's "assigned delivery boy" dropdown current too,
-    // since it lists bike drivers from this same list.
-    if (opCurrentPartnerId && document.getElementById('op-partner-modal').classList.contains('show')) {
-      opPopulatePartnerDriverSelect();
-    }
     opRenderRidesList();
   });
 }
@@ -7263,38 +8887,10 @@ function opPopulatePartnersAreaFilter() {
   sel.innerHTML = '<option value="">All areas</option>' + opAllZones.map(z => `<option value="${z._id}">${escapeHtml(z.name || '')}</option>`).join('');
   if (current && opAllZones.some(z => z._id === current)) sel.value = current;
 }
-// Assigned delivery boy: a bike driver dedicated to one shop. Saved on the
-// restaurant as { dedicatedDriverId, dedicatedDriverName }. The shop app
-// reads this at "mark as ready" time and stamps it onto that order as
-// assignedDriverId — same field the driver app already treats as an
-// override for manually-assigned rides, so it needs no new driver-side
-// logic: the order goes only to this driver (while they're online),
-// bypassing the usual nearest-free-bike matching. See updateOrderStatus()
-// in the shop app and the deliveryMatchFn / assignedDriverId filters in
-// driver.html.
-function opPopulatePartnerDriverSelect() {
-  const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
-  const sel = document.getElementById('op-pm-driver-select');
-  if (!sel) return;
-  const bikeDrivers = opAllDrivers.filter(d => d.vehicleType === 'bike');
-  sel.innerHTML = '<option value="">— No dedicated driver —</option>' + bikeDrivers.map(d => `<option value="${d._id}" ${p && p.dedicatedDriverId === d._id ? 'selected' : ''}>${escapeHtml(d.name || d._id)}</option>`).join('');
-}
-function opSavePartnerDeliveryBoy() {
-  if (!opCurrentPartnerId) return;
-  const sel = document.getElementById('op-pm-driver-select');
-  const status = document.getElementById('op-pm-driver-status');
-  const driverId = sel.value;
-  const driver = opAllDrivers.find(d => d._id === driverId);
-  const { db, ref, update } = window.fb;
-  status.textContent = 'Saving...';
-  update(ref(db, 'restaurants/' + opCurrentPartnerId), { dedicatedDriverId: driverId || null, dedicatedDriverName: driver ? driver.name : null })
-    .then(() => {
-      const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
-      if (p) { p.dedicatedDriverId = driverId || null; p.dedicatedDriverName = driver ? driver.name : null; }
-      status.textContent = driverId ? 'Delivery boy assigned.' : 'Dedicated driver removed — back to normal matching.';
-    })
-    .catch(err => { status.textContent = 'Error: ' + err.message; });
-}
+// Assigned delivery boy (operator-set, per shop) has been removed — see the
+// shop's own manual per-order/bulk "Assign delivery boy" tools instead
+// (shopAssignDeliveryBoy / bulkAssignSelectedOrders), which the shop uses
+// directly from its own order screen.
 // Writes assignedDriverId onto the chosen ride/order. The driver app treats
 // this as an override — that order is offered ONLY to this driver, and only
 // once they're online, regardless of the normal nearest-driver ranking.
@@ -7815,6 +9411,17 @@ function opShowPartnerDetail(id) {
   opRenderShopZoneStatus(p);
   document.getElementById('op-pm-bulk-import-status').textContent = '';
   document.getElementById('op-pm-bulk-import-status').style.display = 'none';
+  // "Add item" is only for groceries partners — NESH Store's shared
+  // catalog. Other business types keep adding their own items as before.
+  const addItemWrap = document.getElementById('op-pm-add-item-wrap');
+  if (addItemWrap) addItemWrap.style.display = (p.businessType === 'groceries') ? 'block' : 'none';
+  document.getElementById('op-pm-item-name').value = '';
+  document.getElementById('op-pm-item-desc').value = '';
+  document.getElementById('op-pm-item-unit').value = 'piece';
+  opAddItemPhotoDataUrl = '';
+  document.getElementById('op-pm-item-photo-label').textContent = 'Add photo (optional)';
+  document.getElementById('op-pm-add-item-status').textContent = '';
+  document.getElementById('op-pm-add-item-status').style.display = 'none';
   document.getElementById('op-pm-bulk-photo-status').textContent = '';
   document.getElementById('op-pm-bulk-photo-status').style.display = 'none';
   document.getElementById('op-pm-export-stock-status').textContent = '';
@@ -7826,8 +9433,6 @@ function opShowPartnerDetail(id) {
   document.getElementById('op-pm-clear-stock-status').style.display = 'none';
   opPopulatePartnerAreaSelect();
   document.getElementById('op-pm-area-status').textContent = '';
-  opPopulatePartnerDriverSelect();
-  document.getElementById('op-pm-driver-status').textContent = '';
   const suspended = p.status === 'suspended';
   document.getElementById('op-pm-status').textContent = suspended ? 'Suspended' : 'Active';
   const toggleBtn = document.getElementById('op-pm-toggle-btn');
@@ -8096,6 +9701,70 @@ async function opConfirmClearStock() {
     status.textContent = 'All stock cleared.';
     document.getElementById('op-pm-clear-stock-auth').style.display = 'none';
     showToast('Stock cleared for ' + (p.restaurantName || p._id));
+  } catch (err) {
+    status.style.color = 'var(--chili)';
+    status.textContent = 'Failed: ' + (err && err.message ? err.message : 'check your connection and try again.');
+  }
+}
+
+let opAddItemPhotoDataUrl = '';
+async function opHandleAddItemPhoto(e) {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  const label = document.getElementById('op-pm-item-photo-label');
+  label.textContent = 'Uploading…';
+  try {
+    const url = await uploadPhotoToCloudinary(file);
+    opAddItemPhotoDataUrl = url;
+    label.textContent = 'Photo added ✓';
+  } catch (err) {
+    opAddItemPhotoDataUrl = '';
+    label.textContent = 'Upload failed — tap to retry';
+  }
+}
+
+// Operator's "Add item" for a groceries partner — writes the same shape of
+// record the shop's own saveItem() writes (restaurants/{id}/menu/{itemId}:
+// name, desc, price, unit, photo, unavailable, sizes), just targeted at
+// whichever shop is open in the partner detail modal instead of the shop's
+// own state.restId. This is the ONLY way a groceries shop's menu grows new
+// items — see the shop-side gating in renderMenu()/openItemForm() that
+// removes their own Add/Bulk import options once businessType is
+// 'groceries'. Unlike before, the operator does NOT set a price here — the
+// item is written at price 0 and unavailable:true so it never shows to
+// customers, until the shop itself opens its Stock screen, sets a real
+// price and marks it available. Pricing (and therefore which shop ends up
+// as the customer-facing "NESH Store" price via the highest-price merge in
+// index.html's buildNeshStoreCatalog(), and the profit math in
+// opCandidateShopsForOrder()) is entirely the shop's own decision now.
+async function opAddGroceryItem() {
+  const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
+  const status = document.getElementById('op-pm-add-item-status');
+  status.style.display = 'block';
+  if (!p) { status.style.color = 'var(--chili)'; status.textContent = 'Shop not found.'; return; }
+  const name = document.getElementById('op-pm-item-name').value.trim();
+  const desc = document.getElementById('op-pm-item-desc').value.trim();
+  const unit = document.getElementById('op-pm-item-unit').value || 'piece';
+  if (!name) {
+    status.style.color = 'var(--chili)';
+    status.textContent = 'Enter an item name.';
+    return;
+  }
+  status.style.color = 'var(--marigold)';
+  status.textContent = 'Adding…';
+  try {
+    const { db, ref, push, set } = window.fb;
+    const data = { name, desc, price: 0, unit, photo: opAddItemPhotoDataUrl || "", unavailable: true, sizes: [] };
+    await set(push(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu')), data);
+    status.style.color = '#2C4A37';
+    status.textContent = `Added "${name}" to ${p.restaurantName || p._id} — still hidden from customers until the shop sets a price and marks it available.`;
+    document.getElementById('op-pm-item-name').value = '';
+    document.getElementById('op-pm-item-desc').value = '';
+    document.getElementById('op-pm-item-unit').value = 'piece';
+    opAddItemPhotoDataUrl = '';
+    document.getElementById('op-pm-item-photo-label').textContent = 'Add photo (optional)';
+    showToast('Stock item added to ' + (p.restaurantName || p._id));
   } catch (err) {
     status.style.color = 'var(--chili)';
     status.textContent = 'Failed: ' + (err && err.message ? err.message : 'check your connection and try again.');

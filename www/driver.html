@@ -1169,8 +1169,8 @@ function applyFriendlyLocationLabel(el, pos) {
 // popup never lags behind by the worker's minute-level Cron granularity.
 const NEAREST_WINDOW_MS = 25 * 1000;
 const MAX_MATCH_RADIUS_KM = 12;
+const NEAR_OVERRIDE_KM = 0.5; // within this distance of the nearest candidate, order count decides instead of raw distance (see rankAmongCandidates)
 const LOCATION_STALE_MS = 3 * 60 * 1000;
-const NEAR_OVERRIDE_KM = 0.5; // within this distance, candidates are compared by order count (see rankAmongCandidates)
 
 // ---------- Live location tracking (while online) ----------
 // Same background-capable tracking as the Bus portal: inside the native
@@ -1749,14 +1749,14 @@ function listenDrivers() {
 // to restrict order matching to only the drivers assigned to the zone a
 // pickup actually falls inside (see zoneForPickup below); zones without a
 // boundary drawn yet fall back to plain distance-based matching.
-let zonesCache = []; // [{ _id, name, bounds? }]
+let zonesCache = []; // [{ _id, name, bounds?, groupId? }]
 function listenZonesForRegistration() {
   const { db, ref, onValue } = window.fb;
   onValue(ref(db, 'driver_zones'), snap => {
     const list = [];
     snap.forEach(child => {
       const v = child.val() || {};
-      list.push({ _id: child.key, name: v.name || '', bounds: Array.isArray(v.bounds) && v.bounds.length >= 3 ? v.bounds : null });
+      list.push({ _id: child.key, name: v.name || '', bounds: Array.isArray(v.bounds) && v.bounds.length >= 3 ? v.bounds : null, groupId: v.groupId || null });
     });
     list.sort((a, b) => a.name.localeCompare(b.name));
     zonesCache = list;
@@ -2040,7 +2040,7 @@ function listenDeliveryJobs() {
       const rest = val[restId] || {};
       const orders = rest.orders || {};
       Object.keys(orders).forEach(orderId => {
-        flat.push(Object.assign({ _restId: restId, _orderId: orderId, _restName: rest.name || '', _restLocation: rest.location || null }, orders[orderId]));
+        flat.push(Object.assign({ _restId: restId, _orderId: orderId, _restName: rest.name || '', _restLocation: rest.location || null, _restGoSeries: !!rest.goSeries }, orders[orderId]));
       });
     });
     deliveriesCache = flat;
@@ -2273,17 +2273,21 @@ function driverOnlineSince(driverId) {
 // Ranks this driver among every other currently-matching online candidate
 // within MAX_MATCH_RADIUS_KM, so we know whose "turn" it is to be offered a
 // job. Ranking is distance-first — the nearest driver to the pickup wins.
-// But drivers who are clustered close together shouldn't have it decided by
-// a handful of metres: any candidate within NEAR_OVERRIDE_KM of whoever's
-// nearest is pulled into that same "cluster", and within the cluster it's
-// order count that decides — whoever has been assigned the fewest
-// rides+deliveries so far goes first — then onlineSince (longest-waiting
-// session first) as a tiebreak, then raw distance as a final tiebreak.
-// Candidates outside the cluster keep their plain distance order. Returns
-// rank -1 if this driver doesn't have a location fix yet (or is excluded as
-// busy, see includeBusy). When includeBusy is false, busy drivers (isBusy on
-// their taxi_drivers record) — including this one, via amIBusy — are left
-// out of the pool entirely, so free drivers always get first claim on a job.
+// But drivers who are clustered close together near the shop shouldn't
+// have it decided by a handful of metres: any candidate within
+// NEAR_OVERRIDE_KM of whoever's nearest is pulled into that same
+// "cluster", and within the cluster it's order count that decides —
+// whoever has been assigned the fewest rides+deliveries so far goes
+// first — then onlineSince (longest-waiting session first) as a tiebreak,
+// then a stable arbitrary tiebreak. Candidates outside the cluster (spread
+// further out across the zone) keep their plain distance order, so a
+// driver who's simply the closest one in the whole zone — with nobody
+// else within 500m of them — still gets first turn, same as a taxi ride.
+// Returns rank -1 if this driver doesn't have a location fix yet (or is
+// excluded as busy, see includeBusy). When includeBusy is false, busy
+// drivers (isBusy on their taxi_drivers record) — including this one, via
+// amIBusy — are left out of the pool entirely, so free drivers always get
+// first claim on a job.
 // Which zone a pickup point actually falls inside, by the zone's drawn
 // boundary (driver_zones/{zoneId}.bounds). Returns the zone's _id, or null
 // if the point isn't inside any drawn zone (nothing drawn yet, or the
@@ -2296,22 +2300,41 @@ function zoneForPickup(pickup) {
   const containing = drawn.find(z => isPointInZoneBounds(pickup, z.bounds));
   return containing ? containing._id : null;
 }
-// Builds the raw candidate list for the pickup's zone ONLY (or, when zoneId
-// is null because the pickup isn't inside any drawn zone, the old
-// zone-agnostic radius search as a fallback). No widening to other zones —
-// if a pickup is inside a drawn zone and that zone currently has nobody
-// matching (free, or busy when includeBusy), the candidate list is simply
-// empty and the job goes unoffered rather than leaking to another zone's
-// drivers.
-function candidatesInZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, zoneId) {
+// A pickup's zone can belong to an operator-defined "group" of zones
+// (driver_zones/{id}.groupId, set from the operator panel's Zone Groups
+// section). When useGroup is true and the zone has one, matching widens to
+// every zone in that same group — a driver registered to ANY zone in the
+// group counts as a match, not just the one exact zone the pickup happens
+// to fall inside. Only delivery (bike) matching passes useGroup=true —
+// taxi ride matching always stays scoped to the exact zone, group or not.
+// Returns a Set containing just zoneId when there's no widening to do, so
+// callers can treat membership the same way either way.
+function zoneMatchSet(zoneId, useGroup) {
+  if (!zoneId) return null;
+  if (!useGroup) return new Set([zoneId]);
+  const zone = zonesCache.find(z => z._id === zoneId);
+  const groupId = zone && zone.groupId;
+  if (!groupId) return new Set([zoneId]);
+  return new Set(zonesCache.filter(z => z.groupId === groupId).map(z => z._id).concat(zoneId));
+}
+// Builds the raw candidate list for the pickup's zone (or its whole zone
+// group, for delivery matching only — see zoneMatchSet) ONLY, or, when
+// zoneId is null because the pickup isn't inside any drawn zone, the old
+// zone-agnostic radius search as a fallback. No widening beyond that
+// group — if a pickup is inside a drawn zone (or group) and it currently
+// has nobody matching (free, or busy when includeBusy), the candidate
+// list is simply empty and the job goes unoffered rather than leaking to
+// another zone's drivers.
+function candidatesInZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, zoneId, useGroup) {
+  const zoneSet = zoneMatchSet(zoneId, useGroup);
   const candidates = [];
-  if ((!amIBusy || includeBusy) && (!zoneId || (state.driver && state.driver.zone === zoneId))) {
+  if ((!amIBusy || includeBusy) && (!zoneSet || (state.driver && zoneSet.has(state.driver.zone)))) {
     candidates.push({ id: state.username, distanceKm: myDistanceKm });
   }
   Object.entries(driversCache).forEach(([id, d]) => {
     if (!d || id === state.username || !matchFn(d)) return;
     if (d.isBusy && !includeBusy) return;
-    if (zoneId && d.zone !== zoneId) return;
+    if (zoneSet && !zoneSet.has(d.zone)) return;
     const loc = d.location;
     if (!loc || typeof loc.lat !== 'number' || !loc.updatedAt) return;
     if (Date.now() - loc.updatedAt > LOCATION_STALE_MS) return;
@@ -2336,9 +2359,9 @@ function stableTieBreakKey(createdAt, driverId) {
   }
   return h;
 }
-function rankAmongCandidates(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, createdAt) {
+function rankAmongCandidates(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, createdAt, useGroup) {
   const zoneId = zoneForPickup(pickup);
-  const candidates = candidatesInZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, zoneId);
+  const candidates = candidatesInZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, zoneId, useGroup);
   // Distance-first: sort everyone by raw distance to the pickup, nearest
   // first. Then pull out the "cluster" — every candidate within
   // NEAR_OVERRIDE_KM of whoever's nearest — since a few hundred metres
@@ -2373,8 +2396,12 @@ function myDistanceToPickup(pickup) {
 // at once. Candidates are restricted to whichever zone the pickup point
 // actually falls inside (by assigned taxi_drivers.zone, matched against the
 // zone's drawn boundary) — a pickup in Zone A is only ever offered to Zone
-// A's drivers, never to a nearby driver from Zone B. If nobody in that zone
-// matches, the job simply isn't offered to anyone (no cross-zone leakage).
+// A's drivers, never to a nearby driver from Zone B — UNLESS this is a
+// delivery (useGroup=true) and Zone A has been added to an operator-defined
+// zone group, in which case every driver registered to any zone in that
+// same group is a candidate too (see zoneMatchSet). Taxi rides never widen
+// this way, group or not. If nobody in that zone (or group) matches, the
+// job simply isn't offered to anyone (no leakage beyond it).
 // Within the zone, candidates are ranked nearest-first; the nearest driver
 // gets the first turn, and if they don't accept within NEAREST_WINDOW_MS
 // the offer rotates to the next-nearest driver, then the next, and so on —
@@ -2387,17 +2414,17 @@ function myDistanceToPickup(pickup) {
 // SAME zone too (including this one) — still never crossing into another
 // zone — so a job never goes completely unoffered just because everyone
 // nearby is already on something.
-function shouldOfferToMe(pickup, createdAt, matchFn, amIBusy) {
+function shouldOfferToMe(pickup, createdAt, matchFn, amIBusy, useGroup) {
   if (!pickup) return true; // no pickup coords on record — can't rank, so don't withhold it
   const distanceKm = myDistanceToPickup(pickup);
   if (distanceKm === Infinity) return false; // we don't know where we are yet
   if (distanceKm > MAX_MATCH_RADIUS_KM) return false; // outside matching radius — never offered
 
-  let { rank, total } = rankAmongCandidates(pickup, matchFn, distanceKm, amIBusy, false, createdAt);
+  let { rank, total } = rankAmongCandidates(pickup, matchFn, distanceKm, amIBusy, false, createdAt, useGroup);
   if (total === 0) {
     // Nobody free in this zone — widen to busy drivers in the SAME zone
     // only, so it isn't left unoffered.
-    ({ rank, total } = rankAmongCandidates(pickup, matchFn, distanceKm, amIBusy, true, createdAt));
+    ({ rank, total } = rankAmongCandidates(pickup, matchFn, distanceKm, amIBusy, true, createdAt, useGroup));
   }
   if (rank < 0) return false;
   const elapsed = Date.now() - (createdAt || 0);
@@ -2580,12 +2607,17 @@ function refreshRidePopupFromCache() {
   const deliveryMatchFn = d => d.isOnline === true && d.vehicleType === 'bike' && (!d.services || d.services.delivery !== false);
   const pendingDeliveries = driverDoesDelivery()
     ? deliveriesCache
+        // Only Go Series shops (restaurants/{id}.goSeries === true) route
+        // their orders to bike delivery boys. Every other shop arranges its
+        // own delivery and is never offered here — see partner.html's
+        // shop-side "Mark as delivered" button for those.
+        .filter(o => o._restGoSeries)
         .filter(o => ['preparing', 'ready'].includes(o.status) && !o.deliveryDriverId)
         .map(o => Object.assign({}, o, { _id: o._restId + '::' + o._orderId, _kind: 'delivery' }))
         .filter(o => !skippedDeliveryIds.has(o._id))
         // Same operator-assignment bypass as rides, above.
         .filter(o => o.assignedDriverId ? o.assignedDriverId === state.username : true)
-        .filter(o => o.assignedDriverId === state.username || shouldOfferToMe(parseLatLngStr(o._restLocation), o.createdAt, deliveryMatchFn, amIBusy))
+        .filter(o => o.assignedDriverId === state.username || shouldOfferToMe(parseLatLngStr(o._restLocation), o.createdAt, deliveryMatchFn, amIBusy, true))
         .map(o => Object.assign({}, o, { _distanceKm: (() => { const p = parseLatLngStr(o._restLocation); return p ? myDistanceToPickup(p) : null; })() }))
     : [];
 
@@ -3611,12 +3643,21 @@ async function markDeliveryDelivered(compositeId) {
 
 function renderEarnings(all) {
   const mine = all.filter(r => r.driverId === state.username && normalizeRideStatus(r.status) === 'completed');
-  const total = mine.reduce((sum, r) => sum + (r.fare || 0), 0);
   const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-  const today = mine.filter(r => (r.createdAt || 0) >= startOfDay.getTime()).reduce((sum, r) => sum + (r.fare || 0), 0);
-  document.getElementById('earn-today').textContent = '₹' + today;
-  document.getElementById('earn-total').textContent = '₹' + total;
-  document.getElementById('earn-trips').textContent = String(mine.length);
+  const rideTotal = mine.reduce((sum, r) => sum + (r.fare || 0), 0);
+  const rideToday = mine.filter(r => (r.createdAt || 0) >= startOfDay.getTime()).reduce((sum, r) => sum + (r.fare || 0), 0);
+
+  // Shop/grocery deliveries: the delivery charge collected from the
+  // customer for each order this driver has completed (o.deliveryFee —
+  // same amount shown on the delivery job card and history list) counts
+  // toward this driver's earnings just like a completed ride's fare does.
+  const myDeliveries = deliveriesCache.filter(o => o.deliveryDriverId === state.username && o.status === 'delivered');
+  const deliveryTotal = myDeliveries.reduce((sum, o) => sum + (o.deliveryFee || 0), 0);
+  const deliveryToday = myDeliveries.filter(o => (o.createdAt || 0) >= startOfDay.getTime()).reduce((sum, o) => sum + (o.deliveryFee || 0), 0);
+
+  document.getElementById('earn-today').textContent = '₹' + (rideToday + deliveryToday);
+  document.getElementById('earn-total').textContent = '₹' + (rideTotal + deliveryTotal);
+  document.getElementById('earn-trips').textContent = String(mine.length + myDeliveries.length);
 }
 
 function buildMapUrl(pos) {
