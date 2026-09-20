@@ -1688,6 +1688,20 @@
         <p class="op-note" id="op-sec-add-status" style="margin-top:4px; display:none;"></p>
       </div>
 
+      <div style="margin-bottom:22px;">
+        <p class="op-note" style="margin-bottom:6px;">Bulk import stock — Excel/CSV with Name, Discription (optional), Unit (optional), Photo link (optional). Adds every row to every shop in the section picked above — same ₹0/unavailable rule, and a shop that already has a row's item (name + unit) is skipped for that row only.</p>
+        <input type="file" id="op-sec-bulk-import-input" accept=".xlsx,.xls,.csv" style="display:none;" onchange="opSecBulkImportFile(event)" />
+        <button type="button" class="op-btn op-btn-push" id="op-sec-bulk-import-btn" onclick="document.getElementById('op-sec-bulk-import-input').click()">📥 Bulk import stock</button>
+        <p class="op-note" id="op-sec-bulk-import-status" style="margin-top:4px; display:none;"></p>
+      </div>
+
+      <div style="margin-bottom:22px;">
+        <p class="op-note" style="margin-bottom:6px;">Bulk upload photos — matches each photo's filename to an item name and attaches it to every matching item across every shop in the section picked above. Unmatched photos are downloaded as photo-links.csv for manual matching.</p>
+        <input type="file" id="op-sec-bulk-photo-input" accept="image/*" multiple style="display:none;" onchange="opSecBulkPhotoUpload(event)" />
+        <button type="button" class="op-btn op-btn-push" id="op-sec-bulk-photo-btn" onclick="document.getElementById('op-sec-bulk-photo-input').click()">📷 Bulk upload photos</button>
+        <p class="op-note" id="op-sec-bulk-photo-status" style="margin-top:4px; display:none;"></p>
+      </div>
+
       <p class="op-note" style="margin-bottom:6px;">Sections</p>
       <button type="button" class="op-btn op-btn-push" onclick="opOpenSectionEditor(null)">➕ New section</button>
       <div id="op-sec-list"></div>
@@ -7291,6 +7305,178 @@ async function opAddStockToSection() {
     document.getElementById('op-sec-item-photo-label').textContent = 'Add photo (optional)';
   }
   if (okCount) showToast(`Stock item added to ${okCount} shop${okCount === 1 ? '' : 's'}`);
+}
+
+// ---- Bulk import stock to a section (Excel/CSV) — same idea as the
+// single-item "Add stock item to this section" above, but reads many rows
+// from a spreadsheet and applies each one to every shop in the section.
+// Price is always ignored/₹0 and every added item starts unavailable — a
+// shop that already has a row's item (same name + unit) is skipped for
+// that row only, never duplicated.
+async function opSecBulkImportFile(e) {
+  const file = e.target.files[0];
+  e.target.value = ""; // allow re-selecting the same file later
+  if (!file) return;
+  const status = document.getElementById('op-sec-bulk-import-status');
+  const btn = document.getElementById('op-sec-bulk-import-btn');
+  const say = (msg, color) => { status.style.display = 'block'; status.style.color = color || 'var(--chili)'; status.textContent = msg; };
+  const sec = opNeshSections.find(x => x.id === document.getElementById('op-sec-add-select').value);
+  if (!sec) { say('Select a section first.'); return; }
+  const shops = opSectionShops(sec);
+  if (!shops.length) { say('This section has no shops yet — use "Edit name & shops" first.'); return; }
+  if (typeof XLSX === 'undefined') { say("Excel reader didn't load — check your connection and try again."); return; }
+  if (btn) btn.disabled = true;
+  say('Reading file…', 'var(--marigold)');
+  try {
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data, { type: 'array' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    if (!rows.length) { say('No rows found in that file.'); return; }
+    const sampleKeys = Object.keys(rows[0]);
+    const findKey = (...aliases) => {
+      const wanted = aliases.map(normalizeHeaderKey);
+      return sampleKeys.find(k => wanted.includes(normalizeHeaderKey(k)));
+    };
+    const nameKey = findKey('name', 'itemname');
+    const descKey = findKey('discription', 'description', 'desc');
+    const photoKey = findKey('photo', 'photourl', 'photolink', 'image', 'imageurl', 'imagelink', 'img', 'picture');
+    const unitKey = findKey('unit', 'soldby', 'perunit', 'uom');
+    if (!nameKey) { say("Couldn't find a Name column. Check your file's header row."); return; }
+
+    const items = [];
+    let badRows = 0;
+    rows.forEach(row => {
+      const name = String(row[nameKey] || "").trim();
+      if (!name) { badRows++; return; }
+      const desc = descKey ? String(row[descKey] || "").trim() : "";
+      const unit = unitKey ? normalizeUnitCell(row[unitKey]) : 'piece';
+      let photo = photoKey ? String(row[photoKey] || "").trim() : "";
+      if (photo && !/^https?:\/\//i.test(photo)) photo = "";
+      items.push({ name, desc, unit, photo });
+    });
+    if (!items.length) { say('No valid rows (need at least a Name column filled in).'); return; }
+
+    const { db, ref, push, update } = window.fb;
+    let totalAdded = 0, totalSkipped = 0;
+    for (let s = 0; s < shops.length; s++) {
+      const shop = shops[s];
+      say(`Importing… shop ${s + 1}/${shops.length}`, 'var(--marigold)');
+      const menuRef = ref(db, 'restaurants/' + shop._id + '/menu');
+      const existing = new Set(Object.values(shop.menu || {}).map(it => (it && (it.name || '').trim().toLowerCase()) + '|' + (it && it.unit || 'piece')));
+      const updates = {};
+      items.forEach(it => {
+        const key = it.name.toLowerCase() + '|' + it.unit;
+        if (existing.has(key)) { totalSkipped++; return; }
+        const newKey = push(menuRef).key;
+        updates[newKey] = { name: it.name, desc: it.desc, price: 0, unit: it.unit, photo: it.photo, unavailable: true, sizes: [] };
+        existing.add(key); // don't re-add the same name twice within this one import
+        totalAdded++;
+      });
+      if (Object.keys(updates).length) await update(menuRef, updates);
+    }
+    let msg = `Done — ${totalAdded} item${totalAdded === 1 ? '' : 's'} added across ${shops.length} shop${shops.length === 1 ? '' : 's'} in "${sec.name}"`;
+    if (totalSkipped) msg += ` (${totalSkipped} skipped — shop already had that item)`;
+    if (badRows) msg += `, ${badRows} row${badRows === 1 ? '' : 's'} ignored (no name)`;
+    say(msg + '.', totalAdded > 0 ? '#33ff66' : 'var(--chili)');
+    if (totalAdded > 0) showToast(`${totalAdded} items imported to "${sec.name}"`);
+  } catch (err) {
+    say('Import failed: ' + (err && err.message ? err.message : 'check your connection and try again.'));
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ---- Bulk upload photos to a section — matches each photo's filename to
+// an item name (same matching rule as the per-shop bulk photo uploader)
+// and attaches it to every item with that name across every shop in the
+// section, since a section-added item exists as a separate copy in each
+// shop's own menu. Unmatched photos are downloaded as photo-links.csv.
+async function opSecBulkPhotoUpload(e) {
+  const files = Array.from(e.target.files || []);
+  e.target.value = ""; // allow re-selecting the same files later
+  if (!files.length) return;
+  const status = document.getElementById('op-sec-bulk-photo-status');
+  const btn = document.getElementById('op-sec-bulk-photo-btn');
+  const say = (msg, color) => { status.style.display = 'block'; status.style.color = color || 'var(--chili)'; status.textContent = msg; };
+  const sec = opNeshSections.find(x => x.id === document.getElementById('op-sec-add-select').value);
+  if (!sec) { say('Select a section first.'); return; }
+  const shops = opSectionShops(sec);
+  if (!shops.length) { say('This section has no shops yet — use "Edit name & shops" first.'); return; }
+  if (btn) btn.disabled = true;
+  const { db, ref, update } = window.fb;
+  const shopIndex = shops.map(shop => {
+    const byName = {};
+    Object.entries(shop.menu || {}).forEach(([id, it]) => {
+      const key = normalizeMatchName(it && it.name);
+      if (!key) return;
+      (byName[key] = byName[key] || []).push(id);
+    });
+    return { shopId: shop._id, byName };
+  });
+  const unmatched = [];
+  let uploaded = 0, failed = 0, attached = 0;
+  try {
+    for (const file of files) {
+      say(`Uploading photo ${uploaded + failed + 1}/${files.length}…`, 'var(--marigold)');
+      try {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = ev => resolve(ev.target.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const img = await new Promise((resolve, reject) => {
+          const im = new Image();
+          im.onload = () => resolve(im);
+          im.onerror = reject;
+          im.src = dataUrl;
+        });
+        const blob = await resizeImageToBlob(img, 600, 0.7);
+        const url = await uploadPhotoToCloudinary(blob);
+        uploaded++;
+
+        const key = normalizeMatchName(stripExt(file.name));
+        let matchedThisFile = 0;
+        for (const s of shopIndex) {
+          const ids = s.byName[key];
+          if (!ids) continue;
+          for (const id of ids) {
+            await update(ref(db, 'restaurants/' + s.shopId + '/menu/' + id), { photo: url });
+            matchedThisFile++;
+          }
+        }
+        if (matchedThisFile > 0) attached += matchedThisFile;
+        else unmatched.push({ file: file.name, url });
+      } catch (err) {
+        failed++;
+      }
+    }
+
+    if (unmatched.length) {
+      const csvRows = [["FileName", "Photo"]].concat(
+        unmatched.map(r => [csvEscape(stripExt(r.file)), csvEscape(r.url)])
+      );
+      const csvContent = csvRows.map(r => r.join(",")).join("\n");
+      const csvBlob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const dlUrl = URL.createObjectURL(csvBlob);
+      const a = document.createElement('a');
+      a.href = dlUrl;
+      a.download = "photo-links.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(dlUrl);
+    }
+
+    let msg = `Done — ${uploaded} uploaded`;
+    if (attached > 0) msg += `, matched and attached to ${attached} item${attached === 1 ? '' : 's'} across this section's shops`;
+    if (unmatched.length) msg += `, ${unmatched.length} had no name match — downloaded photo-links.csv for those`;
+    if (failed > 0) msg += `, ${failed} failed`;
+    say(msg + '.', failed > 0 ? 'var(--chili)' : '#33ff66');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 /* ==================================================================
