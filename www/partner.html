@@ -1593,6 +1593,12 @@
           <h3>Support Chat</h3>
           <p>Chat live with any restaurant partner</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('deletions')" style="position:relative;">
+          <span class="op-home-badge" id="op-deletions-home-badge" style="display:none;"></span>
+          <div class="op-home-icon">🚫</div>
+          <h3>Account Deletions</h3>
+          <p>Customer requests to delete their account and personal data (from the app's delete-account page)</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('notify')">
           <div class="op-home-icon">📢</div>
           <h3>Send Notification</h3>
@@ -1993,6 +1999,19 @@
       <div id="op-partners-list"></div>
     </div>
   </div>
+
+  <!-- ACCOUNT DELETIONS (from the customer app's public delete-account web page) -->
+  <div class="op-section" id="op-section-deletions">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Account Deletions</h2>
+    </div>
+    <div class="op-section-body">
+      <p style="color:#1f7a3d; font-size:.78rem; margin:0 0 14px; line-height:1.5;">Customers submit these from the app's public "Delete Account" page. Verify the number is genuinely theirs (e.g. call to confirm) before deleting — the request itself isn't identity-verified.</p>
+      <div id="op-deletions-list"></div>
+    </div>
+  </div>
+
 
   <!-- HOME CATEGORY ORDER -->
   <div class="op-section" id="op-section-category-order">
@@ -6349,6 +6368,7 @@ function opEnterPanel() {
   opListenNeshCategories();
   opListenNeshPrices();
   opListenGroceryQueue();
+  opListenDeletionRequests();
   setInterval(opUpdateOrdersHomeBadge, 30000); // keeps the "late" badge current even while sitting on the home screen
 }
 function opLogout() {
@@ -6365,6 +6385,7 @@ function opOpenSection(name) {
   document.getElementById('op-section-' + name).classList.add('active');
   if (name === 'push') opUpdateAppCodeSizeLabel();
   if (name === 'partners') { opPopulatePartnersAreaFilter(); opRenderPartnersList(); }
+  if (name === 'deletions') opRenderDeletionsList();
   if (name === 'drivers') { opPopulateDriversZoneFilter(); opRenderDriversList(); }
   if (name === 'taxi-orders') { opPopulateRidesZoneFilter(); opRenderRidesList(); }
   if (name === 'app-videos') { opLoadAppVideos(); opLoadBusVideos(); }
@@ -6952,6 +6973,67 @@ function opListenPartners() {
   });
 }
 function opTypeLabel(t) { return t === 'groceries' ? 'Groceries' : t === 'online_shop' ? 'Other Shop' : 'Hotel'; }
+
+/* ---- Account Deletion requests (submitted from the customer app's public
+   delete-account.html page, written to accountDeletionRequests/{number}).
+   Not identity-verified on submission (that page has no OTP either), so
+   this is a review queue, not an auto-delete — operator confirms the
+   number really belongs to the requester (e.g. a callback) before tapping
+   Delete. Deleting removes the customer's profile (customers/{number}) —
+   past orders stay with the restaurant's own records. ---- */
+let opAllDeletionRequests = [];
+function opListenDeletionRequests() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'accountDeletionRequests'), snap => {
+    const list = [];
+    snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
+    list.sort((a, b) => (b.requestedAt || 0) - (a.requestedAt || 0));
+    opAllDeletionRequests = list;
+    opRenderDeletionsList();
+    opUpdateDeletionsHomeBadge();
+  });
+}
+function opUpdateDeletionsHomeBadge() {
+  const badge = document.getElementById('op-deletions-home-badge');
+  if (!badge) return;
+  const pendingCount = opAllDeletionRequests.filter(r => r.status === 'pending').length;
+  if (pendingCount > 0) { badge.style.display = 'inline-block'; badge.textContent = pendingCount + ' waiting'; }
+  else { badge.style.display = 'none'; }
+}
+function opRenderDeletionsList() {
+  const wrap = document.getElementById('op-deletions-list');
+  if (!wrap) return;
+  if (!opAllDeletionRequests.length) { wrap.innerHTML = '<div class="op-empty">No account deletion requests.</div>'; return; }
+  wrap.innerHTML = opAllDeletionRequests.map(r => `
+    <div class="op-partner-item" style="cursor:default; ${r.status === 'pending' ? 'border-color:#f0a02c;' : ''}">
+      <div class="op-partner-top">
+        <span class="op-partner-name">+91 ${escapeHtml(r._id)}</span>
+        <span class="op-partner-type">${r.status === 'pending' ? '⏳ Pending' : r.status === 'completed' ? '✅ Deleted' : '🚫 Dismissed'}</span>
+      </div>
+      <div class="op-partner-sub">Requested ${r.requestedAt ? new Date(r.requestedAt).toLocaleString() : '—'}</div>
+      ${r.reason ? '<div class="op-partner-sub">Reason: ' + escapeHtml(r.reason) + '</div>' : ''}
+      ${r.status === 'pending' ? `
+        <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="op-btn op-btn-danger" onclick="opDeleteRequestedAccount('${r._id}')">🗑 Delete Account</button>
+          <button class="op-btn" onclick="opDismissDeletionRequest('${r._id}')">Dismiss</button>
+        </div>
+      ` : ''}
+    </div>
+  `).join('');
+}
+function opDeleteRequestedAccount(number) {
+  if (!confirm('Permanently delete the account for +91 ' + number + '?\n\nMake sure you\'ve verified this number really belongs to the person who requested it — this cannot be undone.')) return;
+  const { db, ref, remove, update } = window.fb;
+  remove(ref(db, 'customers/' + number))
+    .then(() => update(ref(db, 'accountDeletionRequests/' + number), { status: 'completed', completedAt: Date.now() }))
+    .catch(err => alert('Error: ' + err.message));
+}
+function opDismissDeletionRequest(number) {
+  if (!confirm('Dismiss this deletion request without deleting the account?')) return;
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'accountDeletionRequests/' + number), { status: 'dismissed', dismissedAt: Date.now() })
+    .catch(err => alert('Error: ' + err.message));
+}
 
 /* ---- Groceries Catalog (operator view: every item, every shop's own price,
    when that price was last changed, and the computed "customer price" —
