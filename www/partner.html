@@ -1626,7 +1626,7 @@
       <h2>NESH Store Orders</h2>
     </div>
     <div class="op-section-body">
-      <p class="op-note" style="margin-bottom:10px;">Customer orders from the merged "NESH Store" groceries catalog. Pick which shop actually fulfills each one — you'll see every candidate shop's price and your profit before deciding.</p>
+      <p class="op-note" style="margin-bottom:10px;">Every order placed from the merged "NESH Store" groceries catalog appears here (unassigned, assigned and cancelled). Tap an unassigned one to pick which shop fulfills it — you'll see every candidate shop's price and your profit before deciding.</p>
       <div id="op-groceries-queue-list"></div>
     </div>
   </div>
@@ -2278,7 +2278,7 @@
         <p class="op-note" id="op-pm-stockadd-status" style="margin-top:4px;"></p>
       </div>
       <div style="margin-top:14px;" id="op-pm-availability-wrap">
-        <p class="op-note" style="margin-bottom:4px;">Item availability — mark any item in this shop unavailable (hidden from customers) or available again, without needing the shop's login.</p>
+        <p class="op-note" style="margin-bottom:4px;">Item price &amp; availability — set any item's price for this shop, and mark it unavailable (hidden from customers) or available again, without needing the shop's login. For gram/kg items the price is the rate per gram/kg.</p>
         <div class="op-search-box" style="margin-bottom:6px;">
           <input type="text" id="op-pm-avail-search" placeholder="Search item name..." autocomplete="off" oninput="opRenderAvailabilityList()">
         </div>
@@ -6257,6 +6257,7 @@ let opReportShopId = null;
 let opReportShopName = '';
 let opReportOrdersCache = []; // orders currently shown for the picked shop+date — used by the delete action
 let opQueueSeenIds = null; // pending queue order ids already seen (null until first snapshot)
+let opGroceriesQueueError = null;
 let opGroceriesQueue = []; // groceryOrderQueue entries, live from Firebase
 let opGroceriesAssignOrderId = null; // which queue order the assign modal is currently showing
 
@@ -7799,6 +7800,7 @@ function opListenGroceryQueue() {
     }
     opQueueSeenIds = new Set(pendingIds);
     opGroceriesQueue = list;
+    opGroceriesQueueLoadedAt = Date.now();
     const activeSection = document.getElementById('op-section-groceries-queue');
     if (activeSection && activeSection.classList.contains('active')) opRenderGroceriesQueueList();
     opUpdateGroceriesQueueHomeBadge();
@@ -7808,6 +7810,14 @@ function opListenGroceryQueue() {
       const stillPending = opGroceriesQueue.find(o => o._id === opGroceriesAssignOrderId && o.status === 'pending_assignment');
       if (!stillPending) document.getElementById('op-groceries-assign-modal').classList.remove('show');
     }
+  }, err => {
+    // Without this, a Firebase permission error (rules not allowing a read
+    // of groceryOrderQueue) fails silently and the list just stays empty.
+    console.error('groceryOrderQueue listener failed:', err);
+    opGroceriesQueueError = (err && err.message) ? err.message : String(err);
+    const w = document.getElementById('op-groceries-queue-list');
+    if (w) w.innerHTML = '<div class="op-empty" style="color:#f87171;">Could not load NESH Store orders: ' + escapeHtml(opGroceriesQueueError) + '<br><br>Firebase Rules must allow reading <b>groceryOrderQueue</b>.</div>';
+    showToast('⚠️ Cannot read NESH Store orders (Firebase rules)');
   });
 }
 function opUpdateGroceriesQueueHomeBadge() {
@@ -7817,20 +7827,42 @@ function opUpdateGroceriesQueueHomeBadge() {
   badge.textContent = count > 0 ? String(count) : '';
   badge.style.display = count > 0 ? 'flex' : 'none';
 }
+let opGroceriesQueueFilter = 'all';
+let opGroceriesQueueLoadedAt = null;
+function opSetGroceriesQueueFilter(f) { opGroceriesQueueFilter = f; opRenderGroceriesQueueList(); }
 function opRenderGroceriesQueueList() {
   const wrap = document.getElementById('op-groceries-queue-list');
   if (!wrap) return;
-  const list = opGroceriesQueue.filter(o => o.status === 'pending_assignment').sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-  if (!list.length) { wrap.innerHTML = '<div class="op-empty">No NESH Store orders waiting for assignment.</div>'; return; }
-  wrap.innerHTML = list.map(o => {
+  if (opGroceriesQueueError) { wrap.innerHTML = '<div class="op-empty" style="color:#f87171;">Could not load NESH Store orders: ' + escapeHtml(opGroceriesQueueError) + '<br><br>Firebase Rules must allow reading <b>groceryOrderQueue</b>.</div>'; return; }
+  // Every order placed from NESH Store is listed here (newest first) — not just
+  // the unassigned ones. Only unassigned ones can be opened to pick a shop.
+  const all = opGroceriesQueue.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const match = { all: () => true, pending_assignment: o => o.status === 'pending_assignment', assigned: o => o.status === 'assigned', cancelled: o => o.status === 'cancelled' };
+  const count = k => all.filter(match[k]).length;
+  const chips = [['all', 'All'], ['pending_assignment', 'Unassigned'], ['assigned', 'Assigned'], ['cancelled', 'Cancelled']].map(([k, label]) =>
+    `<button type="button" class="op-btn ${opGroceriesQueueFilter === k ? 'op-btn-push' : ''}" style="padding:4px 10px; font-size:.72rem;" onclick="opSetGroceriesQueueFilter('${k}')">${label} (${count(k)})</button>`
+  ).join('');
+  const list = all.filter(match[opGroceriesQueueFilter] || match.all);
+  const conn = opGroceriesQueueLoadedAt
+    ? `<div style="font-size:.68rem; color:#6b7280; margin-bottom:8px;">🟢 Connected to Firebase · ${all.length} order${all.length === 1 ? '' : 's'} in groceryOrderQueue · synced ${timeAgo(opGroceriesQueueLoadedAt)}</div>`
+    : `<div style="font-size:.68rem; color:#f0a02c; margin-bottom:8px;">🟠 Not connected yet — waiting for Firebase (if this stays, close and reopen the operator panel, or check the network)</div>`;
+  const header = conn + `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">${chips}</div>`;
+  if (!list.length) { wrap.innerHTML = header + '<div class="op-empty">No NESH Store orders here.</div>'; return; }
+  wrap.innerHTML = header + list.map(o => {
     const itemCount = (o.items || []).reduce((s, it) => s + (it.qty || 0), 0);
+    const st = o.status || 'unknown';
+    const isPending = st === 'pending_assignment';
+    const pillClass = isPending ? 'pending' : (st === 'assigned' ? 'ready' : (st === 'cancelled' ? 'cancelled' : 'done'));
+    const pillText = isPending ? 'unassigned' : st;
+    const extra = st === 'assigned' && o.assignedShopName ? ' · → ' + escapeHtml(o.assignedShopName) : '';
+    const click = isPending ? ` onclick="opOpenGroceriesAssignModal('${o._id}')"` : '';
     return `
-      <div class="op-order-item" onclick="opOpenGroceriesAssignModal('${o._id}')">
+      <div class="op-order-item"${click}${isPending ? '' : ' style="opacity:.85;"'}>
         <div class="op-order-top">
           <span class="op-order-shop">#${escapeHtml(String(o.orderNumber || o._id))}</span>
-          <span class="op-order-status-pill op-order-status-pending">unassigned</span>
+          <span class="op-order-status-pill op-order-status-${pillClass}">${escapeHtml(pillText)}</span>
         </div>
-        <div class="op-order-sub">${escapeHtml(o.customerName || 'Guest')} · ₹${o.total || 0} · ${itemCount} item${itemCount === 1 ? '' : 's'} · ${timeAgo(o.createdAt || Date.now())}</div>
+        <div class="op-order-sub">${escapeHtml(o.customerName || 'Guest')} · ₹${o.total || 0} · ${itemCount} item${itemCount === 1 ? '' : 's'} · ${timeAgo(o.createdAt || Date.now())}${extra}</div>
       </div>
     `;
   }).join('');
@@ -9857,11 +9889,34 @@ function opRenderAvailabilityList() {
     return;
   }
   wrap.innerHTML = items.map(it => `
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid #1f2937;">
-      <span style="flex:1; font-size:.8rem; color:#e2e8f0;">${escapeHtml(it.name || '(unnamed)')}${it.unavailable ? ' <span style="color:#f87171;">(unavailable)</span>' : ''}</span>
-      <button type="button" class="op-btn ${it.unavailable ? 'op-btn-push' : 'op-btn-danger'}" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opToggleItemAvailability('${it.id}')">${it.unavailable ? 'Mark available' : 'Mark unavailable'}</button>
+    <div style="padding:8px 0; border-bottom:1px solid #1f2937;">
+      <div style="font-size:.8rem; color:#e2e8f0; margin-bottom:6px;">${escapeHtml(it.name || '(unnamed)')}${it.unit && it.unit !== 'piece' ? ' <span style="color:#94a3b8;">(per ' + escapeHtml(it.unit) + ')</span>' : ''}${it.unavailable ? ' <span style="color:#f87171;">(unavailable)</span>' : ''}</div>
+      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        <span style="font-size:.8rem; color:#94a3b8;">₹</span>
+        <input type="number" min="0" step="any" inputmode="decimal" id="op-pm-price-${it.id}" value="${Number(it.price) || 0}" style="width:80px; padding:5px 8px; border-radius:6px; border:1px solid #374151; background:#0f172a; color:#e2e8f0; font-size:.8rem;" onkeydown="if(event.key==='Enter'){opSaveItemPrice('${it.id}');}" />
+        <button type="button" class="op-btn op-btn-push" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opSaveItemPrice('${it.id}')">💾 Save price</button>
+        <button type="button" class="op-btn ${it.unavailable ? 'op-btn-push' : 'op-btn-danger'}" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opToggleItemAvailability('${it.id}')">${it.unavailable ? 'Mark available' : 'Mark unavailable'}</button>
+      </div>
     </div>
   `).join('');
+}
+function opSaveItemPrice(itemId) {
+  const item = opAvailItems.find(it => it.id === itemId);
+  if (!item || !opCurrentPartnerId) return;
+  const status = document.getElementById('op-pm-avail-status');
+  const input = document.getElementById('op-pm-price-' + itemId);
+  const price = Number(input && input.value);
+  if (!input || input.value === '' || isNaN(price) || price < 0) {
+    status.textContent = 'Enter a valid price (0 or more) for ' + (item.name || itemId) + '.';
+    return;
+  }
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu/' + itemId), { price })
+    .then(() => {
+      item.price = price;
+      status.textContent = 'Price saved: ' + (item.name || itemId) + ' → ₹' + price + (price <= 0 ? ' (₹0 items are not orderable)' : '');
+    })
+    .catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 function opToggleItemAvailability(itemId) {
   const item = opAvailItems.find(it => it.id === itemId);
