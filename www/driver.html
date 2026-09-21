@@ -277,6 +277,14 @@
   .order-popup-loc-row.drop .order-popup-loc-dot{ background:var(--chili); }
   .order-popup-loc-label{ font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:700; letter-spacing:1px; color:var(--muted-2); display:block; margin-bottom:2px; text-transform:uppercase; }
   .order-popup-loc-text{ font-size:17px; font-weight:700; color:var(--ink); line-height:1.3; display:block; }
+  .order-popup-loc-sub{ display:block; font-size:12px; font-weight:500; color:var(--muted-2); line-height:1.35; margin-top:2px; }
+  .loc-map-btn{
+    margin-top:6px; padding:6px 12px; border-radius:8px; border:1.5px solid var(--leaf);
+    background:transparent; color:var(--leaf); font-weight:700; font-size:12px; cursor:pointer;
+    font-family:'Inter',sans-serif;
+  }
+  .order-chit .order-popup-loc-text{ font-size:15px; }
+  .order-chit .order-popup-loc-row{ padding:6px 0; }
   .order-popup-cust{ color:#4A6B8A; font-size:12px; margin:8px 0 16px; text-align:center; }
   .order-popup-btns{ display:flex; gap:10px; }
   .order-popup-btns .btn-primary{ background:var(--leaf); color:var(--cloud); flex:1; }
@@ -1162,6 +1170,65 @@ function applyFriendlyLocationLabel(el, pos) {
   });
 }
 
+// ---------- Delivery job locations: shop (pickup) + customer (drop) ----------
+// Shop pin comes from restaurants/{id}.location ("lat,lng" text); the
+// customer pin is saved on the order itself as customerLat/customerLng
+// (index.html), with customerLocation as a text fallback.
+function deliveryPickupPos(o) {
+  return o ? parseLatLngStr(o._restLocation) : null;
+}
+function deliveryDropPos(o) {
+  if (!o) return null;
+  if (typeof o.customerLat === 'number' && typeof o.customerLng === 'number') {
+    return { lat: o.customerLat, lng: o.customerLng };
+  }
+  return parseLatLngStr(o.customerLocation);
+}
+// Human-readable drop address: area + saved address + typed location text,
+// de-duplicated, with raw "lat, lng" strings left out.
+function deliveryDropText(o) {
+  if (!o) return '';
+  const parts = [];
+  [o.customerPlace, o.customerAddress, o.customerLocation].forEach(v => {
+    const t = (v == null ? '' : String(v)).trim();
+    if (!t || looksLikeRawCoords(t)) return;
+    if (parts.some(p => p.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(p.toLowerCase()))) return;
+    parts.push(t);
+  });
+  return parts.join(', ');
+}
+// Google Maps directions link (starts from the driver's current spot).
+// Falls back to a text search when there's no pin, only an address.
+function deliveryNavUrl(pos, text) {
+  if (pos && typeof pos.lat === 'number' && typeof pos.lng === 'number') {
+    return `https://www.google.com/maps/dir/?api=1&destination=${pos.lat},${pos.lng}`;
+  }
+  if (text) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}`;
+  return null;
+}
+function deliveryLocRowHtml(kind, label, mainText, subText, url) {
+  return `<div class="order-popup-loc-row ${kind}"><span class="order-popup-loc-dot"></span><span>` +
+    `<span class="order-popup-loc-label">${label}</span>` +
+    `<span class="order-popup-loc-text">${escapeHtml(mainText || '—')}</span>` +
+    (subText ? `<span class="order-popup-loc-sub">${escapeHtml(subText)}</span>` : '') +
+    (url ? `<button type="button" class="loc-map-btn" data-map-url="${escapeHtml(url)}">📍 Navigate</button>` : '') +
+    `</span></div>`;
+}
+// Both rows (shop pickup + customer drop) for a delivery job.
+function deliveryLocationsHtml(o) {
+  const pickupPos = deliveryPickupPos(o);
+  const dropPos = deliveryDropPos(o);
+  const dropText = deliveryDropText(o);
+  const dropSub = [o.customerLandmark ? 'Landmark: ' + o.customerLandmark : '', o.customerPhone || ''].filter(Boolean).join(' · ');
+  return deliveryLocRowHtml('pickup', 'Pickup', o._restName || 'Shop', o._restAddress || '', deliveryNavUrl(pickupPos, o._restAddress)) +
+         deliveryLocRowHtml('drop', 'Drop', dropText || (dropPos ? 'Pinned location' : '—'), dropSub, deliveryNavUrl(dropPos, dropText));
+}
+function wireMapButtons(root) {
+  root.querySelectorAll('[data-map-url]').forEach(btn => {
+    btn.onclick = (e) => { e.stopPropagation(); window.open(btn.dataset.mapUrl, '_blank'); };
+  });
+}
+
 // How long a newly-created ride/delivery is offered only to whichever
 // driver ranks nearest, before every other matching online driver also
 // gets to see it in their popup. Mirrors NEAREST_TIMEOUT_MS in the worker,
@@ -1941,8 +2008,7 @@ function renderOrderPopup(pendingList) {
         <h2 class="order-popup-title">Delivery${item.orderNumber ? ' #' + item.orderNumber : ''} · ₹${item.deliveryFee || 0}</h2>
         <div class="order-popup-body">
           ${awayText}
-          <div class="order-popup-loc-row pickup"><span class="order-popup-loc-dot"></span><span><span class="order-popup-loc-label">Pickup</span><span class="order-popup-loc-text">${item._restName || 'Shop'}</span></span></div>
-          <div class="order-popup-loc-row drop"><span class="order-popup-loc-dot"></span><span><span class="order-popup-loc-label">Drop</span><span class="order-popup-loc-text">${item.customerAddress || '—'}</span></span></div>
+          ${deliveryLocationsHtml(item)}
           <div class="order-popup-row order-popup-row-total"><span>Items</span><span>${item.items ? item.items.map(it => `${it.qty}x ${it.name}`).join(', ') : '—'}</span></div>
         </div>
         <p class="order-popup-cust">${item.customerName || 'Customer'}</p>
@@ -1980,6 +2046,7 @@ function renderOrderPopup(pendingList) {
   listEl.querySelectorAll('[data-action]').forEach(btn => {
     btn.onclick = () => handlePopupItemAction(btn.dataset.id, btn.dataset.action, btn.dataset.kind);
   });
+  wireMapButtons(listEl);
 
   overlay.classList.add('show');
   startRinging();
@@ -2040,7 +2107,7 @@ function listenDeliveryJobs() {
       const rest = val[restId] || {};
       const orders = rest.orders || {};
       Object.keys(orders).forEach(orderId => {
-        flat.push(Object.assign({ _restId: restId, _orderId: orderId, _restName: rest.name || '', _restLocation: rest.location || null, _restGoSeries: !!rest.goSeries }, orders[orderId]));
+        flat.push(Object.assign({ _restId: restId, _orderId: orderId, _restName: rest.restaurantName || rest.name || '', _restAddress: rest.address || '', _restLocation: rest.location || null, _restGoSeries: !!rest.goSeries }, orders[orderId]));
       });
     });
     deliveriesCache = flat;
@@ -2091,14 +2158,23 @@ async function fetchAndMergeNativeAlert(kind, id) {
       const [restId, orderId] = id.split('::');
       const snap = await get(ref(db, 'restaurants/' + restId + '/orders/' + orderId));
       if (snap.exists()) {
-        let restName = '';
+        // Only the few small shop fields we need — not the whole restaurant
+        // node (which would drag every order along with it).
+        let restMeta = {};
         try {
-          const restNameSnap = await get(ref(db, 'restaurants/' + restId + '/name'));
-          restName = restNameSnap.val() || '';
+          const fields = ['restaurantName', 'name', 'address', 'location', 'goSeries'];
+          const snaps = await Promise.all(fields.map(f => get(ref(db, 'restaurants/' + restId + '/' + f))));
+          fields.forEach((f, i) => { restMeta[f] = snaps[i].val(); });
         } catch (e) {}
         deliveriesCache = deliveriesCache
           .filter(o => (o._restId + '::' + o._orderId) !== id)
-          .concat([Object.assign({ _restId: restId, _orderId: orderId, _restName: restName }, snap.val())]);
+          .concat([Object.assign({
+            _restId: restId, _orderId: orderId,
+            _restName: restMeta.restaurantName || restMeta.name || '',
+            _restAddress: restMeta.address || '',
+            _restLocation: restMeta.location || null,
+            _restGoSeries: !!restMeta.goSeries,
+          }, snap.val())]);
       }
     }
   } catch (e) {
@@ -3537,7 +3613,7 @@ function renderHomeLists() {
       : `<p class="hint-text" style="margin-top:10px;">Head to the shop — "Picked up" unlocks once they mark it ready.</p>`;
     card.innerHTML = `
       <div class="order-top">
-        <p class="order-num">Current delivery${currentDelivery.orderNumber ? ' #' + currentDelivery.orderNumber : ''} · ${currentDelivery._restName || ''}</p>
+        <p class="order-num">Current delivery${currentDelivery.orderNumber ? ' #' + currentDelivery.orderNumber : ''}${currentDelivery._restName ? ' · ' + escapeHtml(currentDelivery._restName) : ''}</p>
         <span class="pill pill-accepted">${pillLabel}</span>
       </div>
       <div class="order-mid">
@@ -3545,10 +3621,11 @@ function renderHomeLists() {
         <p class="order-total">₹${currentDelivery.deliveryFee || 0}</p>
       </div>
       <p style="margin:8px 0 0; color:var(--muted); font-size:13px;">${items || ''}</p>
-      <p style="margin:4px 0 0; color:var(--muted); font-size:13px;">${currentDelivery.customerAddress || ''}${currentDelivery.customerPhone ? ' · ' + currentDelivery.customerPhone : ''}</p>
+      <div style="margin-top:8px;">${deliveryLocationsHtml(currentDelivery)}</div>
       ${actionHtml}
     `;
     dWrap.appendChild(card);
+    wireMapButtons(card);
     const pickupBtn = card.querySelector('[data-pickup]');
     if (pickupBtn) pickupBtn.addEventListener('click', (e) => {
       markDeliveryPickedUp(e.target.dataset.pickup);
