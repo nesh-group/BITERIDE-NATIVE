@@ -2174,6 +2174,10 @@
         <input type="text" id="op-sz-name-input" placeholder="New zone name (e.g. Kottayam Town)">
       </div>
       <button type="button" class="op-btn op-btn-push" onclick="opAddShopZone()">➕ Add zone</button>
+      <div style="margin-top:12px;">
+        <button type="button" class="op-btn" onclick="opAutoAssignGroceriesByLocation()">📍 Auto-add groceries shops to the zone their location is in</button>
+        <p class="op-note" id="op-sz-auto-status" style="margin-top:6px;"></p>
+      </div>
       <p class="op-note" id="op-sz-add-status" style="margin-top:8px;"></p>
       <div id="op-sz-list" style="margin-top:16px;"></div>
     </div>
@@ -2265,7 +2269,14 @@
         <button type="button" class="op-btn op-btn-push" onclick="opSavePartnerArea()">💾 Save area</button>
         <p class="op-note" id="op-pm-area-status" style="margin-top:4px;"></p>
       </div>
-      <div style="margin-top:14px;">
+      <div style="margin-top:14px; display:none;" id="op-pm-shopzone-block">
+        <p class="op-note" style="margin-bottom:4px;">Shop zone — groceries shops don't draw their own zone. Pick the zone (from Shop Zones) this shop serves. A customer inside that zone is only matched to shops in it.</p>
+        <p class="op-note" id="op-pm-shopzone-requested" style="margin-bottom:6px; display:none;"></p>
+        <select id="op-pm-shopzone-select" style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
+        <button type="button" class="op-btn op-btn-push" onclick="opSavePartnerShopZone()">💾 Save zone</button>
+        <p class="op-note" id="op-pm-shopzone-status" style="margin-top:4px;"></p>
+      </div>
+      <div style="margin-top:14px;" id="op-pm-drawzone-block">
         <p class="op-note" style="margin-bottom:4px;">Delivery zone — the exact area this shop delivers to (a custom shape, separate from the Area above). Drawing it here saves straight to the shop, so it shows up already set in their own app.</p>
         <p class="op-note" id="op-pm-zone-status" style="margin-bottom:6px;">—</p>
         <button type="button" class="op-btn op-btn-push" id="op-pm-zone-btn" onclick="opOpenShopZoneModal(opCurrentPartnerId)">🗺️ Draw delivery zone</button>
@@ -2423,13 +2434,18 @@
   <div class="op-modal-overlay" id="op-zone-boundary-modal">
     <div class="op-modal-card op-modal-card-wide">
       <h3 id="op-zb-title">Zone boundary</h3>
-      <p class="op-note" id="op-zb-desc" style="margin-bottom:8px;">Pan/zoom to find the spot, then press "Draw the zone" and drag across the map to outline the area — no need to tap point by point.</p>
+      <p class="op-note" id="op-zb-desc" style="margin-bottom:8px;">Pan/zoom to the spot, then draw: ✏️ Freehand (drag once around the area) or 📍 Tap points (tap each corner). Afterwards ✋ Move / Edit: drag a corner to move it, tap a corner to delete it, tap a small dot on an edge to add a corner.</p>
       <div class="op-search-box" style="margin-bottom:0;">
         <input type="text" id="op-zb-search" placeholder="Search area, street, landmark…" autocomplete="off">
       </div>
       <div class="op-zone-search-results" id="op-zb-search-results"></div>
       <div style="margin:8px 0;">
-        <button type="button" class="op-btn" id="op-zb-draw-toggle" style="width:100%; margin:0;" onclick="opZbToggleDrawMode()">✏️ Draw the zone</button>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button type="button" class="op-btn" id="op-zb-mode-freehand" style="flex:1; margin:0; min-width:96px;" onclick="opZbSetMode('freehand')">✏️ Freehand</button>
+          <button type="button" class="op-btn" id="op-zb-mode-points" style="flex:1; margin:0; min-width:96px;" onclick="opZbSetMode('points')">📍 Tap points</button>
+          <button type="button" class="op-btn op-btn-push" id="op-zb-mode-pan" style="flex:1; margin:0; min-width:96px;" onclick="opZbSetMode('pan')">✋ Move / Edit</button>
+          <button type="button" class="op-btn" id="op-zb-sat-btn" style="flex:1; margin:0; min-width:96px;" onclick="opZbToggleSatellite()">🛰️ Satellite</button>
+        </div>
       </div>
       <div class="op-zone-map-wrap">
         <div class="op-zone-map" id="op-zb-map"></div>
@@ -2438,7 +2454,8 @@
       <p class="op-note" id="op-zb-point-count" style="margin-top:8px;">0 points added</p>
       <p class="op-note" id="op-zb-error" style="display:none; color:#ff4444;"></p>
       <div style="display:flex; gap:8px; margin-top:10px;">
-        <button type="button" class="op-btn op-btn-danger" style="flex:1; margin:0;" onclick="opZbUndo()">Undo bit</button>
+        <button type="button" class="op-btn op-btn-danger" style="flex:1; margin:0;" onclick="opZbUndo()">↩ Undo</button>
+        <button type="button" class="op-btn" style="flex:1; margin:0;" onclick="opZbSimplifyNow()">✨ Simplify</button>
         <button type="button" class="op-btn op-btn-danger" style="flex:1; margin:0;" onclick="opZbClear()">Clear all</button>
       </div>
       <div style="margin-top:10px;">
@@ -4005,6 +4022,7 @@ document.getElementById('reg-type-toggle').addEventListener('click', (e) => {
   document.getElementById('reg-shop-category-wrap').style.display = regBusinessType === 'online_shop' ? "flex" : "none";
 });
 
+
 // New accounts go to 'pending' and wait for the operator's approval before
 // they can use the app (see logInRestaurant). regEditMode/regEditId let the
 // same register screen double as the "fix & resend" form a rejected shop
@@ -4080,6 +4098,13 @@ async function doRegister() {
 
   if (!name || !address || !username || !password) {
     errEl.textContent = "Please fill restaurant name, address, username and password";
+    errEl.style.display = "block";
+    return;
+  }
+  // A groceries shop's zone is worked out from its location (the operator
+  // approves it into the zone that location falls inside), so the location is needed.
+  if (businessType === 'groceries' && !location) {
+    errEl.textContent = "Please tap \"Use GPS\" to set your shop location — it decides your delivery zone";
     errEl.style.display = "block";
     return;
   }
@@ -5904,6 +5929,9 @@ function parseRestLatLng(str) {
 }
 
 function updateZoneBadge() {
+  // Groceries shops don't set their own zone — the operator assigns it.
+  const zoneCard = document.getElementById('zone-nav-card');
+  if (zoneCard && zoneCard.parentElement) zoneCard.parentElement.style.display = (state.restaurant?.businessType === 'groceries') ? 'none' : '';
   const badge = document.getElementById('zone-status-badge');
   const zone = state.restaurant?.deliveryZone;
   const has = Array.isArray(zone) && zone.length >= 3;
@@ -7889,6 +7917,9 @@ function opCandidateShopsForOrder(order) {
   });
   // Live check against the shop's CURRENT menu: an item the shop has since
   // marked unavailable (or removed) no longer counts as in stock.
+  // Only shops in the customer's zone may fulfil this order.
+  const allowedShops = opShopsAllowedForOrder(order);
+  if (allowedShops) Object.keys(shopMap).forEach(id => { if (!allowedShops.has(id)) delete shopMap[id]; });
   const liveState = (shopId, itemId) => {
     const p = opAllPartners.find(x => x._id === shopId);
     if (!p || !p.menu || itemId == null) return 'ok'; // can't verify — trust the order snapshot
@@ -7945,7 +7976,7 @@ function opOpenGroceriesAssignModal(orderId) {
   const candidates = opCandidateShopsForOrder(order);
   const candWrap = document.getElementById('op-ga-candidates');
   if (!candidates.length) {
-    candWrap.innerHTML = '<div class="op-empty">No shop currently stocks any of these items.</div>';
+    candWrap.innerHTML = '<div class="op-empty">No shop in the customer\'s zone currently stocks any of these items.</div>';
   } else {
     candWrap.innerHTML = candidates.map(c => `
       <div class="op-order-item" style="cursor:default;">
@@ -8392,19 +8423,45 @@ let opZbMap = null;
 let opZbMarkers = [];
 let opZbPolygon = null;
 let opZbPoints = []; // [{lat, lng}, ...]
-// Freehand drawing state: instead of tapping one point at a time, the
-// operator presses "Draw the zone", drags across the map, and every ~10px
-// of pointer movement gets recorded as a point — so a single drag stroke
-// outlines the whole shape, then the toggle flips back to pan/zoom mode.
-let opZbDrawMode = false;
+// Drawing modes for the zone map:
+//   'freehand' – press & drag once around the area (auto-simplified afterwards)
+//   'points'   – tap the map to add corners one by one
+//   'pan'      – move/zoom the map; corners can be dragged, tapped (deleted),
+//                and edge-midpoint dots tapped (adds a corner)
+// Every change is snapshotted so ↩ Undo steps back through any of them.
+let opZbMode = 'pan';
+let opZbDrawMode = false;   // true only in freehand mode (map dragging is off)
 let opZbDrawing = false;
 let opZbLastContainerPt = null;
-const OP_ZB_MIN_PX_GAP = 10;
+let opZbHistory = [];
+let opZbOsmLayer = null, opZbSatLayer = null, opZbSat = false;
+const OP_ZB_MIN_PX_GAP = 6;
+const OP_ZB_MAX_EDIT_POINTS = 120; // above this, corner handles are hidden (too crowded) until ✨ Simplify
+
+function opZbPush() {
+  opZbHistory.push(JSON.stringify(opZbPoints));
+  if (opZbHistory.length > 60) opZbHistory.shift();
+}
+function opZbSimplifyPts(pts, tolPx) {
+  if (!opZbMap || pts.length < 4) return pts;
+  const P = pts.map(p => opZbMap.latLngToContainerPoint([p.lat, p.lng]));
+  const out = L.LineUtil.simplify(P, tolPx).map(pt => opZbMap.containerPointToLatLng(pt));
+  return out.map(ll => ({ lat: ll.lat, lng: ll.lng }));
+}
 
 function opZbEnsureMap(startLat, startLng) {
   if (opZbMap) return;
   opZbMap = L.map('op-zb-map', { attributionControl: false }).setView([startLat, startLng], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(opZbMap);
+  opZbOsmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(opZbMap);
+  opZbSatLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
+
+  // Tap points mode: each tap adds a corner.
+  opZbMap.on('click', e => {
+    if (opZbMode !== 'points') return;
+    opZbPush();
+    opZbPoints.push({ lat: e.latlng.lat, lng: e.latlng.lng });
+    opZbRedraw();
+  });
 
   const addStrokePoint = (latlng, force) => {
     const pt = opZbMap.latLngToContainerPoint(latlng);
@@ -8414,6 +8471,8 @@ function opZbEnsureMap(startLat, startLng) {
     opZbRedraw();
   };
   const startStroke = latlng => {
+    opZbPush();
+    opZbPoints = [];             // a new freehand stroke replaces the old shape
     opZbDrawing = true;
     opZbLastContainerPt = null;
     addStrokePoint(latlng, true);
@@ -8421,7 +8480,9 @@ function opZbEnsureMap(startLat, startLng) {
   const finishStroke = () => {
     if (!opZbDrawing) return;
     opZbDrawing = false;
-    opZbToggleDrawMode(false); // hand control back to pan/zoom after one stroke
+    // Thin out the hundreds of stroke points into a clean, editable outline.
+    if (opZbPoints.length >= 4) opZbPoints = opZbSimplifyPts(opZbPoints, 5);
+    opZbSetMode('pan');          // then straight into edit mode so it can be fine-tuned
   };
 
   // Desktop mouse dragging.
@@ -8431,9 +8492,7 @@ function opZbEnsureMap(startLat, startLng) {
   opZbMap.on('mouseout', () => { if (opZbDrawing) finishStroke(); });
 
   // Mobile touch dragging — phones don't fire continuous 'mousemove' from a
-  // touch drag (only a one-off synthetic click), so touch needs its own
-  // listeners straight on the map container, reading touch coordinates
-  // directly instead of relying on Leaflet's mouse-event re-firing.
+  // touch drag, so touch needs its own listeners on the map container.
   const container = opZbMap.getContainer();
   const touchLatLng = touch => {
     const rect = container.getBoundingClientRect();
@@ -8453,9 +8512,9 @@ function opZbEnsureMap(startLat, startLng) {
   container.addEventListener('touchcancel', finishStroke);
 }
 
-function opZbToggleDrawMode(forceOn) {
-  opZbDrawMode = typeof forceOn === 'boolean' ? forceOn : !opZbDrawMode;
-  const btn = document.getElementById('op-zb-draw-toggle');
+function opZbSetMode(mode) {
+  opZbMode = mode;
+  opZbDrawMode = mode === 'freehand';
   if (opZbMap) {
     if (opZbDrawMode) {
       opZbMap.dragging.disable();
@@ -8467,13 +8526,31 @@ function opZbToggleDrawMode(forceOn) {
       opZbMap.scrollWheelZoom.enable();
     }
   }
-  if (btn) btn.textContent = opZbDrawMode ? '✋ Stop drawing (pan/zoom)' : '✏️ Draw the zone';
-  const hint = document.getElementById('op-zb-map-hint');
-  if (hint) {
-    hint.textContent = opZbDrawMode
-      ? 'Press and drag across the map to outline the zone'
-      : (opZbPoints.length >= 3 ? 'Looks good — press "Draw the zone" to redo, or save below' : 'Pan/zoom to the right spot, then press "Draw the zone"');
-  }
+  ['freehand', 'points', 'pan'].forEach(m => {
+    const b = document.getElementById('op-zb-mode-' + m);
+    if (b) b.classList.toggle('op-btn-push', m === mode);
+  });
+  if (opZbMap) opZbRedraw();
+}
+// Kept for the code that opens the modal (always starts in Move / Edit mode).
+function opZbToggleDrawMode(forceOn) { opZbSetMode(forceOn === true ? 'freehand' : 'pan'); }
+
+function opZbToggleSatellite() {
+  if (!opZbMap) return;
+  opZbSat = !opZbSat;
+  if (opZbSat) { opZbMap.removeLayer(opZbOsmLayer); opZbSatLayer.addTo(opZbMap); }
+  else { opZbMap.removeLayer(opZbSatLayer); opZbOsmLayer.addTo(opZbMap); }
+  const b = document.getElementById('op-zb-sat-btn');
+  if (b) { b.textContent = opZbSat ? '🗺️ Map' : '🛰️ Satellite'; b.classList.toggle('op-btn-push', opZbSat); }
+}
+
+function opZbHintText() {
+  const n = opZbPoints.length;
+  if (opZbMode === 'freehand') return 'Press and drag across the map to outline the zone (replaces the current shape)';
+  if (opZbMode === 'points') return n < 3 ? 'Tap the map to add corners (need at least 3)' : 'Tap to add more corners — or switch to ✋ Move / Edit to adjust';
+  if (n < 3) return 'Pick ✏️ Freehand or 📍 Tap points to start the zone';
+  if (n > OP_ZB_MAX_EDIT_POINTS) return 'Too many corners to edit by hand — press ✨ Simplify first';
+  return 'Drag a corner to move it · tap a corner to delete it · tap a small dot on an edge to add a corner';
 }
 
 function opZbRedraw() {
@@ -8481,18 +8558,58 @@ function opZbRedraw() {
   opZbMarkers = [];
   if (opZbPolygon) { opZbMap.removeLayer(opZbPolygon); opZbPolygon = null; }
 
-  if (opZbPoints.length >= 2) {
-    opZbPolygon = L.polygon(opZbPoints.map(p => [p.lat, p.lng]), {
-      color: '#39ff14', weight: 2, fillColor: '#39ff14', fillOpacity: 0.2
-    }).addTo(opZbMap);
+  const toLatLngs = () => opZbPoints.map(p => [p.lat, p.lng]);
+  const style = { color: '#39ff14', weight: 2, fillColor: '#39ff14', fillOpacity: 0.2, interactive: false };
+  if (opZbPoints.length >= 3) opZbPolygon = L.polygon(toLatLngs(), style).addTo(opZbMap);
+  else if (opZbPoints.length === 2) opZbPolygon = L.polyline(toLatLngs(), style).addTo(opZbMap);
+
+  const editable = opZbMode !== 'freehand' && opZbPoints.length <= OP_ZB_MAX_EDIT_POINTS;
+  if (editable) {
+    const cornerIcon = L.divIcon({
+      className: '', iconSize: [22, 22], iconAnchor: [11, 11],
+      html: '<div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;"><div style="width:14px;height:14px;border-radius:50%;background:#39ff14;border:2px solid #000;box-shadow:0 0 0 2px #39ff14;"></div></div>'
+    });
+    const midIcon = L.divIcon({
+      className: '', iconSize: [22, 22], iconAnchor: [11, 11],
+      html: '<div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;"><div style="width:8px;height:8px;border-radius:50%;background:#fff;opacity:.85;border:1px solid #000;"></div></div>'
+    });
+    opZbPoints.forEach((p, i) => {
+      const m = L.marker([p.lat, p.lng], { draggable: true, icon: cornerIcon, zIndexOffset: 1000 }).addTo(opZbMap);
+      m.on('dragstart', () => opZbPush());
+      m.on('drag', ev => {
+        const ll = ev.target.getLatLng();
+        opZbPoints[i] = { lat: ll.lat, lng: ll.lng };
+        if (opZbPolygon) opZbPolygon.setLatLngs(toLatLngs());
+      });
+      m.on('dragend', () => opZbRedraw());
+      m.on('click', () => {                       // tap = delete this corner
+        if (opZbPoints.length <= 1) return;
+        opZbPush();
+        opZbPoints.splice(i, 1);
+        opZbRedraw();
+      });
+      opZbMarkers.push(m);
+    });
+    // Small dots on each edge's midpoint: tap one to insert a new corner there.
+    const n = opZbPoints.length;
+    if (n >= 3 && opZbMode === 'pan') {
+      for (let i = 0; i < n; i++) {
+        const a = opZbPoints[i], b = opZbPoints[(i + 1) % n];
+        const mid = L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], { icon: midIcon, zIndexOffset: 500 }).addTo(opZbMap);
+        mid.on('click', () => {
+          opZbPush();
+          opZbPoints.splice(i + 1, 0, { lat: (a.lat + b.lat) / 2, lng: (a.lng + b.lng) / 2 });
+          opZbRedraw();
+        });
+        opZbMarkers.push(mid);
+      }
+    }
   }
 
   document.getElementById('op-zb-point-count').textContent =
-    opZbPoints.length + (opZbPoints.length === 1 ? ' point added' : ' points added');
-  if (!opZbDrawMode) {
-    document.getElementById('op-zb-map-hint').textContent =
-      opZbPoints.length >= 3 ? 'Looks good — press "Draw the zone" to redo, or save below' : 'Pan/zoom to the right spot, then press "Draw the zone"';
-  }
+    opZbPoints.length + (opZbPoints.length === 1 ? ' point' : ' points') + (opZbPoints.length >= 3 ? ' · zone ready to save' : ' · need at least 3');
+  const hint = document.getElementById('op-zb-map-hint');
+  if (hint) hint.textContent = opZbHintText();
 }
 
 function opOpenZoneBoundaryModal(zoneId) {
@@ -8533,7 +8650,8 @@ function opZbShowMap() {
   document.getElementById('op-zone-boundary-modal').classList.add('show');
   setTimeout(() => {
     opZbEnsureMap(startLat, startLng);
-    opZbToggleDrawMode(false); // always open in pan/zoom mode
+    opZbHistory = [];
+    opZbToggleDrawMode(false); // always open in Move / Edit mode
     opZbMap.invalidateSize();
     if (opZbPoints.length) {
       const bounds = L.latLngBounds(opZbPoints.map(p => [p.lat, p.lng]));
@@ -8545,8 +8663,26 @@ function opZbShowMap() {
   }, 60);
 }
 
-function opZbUndo() { opZbPoints.pop(); opZbRedraw(); }
-function opZbClear() { opZbPoints = []; opZbRedraw(); }
+function opZbUndo() {
+  if (opZbHistory.length) opZbPoints = JSON.parse(opZbHistory.pop());
+  else opZbPoints.pop();
+  opZbRedraw();
+}
+function opZbClear() { opZbPush(); opZbPoints = []; opZbRedraw(); }
+// Thins out a crowded outline (e.g. an older freehand zone with hundreds of
+// points) into a few clean corners that are easy to adjust.
+function opZbSimplifyNow() {
+  if (opZbPoints.length < 4) return;
+  opZbPush();
+  let tol = 4, out = opZbPoints;
+  for (let k = 0; k < 6 && out.length > 3; k++, tol += 4) {
+    const t = opZbSimplifyPts(opZbPoints, tol);
+    if (t.length >= 3) out = t;
+    if (out.length <= 40) break;
+  }
+  opZbPoints = out;
+  opZbRedraw();
+}
 
 // Updates the "Delivery zone" status line in the Partner detail modal.
 function opRenderShopZoneStatus(p) {
@@ -8554,6 +8690,113 @@ function opRenderShopZoneStatus(p) {
   if (!el) return;
   const has = Array.isArray(p.deliveryZone) && p.deliveryZone.length >= 3;
   el.textContent = has ? '📍 Zone set' : '⚠️ No zone set yet';
+}
+
+// ---- Groceries shop zone (operator-assigned) ----
+// Membership lives in app_config/shopZones/{zoneId}/shopIds/{shopId} — the
+// same data the Shop Zones screen edits — so this is just a per-shop way to
+// set it. A shop is put in ONE zone here (moving it out of any other).
+function opShopZoneIdsOf(shopId) {
+  return opShopZones.filter(z => z.shopIds && z.shopIds[shopId]).map(z => z._id);
+}
+function opRenderPartnerShopZoneBlock(p) {
+  const isG = p.businessType === 'groceries';
+  const shopBlock = document.getElementById('op-pm-shopzone-block');
+  const drawBlock = document.getElementById('op-pm-drawzone-block');
+  if (shopBlock) shopBlock.style.display = isG ? 'block' : 'none';
+  if (drawBlock) drawBlock.style.display = isG ? 'none' : 'block';
+  if (!isG) return;
+  const sel = document.getElementById('op-pm-shopzone-select');
+  const cur = opShopZoneIdsOf(opCurrentPartnerId);
+  sel.innerHTML = '<option value="">— No zone (not shown to any customer) —</option>' +
+    opShopZones.map(z => '<option value="' + escapeHtml(z._id) + '">' + escapeHtml(z.name || z._id) + '</option>').join('');
+  sel.value = cur[0] || '';
+  const req = document.getElementById('op-pm-shopzone-requested');
+  const detected = opZoneForLocation(p.location);
+  req.style.display = 'block';
+  if (!p.location) {
+    req.textContent = '⚠️ This shop has no location saved, so its zone can\'t be detected — pick one below.';
+  } else if (!detected) {
+    req.textContent = '📍 Shop location ' + p.location + ' is not inside any drawn zone — pick one below or draw a zone that covers it.';
+  } else if (!cur.length) {
+    req.textContent = '📍 Shop location is inside zone: ' + (detected.name || detected._id) + ' (selected below — press Save zone to confirm)';
+    sel.value = detected._id;
+  } else {
+    req.textContent = '📍 Shop location is inside zone: ' + (detected.name || detected._id);
+  }
+  document.getElementById('op-pm-shopzone-status').textContent = cur.length > 1 ? '⚠️ This shop is in ' + cur.length + ' zones — saving will keep only the selected one.' : '';
+}
+async function opSavePartnerShopZone() {
+  if (!opCurrentPartnerId) return;
+  const status = document.getElementById('op-pm-shopzone-status');
+  const zoneId = document.getElementById('op-pm-shopzone-select').value;
+  const { db, ref, update } = window.fb;
+  const updates = {};
+  opShopZones.forEach(z => { updates[z._id + '/shopIds/' + opCurrentPartnerId] = (z._id === zoneId) ? true : null; });
+  if (!Object.keys(updates).length) { status.textContent = 'No zones exist yet — create one in Shop Zones first.'; return; }
+  status.textContent = 'Saving...';
+  try {
+    await update(ref(db, 'app_config/shopZones'), updates);
+    status.textContent = zoneId ? 'Zone saved.' : 'Removed from all zones.';
+  } catch (err) { status.textContent = 'Error: ' + err.message; }
+}
+// Zone (from Shop Zones) whose boundary contains this shop's saved location
+// ("lat, lng" text). Returns the zone object or null.
+function opZoneForLocation(locStr) {
+  const m = locStr ? String(locStr).trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/) : null;
+  if (!m) return null;
+  const pt = { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  return opShopZones.find(z => {
+    const b = Array.isArray(z.bounds) ? z.bounds : Object.values(z.bounds || {});
+    return b.length >= 3 && opPointInPoly(pt, b);
+  }) || null;
+}
+// One-tap: every groceries shop that isn't in any zone yet is added to the
+// zone its saved location falls inside. Shops already in a zone are untouched.
+async function opAutoAssignGroceriesByLocation() {
+  const status = document.getElementById('op-sz-auto-status');
+  const updates = {};
+  const done = [], noLoc = [], outside = [];
+  opAllPartners.filter(p => p.businessType === 'groceries').forEach(p => {
+    if (opShopZoneIdsOf(p._id).length) return;
+    if (!p.location) { noLoc.push(p.restaurantName || p._id); return; }
+    const z = opZoneForLocation(p.location);
+    if (!z) { outside.push(p.restaurantName || p._id); return; }
+    updates[z._id + '/shopIds/' + p._id] = true;
+    done.push((p.restaurantName || p._id) + ' → ' + (z.name || z._id));
+  });
+  try {
+    if (Object.keys(updates).length) await update_(updates);
+  } catch (err) { status.textContent = 'Error: ' + err.message; return; }
+  status.textContent = (done.length ? 'Added: ' + done.join(', ') + '. ' : 'Nothing to add. ') +
+    (outside.length ? 'Outside every zone: ' + outside.join(', ') + '. ' : '') +
+    (noLoc.length ? 'No location: ' + noLoc.join(', ') + '.' : '');
+  function update_(u) { const { db, ref, update } = window.fb; return update(ref(db, 'app_config/shopZones'), u); }
+}
+// Point-in-polygon for an order's delivery pin against operator Shop Zones.
+function opPointInPoly(pt, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].lng, yi = poly[i].lat, xj = poly[j].lng, yj = poly[j].lat;
+    if (((yi > pt.lat) !== (yj > pt.lat)) && (pt.lng < (xj - xi) * (pt.lat - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+// Set of shop ids allowed to fulfil an order placed from this delivery pin
+// (the shops of the zone(s) the pin is inside). null = don't restrict (no
+// zones configured, order has no coordinates, or pin is in no zone).
+function opShopsAllowedForOrder(order) {
+  if (!opShopZones.length) return null;
+  if (typeof order.customerLat !== 'number' || typeof order.customerLng !== 'number') return null;
+  const pt = { lat: order.customerLat, lng: order.customerLng };
+  const hit = opShopZones.filter(z => {
+    const b = Array.isArray(z.bounds) ? z.bounds : Object.values(z.bounds || {});
+    return b.length >= 3 && opPointInPoly(pt, b);
+  });
+  if (!hit.length) return null;
+  const ids = new Set();
+  hit.forEach(z => Object.keys(z.shopIds || {}).forEach(id => { if (z.shopIds[id]) ids.add(id); }));
+  return ids;
 }
 
 function opSaveZoneBoundary() {
@@ -9748,6 +9991,7 @@ function opShowPartnerDetail(id) {
   opRenderShopPhoto(p.photo || '');
   document.getElementById('op-pm-shop-photo-status').textContent = '';
   opRenderShopZoneStatus(p);
+  opRenderPartnerShopZoneBlock(p);
   document.getElementById('op-pm-bulk-import-status').textContent = '';
   document.getElementById('op-pm-bulk-import-status').style.display = 'none';
   // "Add item", "Let this shop add its own stock", and the per-item
@@ -9819,8 +10063,19 @@ function opApprovePartner() {
   const { db, ref, update } = window.fb;
   const msg = document.getElementById('op-pm-approval-status-msg');
   msg.textContent = 'Approving...';
-  update(ref(db, 'restaurants/' + opCurrentPartnerId), { approvalStatus: 'approved', rejectionReason: null })
-    .then(() => { msg.textContent = 'Approved.'; })
+  const shopId = opCurrentPartnerId;
+  const shop = opAllPartners.find(x => x._id === shopId);
+  update(ref(db, 'restaurants/' + shopId), { approvalStatus: 'approved', rejectionReason: null })
+    .then(() => {
+      // A groceries shop is put in the zone its location falls inside
+      // (unless the operator already placed it in a zone).
+      const z = shop && shop.businessType === 'groceries' ? opZoneForLocation(shop.location) : null;
+      if (z && !opShopZoneIdsOf(shopId).length) {
+        return update(ref(db, 'app_config/shopZones/' + z._id + '/shopIds'), { [shopId]: true })
+          .then(() => { msg.textContent = 'Approved and added to zone ' + (z.name || z._id) + '.'; });
+      }
+      msg.textContent = 'Approved.';
+    })
     .catch(err => { msg.textContent = 'Error: ' + err.message; });
 }
 function opShowPartnerRejectBox() {
@@ -10498,6 +10753,99 @@ async function registerForOrderPushNotifications() {
       });
     });
   }
+})();
+
+// ---------- Hardware back button (Android APK via Capacitor) ----------
+// ONE function (neshHandleBack) decides what "back" means so the phone's back
+// button/gesture behaves like the on-screen ← arrows:
+//   1. an open popup / modal closes first
+//   2. otherwise the current screen's own back arrow is pressed
+//   3. on the first screens (login / home / operator home): "tap back again to exit"
+let neshExitArmed = false;
+function neshIsShown(id) {
+  const el = document.getElementById(id);
+  return !!(el && el.classList.contains('show'));
+}
+function neshVisible(el) {
+  return !!(el && el.offsetParent !== null && getComputedStyle(el).display !== 'none');
+}
+// Returns 'stay' (back was used inside the app) or 'exit' (nothing left to go back to).
+function neshHandleBack() {
+  // --- 1) Popups, top-most first ---
+  if (neshIsShown('order-popup-overlay')) return 'stay';            // new-order alert: must be answered, not dismissed
+  if (neshIsShown('app-video-overlay')) {
+    const c = document.getElementById('app-video-close-btn'), k = document.getElementById('app-video-skip-btn');
+    if (neshVisible(c)) c.click(); else if (neshVisible(k)) k.click();
+    return 'stay';
+  }
+  if (neshIsShown('reason-modal-overlay')) { closeReasonModal(); return 'stay'; }
+  if (neshIsShown('support-chat-container')) {
+    const b = document.getElementById('support-chat-back');
+    if (b) b.click(); else document.getElementById('support-chat-container').classList.remove('show');
+    return 'stay';
+  }
+  // Operator panel modals (last one in the page = top-most)
+  const opModals = Array.from(document.querySelectorAll('#operator-container .op-modal-overlay.show'));
+  if (opModals.length) {
+    const m = opModals[opModals.length - 1];
+    const btn = Array.from(m.querySelectorAll('button')).find(b => /^(close|cancel|back|×|✕|x)$/i.test(b.textContent.trim()) || b.classList.contains('op-modal-close'));
+    if (btn) btn.click(); else m.classList.remove('show');
+    return 'stay';
+  }
+
+  // --- 2) Operator panel ---
+  if (neshIsShown('operator-container')) {
+    const chat = document.getElementById('op-chat-panel');
+    if (chat && chat.classList.contains('active') && typeof opCloseChatPanel === 'function') {
+      opCloseChatPanel(); return 'stay';
+    }
+    const sec = document.querySelector('#operator-container .op-section.active');
+    const back = sec && sec.querySelector('.op-back-btn');
+    if (back) { neshExitArmed = false; back.click(); return 'stay'; }
+    return neshDoubleBackExit();                                    // operator home
+  }
+
+  // --- 3) Normal (shop) screens ---
+  const active = document.querySelector('.screen.active');
+  const id = active ? active.id.replace('screen-', '') : 'login';
+  if (id === 'login' || id === 'home' || id === 'pending' || id === 'rejected') return neshDoubleBackExit();
+  neshExitArmed = false;
+  const backBtn = active && active.querySelector('.btn-back');
+  if (backBtn) { backBtn.click(); return 'stay'; }
+  showScreen('home');                                               // safety net
+  return 'stay';
+}
+function neshDoubleBackExit() {
+  if (neshExitArmed) { neshExitArmed = false; return 'exit'; }
+  neshExitArmed = true;
+  showToast('Tap back again to exit');
+  setTimeout(() => { neshExitArmed = false; }, 2000);
+  return 'stay';
+}
+(function () {
+  const CapApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+  if (CapApp && CapApp.addListener) {
+    // Native app: registering this listener turns OFF Android's default back
+    // behaviour (which would just close the app).
+    CapApp.addListener('backButton', () => {
+      if (neshHandleBack() === 'exit') {
+        if (CapApp.minimizeApp) CapApp.minimizeApp();               // goes to background, like WhatsApp
+        else if (CapApp.exitApp) CapApp.exitApp();
+      }
+    });
+    return;
+  }
+  // Fallback (plain browser / WebView build without @capacitor/app): keep one
+  // "guard" history entry so a back press arrives as a popstate event.
+  try {
+    history.replaceState({ nesh: 'base' }, '', location.href);
+    history.pushState({ nesh: 'guard' }, '', location.href);
+  } catch (e) { return; }
+  window.addEventListener('popstate', () => {
+    if (neshHandleBack() === 'stay') {
+      try { history.pushState({ nesh: 'guard' }, '', location.href); } catch (e) {}
+    }
+  });
 })();
 </script>
 </body>
