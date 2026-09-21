@@ -101,6 +101,17 @@ jobs:
           # from the "Turn on Auto-start" modal, instead of only giving the
           # driver generic text instructions to find it themselves.
           npm install @squareetlabs/capacitor-dont-kill-my-app --legacy-peer-deps
+          # Lets partner.html (and driver.html) handle the phone's hardware
+          # back button: window.Capacitor.Plugins.App.addListener('backButton')
+          # plus minimizeApp(). Without this plugin registered, the back
+          # button just closes the whole app / walks WebView history.
+          # The major version must match the installed @capacitor/core
+          # (a mismatched @capacitor/app breaks `cap sync`), so it is
+          # derived from core instead of hardcoded.
+          CAP_MAJOR=$(node -p "require('@capacitor/core/package.json').version.split('.')[0]")
+          echo "@capacitor/core major version: $CAP_MAJOR"
+          npm install @capacitor/app@$CAP_MAJOR --legacy-peer-deps
+          npm ls @capacitor/app --depth=0 || true
 
       - name: Generate native Android project (if not already present)
         run: |
