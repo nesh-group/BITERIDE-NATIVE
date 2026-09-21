@@ -5672,7 +5672,7 @@ function listenDueAmount() {
   });
   onValue(ref(db, 'restaurants/' + state.restId + '/settlements'), snap => {
     const list = [];
-    snap.forEach(child => list.push(Object.assign({ _id: child.key }, child.val())));
+    snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); }); // braces: a truthy return would stop Firebase's forEach after the first child
     dueSettlements = list;
     renderDueUI();
   });
@@ -7791,7 +7791,7 @@ function opListenGroceryQueue() {
   const { db, ref, onValue } = window.fb;
   onValue(ref(db, 'groceryOrderQueue'), snap => {
     const list = [];
-    snap.forEach(child => list.push(Object.assign({ _id: child.key }, child.val())));
+    snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); }); // braces: a truthy return would stop Firebase's forEach after the first child
     // Beep + toast when a NEW unassigned order arrives while the panel is open.
     const pendingIds = list.filter(o => o.status === 'pending_assignment').map(o => o._id);
     if (opQueueSeenIds !== null && pendingIds.some(id => !opQueueSeenIds.has(id))) {
