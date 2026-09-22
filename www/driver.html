@@ -1229,12 +1229,17 @@ function wireMapButtons(root) {
   });
 }
 
-// How long a newly-created ride/delivery is offered only to whichever
-// driver ranks nearest, before every other matching online driver also
-// gets to see it in their popup. Mirrors NEAREST_TIMEOUT_MS in the worker,
-// but is enforced here too (independent of push delivery) so the in-app
-// popup never lags behind by the worker's minute-level Cron granularity.
+// How long a newly-created ride is offered only to whichever driver ranks
+// nearest, before every other matching online driver also gets to see it
+// in their popup. Mirrors NEAREST_TIMEOUT_MS in the worker, but is
+// enforced here too (independent of push delivery) so the in-app popup
+// never lags behind by the worker's minute-level Cron granularity.
 const NEAREST_WINDOW_MS = 25 * 1000;
+// Same idea, but for Go Series delivery jobs specifically — kept on its
+// own constant (rather than sharing NEAREST_WINDOW_MS) so delivery's
+// nearest-only window can be tuned independently of taxi rides. Mirrors
+// DELIVERY_NEAREST_TIMEOUT_MS in the worker.
+const DELIVERY_NEAREST_WINDOW_MS = 2 * 60 * 1000;
 const MAX_MATCH_RADIUS_KM = 12;
 const NEAR_OVERRIDE_KM = 0.5; // within this distance of the nearest candidate, order count decides instead of raw distance (see rankAmongCandidates)
 const LOCATION_STALE_MS = 3 * 60 * 1000;
@@ -1324,6 +1329,17 @@ function startLocationHeartbeat() {
     update(ref(db, 'taxi_drivers/' + state.username), {
       location: { lat: state.myLocation.lat, lng: state.myLocation.lng, updatedAt: now },
     }).catch((e) => { console.warn('Location heartbeat write failed:', e); });
+    // Also poke the native health-check Worker here, not just from a
+    // fresh GPS fix in handleDriverLocationFix(). Without this, a driver
+    // who's simply stationary (parked, waiting for a job — very normal)
+    // never gets a new fix past the plugin's 15m distanceFilter, so
+    // DriverTrackingPlugin's heartbeat goes stale and
+    // LocationHealthCheckWorker fires a false "Location tracking paused"
+    // notification even though this very interval is keeping their
+    // Firebase location (and matching visibility) perfectly fresh.
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DriverTrackingPlugin) {
+      Promise.resolve(window.Capacitor.Plugins.DriverTrackingPlugin.recordHeartbeat()).catch(() => {});
+    }
   }, 60 * 1000);
 }
 function stopLocationHeartbeat() {
@@ -2504,7 +2520,11 @@ function shouldOfferToMe(pickup, createdAt, matchFn, amIBusy, useGroup) {
   }
   if (rank < 0) return false;
   const elapsed = Date.now() - (createdAt || 0);
-  const turn = Math.min(Math.floor(elapsed / NEAREST_WINDOW_MS), total - 1);
+  // Delivery jobs (useGroup === true — see the Go Series delivery call
+  // site below) get their own, longer nearest-only window than taxi
+  // rides.
+  const windowMs = useGroup ? DELIVERY_NEAREST_WINDOW_MS : NEAREST_WINDOW_MS;
+  const turn = Math.min(Math.floor(elapsed / windowMs), total - 1);
   return rank === turn;
 }
 
@@ -3520,6 +3540,26 @@ function timeAgo(ts) {
   return hrs + ' hr ago';
 }
 
+// Swiggy-style "pickup ready" alert: fires once, in-app, the moment this
+// driver's currently-assigned delivery flips from "preparing" to "ready"
+// (shop tapped "Mark as ready" in partner.html) while the driver app is
+// open. Keyed by composite order id so it only fires once per order even
+// though renderHomeLists() re-runs on every Firebase update — a repeat
+// visit to 'ready' status (there isn't one normally, but just in case)
+// won't re-alert. Cleared entries are never removed — the set just grows
+// by a few bytes per delivery, which is negligible over a driver's day.
+const pickupReadyNotified = new Set();
+function notifyPickupReadyIfNew(o) {
+  const id = o._restId + '::' + o._orderId;
+  if (pickupReadyNotified.has(id)) return;
+  pickupReadyNotified.add(id);
+  showToast('🛵 Pickup ready at ' + (o._restName || 'the shop') + ' — head over now!');
+  // Vibration only, no sound — a single long buzz rather than a chime.
+  if (window.navigator && typeof window.navigator.vibrate === 'function') {
+    try { window.navigator.vibrate(1000); } catch (e) {}
+  }
+}
+
 function renderHomeLists() {
   const all = Object.keys(ridesCache).map(id => Object.assign({ _id: id }, ridesCache[id]));
 
@@ -3594,6 +3634,7 @@ function renderHomeLists() {
   const myDeliveries = deliveriesCache.filter(o => o.deliveryDriverId === state.username);
 
   const currentDelivery = myDeliveries.find(o => ['preparing', 'ready', 'picked_up'].includes(o.status));
+  if (currentDelivery && currentDelivery.status === 'ready') notifyPickupReadyIfNew(currentDelivery);
   const dWrap = document.getElementById('home-current-delivery-wrap');
   dWrap.innerHTML = '';
   if (currentDelivery) {
