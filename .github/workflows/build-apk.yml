@@ -101,17 +101,6 @@ jobs:
           # from the "Turn on Auto-start" modal, instead of only giving the
           # driver generic text instructions to find it themselves.
           npm install @squareetlabs/capacitor-dont-kill-my-app --legacy-peer-deps
-          # Lets partner.html (and driver.html) handle the phone's hardware
-          # back button: window.Capacitor.Plugins.App.addListener('backButton')
-          # plus minimizeApp(). Without this plugin registered, the back
-          # button just closes the whole app / walks WebView history.
-          # The major version must match the installed @capacitor/core
-          # (a mismatched @capacitor/app breaks `cap sync`), so it is
-          # derived from core instead of hardcoded.
-          CAP_MAJOR=$(node -p "require('@capacitor/core/package.json').version.split('.')[0]")
-          echo "@capacitor/core major version: $CAP_MAJOR"
-          npm install @capacitor/app@$CAP_MAJOR --legacy-peer-deps
-          npm ls @capacitor/app --depth=0 || true
 
       - name: Generate native Android project (if not already present)
         run: |
@@ -671,6 +660,24 @@ jobs:
                       legacyChannel.setVibrationPattern(new long[]{0, 800, 300, 800, 300, 800, 300, 800});
                       legacyChannel.setBypassDnd(true);
                       manager.createNotificationChannel(legacyChannel);
+
+                      // Vibration-only alert for "pickup ready" pings to a
+                      // delivery driver who already accepted the job — no
+                      // sound, just one long buzz, so it reads as a nudge
+                      // rather than a full alarm. setSound(null, null) is
+                      // what actually silences it; the worker's per-message
+                      // "sound" field in the FCM payload can't override a
+                      // channel's sound once the channel exists, which is
+                      // why this needs its own channel instead of reusing
+                      // order_alerts.
+                      NotificationChannel pickupReadyChannel = new NotificationChannel(
+                          "pickup_ready_alerts", "Pickup Ready Alerts", NotificationManager.IMPORTANCE_HIGH
+                      );
+                      pickupReadyChannel.setSound(null, null);
+                      pickupReadyChannel.enableVibration(true);
+                      pickupReadyChannel.setVibrationPattern(new long[]{0, 1000});
+                      pickupReadyChannel.setBypassDnd(true);
+                      manager.createNotificationChannel(pickupReadyChannel);
                   }
 
                   handleIncomingIntent(getIntent());
