@@ -2905,18 +2905,27 @@ function renderOrderPopup(pendingList) {
 
   eyebrow.textContent = pendingList.length > 1 ? `NEW ORDERS (${pendingList.length})` : "NEW ORDER";
 
+  // Go Series shops (any shop with restaurants/{id}.goSeries === true, not
+  // just NESH Store groceries) have their orders picked up and delivered by
+  // a bike delivery boy — the shop never meets the customer and never
+  // collects the delivery charge (the driver collects the full COD total
+  // directly, see driver.html) — so neither the customer's delivery
+  // location nor the delivery charge/platform fee are the shop's concern.
+  const isGoSeriesShop = !!(state.restaurant && state.restaurant.goSeries);
+
   listEl.innerHTML = "";
   pendingList.forEach(order => {
     const card = document.createElement('div');
     card.className = "order-popup-card";
 
-    // NESH Store queue orders (assigned via the Operator Panel) show the
-    // shop each item at the shop's OWN rate (shopPrice) — same list style
-    // as a normal order — but no platform fee / delivery charge rows,
-    // since those aren't the shop's concern; the total is the shop's own
-    // sum, not the customer-facing total (see neshStoreOrderShopTotal).
+    // Go Series orders (NESH Store queue or a direct order to a Go Series
+    // shop) show the shop each item at its OWN rate (shopPrice, or plain
+    // price for a direct order where there's no markup) — same list style
+    // as any order — but no platform fee / delivery charge rows, and the
+    // total is the shop's own item sum, not the customer-facing total
+    // (see neshStoreOrderShopTotal — works the same for either case).
     let bodyHtml;
-    if (order.fromNeshStoreQueue) {
+    if (order.fromNeshStoreQueue || isGoSeriesShop) {
       const itemsHtml = (order.items || []).map(it => {
         const rate = it.shopPrice != null ? it.shopPrice : it.price;
         return `<div class="order-popup-row"><span>${it.qty} × ${it.name}${it.desc ? `<br><span style="color:#8a94a3; font-size:11px;">${it.desc}</span>` : ''}</span><span>₹${rate * it.qty}</span></div>`;
@@ -2951,7 +2960,7 @@ function renderOrderPopup(pendingList) {
       <div class="order-popup-body">
         ${bodyHtml}
       </div>
-      <p class="order-popup-cust">${(order.customerName || 'Guest')} · ${(order.customerAddress || '')}</p>
+      <p class="order-popup-cust">${(order.customerName || 'Guest')}${isGoSeriesShop ? '' : (order.customerAddress ? ' · ' + order.customerAddress : '')}</p>
       <div class="order-popup-btns">
         <button class="btn-danger" data-action="reject" data-id="${order._id}">Reject</button>
         <button class="btn-primary" data-action="accept" data-id="${order._id}">Accept order</button>
@@ -5200,27 +5209,47 @@ function renderOrderDetail(o) {
     phoneLink.textContent = '—';
     phoneLink.removeAttribute('href');
   }
-  document.getElementById('od-cust-address').textContent = [o.customerAddress, o.customerLocation].filter(Boolean).join(', ') || '—';
 
+  // Go Series shops (any shop with restaurants/{id}.goSeries === true, not
+  // just NESH Store groceries) have their orders picked up and delivered by
+  // a bike delivery boy — the shop never meets the customer and never
+  // collects the delivery charge (the driver collects the full COD total
+  // directly, see driver.html) — so neither the customer's delivery
+  // location/landmark/map nor the delivery charge/platform fee are the
+  // shop's concern; hide them here.
+  const isGoSeriesShop = !!(state.restaurant && state.restaurant.goSeries);
+
+  const addressLabel = document.getElementById('od-cust-address').previousElementSibling;
   const landmarkLabel = document.getElementById('od-landmark-label');
   const landmarkValue = document.getElementById('od-cust-landmark');
-  if (o.customerLandmark) {
-    landmarkLabel.style.display = "block";
-    landmarkValue.style.display = "block";
-    landmarkValue.textContent = o.customerLandmark;
-  } else {
+  const mapBtn = document.getElementById('od-map-btn');
+  if (isGoSeriesShop) {
+    if (addressLabel) addressLabel.style.display = "none";
+    document.getElementById('od-cust-address').style.display = "none";
     landmarkLabel.style.display = "none";
     landmarkValue.style.display = "none";
-  }
-
-  const mapBtn = document.getElementById('od-map-btn');
-  const mapUrl = buildMapUrl(o);
-  if (mapUrl) {
-    mapBtn.style.display = "inline-flex";
-    mapBtn.onclick = () => window.open(mapUrl, '_blank');
-  } else {
     mapBtn.style.display = "none";
     mapBtn.onclick = null;
+  } else {
+    if (addressLabel) addressLabel.style.display = "block";
+    document.getElementById('od-cust-address').style.display = "block";
+    document.getElementById('od-cust-address').textContent = [o.customerAddress, o.customerLocation].filter(Boolean).join(', ') || '—';
+    if (o.customerLandmark) {
+      landmarkLabel.style.display = "block";
+      landmarkValue.style.display = "block";
+      landmarkValue.textContent = o.customerLandmark;
+    } else {
+      landmarkLabel.style.display = "none";
+      landmarkValue.style.display = "none";
+    }
+    const mapUrl = buildMapUrl(o);
+    if (mapUrl) {
+      mapBtn.style.display = "inline-flex";
+      mapBtn.onclick = () => window.open(mapUrl, '_blank');
+    } else {
+      mapBtn.style.display = "none";
+      mapBtn.onclick = null;
+    }
   }
 
   const waBtn = document.getElementById('od-whatsapp-btn');
@@ -5238,10 +5267,10 @@ function renderOrderDetail(o) {
     row.innerHTML = `<span>${it.qty} × ${it.name}${it.desc ? `<br><span style="color:#5C574C; font-size:11px;">${it.desc}</span>` : ''}</span><span>₹${rate * it.qty}</span>`;
     itemsEl.appendChild(row);
   });
-  if (o.fromNeshStoreQueue) {
-    // NESH Store queue order: no platform fee / delivery charge rows —
-    // not the shop's concern — and the total is the shop's own sum, not
-    // the customer-facing total. See neshStoreOrderShopTotal.
+  if (o.fromNeshStoreQueue || isGoSeriesShop) {
+    // Go Series order: no platform fee / delivery charge rows — not the
+    // shop's concern — and the total is the shop's own sum, not the
+    // customer-facing total. See neshStoreOrderShopTotal.
     document.getElementById('od-total').textContent = "₹" + neshStoreOrderShopTotal(o);
   } else {
     if (o.platformFee) {
@@ -5274,7 +5303,6 @@ function renderOrderDetail(o) {
   // delivery boys at all (see listenDeliveryJobs/refreshRidePopupFromCache
   // in driver.html) — that shop arranges its own delivery, so it keeps a
   // shop-side "Mark as delivered" button here.
-  const isGoSeriesShop = !!(state.restaurant && state.restaurant.goSeries);
   if (status === 'ready' || status === 'picked_up') {
     const note = document.createElement('p');
     note.className = 'op-note';
