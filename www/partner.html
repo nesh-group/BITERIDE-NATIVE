@@ -800,11 +800,9 @@
     <div class="route-bar" id="home-route-bar" style="display:none;">
       <span id="home-route-count">0 selected</span>
       <button class="btn-primary" id="home-route-btn" style="width:auto; padding:8px 14px; font-size:13px;" onclick="goToSelectedOrders()">Go</button>
-      <button class="btn-primary" id="home-bulk-assign-btn" style="width:auto; padding:8px 14px; font-size:13px; background:#3A8FB0;" onclick="openBulkAssignPanel()">Assign</button>
       <button class="btn-primary" id="home-whatsapp-btn" style="width:auto; padding:8px 14px; font-size:13px; background:#25D366;" onclick="shareSelectedOrdersOnWhatsApp()">💬 WhatsApp</button>
     </div>
     <div class="route-panel" id="home-route-panel" style="display:none;"></div>
-    <div class="route-panel" id="home-bulk-assign-panel" style="display:none;"></div>
     <div class="home-orders-list" id="home-orders-list"></div>
 
     <p class="empty-text" id="home-empty-text" style="padding:32px 24px 0;">Use the tabs below to manage orders, stock, and your account.</p>
@@ -842,14 +840,6 @@
         <span>Total</span>
         <span id="od-total"></span>
       </div>
-    </div>
-
-    <div class="detail-block" id="od-assign-block" style="display:none;">
-      <p class="detail-label">Delivery boy</p>
-      <p class="detail-value" id="od-assign-current" style="display:none;"></p>
-      <select id="od-assign-select" style="width:100%; padding:8px; border:1px solid #CBB68B; border-radius:6px; font-size:13px; font-family:'Inter',sans-serif; background:#fff; color:#0B2545; margin-bottom:8px;"></select>
-      <button class="status-btn ready" id="od-assign-btn" style="margin:0;" onclick="shopAssignDeliveryBoy()">Assign delivery boy</button>
-      <p class="detail-label" id="od-assign-status" style="margin:8px 0 0; text-transform:none; letter-spacing:normal;"></p>
     </div>
 
     <div class="status-actions" id="od-status-actions"></div>
@@ -3549,7 +3539,6 @@ function logInRestaurant(id, data) {
     listenDailyEarnings();
     listenPartnerSupportMessages();
     registerForOrderPushNotifications();
-    listenShopBikeDrivers();
     checkAndShowAppVideo('shopAppVideo', 'nesh_shop_video_seen');
     // Claim this device as the active session for the shop BEFORE watching
     // it, so the first snapshot the listener sees is our own write, not a
@@ -5125,7 +5114,6 @@ function toggleOrderSelectMode() {
   if (!state.orderSelectMode) {
     selectedOrderIds.clear();
     document.getElementById('home-route-panel').style.display = "none";
-    document.getElementById('home-bulk-assign-panel').style.display = "none";
   }
   document.querySelectorAll('#home-orders-list .order-chit').forEach(el => {
     el.classList.toggle('select-mode', state.orderSelectMode);
@@ -5272,8 +5260,6 @@ function renderOrderDetail(o) {
     document.getElementById('od-total').textContent = "₹" + (o.total || 0);
   }
 
-  renderAssignBlock(o);
-
   const actionsEl = document.getElementById('od-status-actions');
   actionsEl.innerHTML = "";
   const buttons = [];
@@ -5351,142 +5337,6 @@ async function updateOrderStatus(id, newStatus, orderData) {
   } catch (e) {
     alert("Couldn't update order — check your connection and try again.");
   }
-}
-
-/* ---- Manual per-order delivery-boy assignment (shop's own screen) ----
-   Separate from the "dedicated driver" auto-route on mark-ready above:
-   this lets the shop pick a specific order and a specific bike driver and
-   assign it directly, whatever the order's current status. Writes
-   assignedDriverIds (a {driverId: true} map, same format the dedicated-
-   driver route above uses) which the driver app treats as an exclusive
-   override: once the order reaches 'ready', only that one driver sees it. */
-let shopBikeDrivers = []; // [{ _id, name, isOnline, vehicleType }] — bike drivers only
-function listenShopBikeDrivers() {
-  const { db, ref, onValue } = window.fb;
-  onValue(ref(db, 'taxi_drivers'), snap => {
-    const val = snap.val() || {};
-    shopBikeDrivers = Object.keys(val)
-      .map(id => Object.assign({ _id: id }, val[id]))
-      .filter(d => d.vehicleType === 'bike');
-    // Keep the order-detail dropdown current if it's open on an active order.
-    if (state.selectedOrderId) {
-      const o = (state.homeOrdersCache || []).find(x => x._id === state.selectedOrderId);
-      if (o) renderAssignBlock(o);
-    }
-  });
-}
-
-function renderAssignBlock(o) {
-  const block = document.getElementById('od-assign-block');
-  const status = o.status || 'pending';
-  if (status === 'delivered' || status === 'cancelled' || status === 'rejected' || status === 'picked_up') {
-    block.style.display = "none";
-    return;
-  }
-  block.style.display = "block";
-
-  // Accept both the new map format and the older single-id field (from
-  // before this order was assigned, or from the operator panel's own
-  // single-driver assign tool) so existing data still displays.
-  const currentId = o.assignedDriverIds ? Object.keys(o.assignedDriverIds)[0] : o.assignedDriverId;
-  const currentEl = document.getElementById('od-assign-current');
-  if (currentId) {
-    currentEl.style.display = "block";
-    const d = shopBikeDrivers.find(x => x._id === currentId);
-    currentEl.textContent = "Currently assigned: " + (d ? (d.name || currentId) : ((o.assignedDriverNames && o.assignedDriverNames[currentId]) || o.assignedDriverName || currentId));
-  } else {
-    currentEl.style.display = "none";
-  }
-
-  const sel = document.getElementById('od-assign-select');
-  const sorted = shopBikeDrivers.slice().sort((a, b) => (b.isOnline === true) - (a.isOnline === true));
-  sel.innerHTML = '<option value="">— Select delivery boy —</option>' + sorted.map(d =>
-    `<option value="${d._id}" ${currentId === d._id ? 'selected' : ''}>${escapeHtmlShop(d.name || d._id)}${d.isOnline ? ' 🟢' : ' ⚪'}</option>`
-  ).join('');
-
-  document.getElementById('od-assign-status').textContent = '';
-}
-
-// Order-detail HTML has no escaping helper of its own — small local one so
-// a driver name can't break the <option> markup.
-function escapeHtmlShop(str) {
-  return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-function shopAssignDeliveryBoy() {
-  const id = state.selectedOrderId;
-  const o = id && (state.homeOrdersCache || []).find(x => x._id === id);
-  const status = document.getElementById('od-assign-status');
-  if (!o) { status.textContent = 'Order not found.'; return; }
-  const driverId = document.getElementById('od-assign-select').value;
-  if (!driverId) { status.textContent = 'Pick a delivery boy first.'; return; }
-  const driver = shopBikeDrivers.find(d => d._id === driverId);
-  const driverName = driver ? (driver.name || driverId) : driverId;
-  status.textContent = 'Assigning...';
-  const { db, ref, update } = window.fb;
-  update(ref(db, 'restaurants/' + state.restId + '/orders/' + id), {
-    assignedDriverIds: { [driverId]: true },
-    assignedDriverNames: { [driverId]: driverName },
-    // Clear the old single-driver fields so the two formats never disagree.
-    assignedDriverId: null,
-    assignedDriverName: null,
-  }).then(() => {
-    status.textContent = 'Assigned — this driver will get it once the order is ready.';
-    o.assignedDriverIds = { [driverId]: true };
-    o.assignedDriverNames = { [driverId]: driverName };
-    o.assignedDriverId = null;
-    renderAssignBlock(o);
-  }).catch(() => { status.textContent = "Couldn't assign — check your connection and try again."; });
-}
-
-/* ---- Bulk assign: same idea as shopAssignDeliveryBoy above, but for every
-   order currently checked in the home screen's "Select" mode (the same
-   multi-select used by "Go" for route sorting) — one delivery boy, several
-   orders, assigned in a single action instead of opening each one. ---- */
-function openBulkAssignPanel() {
-  const panel = document.getElementById('home-bulk-assign-panel');
-  document.getElementById('home-route-panel').style.display = "none"; // one panel at a time
-  const sorted = shopBikeDrivers.slice().sort((a, b) => (b.isOnline === true) - (a.isOnline === true));
-  panel.innerHTML = `
-    <p class="route-panel-title">ASSIGN ${selectedOrderIds.size} ORDER${selectedOrderIds.size === 1 ? '' : 'S'} TO</p>
-    <select id="bulk-assign-select" style="width:100%; padding:8px; border:1px solid #CBB68B; border-radius:6px; font-size:13px; font-family:'Inter',sans-serif; background:#fff; color:#0B2545; margin:8px 0;">
-      <option value="">— Select delivery boy —</option>
-      ${sorted.map(d => `<option value="${d._id}">${escapeHtmlShop(d.name || d._id)}${d.isOnline ? ' 🟢' : ' ⚪'}</option>`).join('') || ''}
-    </select>
-    <button class="btn-primary" style="width:100%;" onclick="bulkAssignSelectedOrders()">Assign to selected orders</button>
-    <p class="detail-label" id="bulk-assign-status" style="margin:8px 0 0; text-transform:none; letter-spacing:normal;"></p>
-  `;
-  panel.style.display = "block";
-}
-
-function bulkAssignSelectedOrders() {
-  const status = document.getElementById('bulk-assign-status');
-  const driverId = document.getElementById('bulk-assign-select').value;
-  if (!driverId) { status.textContent = 'Pick a delivery boy first.'; return; }
-  if (!selectedOrderIds.size) { status.textContent = 'No orders selected.'; return; }
-  const driver = shopBikeDrivers.find(d => d._id === driverId);
-  const driverName = driver ? (driver.name || driverId) : driverId;
-  status.textContent = 'Assigning...';
-  const { db, ref, update } = window.fb;
-  // One multi-path update so all selected orders change together.
-  const updates = {};
-  selectedOrderIds.forEach(id => {
-    const base = 'restaurants/' + state.restId + '/orders/' + id + '/';
-    updates[base + 'assignedDriverIds'] = { [driverId]: true };
-    updates[base + 'assignedDriverNames'] = { [driverId]: driverName };
-    updates[base + 'assignedDriverId'] = null;
-    updates[base + 'assignedDriverName'] = null;
-  });
-  update(ref(db), updates).then(() => {
-    status.textContent = 'Assigned ' + selectedOrderIds.size + ' order' + (selectedOrderIds.size === 1 ? '' : 's') + ' to ' + driverName + '.';
-    (state.homeOrdersCache || []).forEach(o => {
-      if (selectedOrderIds.has(o._id)) {
-        o.assignedDriverIds = { [driverId]: true };
-        o.assignedDriverNames = { [driverId]: driverName };
-        o.assignedDriverId = null;
-      }
-    });
-  }).catch(() => { status.textContent = "Couldn't assign — check your connection and try again."; });
 }
 
 // Fire-and-forget: let the customer know their order status changed via a
@@ -5574,7 +5424,6 @@ function updateRouteBar() {
   } else {
     bar.style.display = "none";
     document.getElementById('home-route-panel').style.display = "none";
-    document.getElementById('home-bulk-assign-panel').style.display = "none";
   }
 }
 
@@ -9676,10 +9525,9 @@ function opPopulatePartnersAreaFilter() {
   sel.innerHTML = '<option value="">All areas</option>' + opAllZones.map(z => `<option value="${z._id}">${escapeHtml(z.name || '')}</option>`).join('');
   if (current && opAllZones.some(z => z._id === current)) sel.value = current;
 }
-// Assigned delivery boy (operator-set, per shop) has been removed — see the
-// shop's own manual per-order/bulk "Assign delivery boy" tools instead
-// (shopAssignDeliveryBoy / bulkAssignSelectedOrders), which the shop uses
-// directly from its own order screen.
+// Assigned delivery boy (operator-set, per shop) has been removed — routing
+// is fully automatic (nearest/fairness matching in driver.html) now that
+// the shop's own manual per-order/bulk assign tools have been removed too.
 // Writes assignedDriverId onto the chosen ride/order. The driver app treats
 // this as an override — that order is offered ONLY to this driver, and only
 // once they're online, regardless of the normal nearest-driver ranking.
