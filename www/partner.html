@@ -1573,10 +1573,20 @@
           <h3>Shop Zones</h3>
           <p>Draw zones and choose which shops serve each zone</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('location-setup')">
+          <div class="op-home-icon">📌</div>
+          <h3>Location Setup</h3>
+          <p>Draw a named zone — customers inside it see that name as their Place/Area, instead of the map default</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('taxi-fare')">
           <div class="op-home-icon">🛺</div>
           <h3>Taxi Fare</h3>
           <p>Set the per-km taxi rate and a platform fee per ride — leave at 0 to leave off</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('support-phone')">
+          <div class="op-home-icon">📞</div>
+          <h3>Customer Support</h3>
+          <p>Set the phone number the "Call Support" button in the customer app dials</p>
         </div>
         <div class="op-home-card" onclick="opOpenSection('support')">
           <div class="op-home-icon">💬</div>
@@ -2192,6 +2202,23 @@
     </div>
   </div>
 
+  <!-- LOCATION SETUP -->
+  <div class="op-section" id="op-section-location-setup">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Location Setup</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Draw a named zone on the map. When a customer's pin (in "Select your location") falls inside it, the "Place / Area" field is filled with this zone's name instead of the map's own default. A location outside every zone still gets the default (local landmark / OpenStreetMap) name as before. This is just for naming — it doesn't affect which shops or drivers a customer can see.</p>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="text" id="op-ls-name-input" placeholder="Zone name (e.g. Kondotty)">
+      </div>
+      <button type="button" class="op-btn op-btn-push" onclick="opAddLocationZone()">➕ Add zone</button>
+      <p class="op-note" id="op-ls-add-status" style="margin-top:8px;"></p>
+      <div id="op-ls-list" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
   <!-- TAXI FARE -->
   <div class="op-section" id="op-section-taxi-fare">
     <div class="op-section-header">
@@ -2210,6 +2237,24 @@
         <button type="button" class="op-btn op-btn-push" onclick="opSaveTaxiFare()">💾 Save</button>
       </div>
       <p class="op-note" id="op-taxi-fare-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- CUSTOMER SUPPORT PHONE -->
+  <div class="op-section" id="op-section-support-phone">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Customer Support</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Set the phone number the "Call Support" button in the customer app's account menu dials. Leave empty to hide that button from customers.</p>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="tel" id="op-support-phone-input" placeholder="Support phone number (e.g. 9876543210)">
+      </div>
+      <div>
+        <button type="button" class="op-btn op-btn-push" onclick="opSaveSupportPhone()">💾 Save</button>
+      </div>
+      <p class="op-note" id="op-support-phone-status" style="margin-top:10px;"></p>
     </div>
   </div>
 
@@ -6358,8 +6403,10 @@ function opOpenSection(name) {
   if (name === 'support') opRenderChatConvList();
   if (name === 'pricing') opLoadExtraAmount();
   if (name === 'taxi-fare') opLoadTaxiFare();
+  if (name === 'support-phone') opLoadSupportPhone();
   if (name === 'go-series') opLoadGoSeries();
   if (name === 'shop-zones') opRenderShopZones();
+  if (name === 'location-setup') opRenderLocationZones();
   if (name === 'report') opRenderReportShopList();
   if (name === 'groceries-queue') opRenderGroceriesQueueList();
   if (name === 'groceries-catalog') opRenderGroceriesCatalog();
@@ -6569,6 +6616,34 @@ function opSaveTaxiFare() {
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
+/* ---- Customer Support: operator-set phone number for the "Call Support"
+   button in the customer app's account menu.
+   Stored at app_config/supportPhone = { number, updatedAt }.
+   Empty/never-set = button stays hidden in the customer app. */
+function opLoadSupportPhone() {
+  const status = document.getElementById('op-support-phone-status');
+  status.textContent = 'Loading current settings...';
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'app_config/supportPhone')).then(snap => {
+    const data = snap.val();
+    document.getElementById('op-support-phone-input').value = (data && data.number) || '';
+    status.textContent = data && data.updatedAt ? ('Last updated ' + data.updatedAt + '.') : 'Not set yet — the Call Support button is hidden in the customer app.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opSaveSupportPhone() {
+  const input = document.getElementById('op-support-phone-input');
+  const status = document.getElementById('op-support-phone-status');
+  const number = input.value.trim();
+  status.textContent = 'Saving...';
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'app_config/supportPhone'), {
+    number,
+    updatedAt: new Date().toLocaleString()
+  }).then(() => {
+    status.textContent = number ? ('Saved — customers can now call ' + number + '.') : 'Saved — number cleared, Call Support button is hidden in the customer app.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
 /* ---- Shop Zones: operator-drawn zones, each with its own list of shops.
    Stored at app_config/shopZones/{zoneId} = { name, bounds:[{lat,lng}...],
    shopIds:{shopId:true}, createdAt }. The customer app reads this: with any
@@ -6677,6 +6752,76 @@ function opOpenShopZoneAreaModal(zoneId) {
   opZbTarget = { type: 'shopZoneArea', id: zoneId };
   document.getElementById('op-zb-title').textContent = 'Shop zone — ' + (z.name || zoneId);
   document.getElementById('op-zb-desc').textContent = 'Pan/zoom to find the spot, then press "Draw the zone" and drag across the map to outline this zone. Customers inside it can order only from the shops you add to it.';
+  document.getElementById('op-zb-error').style.display = 'none';
+  document.getElementById('op-zb-search').value = '';
+  opZbHideSearchResults();
+  const b = Array.isArray(z.bounds) ? z.bounds : Object.values(z.bounds || {});
+  opZbPoints = b.map(pt => ({ lat: pt.lat, lng: pt.lng }));
+  opZbShowMap();
+}
+
+/* ---- Location Setup: operator-drawn named zones used ONLY to fill the
+   customer app's "Place / Area" field. Stored at
+   app_config/locationZones/{zoneId} = { name, bounds:[{lat,lng}...], createdAt }.
+   A customer pin inside a zone shows that zone's name; outside every zone,
+   the app falls back to its own default (local landmark / OSM) naming. ---- */
+let opLocationZones = [];
+let opLocationZonesListening = false;
+function opListenLocationZones() {
+  if (opLocationZonesListening) return;
+  opLocationZonesListening = true;
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'app_config/locationZones'), snap => {
+    const v = snap.val() || {};
+    opLocationZones = Object.keys(v).map(id => Object.assign({ _id: id }, v[id]))
+      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    const sec = document.getElementById('op-section-location-setup');
+    if (sec && sec.classList.contains('active')) opRenderLocationZones();
+  });
+}
+function opLsBoundsOk(z) {
+  const b = Array.isArray(z.bounds) ? z.bounds : Object.values(z.bounds || {});
+  return b.length >= 3;
+}
+function opRenderLocationZones() {
+  const wrap = document.getElementById('op-ls-list');
+  if (!wrap) return;
+  if (!opLocationZones.length) { wrap.innerHTML = '<p class="op-note">No zones yet — add one above.</p>'; return; }
+  wrap.innerHTML = opLocationZones.map(z => `
+    <div class="op-partner-item" style="display:block; margin-bottom:12px;">
+      <div class="op-partner-name">${escapeHtml(z.name || z._id)}</div>
+      <div class="op-partner-sub">${opLsBoundsOk(z) ? '📍 Boundary set' : '⚠️ No boundary drawn yet (this zone won\'t match any customer yet)'}</div>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+        <button type="button" class="op-btn op-btn-push" style="margin:0;" onclick="opOpenLocationZoneAreaModal('${z._id}')">🗺️ Draw boundary</button>
+        <button type="button" class="op-btn op-btn-danger" style="margin:0;" onclick="opDeleteLocationZone('${z._id}')">🗑 Delete</button>
+      </div>
+    </div>`).join('');
+}
+function opAddLocationZone() {
+  const input = document.getElementById('op-ls-name-input');
+  const status = document.getElementById('op-ls-add-status');
+  const name = input.value.trim();
+  if (!name) { status.textContent = 'Please enter a zone name.'; return; }
+  const { db, ref, push, set } = window.fb;
+  const zRef = push(ref(db, 'app_config/locationZones'));
+  set(zRef, { name, createdAt: Date.now() }).then(() => {
+    input.value = '';
+    status.textContent = 'Zone added — now draw its boundary.';
+    opOpenLocationZoneAreaModal(zRef.key);
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opDeleteLocationZone(zoneId) {
+  const z = opLocationZones.find(x => x._id === zoneId);
+  if (!confirm('Delete zone "' + ((z && z.name) || zoneId) + '"?')) return;
+  const { db, ref, remove } = window.fb;
+  remove(ref(db, 'app_config/locationZones/' + zoneId)).catch(err => alert('Error: ' + err.message));
+}
+// Same shared map modal as the driver-zone / shop-zone editors.
+function opOpenLocationZoneAreaModal(zoneId) {
+  const z = opLocationZones.find(x => x._id === zoneId) || { name: zoneId };
+  opZbTarget = { type: 'locationZoneArea', id: zoneId };
+  document.getElementById('op-zb-title').textContent = 'Location zone — ' + (z.name || zoneId);
+  document.getElementById('op-zb-desc').textContent = 'Pan/zoom to find the spot, then press "Draw the zone" and drag across the map to outline this zone. A customer pin inside it will show "' + (z.name || zoneId) + '" as its Place/Area.';
   document.getElementById('op-zb-error').style.display = 'none';
   document.getElementById('op-zb-search').value = '';
   opZbHideSearchResults();
@@ -6890,6 +7035,7 @@ function opDeletePushedAppUpdate() {
 function opListenPartners() {
   const { db, ref, onValue, update } = window.fb;
   opListenShopZones();
+  opListenLocationZones();
   onValue(ref(db, 'restaurants'), snap => {
     const list = [];
     snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
@@ -8895,8 +9041,10 @@ function opSaveZoneBoundary() {
   const { db, ref, update } = window.fb;
   const isShopZone = opZbTarget.type === 'shopZone';
   const isShopZoneArea = opZbTarget.type === 'shopZoneArea';
+  const isLocationZoneArea = opZbTarget.type === 'locationZoneArea';
   const path = isShopZone ? 'restaurants/' + opZbTarget.id
     : isShopZoneArea ? 'app_config/shopZones/' + opZbTarget.id
+    : isLocationZoneArea ? 'app_config/locationZones/' + opZbTarget.id
     : 'driver_zones/' + opZbTarget.id;
   const field = isShopZone ? 'deliveryZone' : 'bounds';
   update(ref(db, path), { [field]: opZbPoints })
