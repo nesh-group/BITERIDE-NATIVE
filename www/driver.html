@@ -2543,15 +2543,22 @@ let driverDueGrossTotal = 0;
 let driverDueRideCount = 0;
 let driverDueSettlements = [];
 
+// Round to 2 decimals (money sums can pick up floating-point noise like
+// 76.80000000000001) and drop a trailing ".00" so amounts on screen always
+// show a short, clean value.
+function money(n) {
+  const r = Math.round((n + Number.EPSILON) * 100) / 100;
+  return r % 1 === 0 ? String(r) : r.toFixed(2);
+}
 function renderDriverDueUI() {
   const settledTotal = driverDueSettlements.reduce((s, x) => s + (Number(x.amount) || 0), 0);
   const netDue = Math.max(0, driverDueGrossTotal - settledTotal);
 
   const badge = document.getElementById('due-nav-badge');
-  if (badge) badge.textContent = '₹' + netDue;
+  if (badge) badge.textContent = '₹' + money(netDue);
 
   const totalEl = document.getElementById('due-total-amount');
-  if (totalEl) totalEl.textContent = '₹' + netDue;
+  if (totalEl) totalEl.textContent = '₹' + money(netDue);
   const countEl = document.getElementById('due-ride-count');
   if (countEl) countEl.textContent = 'From ' + driverDueRideCount + ' completed ride' + (driverDueRideCount === 1 ? '' : 's');
 
@@ -2564,7 +2571,7 @@ function renderDriverDueUI() {
       listEl.innerHTML = sorted.map(s => `
         <div style="display:flex; justify-content:space-between; background:var(--field-bg); border:1px solid var(--field-border); border-radius:8px; padding:10px 12px; color:var(--cloud); font-size:13px;">
           <span>${s.note ? s.note : 'Settled by operator'}</span>
-          <span>₹${s.amount || 0}</span>
+          <span>₹${money(s.amount || 0)}</span>
         </div>
       `).join('');
     }
@@ -3830,8 +3837,8 @@ function renderEarnings(all) {
   const deliveryTotal = myDeliveries.reduce((sum, o) => sum + (o.deliveryFee || 0), 0);
   const deliveryToday = myDeliveries.filter(o => (o.createdAt || 0) >= startOfDay.getTime()).reduce((sum, o) => sum + (o.deliveryFee || 0), 0);
 
-  document.getElementById('earn-today').textContent = '₹' + (rideToday + deliveryToday);
-  document.getElementById('earn-total').textContent = '₹' + (rideTotal + deliveryTotal);
+  document.getElementById('earn-today').textContent = '₹' + money(rideToday + deliveryToday);
+  document.getElementById('earn-total').textContent = '₹' + money(rideTotal + deliveryTotal);
   document.getElementById('earn-trips').textContent = String(mine.length + myDeliveries.length);
 }
 
