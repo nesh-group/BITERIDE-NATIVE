@@ -2123,7 +2123,7 @@ function listenDeliveryJobs() {
       const rest = val[restId] || {};
       const orders = rest.orders || {};
       Object.keys(orders).forEach(orderId => {
-        flat.push(Object.assign({ _restId: restId, _orderId: orderId, _restName: rest.restaurantName || rest.name || '', _restAddress: rest.address || '', _restLocation: rest.location || null, _restGoSeries: !!rest.goSeries }, orders[orderId]));
+        flat.push(Object.assign({ _restId: restId, _orderId: orderId, _restName: rest.restaurantName || rest.name || '', _restAddress: rest.address || '', _restLocation: rest.location || null, _restGoSeries: !!rest.goSeries, _restIsGroceries: rest.businessType === 'groceries' }, orders[orderId]));
       });
     });
     deliveriesCache = flat;
@@ -2178,7 +2178,7 @@ async function fetchAndMergeNativeAlert(kind, id) {
         // node (which would drag every order along with it).
         let restMeta = {};
         try {
-          const fields = ['restaurantName', 'name', 'address', 'location', 'goSeries'];
+          const fields = ['restaurantName', 'name', 'address', 'location', 'goSeries', 'businessType'];
           const snaps = await Promise.all(fields.map(f => get(ref(db, 'restaurants/' + restId + '/' + f))));
           fields.forEach((f, i) => { restMeta[f] = snaps[i].val(); });
         } catch (e) {}
@@ -2190,6 +2190,7 @@ async function fetchAndMergeNativeAlert(kind, id) {
             _restAddress: restMeta.address || '',
             _restLocation: restMeta.location || null,
             _restGoSeries: !!restMeta.goSeries,
+            _restIsGroceries: restMeta.businessType === 'groceries',
           }, snap.val())]);
       }
     }
@@ -3689,6 +3690,20 @@ function renderHomeLists() {
       : st === 'picked_up'
       ? `<button class="btn-primary" style="margin-top:12px; width:100%;" data-mark-delivered="${currentDelivery._restId}::${currentDelivery._orderId}">Mark as delivered</button>`
       : `<p class="hint-text" style="margin-top:10px;">Head to the shop — "Picked up" unlocks once they mark it ready.</p>`;
+    // "Collect from customer" is always the full COD total — order amount +
+    // delivery charge + platform fee — same for every shop type. (The
+    // separate ask about groceries-shop earnings being based on their own
+    // rate is about the shop side in partner.html, not this collection
+    // amount.)
+    const collectAmount = currentDelivery.total;
+    // NESH Store queue orders: the driver collects the full COD total above
+    // from the customer, but only owes the SHOP its own rate for the items
+    // (shopPrice, same figure partner.html's assignment screen calls "Shop
+    // total") — the gap (item markup + delivery charge + platform fee)
+    // stays with the platform/driver, not the shop. So show that separately.
+    const giveShopAmount = currentDelivery.fromNeshStoreQueue
+      ? (currentDelivery.items || []).reduce((s, it) => s + (Number(it.shopPrice != null ? it.shopPrice : it.price) || 0) * (it.qty || 0), 0)
+      : null;
     // Customer name leads the card (matching how the shop side surfaces the
     // customer up top), with the order #/shop name as a smaller line right
     // under it rather than sharing the top row.
@@ -3701,6 +3716,8 @@ function renderHomeLists() {
       <div class="order-mid" style="justify-content:flex-end;">
         <p class="order-total">₹${currentDelivery.deliveryFee || 0}</p>
       </div>
+      ${collectAmount ? `<div class="order-popup-row order-popup-row-total"><span>Collect from customer</span><span>₹${collectAmount}</span></div>` : ''}
+      ${giveShopAmount != null ? `<div class="order-popup-row"><span>Give to shop</span><span>₹${giveShopAmount}</span></div>` : ''}
       <p style="margin:8px 0 0; color:var(--muted); font-size:13px;">${items || ''}</p>
       <div style="margin-top:8px;">${deliveryLocationsHtml(currentDelivery)}</div>
       ${actionHtml}
