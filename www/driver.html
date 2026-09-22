@@ -3441,6 +3441,15 @@ function hasActiveRide() {
     r.driverId === state.username && ['accepted', 'arriving', 'ontrip'].includes(normalizeRideStatus(r.status))
   );
 }
+// Same idea as hasActiveRide(), for delivery jobs — a shop or customer is
+// relying on this driver for an order that's been accepted but not yet
+// delivered (preparing/ready/picked_up), so going offline mid-delivery is
+// blocked the same way going offline mid-ride is.
+function hasActiveDelivery() {
+  return deliveriesCache.some(o =>
+    o.deliveryDriverId === state.username && ['preparing', 'ready', 'picked_up'].includes(o.status)
+  );
+}
 function updateOnlineLabel() {
   document.getElementById('online-toggle-label').textContent = state.isOnline ? "You're online" : "You're offline";
 }
@@ -3459,6 +3468,13 @@ document.getElementById('online-toggle-input').addEventListener('change', (e) =>
   if (!e.target.checked && hasActiveRide()) {
     e.target.checked = true;
     alert("You can't go offline while a ride is in progress. Complete or hand off the current ride first.");
+    return;
+  }
+  // Same rule for deliveries — a shop/customer is relying on this driver
+  // for an order that's already been accepted but not yet delivered.
+  if (!e.target.checked && hasActiveDelivery()) {
+    e.target.checked = true;
+    alert("You can't go offline while an order is in progress. Deliver it first.");
     return;
   }
 
@@ -3570,12 +3586,16 @@ function renderHomeLists() {
   const current = all.find(r => r.driverId === state.username && ['accepted', 'arriving', 'ontrip'].includes(normalizeRideStatus(r.status)));
   // Lock the online toggle for the duration — reflects the same rule the
   // toggle's own change handler enforces, so it's visibly disabled instead
-  // of just silently snapping back if tapped.
+  // of just silently snapping back if tapped. A delivery in progress locks
+  // it too, same as an active ride does.
+  const busyWithDelivery = hasActiveDelivery();
   const toggleInput = document.getElementById('online-toggle-input');
   const toggleSub = document.querySelector('.online-toggle-sub');
-  toggleInput.disabled = !!current;
+  toggleInput.disabled = !!current || busyWithDelivery;
   if (toggleSub) toggleSub.textContent = current
     ? "Can't go offline while a ride is in progress"
+    : busyWithDelivery
+    ? "Can't go offline while an order is in progress"
     : 'Go online to start receiving ride requests';
   const wrap = document.getElementById('home-current-ride-wrap');
   wrap.innerHTML = '';
@@ -3633,11 +3653,28 @@ function renderHomeLists() {
   // ---- Delivery jobs (from deliveriesCache, nested under restaurants) ----
   const myDeliveries = deliveriesCache.filter(o => o.deliveryDriverId === state.username);
 
-  const currentDelivery = myDeliveries.find(o => ['preparing', 'ready', 'picked_up'].includes(o.status));
-  if (currentDelivery && currentDelivery.status === 'ready') notifyPickupReadyIfNew(currentDelivery);
+  // A driver can be carrying more than one accepted-but-not-yet-delivered
+  // order at once (batched pickups) — show EVERY one of them here, not just
+  // the first, each as its own "in progress" card with its own status pill
+  // and action button, so nothing silently disappears from view once a
+  // second (or third) order is accepted on top of the first.
+  const currentDeliveries = myDeliveries
+    .filter(o => ['preparing', 'ready', 'picked_up'].includes(o.status))
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  currentDeliveries.forEach(o => { if (o.status === 'ready') notifyPickupReadyIfNew(o); });
   const dWrap = document.getElementById('home-current-delivery-wrap');
   dWrap.innerHTML = '';
-  if (currentDelivery) {
+  // A clear "Order in progress" heading of its own — same look as the
+  // "Recent deliveries" section below — so the in-progress card(s) read as
+  // their own distinct block, not lumped in with the recent/history list.
+  if (currentDeliveries.length) {
+    const heading = document.createElement('div');
+    heading.className = 'section-row';
+    heading.style.padding = '24px 24px 0';
+    heading.innerHTML = `<h2 class="section-title">Order in progress${currentDeliveries.length > 1 ? ` (${currentDeliveries.length})` : ''}</h2>`;
+    dWrap.appendChild(heading);
+  }
+  currentDeliveries.forEach(currentDelivery => {
     const st = currentDelivery.status;
     const pillLabel = st === 'picked_up' ? 'picked up' : st === 'ready' ? 'ready for pickup' : 'shop preparing';
     const items = (currentDelivery.items || []).map(it => `${it.qty}x ${it.name}`).join(', ');
@@ -3652,13 +3689,16 @@ function renderHomeLists() {
       : st === 'picked_up'
       ? `<button class="btn-primary" style="margin-top:12px; width:100%;" data-mark-delivered="${currentDelivery._restId}::${currentDelivery._orderId}">Mark as delivered</button>`
       : `<p class="hint-text" style="margin-top:10px;">Head to the shop — "Picked up" unlocks once they mark it ready.</p>`;
+    // Customer name leads the card (matching how the shop side surfaces the
+    // customer up top), with the order #/shop name as a smaller line right
+    // under it rather than sharing the top row.
     card.innerHTML = `
       <div class="order-top">
-        <p class="order-num">Current delivery${currentDelivery.orderNumber ? ' #' + currentDelivery.orderNumber : ''}${currentDelivery._restName ? ' · ' + escapeHtml(currentDelivery._restName) : ''}</p>
+        <p class="order-num">${escapeHtml(currentDelivery.customerName || 'Customer')}</p>
         <span class="pill pill-accepted">${pillLabel}</span>
       </div>
-      <div class="order-mid">
-        <p class="order-cust">${currentDelivery.customerName || 'Customer'}</p>
+      <p class="order-time" style="margin-top:2px;">${currentDelivery.orderNumber ? '#' + currentDelivery.orderNumber : ''}${currentDelivery._restName ? ' · ' + escapeHtml(currentDelivery._restName) : ''}</p>
+      <div class="order-mid" style="justify-content:flex-end;">
         <p class="order-total">₹${currentDelivery.deliveryFee || 0}</p>
       </div>
       <p style="margin:8px 0 0; color:var(--muted); font-size:13px;">${items || ''}</p>
@@ -3675,7 +3715,7 @@ function renderHomeLists() {
     if (markBtn) markBtn.addEventListener('click', (e) => {
       markDeliveryDelivered(e.target.dataset.markDelivered);
     });
-  }
+  });
 
   const pastDeliveries = myDeliveries
     .filter(o => o.status === 'delivered')
