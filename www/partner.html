@@ -6724,6 +6724,20 @@ function opRenderSzShopList(zoneId) {
 }
 function opSzToggleShop(zoneId, shopId, checked) {
   const { db, ref, update } = window.fb;
+  if (checked) {
+    // A shop's own already-set zone wins. If this shop is already in a
+    // different zone (set here or from its own "Shop zone" dropdown —
+    // same underlying data), don't move it just because it got checked
+    // here: keep its existing zone and tell the operator, instead of
+    // silently reassigning it.
+    const already = opShopZoneIdsOf(shopId).filter(id => id !== zoneId);
+    if (already.length) {
+      const z = opShopZones.find(x => x._id === already[0]);
+      alert('This shop already has a zone set (' + ((z && z.name) || already[0]) + '). Remove it from that zone first if you want to move it here.');
+      opRenderSzShopList(zoneId); // revert the checkbox to its actual state
+      return;
+    }
+  }
   update(ref(db, 'app_config/shopZones/' + zoneId + '/shopIds'), { [shopId]: checked ? true : null })
     .catch(err => alert('Error: ' + err.message));
 }
