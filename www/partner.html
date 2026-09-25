@@ -1495,6 +1495,11 @@
           <h3>NESH Store Categories</h3>
           <p>Group items into categories (Vegetables, Fruits…) — shown as tabs at the top of the customer app's NESH Store</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('item-categories')">
+          <div class="op-home-icon">📦</div>
+          <h3>Stock Item Categories</h3>
+          <p>Pick any shop and group its own stock items into categories (e.g. Starters, Drinks) — shown as tabs on that shop's menu</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('buses')" style="position:relative;">
           <span class="op-home-badge" id="op-buses-home-badge" style="display:none;"></span>
           <div class="op-home-icon">🚌</div>
@@ -1761,6 +1766,55 @@
       <button type="button" class="op-btn op-btn-push" onclick="opSaveCategoryEditor()">💾 Save category</button>
       <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-category-editor-modal').classList.remove('show')">Cancel</button>
       <p class="op-note" id="op-cat-editor-status" style="margin-top:4px; display:none;"></p>
+    </div>
+  </div>
+
+  <!-- STOCK ITEM CATEGORIES — step 1: pick a shop -->
+  <div class="op-section" id="op-section-item-categories">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Stock Item Categories</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Select a shop to group its own stock items into categories (e.g. Starters, Biryani, Drinks for a hotel; Vegetables, Snacks for a shop). Shown as tabs at the top of that shop's own menu in the customer app.</p>
+      <div class="op-search-box"><input type="text" id="op-itemcat-shop-search" placeholder="Search shops..." oninput="opRenderItemCatShopList()"></div>
+      <div id="op-itemcat-shop-list"></div>
+    </div>
+  </div>
+
+  <!-- STOCK ITEM CATEGORIES — step 2: categories for the picked shop -->
+  <div class="op-section" id="op-section-item-categories-detail">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('item-categories')">←</button>
+      <h2 id="op-itemcat-shop-name">Stock Item Categories</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note" style="margin-bottom:10px;">Make a category, tick every stock item of this shop that belongs in it and save. Use ▲ ▼ to set the tab order. An item can be in more than one category, and it still shows under "All".</p>
+      <button type="button" class="op-btn op-btn-push" onclick="opOpenItemCategoryEditor(null)">➕ New category</button>
+      <div id="op-itemcat-list"></div>
+    </div>
+  </div>
+
+  <!-- Stock item category editor modal (name + which of this shop's own items) -->
+  <div class="op-modal-overlay" id="op-itemcat-editor-modal">
+    <div class="op-modal-card op-modal-card-wide">
+      <h3 id="op-itemcat-editor-title">New category</h3>
+      <div class="op-search-box">
+        <input type="text" id="op-itemcat-editor-name" placeholder="Category name (e.g. Starters)" maxlength="30" autocomplete="off">
+      </div>
+      <p class="op-note" style="margin-bottom:6px;">Select the items in this category</p>
+      <div class="op-search-box" style="padding-bottom:6px;">
+        <input type="text" id="op-itemcat-editor-search" placeholder="Search items..." oninput="opRenderItemCategoryEditorItems()" autocomplete="off">
+      </div>
+      <div style="margin-bottom:6px;">
+        <button type="button" class="op-btn" style="padding:6px 10px; margin-bottom:0;" onclick="opItemCategorySelectShown(true)">Select all shown</button>
+        <button type="button" class="op-btn" style="padding:6px 10px; margin-bottom:0;" onclick="opItemCategorySelectShown(false)">Clear shown</button>
+      </div>
+      <div id="op-itemcat-editor-items" style="max-height:38vh; overflow-y:auto; margin-bottom:8px;"></div>
+      <p class="op-note" id="op-itemcat-editor-count" style="margin-bottom:10px;"></p>
+      <button type="button" class="op-btn op-btn-push" onclick="opSaveItemCategoryEditor()">💾 Save category</button>
+      <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-itemcat-editor-modal').classList.remove('show')">Cancel</button>
+      <p class="op-note" id="op-itemcat-editor-status" style="margin-top:4px; display:none;"></p>
     </div>
   </div>
 
@@ -6390,6 +6444,7 @@ function opOpenSection(name) {
   if (name === 'nesh-item-order') opBuildNeshItemOrderWorking();
   if (name === 'nesh-sections') opRenderNeshSections();
   if (name === 'nesh-categories') opRenderNeshCategories();
+  if (name === 'item-categories') opRenderItemCatShopList();
   if (name === 'orders') {
     opRenderOrdersList();
     if (!opOrdersLateTimer) opOrdersLateTimer = setInterval(opRenderOrdersList, 30000);
@@ -7777,6 +7832,223 @@ async function opDeleteNeshCategory(id) {
   try {
     const { db, ref, remove } = window.fb;
     await remove(ref(db, 'app_config/neshStoreCategories/' + id));
+    showToast('Category deleted');
+  } catch (err) {
+    showToast("Couldn't delete — check your connection");
+  }
+}
+
+/* ==================================================================
+   STOCK ITEM CATEGORIES (Operator Panel → Stock Item Categories)
+   Unlike NESH Store Categories (which merge items with the same
+   name+unit across every groceries shop), this groups ONE shop's own
+   stock items — any shop, any businessType — into named categories.
+   A shop's own items already have unique Firebase ids (restaurants/
+   {shopId}/menu/{itemId}), so categories are keyed by real item id,
+   no name+unit hack needed. Stored at
+   restaurants/{shopId}/itemCategories/{id} =
+   { name, order, items: { itemId: true, ... } }. The customer app
+   shows each one as a tab at the top of that shop's own menu screen.
+   ================================================================== */
+let opItemCatShopId = null;      // shop currently picked in this section
+let opItemCatShopName = '';
+let opItemCategories = [];       // [{ id, name, order, itemIds }] for opItemCatShopId, live from Firebase
+let opItemCatUnsub = null;       // detaches the previous shop's listener when switching shops
+let opItemCatEditingId = null;   // null while creating a new category
+let opItemCatPickSet = new Set(); // item ids ticked in the editor
+let opItemCatEditorMenuItems = []; // [{ id, name, unit }] — opItemCatShopId's own stock items
+
+function opRenderItemCatShopList() {
+  const wrap = document.getElementById('op-itemcat-shop-list');
+  if (!wrap) return;
+  const q = (document.getElementById('op-itemcat-shop-search').value || '').toLowerCase();
+  const filtered = opAllPartners.filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q));
+  if (!filtered.length) { wrap.innerHTML = '<div class="op-empty">No shops found.</div>'; return; }
+  wrap.innerHTML = filtered.map(p => {
+    const n = Object.keys(p.menu || {}).length;
+    return `
+    <div class="op-partner-item" onclick="opOpenItemCatShop('${p._id}')">
+      <div class="op-partner-top">
+        <span class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</span>
+        <span class="op-partner-type">${opTypeLabel(p.businessType)}</span>
+      </div>
+      <div class="op-partner-sub">${n} stock item${n === 1 ? '' : 's'}</div>
+    </div>`;
+  }).join('');
+}
+function opOpenItemCatShop(id) {
+  const p = opAllPartners.find(x => x._id === id);
+  opItemCatShopId = id;
+  opItemCatShopName = (p && p.restaurantName) || id;
+  document.getElementById('op-itemcat-shop-name').textContent = opItemCatShopName;
+  document.querySelectorAll('#operator-container .op-section').forEach(s => s.classList.remove('active'));
+  document.getElementById('op-section-item-categories-detail').classList.add('active');
+  opListenItemCategories(id);
+}
+// Re-subscribes to the picked shop's own itemCategories node, detaching
+// whatever shop's listener was running before (onValue's return value is
+// its own unsubscribe function) so switching shops never leaves a stale
+// listener updating the wrong shop's screen.
+function opListenItemCategories(shopId) {
+  if (opItemCatUnsub) { try { opItemCatUnsub(); } catch (e) {} opItemCatUnsub = null; }
+  const { db, ref, onValue } = window.fb;
+  opItemCatUnsub = onValue(ref(db, 'restaurants/' + shopId + '/itemCategories'), snap => {
+    const list = [];
+    snap.forEach(child => {
+      const v = child.val() || {};
+      list.push({ id: child.key, name: v.name || '(unnamed)', order: Number(v.order) || 0, itemIds: Object.keys(v.items || {}) });
+    });
+    list.sort((a, b) => (a.order - b.order) || a.name.localeCompare(b.name));
+    opItemCategories = list;
+    const sec = document.getElementById('op-section-item-categories-detail');
+    if (sec && sec.classList.contains('active')) opRenderItemCategories();
+  });
+}
+// The currently-picked shop's own stock items (restaurants/{id}/menu),
+// freshly read off opAllPartners every time — same live data the shop's
+// own Stock screen and the operator's other per-shop tools use.
+function opCurrentShopMenuItems() {
+  const p = opAllPartners.find(x => x._id === opItemCatShopId);
+  const menu = (p && p.menu) || {};
+  return Object.keys(menu).map(id => ({ id, name: menu[id].name || '(unnamed)', unit: menu[id].unit || 'piece' }));
+}
+function opRenderItemCategories() {
+  const wrap = document.getElementById('op-itemcat-list');
+  if (!wrap) return;
+  if (!opItemCategories.length) {
+    wrap.innerHTML = '<div class="op-empty">No categories yet. Tap "New category" to make one.</div>';
+    return;
+  }
+  const byId = new Map(opCurrentShopMenuItems().map(it => [it.id, it]));
+  wrap.innerHTML = opItemCategories.map((c, i) => {
+    const items = c.itemIds.map(id => byId.get(id)).filter(Boolean);
+    const names = items.slice(0, 6).map(it => it.name);
+    const more = items.length > 6 ? ` +${items.length - 6} more` : '';
+    return `
+      <div class="op-partner-item" style="cursor:default;">
+        <div class="op-partner-top">
+          <span class="op-partner-name">${escapeHtml(c.name)}</span>
+          <span class="op-partner-sub">${items.length} item${items.length === 1 ? '' : 's'}</span>
+        </div>
+        <div class="op-partner-sub" style="margin:6px 0 10px;">${items.length ? escapeHtml(names.join(', ')) + more : 'No items found — edit to pick items'}</div>
+        <button type="button" class="op-btn" style="padding:6px 10px; margin-bottom:0;" onclick="opMoveItemCategory('${c.id}', -1)" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button type="button" class="op-btn" style="padding:6px 10px; margin-bottom:0;" onclick="opMoveItemCategory('${c.id}', 1)" ${i === opItemCategories.length - 1 ? 'disabled' : ''}>▼</button>
+        <button type="button" class="op-btn op-btn-push" style="padding:6px 10px; margin-bottom:0;" onclick="opOpenItemCategoryEditor('${c.id}')">✏️ Edit</button>
+        <button type="button" class="op-btn op-btn-danger" style="padding:6px 10px; margin-bottom:0;" onclick="opDeleteItemCategory('${c.id}')">🗑️ Delete</button>
+      </div>`;
+  }).join('');
+}
+function opOpenItemCategoryEditor(id) {
+  const c = id ? opItemCategories.find(x => x.id === id) : null;
+  if (id && !c) return;
+  opItemCatEditingId = c ? c.id : null;
+  opItemCatPickSet = new Set(c ? c.itemIds : []);
+  document.getElementById('op-itemcat-editor-title').textContent = c ? 'Edit category' : 'New category';
+  document.getElementById('op-itemcat-editor-name').value = c ? c.name : '';
+  document.getElementById('op-itemcat-editor-search').value = '';
+  const st = document.getElementById('op-itemcat-editor-status');
+  st.style.display = 'none'; st.textContent = '';
+  opRenderItemCategoryEditorItems();
+  document.getElementById('op-itemcat-editor-modal').classList.add('show');
+}
+// Items the editor is currently showing (after the search filter), each
+// with its index into opItemCatEditorMenuItems so handlers never need the
+// item id itself inside an inline onclick (item names can contain quotes).
+function opItemCategoryShownItems() {
+  const q = (document.getElementById('op-itemcat-editor-search').value || '').trim().toLowerCase();
+  const out = [];
+  opItemCatEditorMenuItems.forEach((it, i) => { if (!q || it.name.toLowerCase().includes(q)) out.push({ i, it }); });
+  return out;
+}
+function opRenderItemCategoryEditorItems() {
+  const wrap = document.getElementById('op-itemcat-editor-items');
+  if (!wrap) return;
+  opItemCatEditorMenuItems = opCurrentShopMenuItems();
+  const shown = opItemCategoryShownItems();
+  if (!shown.length) {
+    wrap.innerHTML = `<div class="op-empty">${opItemCatEditorMenuItems.length ? 'No items match your search.' : 'This shop has no stock items yet.'}</div>`;
+  } else {
+    wrap.innerHTML = shown.map(({ i, it }) => {
+      const others = opItemCategories.filter(c => c.id !== opItemCatEditingId && c.itemIds.includes(it.id)).map(c => c.name);
+      return `
+        <label style="display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #124a24; cursor:pointer;">
+          <input type="checkbox" style="width:20px; height:20px; margin:0; accent-color:#33ff66;" ${opItemCatPickSet.has(it.id) ? 'checked' : ''} onchange="opToggleItemCategoryItem(${i}, this.checked)">
+          <span style="font-size:.85rem; color:#33ff66;">${escapeHtml(it.name)}${others.length ? ` <span style="color:#1f7a3d; font-size:.72rem;">also in ${escapeHtml(others.join(', '))}</span>` : ''}</span>
+        </label>`;
+    }).join('');
+  }
+  opUpdateItemCategoryEditorCount();
+}
+function opToggleItemCategoryItem(i, on) {
+  const it = opItemCatEditorMenuItems[i];
+  if (!it) return;
+  if (on) opItemCatPickSet.add(it.id); else opItemCatPickSet.delete(it.id);
+  opUpdateItemCategoryEditorCount();
+}
+function opItemCategorySelectShown(on) {
+  opItemCategoryShownItems().forEach(({ it }) => { if (on) opItemCatPickSet.add(it.id); else opItemCatPickSet.delete(it.id); });
+  opRenderItemCategoryEditorItems();
+}
+function opUpdateItemCategoryEditorCount() {
+  const el = document.getElementById('op-itemcat-editor-count');
+  if (!el) return;
+  const valid = new Set(opItemCatEditorMenuItems.map(it => it.id));
+  let n = 0;
+  opItemCatPickSet.forEach(id => { if (valid.has(id)) n++; });
+  el.textContent = n + ' item' + (n === 1 ? '' : 's') + ' selected';
+}
+async function opSaveItemCategoryEditor() {
+  const status = document.getElementById('op-itemcat-editor-status');
+  const say = (msg, color) => { status.style.display = 'block'; status.style.color = color || 'var(--chili)'; status.textContent = msg; };
+  const name = document.getElementById('op-itemcat-editor-name').value.trim();
+  if (!name) { say('Enter a category name.'); return; }
+  if (opItemCategories.some(c => c.id !== opItemCatEditingId && c.name.trim().toLowerCase() === name.toLowerCase())) {
+    say('A category with this name already exists.'); return;
+  }
+  const valid = new Set(opCurrentShopMenuItems().map(it => it.id));
+  const ids = [];
+  opItemCatPickSet.forEach(id => { if (valid.has(id)) ids.push(id); });
+  if (!ids.length) { say('Select at least one item.'); return; }
+  say('Saving…', 'var(--marigold)');
+  try {
+    const { db, ref, push, set, update } = window.fb;
+    const itemsObj = {}; ids.forEach(id => { itemsObj[id] = true; });
+    if (opItemCatEditingId) {
+      await update(ref(db, 'restaurants/' + opItemCatShopId + '/itemCategories/' + opItemCatEditingId), { name, items: itemsObj });
+    } else {
+      // New categories go to the end of the tab row (order = creation time).
+      await set(push(ref(db, 'restaurants/' + opItemCatShopId + '/itemCategories')), { name, order: Date.now(), items: itemsObj });
+    }
+    document.getElementById('op-itemcat-editor-modal').classList.remove('show');
+    showToast('Category saved — live in the customer app');
+  } catch (err) {
+    say('Failed: ' + (err && err.message ? err.message : 'check your connection and try again.'));
+  }
+}
+async function opMoveItemCategory(id, dir) {
+  const i = opItemCategories.findIndex(c => c.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= opItemCategories.length) return;
+  const arr = opItemCategories.slice();
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  // Renumber everything by its new position so the order is always
+  // unambiguous (no two categories ever share an order value).
+  const updates = {};
+  arr.forEach((c, idx) => { updates[c.id + '/order'] = idx + 1; });
+  try {
+    const { db, ref, update } = window.fb;
+    await update(ref(db, 'restaurants/' + opItemCatShopId + '/itemCategories'), updates);
+  } catch (err) {
+    showToast("Couldn't reorder — check your connection");
+  }
+}
+async function opDeleteItemCategory(id) {
+  const c = opItemCategories.find(x => x.id === id);
+  if (!c) return;
+  if (!confirm(`Delete the category "${c.name}"?\n\nThe items themselves aren't touched — only this tab is removed from the shop's menu.`)) return;
+  try {
+    const { db, ref, remove } = window.fb;
+    await remove(ref(db, 'restaurants/' + opItemCatShopId + '/itemCategories/' + id));
     showToast('Category deleted');
   } catch (err) {
     showToast("Couldn't delete — check your connection");
