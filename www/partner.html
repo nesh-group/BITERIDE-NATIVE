@@ -1006,6 +1006,23 @@
       </div>
     </div>
 
+    <div class="px" style="margin-top:16px;">
+      <div class="pay-pending-card" id="shop-minorder-card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+          <p class="rest-title" style="font-size:15px; margin:0;">Minimum order amount</p>
+          <span class="nav-badge" id="shop-minorder-badge" style="background:#6E8CAE;">Off</span>
+        </div>
+        <p class="hint-text" style="margin-bottom:12px;">Customers can place an order only if their item total reaches this amount. Leave it off to accept orders of any value.</p>
+        <div class="field" style="margin-bottom:10px;">
+          <span style="font-weight:800; color:var(--ink);">₹</span>
+          <input id="shop-minorder-input" type="number" inputmode="numeric" min="1" step="1" placeholder="e.g. 200" />
+        </div>
+        <button type="button" class="btn-primary" id="shop-minorder-save-btn" style="margin-bottom:8px;">Save minimum order</button>
+        <button type="button" class="btn-danger" id="shop-minorder-off-btn" style="width:100%;">Remove minimum order</button>
+        <p class="hint-text" id="shop-minorder-status" style="margin-top:10px; margin-bottom:0;"></p>
+      </div>
+    </div>
+
     <div class="px" style="margin-top:20px;">
       <div class="section-row" style="padding:0 0 8px;">
         <h2 class="section-title">Location</h2>
@@ -1572,6 +1589,11 @@
           <div class="op-home-icon">🚚</div>
           <h3>Go Series</h3>
           <p>Delivery charge &amp; shop list</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('shop-delivery')">
+          <div class="op-home-icon">🛵</div>
+          <h3>Shop Delivery Charges</h3>
+          <p>Set a separate delivery charge &amp; minimum order for each non-Go-Series shop</p>
         </div>
         <div class="op-home-card" onclick="opOpenSection('shop-zones')">
           <div class="op-home-icon">🗺️</div>
@@ -2227,6 +2249,47 @@
 
       <h2 style="margin-top:18px;">Currently in Go Series</h2>
       <div id="op-goseries-shop-list" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- SHOP DELIVERY CHARGES — operator sets each non-Go-Series shop's OWN
+       delivery charge (same restaurants/{id}/deliveryCharges field the shop's
+       own Delivery Charges screen writes) and its minimum order amount. -->
+  <div class="op-section" id="op-section-shop-delivery">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Shop Delivery Charges</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Pick any shop that is NOT in Go Series and set its own delivery charge and minimum order. This writes the same settings the shop sees in its own Account → Delivery Charges, so whichever was saved last wins. Go Series and Groceries shops always use the Go Series charge, so they are not listed here.</p>
+      <div id="op-sdc-editor" style="display:none; margin-bottom:16px; padding:14px; border:1px solid #124a24;">
+        <h2 id="op-sdc-editor-title" style="margin-top:0;"></h2>
+        <div class="op-search-box" style="margin-bottom:10px;">
+          <input type="number" id="op-sdc-base" placeholder="Fixed/base charge in ₹ (e.g. 20)" min="0" step="0.5">
+        </div>
+        <div class="op-search-box" style="margin-bottom:10px;">
+          <input type="number" id="op-sdc-perkm" placeholder="Per-km rate in ₹ (e.g. 5)" min="0" step="0.5">
+        </div>
+        <div class="op-search-box" style="margin-bottom:10px;">
+          <input type="number" id="op-sdc-freekm" placeholder="Free delivery under __ km (blank/0 = off)" min="0" step="0.1">
+        </div>
+        <div class="op-search-box" style="margin-bottom:10px;">
+          <input type="number" id="op-sdc-freeabove" placeholder="Free delivery on orders of ₹ and above (blank/0 = off)" min="0" step="1">
+        </div>
+        <div class="op-search-box" style="margin-bottom:10px;">
+          <input type="number" id="op-sdc-minorder" placeholder="Minimum order amount in ₹ (blank/0 = no minimum)" min="0" step="1">
+        </div>
+        <div>
+          <button type="button" class="op-btn op-btn-push" onclick="opSaveShopDelivery()">💾 Save for this shop</button>
+          <button type="button" class="op-btn op-btn-danger" onclick="opClearShopDelivery()">Clear delivery charge</button>
+          <button type="button" class="op-btn" onclick="opCloseShopDeliveryEditor()">Cancel</button>
+        </div>
+        <p class="op-note" id="op-sdc-status" style="margin-top:10px;"></p>
+      </div>
+      <div class="op-search-box" style="margin-bottom:6px;">
+        <input type="text" id="op-sdc-search" placeholder="Search shops..." oninput="opRenderShopDeliveryList()">
+      </div>
+      <div id="op-sdc-list" style="margin-top:10px;"></div>
     </div>
   </div>
 
@@ -3636,6 +3699,7 @@ function logInRestaurant(id, data) {
   updateShopDiscountBadge();
   renderShopAvailability();
   renderShopHours();
+  renderMinOrder();
   document.getElementById('support-fab').classList.add('show');
 }
 
@@ -3798,6 +3862,54 @@ async function turnOffShopHours() {
   }
 }
 document.getElementById('shop-hours-off-btn').addEventListener('click', turnOffShopHours);
+
+// ---------- Minimum order amount ----------
+// Stored as restaurants/{id}/minOrderAmount (number of rupees; 0 / missing =
+// no minimum). The customer app reads it and blocks checkout while the item
+// total is below it.
+function renderMinOrder() {
+  const r = state.restaurant;
+  const badge = document.getElementById('shop-minorder-badge');
+  const status = document.getElementById('shop-minorder-status');
+  const input = document.getElementById('shop-minorder-input');
+  if (!r || !badge || !status || !input) return;
+  const min = Number(r.minOrderAmount) || 0;
+  if (document.activeElement !== input) input.value = min > 0 ? String(min) : '';
+  if (min > 0) {
+    badge.textContent = "On · ₹" + min;
+    badge.style.background = "#1f7a3d";
+    status.textContent = "Customers must order items worth at least ₹" + min + " (delivery & platform fee not counted).";
+  } else {
+    badge.textContent = "Off";
+    badge.style.background = "#6E8CAE";
+    status.textContent = "No minimum — customers can order any amount.";
+  }
+}
+
+async function saveMinOrder(amount) {
+  const { db, ref, update } = window.fb;
+  const saveBtn = document.getElementById('shop-minorder-save-btn');
+  const offBtn = document.getElementById('shop-minorder-off-btn');
+  saveBtn.disabled = true; offBtn.disabled = true;
+  try {
+    await update(ref(db, 'restaurants/' + state.restId), { minOrderAmount: amount });
+    state.restaurant = { ...(state.restaurant || {}), minOrderAmount: amount };
+    renderMinOrder();
+    showToast(amount > 0 ? "Minimum order saved: ₹" + amount : "Minimum order removed");
+  } catch (e) {
+    showToast("Couldn't update — check your connection and try again.");
+  } finally {
+    saveBtn.disabled = false; offBtn.disabled = false;
+  }
+}
+document.getElementById('shop-minorder-save-btn').addEventListener('click', () => {
+  const raw = document.getElementById('shop-minorder-input').value.trim();
+  const amount = Math.round(Number(raw));
+  if (!raw || !isFinite(amount) || amount < 1) { showToast("Enter an amount of ₹1 or more"); return; }
+  if (amount > 100000) { showToast("That amount looks too high — please check it"); return; }
+  saveMinOrder(amount);
+});
+document.getElementById('shop-minorder-off-btn').addEventListener('click', () => saveMinOrder(0));
 
 // ---------- SHOP DISCOUNT (one flat amount, auto-shown to every customer
 // checking out with this shop — no per-customer targeting) ----------
@@ -6437,6 +6549,7 @@ function opOpenSection(name) {
   if (name === 'taxi-fare') opLoadTaxiFare();
   if (name === 'support-phone') opLoadSupportPhone();
   if (name === 'go-series') opLoadGoSeries();
+  if (name === 'shop-delivery') { opCloseShopDeliveryEditor(); opRenderShopDeliveryList(); }
   if (name === 'shop-zones') opRenderShopZones();
   if (name === 'report') opRenderReportShopList();
   if (name === 'groceries-queue') opRenderGroceriesQueueList();
@@ -6930,6 +7043,101 @@ function opRemoveShopFromGoSeries(id) {
   }).catch(err => alert('Error: ' + err.message));
 }
 
+/* ---- Shop Delivery Charges (operator sets each non-Go-Series shop's own charge) ---- */
+let opSdcEditingId = null;
+function opSdcSummary(p) {
+  const dc = p.deliveryCharges;
+  const has = dc && (Number(dc.baseFee) > 0 || Number(dc.perKmFee) > 0);
+  let s = has ? ('₹' + (Number(dc.baseFee) || 0) + ' + ₹' + (Number(dc.perKmFee) || 0) + '/km') : 'Delivery charge not set';
+  if (has && Number(dc.freeAbove) > 0) s += ' · free above ₹' + dc.freeAbove;
+  if (has && Number(dc.freeUnderKm) > 0) s += ' · free under ' + dc.freeUnderKm + ' km';
+  const min = Number(p.minOrderAmount) || 0;
+  s += min > 0 ? (' · min order ₹' + min) : ' · no min order';
+  return s;
+}
+function opRenderShopDeliveryList() {
+  const wrap = document.getElementById('op-sdc-list');
+  if (!wrap) return;
+  const q = (document.getElementById('op-sdc-search').value || '').trim().toLowerCase();
+  const shops = opAllPartners
+    .filter(p => !p.goSeries && p.businessType !== 'groceries')
+    .filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q))
+    .sort((a, b) => (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id));
+  if (!shops.length) {
+    wrap.innerHTML = '<p class="op-note">' + (q ? 'No matching shops.' : 'No shops outside Go Series yet.') + '</p>';
+    return;
+  }
+  wrap.innerHTML = shops.map(p => `
+    <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div>
+        <div class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</div>
+        <div class="op-partner-sub">${escapeHtml(opTypeLabel(p.businessType))} · ${escapeHtml(opSdcSummary(p))}</div>
+      </div>
+      <button type="button" class="op-btn op-btn-push" style="margin:0;" data-id="${escapeHtml(p._id)}" onclick="opOpenShopDeliveryEditor(this.dataset.id)">✏️ Set</button>
+    </div>
+  `).join('');
+}
+function opOpenShopDeliveryEditor(id) {
+  const p = opAllPartners.find(x => x._id === id);
+  if (!p) return;
+  opSdcEditingId = id;
+  const dc = p.deliveryCharges || {};
+  const val = v => (v === undefined || v === null || Number(v) === 0) ? '' : v;
+  document.getElementById('op-sdc-editor-title').textContent = p.restaurantName || p._id;
+  document.getElementById('op-sdc-base').value = val(dc.baseFee);
+  document.getElementById('op-sdc-perkm').value = val(dc.perKmFee);
+  document.getElementById('op-sdc-freekm').value = val(dc.freeUnderKm);
+  document.getElementById('op-sdc-freeabove').value = val(dc.freeAbove);
+  document.getElementById('op-sdc-minorder').value = val(p.minOrderAmount);
+  document.getElementById('op-sdc-status').textContent = '';
+  const ed = document.getElementById('op-sdc-editor');
+  ed.style.display = 'block';
+  ed.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function opCloseShopDeliveryEditor() {
+  opSdcEditingId = null;
+  const ed = document.getElementById('op-sdc-editor');
+  if (ed) ed.style.display = 'none';
+}
+function opSaveShopDelivery() {
+  const id = opSdcEditingId;
+  const status = document.getElementById('op-sdc-status');
+  if (!id) return;
+  const num = elId => { const raw = document.getElementById(elId).value.trim(); return raw === '' ? 0 : Number(raw); };
+  const baseFee = num('op-sdc-base'), perKmFee = num('op-sdc-perkm');
+  const freeUnderKm = num('op-sdc-freekm'), freeAbove = num('op-sdc-freeabove');
+  const minOrder = Math.round(num('op-sdc-minorder'));
+  if ([baseFee, perKmFee, freeUnderKm, freeAbove, minOrder].some(n => !isFinite(n) || n < 0)) {
+    status.textContent = "Amounts can't be negative or invalid.";
+    return;
+  }
+  const deliveryCharges = { baseFee, perKmFee };
+  if (freeUnderKm > 0) deliveryCharges.freeUnderKm = freeUnderKm;
+  if (freeAbove > 0) deliveryCharges.freeAbove = freeAbove;
+  const { db, ref, update } = window.fb;
+  status.textContent = 'Saving...';
+  update(ref(db, 'restaurants/' + id), { deliveryCharges, minOrderAmount: minOrder > 0 ? minOrder : null }).then(() => {
+    const p = opAllPartners.find(x => x._id === id);
+    if (p) { p.deliveryCharges = deliveryCharges; p.minOrderAmount = minOrder > 0 ? minOrder : 0; }
+    status.textContent = 'Saved.';
+    opRenderShopDeliveryList();
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opClearShopDelivery() {
+  const id = opSdcEditingId;
+  const status = document.getElementById('op-sdc-status');
+  if (!id) return;
+  if (!confirm("Clear this shop's delivery charge? Customers will see no delivery charge for it until one is set again.")) return;
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'restaurants/' + id), { deliveryCharges: null }).then(() => {
+    const p = opAllPartners.find(x => x._id === id);
+    if (p) p.deliveryCharges = null;
+    ['op-sdc-base', 'op-sdc-perkm', 'op-sdc-freekm', 'op-sdc-freeabove'].forEach(i => { document.getElementById(i).value = ''; });
+    status.textContent = 'Delivery charge cleared.';
+    opRenderShopDeliveryList();
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
 /* ---- Push App Update ---- */
 function opHandleFileUpload(e) {
   const file = e.target.files[0];
@@ -7024,6 +7232,8 @@ function opListenPartners() {
     opUpdatePartnersHomeBadge();
     const reportDetail = document.getElementById('op-section-report-detail');
     if (reportDetail && reportDetail.classList.contains('active')) opRenderReportOrders();
+    const sdcSec = document.getElementById('op-section-shop-delivery');
+    if (sdcSec && sdcSec.classList.contains('active')) opRenderShopDeliveryList();
     const shopOrderSec = document.getElementById('op-section-shop-order');
     if (shopOrderSec && shopOrderSec.classList.contains('active')) opBuildShopOrderWorking();
     const groceriesCatalogSec = document.getElementById('op-section-groceries-catalog');
