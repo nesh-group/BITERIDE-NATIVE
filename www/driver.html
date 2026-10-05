@@ -889,7 +889,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, onValue, push, set, get, update, remove, runTransaction, goOffline, goOnline } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getDatabase, ref, onValue, push, set, get, update, remove, runTransaction, query, orderByChild, equalTo, goOffline, goOnline } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   // Same Firebase project as the customer app and the restaurant partner
   // app — rides written here are the exact 'rides' node the customer app's
@@ -906,7 +906,7 @@
 
   const fbApp = initializeApp(firebaseConfig);
   const db = getDatabase(fbApp);
-  window.fb = { db, ref, onValue, push, set, get, update, remove, runTransaction };
+  window.fb = { db, ref, onValue, push, set, get, update, remove, runTransaction, query, orderByChild, equalTo };
 
 
   // Keep the realtime socket alive/reconnecting so a minimized driver app
@@ -3035,6 +3035,16 @@ function startEditResubmit() {
   regPhotoDataUrl = data.photo || '';
   setPhotoAvatarPreview(document.getElementById('reg-photo-avatar'), regPhotoDataUrl);
   document.getElementById('reg-photo-camera-btn').textContent = regPhotoDataUrl ? '📷 Retake' : '📷 Take photo';
+  if (!regPhotoDataUrl && regEditId) {
+    const editingId = regEditId;
+    fetchDriverPhoto(editingId).then(p => {
+      if (p && regEditMode && regEditId === editingId && !regPhotoDataUrl) {
+        regPhotoDataUrl = p;
+        setPhotoAvatarPreview(document.getElementById('reg-photo-avatar'), p);
+        document.getElementById('reg-photo-camera-btn').textContent = '📷 Retake';
+      }
+    });
+  }
   setRegServiceToggle(data.services || { taxi: true, delivery: true });
   setRegVehicleType(data.vehicleType || 'bike');
   document.getElementById('reg-error').style.display = 'none';
@@ -3094,13 +3104,19 @@ async function doRegisterDriver() {
         name, phone, vehicleNumber, password,
         vehicleType: selectedRegType,
         services,
-        photo: regPhotoDataUrl,
         approvalStatus: 'pending',
         rejectionReason: null,
         resubmittedAt: Date.now(),
       };
+      // Only touch the photo fields when there is a photo in hand, so a
+      // still-loading photo can never wipe the saved one.
+      if (regPhotoDataUrl) {
+        const photoOk = await saveDriverPhoto(regEditId, regPhotoDataUrl);
+        updates.photo = photoOk ? null : regPhotoDataUrl;
+        updates.hasPhoto = true;
+      }
       await update(ref(db, 'taxi_drivers/' + regEditId), updates);
-      const fresh = Object.assign({}, state.driver, updates);
+      const fresh = Object.assign({}, state.driver, updates, regPhotoDataUrl ? { photo: regPhotoDataUrl } : {});
       const editedId = regEditId;
       regEditMode = false;
       regEditId = null;
@@ -3114,19 +3130,24 @@ async function doRegisterDriver() {
       errEl.style.display = 'block';
       return;
     }
+    const photoForLocal = regPhotoDataUrl;
+    const photoOk = photoForLocal ? await saveDriverPhoto(username, photoForLocal) : false;
     const record = {
       name, phone, vehicleNumber, username, password,
       vehicleType: selectedRegType,
       services,
       zone: zoneId,
       zoneName: zone ? zone.name : '',
-      photo: regPhotoDataUrl,
       approvalStatus: 'pending',
       createdAt: Date.now(),
     };
+    if (photoForLocal) {
+      record.hasPhoto = true;
+      if (!photoOk) record.photo = photoForLocal; // fallback: old behaviour
+    }
     await set(ref(db, 'taxi_drivers/' + username), record);
     regPhotoDataUrl = '';
-    logInDriver(username, record);
+    logInDriver(username, Object.assign({}, record, photoForLocal ? { photo: photoForLocal } : {}));
   } catch (e) {
     errEl.textContent = "Couldn't create your account — check your connection and try again.";
     errEl.style.display = 'block';
@@ -3248,7 +3269,42 @@ function listenOwnApprovalStatus(id) {
   } catch (e) { driverApprovalListenerAttached = false; }
 }
 
+// ---------- Driver photo storage ----------
+// The photo (a small base64 JPEG) used to live on taxi_drivers/{id}.photo,
+// which meant every phone listening to 'taxi_drivers' downloaded every
+// driver's photo. It now lives in its own node, driver_photos/{id}, and the
+// driver record only carries a tiny hasPhoto flag. Everything here falls
+// back to the old behaviour if the new node can't be written, so a photo
+// can never be lost or block registration.
+async function saveDriverPhoto(id, dataUrl) {
+  try {
+    const { db, ref, set } = window.fb;
+    await set(ref(db, 'driver_photos/' + id), dataUrl);
+    return true;
+  } catch (e) { return false; }
+}
+async function fetchDriverPhoto(id) {
+  try {
+    const { db, ref, get } = window.fb;
+    const snap = await get(ref(db, 'driver_photos/' + id));
+    return snap.val() || '';
+  } catch (e) { return ''; }
+}
+// One-time, self-migrating: if this driver's LIVE record still holds the
+// photo, copy it to driver_photos and only then clear it from the record.
+function migrateLegacyDriverPhoto(id) {
+  if (!window.fb || !id) return;
+  const { db, ref, get, set, update } = window.fb;
+  get(ref(db, 'taxi_drivers/' + id + '/photo')).then(snap => {
+    const photo = snap.val();
+    if (!photo) return;
+    return set(ref(db, 'driver_photos/' + id), photo)
+      .then(() => update(ref(db, 'taxi_drivers/' + id), { photo: null, hasPhoto: true }));
+  }).catch(() => {});
+}
+
 function logInDriver(username, data) {
+  migrateLegacyDriverPhoto(username);
   state.username = username;
   state.driver = data;
   localStorage.setItem('nesh_driver_id', username);
@@ -3280,6 +3336,11 @@ function logInDriver(username, data) {
   document.getElementById('account-zone').value = data.zoneName || '';
   renderAccountServiceToggle();
   renderAccountPhoto(data.photo || '');
+  if (!data.photo) {
+    fetchDriverPhoto(username).then(p => {
+      if (p) { renderAccountPhoto(p); if (state.driver) state.driver.photo = p; }
+    });
+  }
 
   try {
     const savedOnline = localStorage.getItem('nesh_driver_online_' + username);
@@ -3351,7 +3412,8 @@ async function handleAccountPhotoFile(file) {
     if (state.driver) state.driver.photo = dataUrl;
     try { localStorage.setItem('nesh_driver_data', JSON.stringify(state.driver)); } catch (err) {}
     const { db, ref, update } = window.fb;
-    await update(ref(db, 'taxi_drivers/' + state.username), { photo: dataUrl });
+    const photoOk = await saveDriverPhoto(state.username, dataUrl);
+    await update(ref(db, 'taxi_drivers/' + state.username), photoOk ? { photo: null, hasPhoto: true } : { photo: dataUrl, hasPhoto: true });
     document.getElementById('account-photo-hint').style.display = 'none';
     camBtn.textContent = '📷 Retake'; galBtn.textContent = '🖼️ Gallery';
   } catch (err) {
@@ -3488,7 +3550,7 @@ document.getElementById('online-toggle-input').addEventListener('change', (e) =>
   try {
   // Photo is mandatory — customers see it in their driver-match card, so a
   // driver with no photo on file can't go online until they add one.
-  if (e.target.checked && (!state.driver || !state.driver.photo)) {
+  if (e.target.checked && (!state.driver || !(state.driver.photo || state.driver.hasPhoto))) {
     e.target.checked = false;
     alert("Please add your profile photo first — go to Account and tap \"Add your photo\".");
     showScreen('account');
@@ -3564,7 +3626,51 @@ function normalizeRideStatus(raw) {
   return 'searching';
 }
 
+// Everything this app does with rides only ever needs two things: rides that
+// are still open for pickup (status === 'searching') and this driver's own
+// rides (history, earnings/due, current trip). So instead of every driver's
+// phone downloading the whole 'rides' node, we listen to just those two
+// slices and merge them into ridesCache. Needs ".indexOn": ["status",
+// "driverId"] on 'rides' in the database rules to save bandwidth — without
+// it Firebase still returns the right data (it filters on the phone), it
+// just can't save anything. If either query is rejected for any reason, we
+// fall back to the original whole-node listener so the app never breaks.
 function listenRides() {
+  const { db, ref, onValue, query, orderByChild, equalTo } = window.fb;
+  if (typeof query !== 'function' || !state.username) { listenRidesAll(); return; }
+  let searchingVal = {}, mineVal = {};
+  let fellBack = false;
+  const fallback = (e) => {
+    if (fellBack) return;
+    fellBack = true;
+    console.warn('Filtered rides listener failed, using full listener:', e);
+    listenRidesAll();
+  };
+  const apply = () => {
+    if (fellBack) return;
+    ridesCache = Object.assign({}, searchingVal, mineVal);
+    renderHomeLists();
+    recomputeDriverDueGross();
+    if (state.isOnline) refreshRidePopupFromCache();
+    if (state.selectedRideId && ridesCache[state.selectedRideId]) {
+      renderRideDetail(state.selectedRideId, ridesCache[state.selectedRideId]);
+    }
+  };
+  try {
+    onValue(query(ref(db, 'rides'), orderByChild('status'), equalTo('searching')), snap => {
+      searchingVal = snap.val() || {};
+      apply();
+    }, fallback);
+    onValue(query(ref(db, 'rides'), orderByChild('driverId'), equalTo(state.username)), snap => {
+      mineVal = snap.val() || {};
+      apply();
+    }, fallback);
+  } catch (e) { fallback(e); }
+}
+
+// Original behaviour: listen to the entire 'rides' node. Kept only as a
+// safety net for listenRides() above.
+function listenRidesAll() {
   const { db, ref, onValue } = window.fb;
   onValue(ref(db, 'rides'), snap => {
     const val = snap.val() || {};
