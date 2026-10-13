@@ -1275,8 +1275,10 @@
         <p style="color:#fff; font-family:'Fraunces',serif; font-size:32px; font-weight:700; margin:0;" id="due-total-amount">₹0</p>
         <p class="hint-text" style="margin-top:6px;" id="due-order-count">From 0 delivered orders</p>
       </div>
-      <p class="hint-text" style="margin-top:14px;">Every delivered order adds the operator's extra amount for that order to your due. This clears when the operator marks a settlement against your account.</p>
-      <h2 class="section-title" style="margin-top:20px; font-size:16px;">Settlement history</h2>
+      <p class="hint-text" style="margin-top:14px;">Every order that reaches ready or beyond adds the operator's commission for that order to your due. The commission depends on your order's item total at your own prices (set by the operator for your shop). The platform fee and delivery charge are never added to your due. This clears when the operator marks a settlement against your account.</p>
+      <h2 class="section-title" style="margin-top:20px; font-size:16px;">Commission history</h2>
+      <div id="due-history-list" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
+      <h2 class="section-title" style="margin-top:24px; font-size:16px;">Settlement history</h2>
       <div id="due-settlements-list" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
     </div>
   </section>
@@ -2389,12 +2391,21 @@
         <p class="op-note" id="op-pm-approval-status-msg" style="margin-top:6px;"></p>
       </div>
       <div class="op-mc-row"><b>Due amount:</b> <span id="op-pm-due">—</span></div>
+      <button type="button" class="op-btn" onclick="opToggleDueHistory()">📜 Due history</button>
+      <div id="op-pm-due-history" style="display:none; margin-top:8px;"></div>
       <div style="margin-top:10px;">
         <div class="op-search-box" style="margin-bottom:6px;">
           <input type="number" id="op-pm-settle-input" placeholder="Amount settled (₹)" min="0" step="0.5">
         </div>
         <button type="button" class="op-btn op-btn-push" onclick="opSettleDue()">✅ Mark Settled</button>
         <p class="op-note" id="op-pm-settle-status" style="margin-top:4px;"></p>
+      </div>
+      <div style="margin-top:14px;" id="op-pm-commission-block">
+        <p class="op-note" style="margin-bottom:6px;"><b>Commission per order (due from this shop only)</b> — pick a range of the order's item total at the shop's own prices (not the customer price) and the ₹ amount this shop owes for orders in it. Example: 100 to 200 → ₹5, 200 to 300 → ₹10. Never added to the customer's bill; delivery charge and platform fee are not counted and never become the shop's due. "To" blank = no upper limit; a range includes its "From" but not its "To".</p>
+        <div id="op-pm-commission-rows"></div>
+        <button type="button" class="op-btn" onclick="opAddCommissionRow()">+ Add range</button>
+        <button type="button" class="op-btn op-btn-push" onclick="opSaveCommissionTiers()">💾 Save commission</button>
+        <p class="op-note" id="op-pm-commission-status" style="margin-top:4px;"></p>
       </div>
       <div style="margin-top:14px;">
         <p class="op-note" style="margin-bottom:6px;">Shop photo — shown on this shop's card in the customer app list.</p>
@@ -5831,6 +5842,11 @@ function renderDueUI() {
   const countEl = document.getElementById('due-order-count');
   if (countEl) countEl.textContent = 'From ' + dueOrderCount + ' delivered order' + (dueOrderCount === 1 ? '' : 's');
 
+  const histEl = document.getElementById('due-history-list');
+  if (histEl) {
+    const hist = neshCommissionHistory(dueOrdersList, dueCommissionTiers);
+    histEl.innerHTML = hist.length ? neshHistoryRowsHtml(hist) : '<p class="hint-text">No orders with commission yet.</p>';
+  }
   const listEl = document.getElementById('due-settlements-list');
   if (listEl) {
     if (!dueSettlements.length) {
@@ -5847,23 +5863,99 @@ function renderDueUI() {
   }
 }
 
+// ---- Per-shop commission tiers (Operator Panel -> partner -> Commission) ----
+// Stored at restaurants/{id}/commissionTiers as [{min, max, amount}]. An
+// order's commission is the `amount` of the tier where min <= itemsTotal < max
+// (max blank/0 = no upper limit). itemsTotal is the item total at the shop's own prices (shopPrice, else price) —
+// platform fee and delivery charge are NOT counted. This commission is the
+// ONLY thing that becomes due from a shop; the platform fee never does.
+function neshNormalizeTiers(raw) {
+  const arr = Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.values(raw) : []);
+  return arr.map(t => ({ min: Number(t && t.min) || 0, max: Number(t && t.max) || 0, amount: Number(t && t.amount) || 0 }))
+            .filter(t => t.amount > 0)
+            .sort((a, b) => a.min - b.min);
+}
+function neshOrderItemsTotal(o) {
+  const items = Array.isArray(o && o.items) ? o.items : (o && o.items && typeof o.items === 'object' ? Object.values(o.items) : []);
+  // Uses the shop's own price (shopPrice, stamped on orders whose item had an
+  // operator "Customer price") and falls back to price when there is none.
+  return items.reduce((sum, it) => sum + ((it.shopPrice != null ? Number(it.shopPrice) : Number(it.price)) || 0) * (Number(it.qty) || 0), 0);
+}
+// Commission is versioned: every save in the operator panel adds an entry
+// {from: timestamp, tiers: [...]} at restaurants/{id}/commissionHistory. An
+// order uses the version that was live when it was PLACED (createdAt), so
+// orders from before commission was set carry none, and later edits only
+// affect new orders.
+function neshNormalizeVersions(raw) {
+  const arr = Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.values(raw) : []);
+  return arr.map(v => ({ from: Number(v && v.from) || 0, tiers: v && v.tiers })).sort((a, b) => a.from - b.from);
+}
+function neshCommissionForOrder(o, rawVersions) {
+  const versions = neshNormalizeVersions(rawVersions);
+  const at = Number(o && o.createdAt) || 0;
+  let live = null;
+  versions.forEach(v => { if (v.from > 0 && v.from <= at) live = v; });
+  return live ? neshCommissionFromTiers(o, live.tiers) : 0;
+}
+function neshCommissionFromTiers(o, rawTiers) {
+  const tiers = neshNormalizeTiers(rawTiers);
+  if (!tiers.length) return 0;
+  const total = neshOrderItemsTotal(o);
+  const hit = tiers.find(t => total >= t.min && (!t.max || total < t.max));
+  return hit ? hit.amount : 0;
+}
+
+// Orders that actually carry a commission (₹0 ones are left out), newest first.
+function neshCommissionHistory(orders, rawTiers) {
+  const out = [];
+  orders.forEach(o => {
+    const status = (o.status || '').toLowerCase();
+    if (!DUE_QUALIFYING_STATUSES.includes(status)) return;
+    const commission = neshCommissionForOrder(o, rawTiers);
+    if (commission > 0) out.push({ no: o.orderNumber || '—', at: Number(o.createdAt) || 0, amount: neshOrderItemsTotal(o), commission });
+  });
+  return out.sort((a, b) => b.at - a.at);
+}
+function neshHistoryRowsHtml(list) {
+  return list.map(h => `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--field-bg); border:1px solid var(--field-border); border-radius:8px; padding:10px 12px;">
+      <div style="font-size:12px; line-height:1.5;">
+        <div><b>Order #${h.no}</b></div>
+        <div style="opacity:.75;">${h.at ? new Date(h.at).toLocaleString() : ''}</div>
+        <div style="opacity:.75;">Order amount ₹${Math.round(h.amount * 100) / 100}</div>
+      </div>
+      <div style="font-size:20px; font-weight:800; white-space:nowrap;">₹${h.commission}</div>
+    </div>`).join('');
+}
+
+let dueOrdersList = [];
+let dueCommissionTiers = [];
+function recomputeDueGross() {
+  let gross = 0, count = 0;
+  dueOrdersList.forEach(o => {
+    const status = (o.status || '').toLowerCase();
+    // Due starts accruing the moment the restaurant marks an order "ready".
+    if (DUE_QUALIFYING_STATUSES.includes(status)) {
+      const c = neshCommissionForOrder(o, dueCommissionTiers);
+      if (c > 0) { gross += c; count++; }
+    }
+  });
+  dueGrossTotal = gross;
+  dueOrderCount = count;
+  renderDueUI();
+}
+
 function listenDueAmount() {
   const { db, ref, onValue } = window.fb;
   onValue(ref(db, 'restaurants/' + state.restId + '/orders'), snap => {
-    let gross = 0, count = 0;
-    snap.forEach(child => {
-      const o = child.val();
-      const status = (o.status || '').toLowerCase();
-      // Due starts accruing the moment the restaurant marks an order
-      // "ready" — no need to wait for full delivery/completion.
-      if (DUE_QUALIFYING_STATUSES.includes(status) && o.platformDue) {
-        gross += Number(o.platformDue) || 0;
-        count++;
-      }
-    });
-    dueGrossTotal = gross;
-    dueOrderCount = count;
-    renderDueUI();
+    const list = [];
+    snap.forEach(child => { list.push(child.val() || {}); }); // braces: a truthy return would stop Firebase's forEach
+    dueOrdersList = list;
+    recomputeDueGross();
+  });
+  onValue(ref(db, 'restaurants/' + state.restId + '/commissionHistory'), snap => {
+    dueCommissionTiers = snap.val() || [];
+    recomputeDueGross();
   });
   onValue(ref(db, 'restaurants/' + state.restId + '/settlements'), snap => {
     const list = [];
@@ -10562,17 +10654,17 @@ function opDeleteAllTransactionsForDate() {
   }).catch(err => { delStatus.textContent = 'Error: ' + err.message; });
 }
 
-// Gross due = sum of platformDue on this partner's orders that have reached
-// "ready" or beyond (the operator's flat platform fee stamped onto each
-// order when it was placed), minus everything already recorded as settled
-// against this partner.
+// Gross due = sum of the commission (from this partner's commissionTiers,
+// based on each order's item total) on orders that have reached "ready" or
+// beyond, minus everything already recorded as settled. The platform fee is
+// never part of a shop's due.
 function opComputeDue(p) {
   let gross = 0;
   if (p.orders) {
     Object.values(p.orders).forEach(o => {
       const status = (o.status || '').toLowerCase();
-      if (DUE_QUALIFYING_STATUSES.includes(status) && o.platformDue) {
-        gross += Number(o.platformDue) || 0;
+      if (DUE_QUALIFYING_STATUSES.includes(status)) {
+        gross += neshCommissionForOrder(o, p.commissionHistory);
       }
     });
   }
@@ -10624,6 +10716,8 @@ function opShowPartnerDetail(id) {
   document.getElementById('op-pm-address').textContent = p.address || '—';
   document.getElementById('op-pm-gpay').textContent = p.gpayNumber || '—';
   document.getElementById('op-pm-due').textContent = '₹' + opComputeDue(p);
+  opRenderCommissionRows(p);
+  const dh = document.getElementById('op-pm-due-history'); if (dh) { dh.style.display = 'none'; dh.innerHTML = ''; }
   document.getElementById('op-pm-settle-input').value = '';
   document.getElementById('op-pm-settle-status').textContent = '';
   document.getElementById('op-pm-category-input').value = p.opCategory || '';
@@ -10859,6 +10953,81 @@ function opToggleItemAvailability(itemId) {
       document.getElementById('op-pm-avail-status').textContent = (next ? 'Marked unavailable: ' : 'Marked available: ') + (item.name || itemId);
     })
     .catch(err => { document.getElementById('op-pm-avail-status').textContent = 'Error: ' + err.message; });
+}
+function opCommissionRowHtml(t) {
+  const v = (x) => (x === 0 || x === undefined || x === null || x === '') ? '' : x;
+  const inp = 'style="width:30%; padding:7px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-family:inherit; font-size:.8rem; margin-right:4px;"';
+  return '<div class="op-comm-row" style="display:flex; align-items:center; gap:4px; margin-bottom:6px;">' +
+    '<input type="number" class="op-comm-min" min="0" step="any" inputmode="decimal" placeholder="From ₹" value="' + v(t.min) + '" ' + inp + '>' +
+    '<input type="number" class="op-comm-max" min="0" step="any" inputmode="decimal" placeholder="To ₹" value="' + v(t.max) + '" ' + inp + '>' +
+    '<input type="number" class="op-comm-amt" min="0" step="any" inputmode="decimal" placeholder="Due ₹" value="' + v(t.amount) + '" ' + inp + '>' +
+    '<button type="button" class="op-btn op-btn-danger" style="padding:6px 9px; margin:0;" onclick="this.closest(\'.op-comm-row\').remove()">✕</button>' +
+    '</div>';
+}
+function opToggleDueHistory() {
+  const box = document.getElementById('op-pm-due-history');
+  const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
+  if (!box || !p) return;
+  if (box.style.display === 'block') { box.style.display = 'none'; return; }
+  const hist = neshCommissionHistory(p.orders ? Object.values(p.orders) : [], p.commissionHistory);
+  const sets = p.settlements ? Object.values(p.settlements).sort((a, b) => (b.settledAt || 0) - (a.settledAt || 0)) : [];
+  const rows = hist.map(h => `
+    <div class="op-order-item" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div style="font-size:.78rem; line-height:1.5;"><b>Order #${escapeHtml(String(h.no))}</b><br><span style="color:#1f7a3d;">${h.at ? new Date(h.at).toLocaleString() : ''}<br>Order amount ₹${Math.round(h.amount * 100) / 100}</span></div>
+      <div style="font-size:1.3rem; font-weight:800; color:#39ff14; white-space:nowrap;">₹${h.commission}</div>
+    </div>`).join('');
+  const setRows = sets.map(x => `
+    <div class="op-order-item" style="display:flex; justify-content:space-between; gap:10px; font-size:.78rem;">
+      <span>${x.settledAt ? new Date(x.settledAt).toLocaleString() : (x.note || 'Settled')}</span><b>₹${x.amount || 0}</b>
+    </div>`).join('');
+  box.innerHTML = '<p class="op-note" style="margin-bottom:6px;"><b>Commission history</b> (₹0 orders not shown)</p>' + (rows || '<div class="op-empty">No orders with commission yet.</div>') +
+    '<p class="op-note" style="margin:14px 0 6px;"><b>Settlement history</b></p>' + (setRows || '<div class="op-empty">No settlements yet.</div>');
+  box.style.display = 'block';
+}
+function opRenderCommissionRows(p) {
+  const wrap = document.getElementById('op-pm-commission-rows');
+  if (!wrap) return;
+  const tiers = neshNormalizeTiers(p && p.commissionTiers);
+  wrap.innerHTML = tiers.map(opCommissionRowHtml).join('');
+  document.getElementById('op-pm-commission-status').textContent = tiers.length ? '' : 'No commission set — nothing is due from this shop.';
+}
+function opAddCommissionRow() {
+  const wrap = document.getElementById('op-pm-commission-rows');
+  wrap.insertAdjacentHTML('beforeend', opCommissionRowHtml({}));
+}
+function opSaveCommissionTiers() {
+  const status = document.getElementById('op-pm-commission-status');
+  if (!opCurrentPartnerId) return;
+  const rows = Array.from(document.querySelectorAll('#op-pm-commission-rows .op-comm-row'));
+  const tiers = [];
+  for (const r of rows) {
+    const minRaw = r.querySelector('.op-comm-min').value, maxRaw = r.querySelector('.op-comm-max').value, amtRaw = r.querySelector('.op-comm-amt').value;
+    if (minRaw === '' && maxRaw === '' && amtRaw === '') continue; // blank row — skip
+    const min = minRaw === '' ? 0 : Number(minRaw), max = maxRaw === '' ? 0 : Number(maxRaw), amount = Number(amtRaw);
+    if (isNaN(min) || isNaN(max) || isNaN(amount) || min < 0 || max < 0 || amtRaw === '' || amount < 0) {
+      status.textContent = 'Check every row — From, To and Due must be valid numbers (To can be blank).'; return;
+    }
+    if (max && max <= min) { status.textContent = 'In each row "To" must be greater than "From".'; return; }
+    tiers.push({ min, max, amount });
+  }
+  tiers.sort((a, b) => a.min - b.min);
+  for (let i = 1; i < tiers.length; i++) {
+    const prev = tiers[i - 1];
+    if (!prev.max || tiers[i].min < prev.max) { status.textContent = 'Ranges overlap (₹' + prev.min + (prev.max ? '–' + prev.max : '+') + ' and ₹' + tiers[i].min + '…). Fix them and save again.'; return; }
+  }
+  status.textContent = 'Saving...';
+  const { db, ref, set } = window.fb;
+  const { push } = window.fb;
+  const from = Date.now();
+  const verRef = push(ref(db, 'restaurants/' + opCurrentPartnerId + '/commissionHistory'));
+  set(verRef, { from, tiers })
+    .then(() => set(ref(db, 'restaurants/' + opCurrentPartnerId + '/commissionTiers'), tiers.length ? tiers : null))
+    .then(() => {
+      status.textContent = tiers.length ? ('Saved ' + tiers.length + ' range' + (tiers.length === 1 ? '' : 's') + '. Applies only to orders placed from now on.') : 'Cleared — nothing is due from this shop for new orders.';
+      const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
+      if (p) { p.commissionTiers = tiers; p.commissionHistory = Object.assign({}, p.commissionHistory || {}, { [verRef.key]: { from, tiers } }); document.getElementById('op-pm-due').textContent = '₹' + opComputeDue(p); }
+    })
+    .catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 function opSettleDue() {
   const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
