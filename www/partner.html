@@ -376,6 +376,40 @@
   .reason-modal-btns .btn-danger{ flex:1; padding:12px; }
   .reason-modal-btns .btn-primary{ flex:1; padding:12px; }
 
+  /* Shop's own Item Categories (Stock screen -> Item categories) */
+  .icat-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:9200;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .icat-overlay.show{ display:flex; }
+  .icat-card{
+    width:100%; max-width:420px; max-height:90vh; overflow-y:auto; background:var(--ink); border:1px solid var(--field-border);
+    border-radius:16px; padding:22px; box-shadow:0 20px 50px rgba(0,0,0,.4);
+  }
+  .icat-input{
+    width:100%; padding:12px; border-radius:10px; background:var(--field-bg); border:1px solid var(--field-border);
+    color:var(--cloud); font-family:'Inter',sans-serif; font-size:14px; outline:none; box-sizing:border-box; margin-bottom:10px;
+  }
+  .icat-row{
+    display:flex; align-items:center; gap:10px; padding:9px 4px; border-bottom:1px solid var(--field-border);
+    color:var(--cloud); font-family:'Inter',sans-serif; font-size:14px; cursor:pointer;
+  }
+  .icat-row input{ width:20px; height:20px; margin:0; accent-color:var(--leaf); flex-shrink:0; }
+  .icat-row small{ color:var(--muted); font-size:11px; display:block; }
+  .icat-item{
+    margin:0 24px 10px; padding:14px; border-radius:12px; background:var(--field-bg); border:1px solid var(--field-border);
+  }
+  .icat-item-top{ display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+  .icat-item-name{ color:var(--cloud); font-family:'Fraunces',serif; font-size:16px; font-weight:700; }
+  .icat-item-sub{ color:var(--muted); font-size:12px; font-family:'Inter',sans-serif; margin:6px 0 10px; }
+  .icat-mini{
+    padding:7px 11px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;
+    background:transparent; border:1.5px solid var(--field-border); color:var(--cloud); margin-right:6px;
+  }
+  .icat-mini:disabled{ opacity:.35; cursor:default; }
+  .icat-mini.edit{ border-color:var(--marigold); color:var(--marigold); }
+  .icat-mini.del{ border-color:var(--chili); color:var(--chili); }
+
   /* Delivery zone map */
   .zone-map-wrap{ position:relative; margin-top:10px; }
   .zone-map{ width:100%; height:340px; border-radius:14px; overflow:hidden; background:var(--field-bg); border:1px solid var(--field-border); }
@@ -652,6 +686,27 @@
     </div>
   </div>
 
+  <!-- ITEM CATEGORY EDITOR (shop's own) -->
+  <div class="icat-overlay" id="icat-editor-overlay">
+    <div class="icat-card">
+      <p class="reason-modal-title" id="icat-editor-title">New category</p>
+      <p class="reason-modal-sub">Pick the items that belong in this category.</p>
+      <input class="icat-input" type="text" id="icat-editor-name" placeholder="Category name (e.g. Starters)" maxlength="30" autocomplete="off">
+      <input class="icat-input" type="text" id="icat-editor-search" placeholder="Search items..." autocomplete="off" oninput="renderItemCatEditorItems()">
+      <div style="display:flex; gap:8px; margin-bottom:6px;">
+        <button type="button" class="icat-mini" onclick="itemCatSelectShown(true)">Select all shown</button>
+        <button type="button" class="icat-mini" onclick="itemCatSelectShown(false)">Clear shown</button>
+      </div>
+      <div id="icat-editor-items" style="max-height:38vh; overflow-y:auto;"></div>
+      <p class="hint-text" id="icat-editor-count" style="margin-top:8px;"></p>
+      <p class="reason-modal-error" id="icat-editor-error"></p>
+      <div class="reason-modal-btns">
+        <button class="btn-danger" type="button" onclick="closeItemCatEditor()">Cancel</button>
+        <button class="btn-primary" type="button" id="icat-editor-save-btn" onclick="saveItemCatEditor()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- LOGIN -->
   <section class="screen active" id="screen-login">
     <div class="header">
@@ -897,6 +952,11 @@
       </button>
     </p>
     <p style="padding:4px 24px 0; margin:0;">
+      <button class="btn-link" id="item-cats-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;" onclick="openItemCategoriesScreen()">
+        🗂️ Set item categories (tabs on your menu) →
+      </button>
+    </p>
+    <p style="padding:4px 24px 0; margin:0;">
       <button class="btn-link" id="indiv-price-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;">
         ✏️ Edit each item's price individually →
       </button>
@@ -942,6 +1002,24 @@
       </div>
     </div>
     <div class="menu-list" id="menu-list"></div>
+  </section>
+
+  <!-- ITEM CATEGORIES (shop's own) -->
+  <section class="screen screen-with-tabs" id="screen-item-categories">
+    <div class="px" style="padding-top:32px;">
+      <button class="btn-back" onclick="showScreen('stock')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+    </div>
+    <div class="header">
+      <p class="eyebrow">STOCK</p>
+      <h1 class="title">Item categories</h1>
+    </div>
+    <p class="hint-text" style="padding:0 24px 12px;">Make a category (e.g. Starters, Biryani, Drinks), tick the items that belong in it and save. Customers see each category as a tab at the top of your menu. Use ▲ ▼ to set the tab order. An item can be in more than one category and still shows under "All".</p>
+    <div style="padding:0 24px 14px;">
+      <button class="add-item-btn" type="button" onclick="openItemCatEditor(null)">➕ New category</button>
+    </div>
+    <div id="icat-list"></div>
   </section>
 
   <!-- ACCOUNT -->
@@ -1481,6 +1559,7 @@
         </div>
         <button class="op-logout-btn" onclick="opLogout()">Logout</button>
       </div>
+      <p class="op-note" id="op-data-usage" style="margin:0 0 10px; display:none;"></p>
       <div class="op-home-grid">
         <div class="op-home-card" onclick="opOpenSection('orders')" style="position:relative;">
           <span class="op-home-badge" id="op-orders-home-badge" style="display:none;"></span>
@@ -1777,6 +1856,13 @@
       <div class="op-search-box">
         <input type="text" id="op-cat-editor-name" placeholder="Category name (e.g. Vegetables)" maxlength="30" autocomplete="off">
       </div>
+      <p class="op-note" style="margin-bottom:6px;">Category photo (shown in the customer app's left category list)</p>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <img id="op-cat-photo-preview" alt="" style="width:64px;height:64px;object-fit:cover;border:1px solid #124a24;background:#020a04;display:none;">
+        <input type="file" id="op-cat-photo-file" accept="image/*" style="display:none" onchange="opCatPhotoPicked(this)">
+        <button type="button" class="op-btn" style="padding:6px 10px; margin-bottom:0;" onclick="document.getElementById('op-cat-photo-file').click()">📷 Choose photo</button>
+        <button type="button" class="op-btn op-btn-danger" id="op-cat-photo-remove" style="padding:6px 10px; margin-bottom:0; display:none;" onclick="opCatPhotoRemove()">Remove</button>
+      </div>
       <p class="op-note" style="margin-bottom:6px;">Select the items in this category</p>
       <div class="op-search-box" style="padding-bottom:6px;">
         <input type="text" id="op-cat-editor-search" placeholder="Search items..." oninput="opRenderCategoryEditorItems()" autocomplete="off">
@@ -1982,6 +2068,39 @@
         <button type="button" class="op-btn op-btn-push" onclick="opSendBroadcastNotification()">📢 Send to all customers</button>
       </div>
       <p class="op-note" id="op-notify-status" style="margin-top:10px;"></p>
+       <hr style="border:0;border-top:1px solid #124a24;margin:26px 0 16px;">
+       <h3 style="color:#33ff66; font-size:14px; margin:0 0 6px;">🖼️ Home screen posters</h3>
+       <p class="op-note">Offer posters shown as a swipeable banner at the top of the customer app's home screen (auto-slides every 4 seconds). Add as many as you like. Best size: 16:9, e.g. 1280×720 — photos are resized automatically. Optional link opens when a customer taps that poster. Tick Home screen, NESH Mart, or both — you can change it later on each poster.</p>
+       <div style="margin:0 0 10px;">
+         <p class="op-note" style="margin-bottom:6px;">Show new poster(s) on:</p>
+         <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-home" checked> 🏠 Home screen</label>
+         <label style="color:#33ff66;font-size:.85rem;"><input type="checkbox" id="op-poster-t-mart" checked> 🛍️ NESH Mart</label>
+       </div>
+       <div style="margin:0 0 10px;">
+         <p class="op-note" style="margin-bottom:6px;">Open a home card or a shop when tapped? <span style="color:#1f7a3d;">(optional - pick one)</span></p>
+         <select id="op-poster-shop" style="max-width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"></select>
+       </div>
+       <div style="margin:0 0 10px;">
+         <p class="op-note" style="margin-bottom:6px;">Show in which zone? <span style="color:#1f7a3d;">(none ticked = 🌍 General, shows in every zone)</span></p>
+         <div id="op-poster-zones" style="color:#33ff66;font-size:.85rem;line-height:1.9;">Loading zones...</div>
+       </div>
+       <div style="margin:0 0 10px;">
+         <p class="op-note" style="margin-bottom:6px;">Show for how long:</p>
+         <select id="op-poster-dur" onchange="opDurChange(this)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+           <option value="0">No time limit</option><option value="6">6 hours</option><option value="12">12 hours</option>
+           <option value="24" selected>24 hours</option><option value="48">2 days</option><option value="72">3 days</option>
+           <option value="168">7 days</option><option value="custom">Custom hours…</option>
+         </select>
+         <input type="number" id="op-poster-dur-custom" min="1" max="8760" placeholder="hours" style="display:none;width:90px;margin-left:8px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+       </div>
+       <input type="file" id="op-poster-file" accept="image/*" multiple style="display:none" onchange="opPosterUpload(this)">
+       <button type="button" class="op-btn op-btn-push" onclick="document.getElementById('op-poster-file').click()">＋ Add poster photo(s)</button>
+       <div style="margin-top:10px;">
+         <label style="color:#33ff66;font-size:.8rem;"><input type="checkbox" id="op-poster-autodel" checked onchange="opAutoDelSet(this)"> 🗑 Auto-delete expired posters + notification photos after 24h (also from Cloudinary)</label>
+         <button type="button" class="op-btn op-btn-danger" style="margin-left:8px;" onclick="opCleanupAll()">Delete expired now</button>
+       </div>
+       <p class="op-note" id="op-poster-status" style="margin-top:10px;"></p>
+       <div id="op-poster-list"></div>
     </div>
   </div>
 
@@ -2409,6 +2528,7 @@
       </div>
       <div style="margin-top:14px;">
         <p class="op-note" style="margin-bottom:6px;">Shop photo — shown on this shop's card in the customer app list.</p>
+        <button type="button" class="op-btn" id="op-pm-shop-photo-show-btn" style="display:none;" onclick="opShowShopPhoto()">👁️ Show shop photo</button>
         <img id="op-pm-shop-photo-preview" style="display:none; width:100%; max-height:160px; object-fit:cover; border-radius:10px; margin-bottom:8px;" />
         <input type="file" id="op-pm-shop-photo-input" accept="image/*" style="display:none;" onchange="handleOpShopPhotoSelect(event)" />
         <button type="button" class="op-btn op-btn-push" id="op-pm-shop-photo-btn" onclick="document.getElementById('op-pm-shop-photo-input').click()">📷 Upload shop photo</button>
@@ -2699,7 +2819,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, onValue, push, set, get, update, remove, goOffline, goOnline } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getDatabase, ref, onValue, push, set, get, update, remove, goOffline, goOnline, query, orderByKey, startAt, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCrM5wKwsnGtIc7HSTk_5R1d3dXEcYyd7o",
@@ -2713,7 +2833,7 @@
 
   const fbApp = initializeApp(firebaseConfig);
   const db = getDatabase(fbApp);
-  window.fb = { db, ref, onValue, push, set, get, update, remove };
+  window.fb = { db, ref, onValue, push, set, get, update, remove, query, orderByKey, startAt, runTransaction };
 
   // ---------- Reliable reconnect after the app is minimized ----------
   // Mobile browsers/PWAs freeze the RTDB websocket while the app is in the
@@ -2906,7 +3026,7 @@ function showScreen(id) {
   }
 
   const tabBar = document.getElementById('bottom-tab-bar');
-  const tabScreens = { home: 'tab-shop-details', stock: 'tab-stock', 'item-form': 'tab-stock', account: 'tab-account', zone: 'tab-account', 'delivery-charges': 'tab-account', 'delivery-earnings': 'tab-account', 'daily-earnings': 'tab-account', due: 'tab-account' };
+  const tabScreens = { home: 'tab-shop-details', stock: 'tab-stock', 'item-form': 'tab-stock', 'item-categories': 'tab-stock', account: 'tab-account', zone: 'tab-account', 'delivery-charges': 'tab-account', 'delivery-earnings': 'tab-account', 'daily-earnings': 'tab-account', due: 'tab-account' };
   if (id in tabScreens) {
     tabBar.classList.add('show');
     document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
@@ -3699,11 +3819,14 @@ function logInRestaurant(id, data) {
   if (!state.listenersAttached) {
     state.listenersAttached = true;
     listenMenu();
-    listenOrdersBadge();
-    listenPaymentPending();
-    listenDueAmount();
-    listenDeliveryEarnings();
-    listenDailyEarnings();
+    listenItemCategories();
+    initOrdersWindow().finally(() => {
+      listenOrdersBadge();
+      listenPaymentPending();
+      listenDueAmount();
+      listenDeliveryEarnings();
+      listenDailyEarnings();
+    });
     listenPartnerSupportMessages();
     registerForOrderPushNotifications();
     checkAndShowAppVideo('shopAppVideo', 'nesh_shop_video_seen');
@@ -4209,6 +4332,13 @@ async function opHandleNotifyImageUpload(e) {
     preview.src = url;
     preview.style.display = 'block';
     status.textContent = '✅ Uploaded';
+    // remember it so it can be deleted from Cloudinary 24h later (see opCleanupNotifImages)
+    window.opNotifImgId = null; window.opNotifImgUrl = url;
+    try {
+      const fb = window.fb, nref = fb.push(fb.ref(fb.db, 'notif_images'));
+      await fb.set(nref, { img: url, ts: Date.now(), expiresAt: Date.now() + 24 * 3600000 });
+      window.opNotifImgId = nref.key;
+    } catch (e2) {}
   } catch (err) {
     status.textContent = '❌ Upload failed, try again';
   } finally {
@@ -4428,6 +4558,179 @@ async function doRegister() {
   }
 }
 
+// ---------- ITEM CATEGORIES (the shop's own) ----------
+// Same data the Operator Panel's "Stock Item Categories" edits, so either
+// side can manage it: restaurants/{shopId}/itemCategories/{id} =
+// { name, order, items: { itemId: true } }. The customer app shows each
+// one as a tab at the top of this shop's menu.
+let itemCats = [];            // [{ id, name, order, itemIds }]
+let itemCatEditingId = null;  // null while creating a new category
+let itemCatPick = new Set();  // item ids ticked in the editor
+let itemCatShown = [];        // items currently listed in the editor (after search)
+
+function listenItemCategories() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'restaurants/' + state.restId + '/itemCategories'), snap => {
+    const list = [];
+    snap.forEach(child => {
+      const v = child.val() || {};
+      list.push({ id: child.key, name: v.name || '(unnamed)', order: Number(v.order) || 0, itemIds: Object.keys(v.items || {}) });
+    });
+    list.sort((a, b) => (a.order - b.order) || a.name.localeCompare(b.name));
+    itemCats = list;
+    const sec = document.getElementById('screen-item-categories');
+    if (sec && sec.classList.contains('active')) renderItemCats();
+  }, (err) => {
+    console.error('listenItemCategories onValue error:', err);
+  });
+}
+
+function openItemCategoriesScreen() {
+  showScreen('item-categories');
+  renderItemCats();
+}
+
+function renderItemCats() {
+  const wrap = document.getElementById('icat-list');
+  if (!wrap) return;
+  if (!itemCats.length) {
+    wrap.innerHTML = '<p class="hint-text" style="padding:0 24px;">No categories yet. Tap "New category" to make one.</p>';
+    return;
+  }
+  const byId = new Map((state.menuItems || []).map(it => [it.id, it]));
+  wrap.innerHTML = itemCats.map((c, i) => {
+    const items = c.itemIds.map(id => byId.get(id)).filter(Boolean);
+    const names = items.slice(0, 6).map(it => it.name || '(unnamed)');
+    const more = items.length > 6 ? ' +' + (items.length - 6) + ' more' : '';
+    return `
+      <div class="icat-item">
+        <div class="icat-item-top">
+          <span class="icat-item-name">${escapeHtml(c.name)}</span>
+          <span class="icat-item-sub" style="margin:0;">${items.length} item${items.length === 1 ? '' : 's'}</span>
+        </div>
+        <div class="icat-item-sub">${items.length ? escapeHtml(names.join(', ')) + more : 'No items found — edit to pick items'}</div>
+        <button type="button" class="icat-mini" onclick="moveItemCat('${c.id}', -1)" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button type="button" class="icat-mini" onclick="moveItemCat('${c.id}', 1)" ${i === itemCats.length - 1 ? 'disabled' : ''}>▼</button>
+        <button type="button" class="icat-mini edit" onclick="openItemCatEditor('${c.id}')">✏️ Edit</button>
+        <button type="button" class="icat-mini del" onclick="deleteItemCat('${c.id}')">🗑️ Delete</button>
+      </div>`;
+  }).join('');
+}
+
+function openItemCatEditor(id) {
+  const c = id ? itemCats.find(x => x.id === id) : null;
+  if (id && !c) return;
+  if (!(state.menuItems || []).length) { showToast('Add some stock items first'); return; }
+  itemCatEditingId = c ? c.id : null;
+  itemCatPick = new Set(c ? c.itemIds : []);
+  document.getElementById('icat-editor-title').textContent = c ? 'Edit category' : 'New category';
+  document.getElementById('icat-editor-name').value = c ? c.name : '';
+  document.getElementById('icat-editor-search').value = '';
+  const err = document.getElementById('icat-editor-error');
+  err.style.display = 'none'; err.textContent = '';
+  renderItemCatEditorItems();
+  document.getElementById('icat-editor-overlay').classList.add('show');
+}
+function closeItemCatEditor() {
+  document.getElementById('icat-editor-overlay').classList.remove('show');
+}
+function renderItemCatEditorItems() {
+  const wrap = document.getElementById('icat-editor-items');
+  const q = (document.getElementById('icat-editor-search').value || '').trim().toLowerCase();
+  const all = (state.menuItems || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+  itemCatShown = all.filter(it => !q || String(it.name || '').toLowerCase().includes(q));
+  if (!itemCatShown.length) {
+    wrap.innerHTML = '<p class="hint-text" style="padding:8px 0;">No items match your search.</p>';
+  } else {
+    wrap.innerHTML = itemCatShown.map((it, i) => {
+      const others = itemCats.filter(c => c.id !== itemCatEditingId && c.itemIds.includes(it.id)).map(c => c.name);
+      return `
+        <label class="icat-row">
+          <input type="checkbox" ${itemCatPick.has(it.id) ? 'checked' : ''} onchange="toggleItemCatItem(${i}, this.checked)">
+          <span>${escapeHtml(it.name || '(unnamed)')}${others.length ? `<small>Also in: ${escapeHtml(others.join(', '))}</small>` : ''}</span>
+        </label>`;
+    }).join('');
+  }
+  updateItemCatCount();
+}
+function toggleItemCatItem(i, on) {
+  const it = itemCatShown[i];
+  if (!it) return;
+  if (on) itemCatPick.add(it.id); else itemCatPick.delete(it.id);
+  updateItemCatCount();
+}
+function itemCatSelectShown(on) {
+  itemCatShown.forEach(it => { if (on) itemCatPick.add(it.id); else itemCatPick.delete(it.id); });
+  renderItemCatEditorItems();
+}
+function updateItemCatCount() {
+  const valid = new Set((state.menuItems || []).map(it => it.id));
+  let n = 0;
+  itemCatPick.forEach(id => { if (valid.has(id)) n++; });
+  document.getElementById('icat-editor-count').textContent = n + ' item' + (n === 1 ? '' : 's') + ' selected';
+}
+async function saveItemCatEditor() {
+  const err = document.getElementById('icat-editor-error');
+  const say = (msg) => { err.style.display = 'block'; err.textContent = msg; };
+  const btn = document.getElementById('icat-editor-save-btn');
+  const name = document.getElementById('icat-editor-name').value.trim();
+  if (!name) { say('Enter a category name.'); return; }
+  if (itemCats.some(c => c.id !== itemCatEditingId && c.name.trim().toLowerCase() === name.toLowerCase())) {
+    say('A category with this name already exists.'); return;
+  }
+  const valid = new Set((state.menuItems || []).map(it => it.id));
+  const itemsObj = {};
+  let n = 0;
+  itemCatPick.forEach(id => { if (valid.has(id)) { itemsObj[id] = true; n++; } });
+  if (!n) { say('Select at least one item.'); return; }
+  err.style.display = 'none';
+  btn.disabled = true;
+  try {
+    const { db, ref, push, set, update } = window.fb;
+    const base = 'restaurants/' + state.restId + '/itemCategories';
+    if (itemCatEditingId) {
+      await update(ref(db, base + '/' + itemCatEditingId), { name, items: itemsObj });
+    } else {
+      // New categories go to the end of the tab row (order = creation time).
+      await set(push(ref(db, base)), { name, order: Date.now(), items: itemsObj });
+    }
+    closeItemCatEditor();
+    showToast('Category saved — live in the customer app');
+  } catch (e) {
+    say('Failed: ' + (e && e.message ? e.message : 'check your connection and try again.'));
+  } finally {
+    btn.disabled = false;
+  }
+}
+async function moveItemCat(id, dir) {
+  const i = itemCats.findIndex(c => c.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= itemCats.length) return;
+  const arr = itemCats.slice();
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  // Renumber by new position so no two categories ever share an order value.
+  const updates = {};
+  arr.forEach((c, idx) => { updates[c.id + '/order'] = idx + 1; });
+  try {
+    const { db, ref, update } = window.fb;
+    await update(ref(db, 'restaurants/' + state.restId + '/itemCategories'), updates);
+  } catch (e) {
+    showToast("Couldn't reorder — check your connection");
+  }
+}
+async function deleteItemCat(id) {
+  const c = itemCats.find(x => x.id === id);
+  if (!c) return;
+  if (!confirm('Delete the category "' + c.name + '"?\n\nYour items are not touched — only this tab is removed from your menu.')) return;
+  try {
+    const { db, ref, remove } = window.fb;
+    await remove(ref(db, 'restaurants/' + state.restId + '/itemCategories/' + id));
+    showToast('Category deleted');
+  } catch (e) {
+    showToast("Couldn't delete — check your connection");
+  }
+}
+
 // ---------- MENU ----------
 // Reads only this restaurant's own menu path instead of the whole
 // top-level 'restaurants' node. The old code fetched every restaurant's
@@ -4442,6 +4745,8 @@ function listenMenu() {
     const items = Object.keys(menuObj).map(k => ({ id: k, ...menuObj[k] }));
     state.menuItems = items; // cached for photo-name matching in bulk photo upload
     filterMenuBySearch();
+    const icatScreen = document.getElementById('screen-item-categories');
+    if (icatScreen && icatScreen.classList.contains('active')) renderItemCats();
   }, (err) => {
     console.error('listenMenu onValue error:', err);
   });
@@ -5771,9 +6076,107 @@ function notifyOfferCancelled() {
   clearDeliveredNotifications(); // stops the native RingingService too
 }
 
+// ---------- ORDERS WINDOW + ROLLUP (keeps Firebase downloads small) ----------
+// Every shop used to download its WHOLE order history on every app open.
+// Now old, finished orders are folded once into restaurants/{id}/orderRollup
+// (their commission-due and delivery-fee totals) and the live listeners only
+// read orders from `cutoffKey` onwards (order keys are push() ids, so key
+// order = time order and no database index is needed).
+//   total shown = rollup totals + totals of the orders still in the window
+// An order is only folded in once it is in a FINAL status, older than 45 days,
+// and not among the shop's newest 100 orders — so nothing that can still
+// change ever leaves the live window. Any error anywhere falls back to the
+// old behaviour (read everything), so numbers never depend on this working.
+const ORDER_FINAL_STATUSES = ['delivered', 'completed', 'done', 'cancelled', 'rejected'];
+const ORDER_FREEZE_AGE_MS = 45 * 24 * 60 * 60 * 1000;
+const ORDER_KEEP_RECENT = 100;
+const ORDER_FREEZE_MIN = 20;
+function emptyOrdersRollup() { return { cutoffKey: '', cutoffAt: 0, dueGross: 0, dueCount: 0, delTotal: 0, delCount: 0 }; }
+let ordersRollup = emptyOrdersRollup();
+let ordersStartKey = '';
+let ordersCompactTried = false;
+
+function shopOrdersQuery() {
+  const { db, ref, query, orderByKey, startAt } = window.fb;
+  const r = ref(db, 'restaurants/' + state.restId + '/orders');
+  return ordersStartKey ? query(r, orderByKey(), startAt(ordersStartKey)) : r;
+}
+async function initOrdersWindow() {
+  ordersRollup = emptyOrdersRollup(); ordersStartKey = ''; ordersCompactTried = false;
+  try {
+    const { db, ref, get } = window.fb;
+    const v = (await get(ref(db, 'restaurants/' + state.restId + '/orderRollup'))).val();
+    if (v && typeof v.cutoffKey === 'string' && v.cutoffKey) {
+      ordersRollup = {
+        cutoffKey: v.cutoffKey, cutoffAt: Number(v.cutoffAt) || 0,
+        dueGross: Number(v.dueGross) || 0, dueCount: Number(v.dueCount) || 0,
+        delTotal: Number(v.delTotal) || 0, delCount: Number(v.delCount) || 0
+      };
+      ordersStartKey = v.cutoffKey;
+    }
+  } catch (e) {
+    console.error('initOrdersWindow failed, reading full order history:', e);
+    ordersRollup = emptyOrdersRollup(); ordersStartKey = '';
+  }
+}
+// entries = [{ key, o }] oldest first. Returns the totals of the leading run
+// of orders that are safe to fold in, or null when there is not enough to do.
+function computeOrderFreeze(entries, versions, nowMs) {
+  let n = 0;
+  while (n < entries.length) {
+    const o = entries[n].o || {};
+    const st = String(o.status || '').toLowerCase();
+    const at = Number(o.createdAt) || 0;
+    if (!ORDER_FINAL_STATUSES.includes(st) || !at || nowMs - at < ORDER_FREEZE_AGE_MS) break;
+    n++;
+  }
+  n = Math.min(n, entries.length - ORDER_KEEP_RECENT);
+  if (n < ORDER_FREEZE_MIN) return null;
+  let dueGross = 0, dueCount = 0, delTotal = 0, delCount = 0;
+  for (let i = 0; i < n; i++) {
+    const o = entries[i].o || {};
+    const st = String(o.status || '').toLowerCase();
+    if (!DUE_QUALIFYING_STATUSES.includes(st)) continue;
+    const c = neshCommissionForOrder(o, versions);
+    if (c > 0) { dueGross += c; dueCount++; }
+    if (o.deliveryFee) { delTotal += Number(o.deliveryFee) || 0; delCount++; }
+  }
+  return { n, dueGross, dueCount, delTotal, delCount, newKey: entries[n].key, newAt: Number(entries[n].o && entries[n].o.createdAt) || 0 };
+}
+// Runs once per session after the first full orders snapshot. The new rollup
+// only takes effect on the NEXT app open (this session's live window still
+// holds those orders, so changing the in-memory totals now would double count).
+async function maybeCompactOrders(snap) {
+  if (ordersCompactTried) return;
+  ordersCompactTried = true;
+  try {
+    const entries = [];
+    snap.forEach(child => { entries.push({ key: child.key, o: child.val() || {} }); });
+    if (entries.length < ORDER_KEEP_RECENT + ORDER_FREEZE_MIN) return;
+    const { db, ref, get, runTransaction } = window.fb;
+    const base = 'restaurants/' + state.restId;
+    const versions = (await get(ref(db, base + '/commissionHistory'))).val() || [];
+    const f = computeOrderFreeze(entries, versions, Date.now());
+    if (!f) return;
+    const basedOn = ordersRollup.cutoffKey || '';
+    await runTransaction(ref(db, base + '/orderRollup'), cur => {
+      const c = cur || {};
+      if ((c.cutoffKey || '') !== basedOn) return; // another device already folded orders in — abort
+      return {
+        cutoffKey: f.newKey, cutoffAt: f.newAt,
+        dueGross: (Number(c.dueGross) || 0) + f.dueGross, dueCount: (Number(c.dueCount) || 0) + f.dueCount,
+        delTotal: (Number(c.delTotal) || 0) + f.delTotal, delCount: (Number(c.delCount) || 0) + f.delCount,
+        updatedAt: Date.now()
+      };
+    });
+  } catch (e) {
+    console.error('maybeCompactOrders failed (harmless, will retry next session):', e);
+  }
+}
+
 function listenOrdersBadge() {
   const { db, ref, onValue } = window.fb;
-  onValue(ref(db, 'restaurants/' + state.restId + '/orders'), snap => {
+  onValue(shopOrdersQuery(), snap => {
     const pendingList = [];
     const inProgressList = [];
     let openOrder = null;
@@ -5845,7 +6248,12 @@ function renderDueUI() {
   const histEl = document.getElementById('due-history-list');
   if (histEl) {
     const hist = neshCommissionHistory(dueOrdersList, dueCommissionTiers);
-    histEl.innerHTML = hist.length ? neshHistoryRowsHtml(hist) : '<p class="hint-text">No orders with commission yet.</p>';
+    const earlierRow = ordersRollup.dueCount ? `
+      <div style="background:var(--field-bg); border:1px solid var(--field-border); border-radius:8px; padding:10px 12px; margin-top:8px; font-size:12px; display:flex; justify-content:space-between; gap:10px;">
+        <span>Earlier orders${ordersRollup.cutoffAt ? ' (before ' + new Date(ordersRollup.cutoffAt).toLocaleDateString() + ')' : ''} · ${ordersRollup.dueCount} order${ordersRollup.dueCount === 1 ? '' : 's'}</span>
+        <b>₹${ordersRollup.dueGross}</b>
+      </div>` : '';
+    histEl.innerHTML = (hist.length ? neshHistoryRowsHtml(hist) : (earlierRow ? '' : '<p class="hint-text">No orders with commission yet.</p>')) + earlierRow;
   }
   const listEl = document.getElementById('due-settlements-list');
   if (listEl) {
@@ -5931,7 +6339,7 @@ function neshHistoryRowsHtml(list) {
 let dueOrdersList = [];
 let dueCommissionTiers = [];
 function recomputeDueGross() {
-  let gross = 0, count = 0;
+  let gross = ordersRollup.dueGross, count = ordersRollup.dueCount; // folded-in old orders + live window
   dueOrdersList.forEach(o => {
     const status = (o.status || '').toLowerCase();
     // Due starts accruing the moment the restaurant marks an order "ready".
@@ -5947,11 +6355,12 @@ function recomputeDueGross() {
 
 function listenDueAmount() {
   const { db, ref, onValue } = window.fb;
-  onValue(ref(db, 'restaurants/' + state.restId + '/orders'), snap => {
+  onValue(shopOrdersQuery(), snap => {
     const list = [];
     snap.forEach(child => { list.push(child.val() || {}); }); // braces: a truthy return would stop Firebase's forEach
     dueOrdersList = list;
     recomputeDueGross();
+    maybeCompactOrders(snap);
   });
   onValue(ref(db, 'restaurants/' + state.restId + '/commissionHistory'), snap => {
     dueCommissionTiers = snap.val() || [];
@@ -5971,8 +6380,8 @@ function listenDueAmount() {
 // restaurant's to keep, not owed to the platform.
 function listenDeliveryEarnings() {
   const { db, ref, onValue } = window.fb;
-  onValue(ref(db, 'restaurants/' + state.restId + '/orders'), snap => {
-    let total = 0, count = 0;
+  onValue(shopOrdersQuery(), snap => {
+    let total = ordersRollup.delTotal, count = ordersRollup.delCount; // folded-in old orders + live window
     const withFee = [];
     snap.forEach(child => {
       const o = child.val();
@@ -6049,7 +6458,7 @@ let dailyEarningsOrders = [];
 
 function listenDailyEarnings() {
   const { db, ref, onValue } = window.fb;
-  onValue(ref(db, 'restaurants/' + state.restId + '/orders'), snap => {
+  onValue(shopOrdersQuery(), snap => {
     const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
     const qualifying = dailyEarningsQualifyingStatuses();
     let total = 0, count = 0;
@@ -6120,7 +6529,7 @@ function renderDailyEarningsUI() {
 // has actually checked their own GPay/bank app and seen the credit land.
 function listenPaymentPending() {
   const { db, ref, onValue } = window.fb;
-  onValue(ref(db, 'restaurants/' + state.restId + '/orders'), snap => {
+  onValue(shopOrdersQuery(), snap => {
     const list = [];
     snap.forEach(child => {
       const o = child.val();
@@ -6599,6 +7008,26 @@ function opBeep() {
   } catch (e) {}
 }
 
+// ---- Operator panel: how much data each big listener loaded (display only) ----
+// Measured once per node, from the snapshot the panel already downloaded —
+// it adds no reads. Shows on the operator home so heavy nodes are easy to spot.
+const opDataUsage = {};
+function opMeasure(label, snap) {
+  if (opDataUsage[label] != null) return;
+  opDataUsage[label] = 0; // claim it so this only ever runs once per node
+  setTimeout(() => {
+    try {
+      const v = snap.val();
+      opDataUsage[label] = v == null ? 0 : JSON.stringify(v).length;
+      const fmt = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+      const el = document.getElementById('op-data-usage');
+      if (!el) return;
+      el.style.display = 'block';
+      el.textContent = '📊 Loaded on open: ' + Object.keys(opDataUsage).map(k => k + ' ' + fmt(opDataUsage[k])).join(' · ');
+    } catch (e) {}
+  }, 1500);
+}
+
 function opEnterPanel() {
   opRegisterOperatorPush();
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -6639,6 +7068,7 @@ function opOpenSection(name) {
   if (name === 'drivers') { opPopulateDriversZoneFilter(); opRenderDriversList(); }
   if (name === 'taxi-orders') { opPopulateRidesZoneFilter(); opRenderRidesList(); }
   if (name === 'app-videos') { opLoadAppVideos(); opLoadBusVideos(); }
+  if (name === 'notify') opLoadPosters();
   if (name === 'zones') opRenderZonesList();
   if (name === 'category-order') opRenderCategoryOrder();
   if (name === 'shop-categories') opRenderShopCategoriesList();
@@ -6686,6 +7116,10 @@ function opSendBroadcastNotification() {
     .then(res => res.json().catch(() => ({})))
     .then(() => {
       status.textContent = 'Sent! ✅';
+      if (window.opNotifImgId && image && image === window.opNotifImgUrl) {
+        try { window.fb.update(window.fb.ref(window.fb.db, 'notif_images/' + window.opNotifImgId), { expiresAt: Date.now() + 24 * 3600000, sent: true }); } catch (e3) {}
+      }
+      window.opNotifImgId = null; window.opNotifImgUrl = '';
       titleEl.value = '';
       bodyEl.value = '';
       imageEl.value = '';
@@ -7306,6 +7740,7 @@ function opListenPartners() {
   const { db, ref, onValue, update } = window.fb;
   opListenShopZones();
   onValue(ref(db, 'restaurants'), snap => {
+    try { opMeasure('restaurants', snap); } catch (e) {}
     const list = [];
     snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
     opAllPartners = list;
@@ -7985,6 +8420,33 @@ let opCatEditingId = null; // null while creating a new category
 let opCatPickSet = new Set(); // item keys ticked in the editor
 let opCatEditorGroups = []; // [{ key, name, unit }] — what the editor is currently listing
 
+let opCatPhoto = ''; // compressed data-URL of the category photo being edited ('' = none)
+function opCatPhotoSync() {
+  const img = document.getElementById('op-cat-photo-preview'), rm = document.getElementById('op-cat-photo-remove');
+  if (!img) return;
+  if (opCatPhoto) { img.src = opCatPhoto; img.style.display = 'block'; rm.style.display = ''; }
+  else { img.removeAttribute('src'); img.style.display = 'none'; rm.style.display = 'none'; }
+}
+function opCatPhotoRemove() { opCatPhoto = ''; opCatPhotoSync(); }
+function opCatPhotoPicked(input) {
+  const f = input.files && input.files[0]; input.value = '';
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    const im = new Image();
+    im.onload = () => {
+      const S = 160, cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+      const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, S, S);
+      const m = Math.min(im.width, im.height), sx = (im.width - m) / 2, sy = (im.height - m) / 2;
+      cx.drawImage(im, sx, sy, m, m, 0, 0, S, S); // centre-crop to a square
+      opCatPhoto = cv.toDataURL('image/jpeg', 0.82);
+      opCatPhotoSync();
+    };
+    im.src = r.result;
+  };
+  r.readAsDataURL(f);
+}
+
 function opNeshItemKey(g) { return (g.name || '').trim().toLowerCase() + '|' + (g.unit || 'piece'); }
 
 function opListenNeshCategories() {
@@ -7993,7 +8455,7 @@ function opListenNeshCategories() {
     const list = [];
     snap.forEach(child => {
       const v = child.val() || {};
-      list.push({ id: child.key, name: v.name || '(unnamed)', order: Number(v.order) || 0, itemKeys: Object.values(v.items || {}) });
+      list.push({ id: child.key, name: v.name || '(unnamed)', order: Number(v.order) || 0, image: v.image || '', itemKeys: Object.values(v.items || {}) });
     });
     list.sort((a, b) => (a.order - b.order) || a.name.localeCompare(b.name));
     opNeshCategories = list;
@@ -8018,7 +8480,7 @@ function opRenderNeshCategories() {
     return `
       <div class="op-partner-item" style="cursor:default;">
         <div class="op-partner-top">
-          <span class="op-partner-name">${escapeHtml(c.name)}</span>
+          <span class="op-partner-name">${c.image ? `<img src="${c.image}" alt="" style="width:34px;height:34px;object-fit:cover;vertical-align:middle;margin-right:8px;border:1px solid #124a24;">` : ''}${escapeHtml(c.name)}</span>
           <span class="op-partner-sub">${items.length} item${items.length === 1 ? '' : 's'}</span>
         </div>
         <div class="op-partner-sub" style="margin:6px 0 10px;">${items.length ? escapeHtml(names.join(', ')) + more : 'No items found — edit to pick items'}</div>
@@ -8037,6 +8499,8 @@ function opOpenCategoryEditor(id) {
   opCatPickSet = new Set(c ? c.itemKeys : []);
   document.getElementById('op-cat-editor-title').textContent = c ? 'Edit category' : 'New category';
   document.getElementById('op-cat-editor-name').value = c ? c.name : '';
+  opCatPhoto = c ? (c.image || '') : '';
+  opCatPhotoSync();
   document.getElementById('op-cat-editor-search').value = '';
   const st = document.getElementById('op-cat-editor-status');
   st.style.display = 'none'; st.textContent = '';
@@ -8107,10 +8571,10 @@ async function opSaveCategoryEditor() {
   try {
     const { db, ref, push, set, update } = window.fb;
     if (opCatEditingId) {
-      await update(ref(db, 'app_config/neshStoreCategories/' + opCatEditingId), { name, items: keys });
+      await update(ref(db, 'app_config/neshStoreCategories/' + opCatEditingId), { name, items: keys, image: opCatPhoto || null });
     } else {
       // New categories go to the end of the tab row (order = creation time).
-      await set(push(ref(db, 'app_config/neshStoreCategories')), { name, order: Date.now(), items: keys });
+      await set(push(ref(db, 'app_config/neshStoreCategories')), Object.assign({ name, order: Date.now(), items: keys }, opCatPhoto ? { image: opCatPhoto } : {}));
     }
     document.getElementById('op-category-editor-modal').classList.remove('show');
     showToast('Category saved — live in the customer app');
@@ -9631,6 +10095,7 @@ function opToggleBusFeature() {
 function opListenBuses() {
   const { db, ref, onValue } = window.fb;
   onValue(ref(db, 'buses'), snap => {
+    try { opMeasure('buses', snap); } catch (e) {}
     const list = [];
     snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
     list.sort((a, b) => (a.name || a._id).localeCompare(b.name || b._id));
@@ -9941,6 +10406,7 @@ let opCurrentDriverId = null;
 function opListenDrivers() {
   const { db, ref, onValue } = window.fb;
   onValue(ref(db, 'taxi_drivers'), snap => {
+    try { opMeasure('taxi_drivers', snap); } catch (e) {}
     const list = [];
     snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
     opAllDrivers = list;
@@ -10226,6 +10692,7 @@ let opAllRides = [];
 function opListenRides() {
   const { db, ref, onValue } = window.fb;
   onValue(ref(db, 'rides'), snap => {
+    try { opMeasure('rides', snap); } catch (e) {}
     const list = [];
     snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
     opAllRides = list;
@@ -11345,16 +11812,29 @@ function opSaveShopCategory() {
 // field the shop's own "Restaurant photo" uploader writes to — same
 // Cloudinary resize/upload helpers, just pointed at whichever shop the
 // operator currently has open in the partner detail modal). ----
-function opRenderShopPhoto(url) {
+let opShopPhotoUrl = '';
+// The photo is NOT fetched when a shop's detail opens. Only a "Show shop
+// photo" button appears; the image loads when the operator taps it.
+// `show` forces it on straight away (used right after an upload).
+function opRenderShopPhoto(url, show) {
   const preview = document.getElementById('op-pm-shop-photo-preview');
+  const showBtn = document.getElementById('op-pm-shop-photo-show-btn');
   const removeBtn = document.getElementById('op-pm-shop-photo-remove-btn');
-  if (url) {
-    preview.src = url; preview.style.display = 'block';
-    removeBtn.style.display = 'inline-block';
-  } else {
-    preview.style.display = 'none';
-    removeBtn.style.display = 'none';
+  opShopPhotoUrl = url || '';
+  if (!url) {
+    preview.removeAttribute('src'); preview.style.display = 'none';
+    showBtn.style.display = 'none'; removeBtn.style.display = 'none';
+    return;
   }
+  removeBtn.style.display = 'inline-block';
+  if (show || String(url).startsWith('data:')) { // data: = local preview, no network
+    preview.src = url; preview.style.display = 'block'; showBtn.style.display = 'none';
+  } else {
+    preview.removeAttribute('src'); preview.style.display = 'none'; showBtn.style.display = 'inline-block';
+  }
+}
+function opShowShopPhoto() {
+  if (opShopPhotoUrl) opRenderShopPhoto(opShopPhotoUrl, true);
 }
 function handleOpShopPhotoSelect(e) {
   const file = e.target.files[0];
@@ -11375,7 +11855,7 @@ function handleOpShopPhotoSelect(e) {
         await update(ref(db, 'restaurants/' + partnerId), { photo: url });
         const p = opAllPartners.find(x => x._id === partnerId);
         if (p) p.photo = url;
-        if (opCurrentPartnerId === partnerId) opRenderShopPhoto(url);
+        if (opCurrentPartnerId === partnerId) opRenderShopPhoto(url, true);
         status.textContent = 'Shop photo updated.';
       } catch (err) {
         status.textContent = "Couldn't upload photo — check your connection and try again.";
@@ -11690,6 +12170,267 @@ function neshDoubleBackExit() {
     }
   });
 })();
+</script>
+<script id="op-posters-js">
+/* ---- Home Posters (operator) -> Firebase RTDB 'banners' node, read by the customer app ---- */
+var opPostersCache = [];
+// Shop picker for "tap poster -> open this shop". Uses the shop list the panel already loads (opAllPartners) - no extra database read.
+// ONE picker for "tap poster -> open ...": either a home card or a shop. Card values are stored as 'card:<id>'.
+var OP_POSTER_CARDS = [['food','🍔 Food'],['groceries','🛒 Groceries'],['online-shop','🛍️ NESH Mart'],['taxi','🚕 Taxi'],['bus','🚌 Bus']];
+function opFillShopSelect(sel, selectedId) {
+  if (!sel) return;
+  var shops = (typeof opAllPartners !== 'undefined' && opAllPartners ? opAllPartners : [])
+    .filter(function (s) { return s.businessType !== 'groceries'; })   // groceries shops are only sold through NESH Store
+    .sort(function (a, b) { return (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id); });
+  sel.innerHTML = '';
+  var none = document.createElement('option'); none.value = ''; none.textContent = '— Nothing (poster just shows) —'; sel.appendChild(none);
+  var found = !selectedId;
+  var gC = document.createElement('optgroup'); gC.label = '🏠 Home cards';
+  OP_POSTER_CARDS.forEach(function (c) {
+    var o = document.createElement('option'); o.value = 'card:' + c[0]; o.textContent = c[1];
+    if (o.value === selectedId) { o.selected = true; found = true; }
+    gC.appendChild(o);
+  });
+  sel.appendChild(gC);
+  var gS = document.createElement('optgroup'); gS.label = '🏪 Shops';
+  shops.forEach(function (s) {
+    var o = document.createElement('option'); o.value = s._id;
+    o.textContent = (s.restaurantName || s._id) + (s.businessType === 'online_shop' ? '  (NESH Mart)' : '');
+    if (s._id === selectedId) { o.selected = true; found = true; }
+    gS.appendChild(o);
+  });
+  sel.appendChild(gS);
+  if (selectedId && !found) { var m = document.createElement('option'); m.value = selectedId; m.textContent = shops.length ? '(shop not found: ' + selectedId + ')' : '(shops still loading - ' + selectedId + ')'; m.selected = true; sel.appendChild(m); }
+}
+// dropdown value -> what is saved on the poster
+function opPosterTarget(v) {
+  v = v || '';
+  if (v.indexOf('card:') === 0) return { shopId: null, cardId: v.slice(5) || null };
+  return { shopId: v || null, cardId: null };
+}
+function opPosterPickValue(b) { return b.cardId ? 'card:' + b.cardId : (b.shopId || ''); }
+function opCardLabel(id) {
+  if (!id) return '';
+  var c = OP_POSTER_CARDS.filter(function (x) { return x[0] === id; })[0];
+  return '🔗 Opens card: ' + (c ? c[1] : id);
+}
+function opShopLabel(id) {
+  if (!id) return '';
+  var s = (typeof opAllPartners !== 'undefined' ? opAllPartners : []).filter(function (x) { return x._id === id; })[0];
+  return '🏪 Opens: ' + (s ? (s.restaurantName || id) : id);
+}
+var opPosterZones = [];   // [{id,name}] from Shop Zones (app_config/shopZones)
+function opLoadZoneNames() {
+  var fb = window.fb;
+  return fb.get(fb.ref(fb.db, 'app_config/shopZones')).then(function (snap) {
+    var v = snap.val() || {};
+    opPosterZones = Object.keys(v).map(function (k) { return { id: k, name: (v[k] && v[k].name) || k }; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name); });
+  }).catch(function () { opPosterZones = []; }).then(opRenderUploadZones);
+}
+function opZoneBoxes(container, attr, selected) {
+  container.innerHTML = '';
+  if (!opPosterZones.length) { container.textContent = 'No shop zones created yet — posters will be General.'; return; }
+  opPosterZones.forEach(function (z) {
+    var l = document.createElement('label'); l.style.cssText = 'display:inline-block;margin-right:14px;';
+    var c = document.createElement('input'); c.type = 'checkbox'; c.setAttribute(attr, z.id); c.checked = selected.indexOf(z.id) > -1;
+    l.appendChild(c); l.appendChild(document.createTextNode(' 📍 ' + z.name)); container.appendChild(l);
+  });
+}
+function opRenderUploadZones() {
+  var box = document.getElementById('op-poster-zones'); if (!box) return;
+  var keep = Array.prototype.map.call(box.querySelectorAll('input:checked'), function (c) { return c.getAttribute('data-uz'); });
+  opZoneBoxes(box, 'data-uz', keep);
+}
+function opPickedZones(container, attr) {
+  return Array.prototype.map.call(container.querySelectorAll('input:checked'), function (c) { return c.getAttribute(attr); });
+}
+function opZonesToObj(ids) { var o = {}; ids.forEach(function (id) { o[id] = true; }); return o; }
+function opZoneLabel(ids) {
+  if (!ids || !ids.length) return '🌍 General (all zones)';
+  return '📍 ' + ids.map(function (id) { var z = opPosterZones.filter(function (x) { return x.id === id; })[0]; return z ? z.name : '(deleted zone)'; }).join(', ');
+}
+/* Cloudinary delete goes through a tiny Cloudflare Worker (keeps the API secret off this page).
+   Paste the worker URL here, e.g. 'https://nesh-poster-delete.YOURNAME.workers.dev'. Empty = Firebase-only delete. */
+window.POSTER_DELETE_ENDPOINT = 'https://poster-delete.raise3715.workers.dev';
+function opAutoDelOn() { try { return localStorage.getItem('op_poster_autodel') !== '0'; } catch (e) { return true; } }
+function opAutoDelSet(cb) { try { localStorage.setItem('op_poster_autodel', cb.checked ? '1' : '0'); } catch (e) {} if (cb.checked) opCleanupExpired(); }
+// Delete one poster: Cloudinary photo (via worker) + Firebase entry. Resolves { ok, cloud } ; ok=false means nothing was removed.
+async function opPosterRemove(b, keepIfCloudFails) {
+  var fb = window.fb, cloud = 'skipped';
+  var isCloud = typeof b.img === 'string' && b.img.indexOf('res.cloudinary.com') > -1;
+  if (isCloud && window.POSTER_DELETE_ENDPOINT) {
+    try {
+      if (!(b.exp && b.exp < Date.now())) await fb.update(fb.ref(fb.db, 'banners/' + b.id), { del: true });   // worker only deletes expired / marked posters
+      var r = await fetch(window.POSTER_DELETE_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bannerId: b.id }) });
+      var j = await r.json().catch(function () { return {}; });
+      cloud = (r.ok && j.ok) ? 'deleted' : 'failed';
+    } catch (e) { cloud = 'failed'; }
+    if (cloud === 'failed' && keepIfCloudFails) { try { await fb.update(fb.ref(fb.db, 'banners/' + b.id), { del: null }); } catch (e) {} return { ok: false, cloud: cloud }; }
+  }
+  await fb.remove(fb.ref(fb.db, 'banners/' + b.id));
+  return { ok: true, cloud: cloud };
+}
+var opCleaning = false;
+// Notification photos: deleted from Cloudinary 24h after sending (worker checks the expiry itself).
+async function opCleanupNotifImages(manual) {
+  var fb = window.fb, msg = document.getElementById('op-notify-image-status');
+  if (!fb || !window.POSTER_DELETE_ENDPOINT) { if (manual && msg) msg.textContent = 'Set POSTER_DELETE_ENDPOINT first (Cloudinary delete worker).'; return; }
+  try {
+    var snap = await fb.get(fb.ref(fb.db, 'notif_images')), v = snap.val() || {}, n = 0, bad = 0;
+    var ids = Object.keys(v).filter(function (k) { return v[k] && v[k].expiresAt && v[k].expiresAt < Date.now(); });
+    for (var i = 0; i < ids.length; i++) {
+      try {
+        var r = await fetch(window.POSTER_DELETE_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'notif', id: ids[i] }) });
+        var j = await r.json().catch(function () { return {}; });
+        if (r.ok && j.ok) { await fb.remove(fb.ref(fb.db, 'notif_images/' + ids[i])); n++; } else bad++;
+      } catch (e) { bad++; }
+    }
+    if (msg && (n || bad || manual)) msg.textContent = n + ' old notification photo(s) deleted from Cloudinary' + (bad ? ' (' + bad + ' failed - will retry)' : '') + '.';
+  } catch (e) { if (manual && msg) msg.textContent = 'Could not check notification photos.'; }
+}
+function opCleanupAll() { opCleanupExpired(true); opCleanupNotifImages(true); }
+async function opCleanupExpired(manual) {
+  if (opCleaning || !window.fb) return; opCleaning = true;
+  try {
+    var ex = opPostersCache.filter(function (b) { return b.exp && b.exp < Date.now(); });
+    if (!ex.length) { if (manual) opPosterMsg('No expired posters.'); return; }
+    var n = 0, cf = 0;
+    for (var i = 0; i < ex.length; i++) {
+      opPosterMsg('Deleting expired ' + (i + 1) + '/' + ex.length + '...');
+      var r = await opPosterRemove(ex[i], true);
+      if (r.ok) n++; if (r.cloud === 'failed') cf++;
+    }
+    opPosterMsg(n + ' expired poster(s) deleted' + (window.POSTER_DELETE_ENDPOINT ? (cf ? ' (' + cf + ' Cloudinary delete failed - will retry)' : ' from Firebase + Cloudinary') : ' from Firebase (Cloudinary photos stay - delete endpoint not set)') + '.');
+    opLoadPosters(true);
+  } finally { opCleaning = false; }
+}
+function opDurChange(sel) { document.getElementById('op-poster-dur-custom').style.display = sel.value === 'custom' ? '' : 'none'; }
+// hours -> absolute expiry time (ms). 0 = no limit. null = invalid custom value.
+function opDurToExpiry(val, custom) {
+  var h = val === 'custom' ? parseFloat(custom) : parseFloat(val);
+  if (val === 'custom' && !(h >= 1)) return null;
+  return h > 0 ? Date.now() + Math.round(h * 3600000) : 0;
+}
+function opPosterStatus(exp) {
+  if (!exp) return '⏱ No time limit';
+  var ms = exp - Date.now();
+  if (ms <= 0) return '⛔ Expired — not showing to customers (pick a new time and Save to show again)';
+  var m = Math.floor(ms / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
+  return '⏳ Shows for ' + (d ? d + 'd ' : '') + (h || !d ? h + 'h ' : '') + (d ? '' : (m % 60) + 'm ') + 'more';
+}
+function opPosterMsg(t) { var e = document.getElementById('op-poster-status'); if (e) e.textContent = t || ''; }
+function opLoadPosters(skipAuto) {
+  opPosterMsg('Loading...');
+  if (!window.fb) { setTimeout(opLoadPosters, 400); return; }
+  var fb = window.fb;
+  opLoadZoneNames().then(function () { return fb.get(fb.ref(fb.db, 'banners')); }).then(function (snap) {
+    var v = snap.val() || {}, a = [];
+    Object.keys(v).forEach(function (k) { if (!v[k] || !v[k].img) return; var t = v[k].targets; a.push({ id: k, img: v[k].img, link: v[k].link || '', ts: v[k].ts || 0, home: t ? !!t.home : true, mart: t ? !!t.mart : false, exp: +v[k].expiresAt || 0, del: !!v[k].del, shopId: v[k].shopId || '', cardId: v[k].cardId || '', zones: Object.keys(v[k].zones || {}).filter(function (z) { return v[k].zones[z]; }) }); });
+    opPostersCache = a.sort(function (x, y) { return x.ts - y.ts; });
+    opPosterMsg(a.length ? '' : 'No posters yet.');
+    opFillShopSelect(document.getElementById('op-poster-shop'), document.getElementById('op-poster-shop') ? document.getElementById('op-poster-shop').value : '');
+    opRenderPosters();
+    var cb = document.getElementById('op-poster-autodel'); if (cb) cb.checked = opAutoDelOn();
+    if (skipAuto !== true && opAutoDelOn()) { opCleanupExpired(); opCleanupNotifImages(); }
+  }).catch(function () { opPosterMsg('Could not load - check internet / database rules.'); });
+}
+function opRenderPosters() {
+  var l = document.getElementById('op-poster-list'); l.innerHTML = '';
+  opPostersCache.forEach(function (b, i) {
+    var d = document.createElement('div'); d.className = 'op-partner-item'; d.style.cursor = 'default';
+    d.innerHTML = '<img style="width:100%;max-width:360px;aspect-ratio:16/9;object-fit:cover;border:1px solid #124a24;display:block;margin-bottom:8px;" alt="">' +
+      '<div class="op-search-box" style="padding-bottom:8px;"><input type="url" placeholder="Tap link (optional)"></div>' +
+      '<div style="margin-bottom:8px;"><label style="color:#33ff66;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="home"> 🏠 Home</label>' +
+      '<label style="color:#33ff66;font-size:.8rem;"><input type="checkbox" data-t="mart"> 🛍️ NESH Mart</label></div>' +
+      '<div style="margin-bottom:8px;"><select data-r="shop" style="max-width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:7px;font-family:inherit;font-size:.8rem;"></select></div>' +
+      '<div data-r="zones" style="color:#33ff66;font-size:.8rem;line-height:1.9;margin-bottom:8px;"></div>' +
+      '<p class="op-note" data-r="status" style="margin-bottom:6px;"></p>' +
+      '<div style="margin-bottom:8px;"><select data-r="dur" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:7px;font-family:inherit;font-size:.8rem;">' +
+      '<option value="keep">Keep time as is</option><option value="0">No time limit</option><option value="6">Show 6 hours from now</option><option value="12">Show 12 hours from now</option>' +
+      '<option value="24">Show 24 hours from now</option><option value="48">Show 2 days from now</option><option value="72">Show 3 days from now</option><option value="168">Show 7 days from now</option><option value="custom">Custom hours from now…</option></select> ' +
+      '<input type="number" data-r="custom" min="1" max="8760" placeholder="hours" style="display:none;width:80px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:7px;font-family:inherit;font-size:.8rem;"></div>' +
+      '<button type="button" class="op-btn" data-a="save">Save</button> ' +
+      '<button type="button" class="op-btn" data-a="up">↑</button> <button type="button" class="op-btn" data-a="down">↓</button> ' +
+      '<button type="button" class="op-btn op-btn-danger" data-a="del">Delete</button>';
+    d.querySelector('img').src = b.img;
+    var inp = d.querySelector('input[type=url]'); inp.value = b.link;
+    var cbHome = d.querySelector('[data-t=home]'), cbMart = d.querySelector('[data-t=mart]');
+    cbHome.checked = !!b.home; cbMart.checked = !!b.mart;
+    var durSel = d.querySelector('[data-r=dur]'), durCus = d.querySelector('[data-r=custom]');
+    durSel.onchange = function () { durCus.style.display = durSel.value === 'custom' ? '' : 'none'; };
+    var shopSel = d.querySelector('[data-r=shop]'); opFillShopSelect(shopSel, opPosterPickValue(b));
+    var zBox = d.querySelector('[data-r=zones]'); opZoneBoxes(zBox, 'data-pz', b.zones || []);
+    d.querySelector('[data-r=status]').textContent = opPosterStatus(b.exp) + '  |  ' + opZoneLabel(b.zones) + (b.shopId ? '  |  ' + opShopLabel(b.shopId) : '') + (!b.shopId && b.cardId ? '  |  ' + opCardLabel(b.cardId) : '');
+    var fb = window.fb;
+    d.querySelector('[data-a=save]').onclick = function () {
+      if (!cbHome.checked && !cbMart.checked) { opPosterMsg('Select Home screen or NESH Mart (or both).'); return; }
+      var zIds = opPosterZones.length ? opPickedZones(zBox, 'data-pz') : (b.zones || []);
+      var upd = { link: inp.value.trim(), targets: { home: cbHome.checked, mart: cbMart.checked }, zones: zIds.length ? opZonesToObj(zIds) : null, shopId: opPosterTarget(shopSel.value).shopId, cardId: opPosterTarget(shopSel.value).cardId };
+      if (durSel.value !== 'keep') {
+        var ex = opDurToExpiry(durSel.value, durCus.value);
+        if (ex === null) { opPosterMsg('Enter hours (1 or more).'); return; }
+        upd.expiresAt = ex;
+      }
+      fb.update(fb.ref(fb.db, 'banners/' + b.id), upd).then(function () { opPosterMsg('Saved ✅'); opLoadPosters(); }).catch(function () { opPosterMsg('Save failed.'); });
+    };
+    d.querySelector('[data-a=del]').onclick = function () {
+      if (!confirm('Delete this poster' + (window.POSTER_DELETE_ENDPOINT ? ' (also from Cloudinary)' : '') + '?')) return;
+      opPosterMsg('Deleting...');
+      opPosterRemove(b, false).then(function (r) {
+        opPosterMsg(r.cloud === 'failed' ? 'Poster deleted, but Cloudinary photo could not be deleted.' : 'Poster deleted ✅');
+        opLoadPosters(true);
+      }).catch(function () { opPosterMsg('Delete failed.'); });
+    };
+    function swap(j) {
+      var o = opPostersCache[j]; if (!o) return;
+      Promise.all([
+        fb.update(fb.ref(fb.db, 'banners/' + b.id), { ts: o.ts }),
+        fb.update(fb.ref(fb.db, 'banners/' + o.id), { ts: b.ts })
+      ]).then(opLoadPosters);
+    }
+    d.querySelector('[data-a=up]').onclick = function () { swap(i - 1); };
+    d.querySelector('[data-a=down]').onclick = function () { swap(i + 1); };
+    l.appendChild(d);
+  });
+}
+function opPosterCompress(file) {
+  return new Promise(function (res, rej) {
+    var r = new FileReader(); r.onerror = rej;
+    r.onload = function () {
+      var im = new Image(); im.onerror = rej;
+      im.onload = function () {
+        var sc = Math.min(1, 1280 / im.width), w = Math.round(im.width * sc), h = Math.round(im.height * sc);
+        var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h); cx.drawImage(im, 0, 0, w, h);
+        cv.toBlob(function (b) { b ? res(b) : rej(new Error('compress failed')); }, 'image/jpeg', 0.8);
+      };
+      im.src = r.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+async function opPosterUpload(input) {
+  var files = Array.prototype.slice.call(input.files || []); input.value = '';
+  var fb = window.fb; if (!fb) { opPosterMsg('Not connected yet, try again.'); return; }
+  var tHome = document.getElementById('op-poster-t-home').checked, tMart = document.getElementById('op-poster-t-mart').checked;
+  if (!tHome && !tMart) { opPosterMsg('Select Home screen or NESH Mart (or both) first.'); return; }
+  var upPick = opPosterTarget((document.getElementById('op-poster-shop') || {}).value);
+  var upShop = upPick.shopId, upCard = upPick.cardId;
+  var upZones = opPickedZones(document.getElementById('op-poster-zones'), 'data-uz');
+  var expAt = opDurToExpiry(document.getElementById('op-poster-dur').value, document.getElementById('op-poster-dur-custom').value);
+  if (expAt === null) { opPosterMsg('Enter how many hours to show (1 or more).'); return; }
+  for (var i = 0; i < files.length; i++) {
+    try {
+      opPosterMsg('Uploading ' + (i + 1) + '/' + files.length + '...');
+      var blob = await opPosterCompress(files[i]);
+      var data = await uploadPhotoToCloudinary(blob);   // photo goes to Cloudinary; Firebase stores only the small URL
+      await fb.set(fb.push(fb.ref(fb.db, 'banners')), { img: data, link: '', ts: Date.now() + i, targets: { home: tHome, mart: tMart }, expiresAt: expAt, zones: upZones.length ? opZonesToObj(upZones) : null, shopId: upShop, cardId: upCard });
+    } catch (e) { opPosterMsg('Upload failed - check internet / Cloudinary / database rules.'); return; }
+  }
+  opPosterMsg('Poster added ✅');
+  opLoadPosters();
+}
 </script>
 </body>
 </html>
