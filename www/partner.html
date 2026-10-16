@@ -707,6 +707,40 @@
     </div>
   </div>
 
+  <!-- SUGGESTED ADD-ONS EDITOR (hotel shop picks up to 8 items shown to customers at checkout) -->
+  <div class="icat-overlay" id="sug-editor-overlay">
+    <div class="icat-card">
+      <p class="reason-modal-title">🥤 Suggested add-ons</p>
+      <p class="reason-modal-sub">Pick up to 8 items (drinks, sides, desserts...) to suggest to customers when they place an order. If you pick none, we suggest your drinks automatically.</p>
+      <input class="icat-input" type="text" id="sug-editor-search" placeholder="Search items..." autocomplete="off" oninput="renderSuggestEditorItems()">
+      <div id="sug-editor-items" style="max-height:42vh; overflow-y:auto;"></div>
+      <p class="hint-text" id="sug-editor-count" style="margin-top:8px;"></p>
+      <p class="reason-modal-error" id="sug-editor-error"></p>
+      <div class="reason-modal-btns">
+        <button class="btn-danger" type="button" onclick="closeSuggestEditor()">Cancel</button>
+        <button class="icat-mini" type="button" onclick="clearSuggestPick()">Use default</button>
+        <button class="btn-primary" type="button" id="sug-editor-save-btn" onclick="saveSuggestEditor()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- POPULAR PRODUCTS EDITOR (shop picks up to 5) -->
+  <div class="icat-overlay" id="pop-editor-overlay">
+    <div class="icat-card">
+      <p class="reason-modal-title">⭐ Popular products</p>
+      <p class="reason-modal-sub">Pick up to 5 items to show in the customer app's "Popular products". If you pick none, we show your first 5 items automatically.</p>
+      <input class="icat-input" type="text" id="pop-editor-search" placeholder="Search items..." autocomplete="off" oninput="renderPopularEditorItems()">
+      <div id="pop-editor-items" style="max-height:42vh; overflow-y:auto;"></div>
+      <p class="hint-text" id="pop-editor-count" style="margin-top:8px;"></p>
+      <p class="reason-modal-error" id="pop-editor-error"></p>
+      <div class="reason-modal-btns">
+        <button class="btn-danger" type="button" onclick="closePopularEditor()">Cancel</button>
+        <button class="icat-mini" type="button" onclick="clearPopularPick()">Use default</button>
+        <button class="btn-primary" type="button" id="pop-editor-save-btn" onclick="savePopularEditor()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- LOGIN -->
   <section class="screen active" id="screen-login">
     <div class="header">
@@ -950,6 +984,18 @@
       <button class="btn-link" id="bulk-stock-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;">
         📦 Mark several items in/out of stock at once →
       </button>
+    </p>
+    <p style="padding:4px 24px 0; margin:0; display:none;" id="popular-items-wrap">
+      <button class="btn-link" id="popular-items-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;" onclick="openPopularEditor()">
+        ⭐ Choose popular products (max 5) →
+      </button>
+      <span id="popular-items-sub" style="display:block; font-size:11px; color:#6E8CAE; margin-top:2px;"></span>
+    </p>
+    <p style="padding:4px 24px 0; margin:0; display:none;" id="suggest-items-wrap">
+      <button class="btn-link" id="suggest-items-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;" onclick="openSuggestEditor()">
+        🥤 Choose suggested add-ons for customers (max 8) →
+      </button>
+      <span id="suggest-items-sub" style="display:block; font-size:11px; color:#6E8CAE; margin-top:2px;"></span>
     </p>
     <p style="padding:4px 24px 0; margin:0;">
       <button class="btn-link" id="item-cats-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;" onclick="openItemCategoriesScreen()">
@@ -1702,6 +1748,11 @@
           <h3>Account Deletions</h3>
           <p>Customer requests to delete their account and personal data (from the app's delete-account page)</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('visits')">
+          <div class="op-home-icon">👥</div>
+          <h3>Visits</h3>
+          <p>Daily customer app visits (one per device per day)</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('notify')">
           <div class="op-home-icon">📢</div>
           <h3>Send Notification</h3>
@@ -2047,6 +2098,22 @@
     </div>
   </div>
 
+  <!-- VISITS (customer app daily visit counts) -->
+  <div class="op-section" id="op-section-visits">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Visits</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">One device = one visit per day, however many times the customer opens the app. Shows the last 30 days.</p>
+      <div id="op-visits-summary" style="margin-bottom:14px;"></div>
+      <button class="op-btn" onclick="opLoadVisits()">Refresh</button>
+      <div id="op-visitors-box" style="margin:10px 0 16px;"></div>
+      <p class="op-note">Tap a day to see who visited (name + phone if they were logged in).</p>
+      <div id="op-visits-list"></div>
+    </div>
+  </div>
+
   <!-- SEND NOTIFICATION (broadcast to every customer) -->
   <div class="op-section" id="op-section-notify">
     <div class="op-section-header">
@@ -2070,11 +2137,14 @@
       <p class="op-note" id="op-notify-status" style="margin-top:10px;"></p>
        <hr style="border:0;border-top:1px solid #124a24;margin:26px 0 16px;">
        <h3 style="color:#33ff66; font-size:14px; margin:0 0 6px;">🖼️ Home screen posters</h3>
-       <p class="op-note">Offer posters shown as a swipeable banner at the top of the customer app's home screen (auto-slides every 4 seconds). Add as many as you like. Best size: 16:9, e.g. 1280×720 — photos are resized automatically. Optional link opens when a customer taps that poster. Tick Home screen, NESH Mart, or both — you can change it later on each poster.</p>
+       <p class="op-note">Offer posters shown as a swipeable banner at the top of the customer app's home screen (auto-slides every 4 seconds). Add as many as you like. Best size: 16:9, e.g. 1280×720 — photos are resized automatically. Optional link opens when a customer taps that poster. Tick Home screen, NESH Mart, Food, or any combination — you can change it later on each poster.</p>
        <div style="margin:0 0 10px;">
          <p class="op-note" style="margin-bottom:6px;">Show new poster(s) on:</p>
          <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-home" checked> 🏠 Home screen</label>
-         <label style="color:#33ff66;font-size:.85rem;"><input type="checkbox" id="op-poster-t-mart" checked> 🛍️ NESH Mart</label>
+         <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-mart" checked> 🛍️ NESH Mart</label>
+         <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-food" checked> 🍔 Food</label>
+         <label style="color:#33ff66;font-size:.85rem;"><input type="checkbox" id="op-poster-t-popup"> 📣 NESH Mart popup</label>
+         <p class="op-note" style="margin:6px 0 0;">📣 Popup = shows over the NESH Mart screen like Spotify's offer card, closes by itself after 4 seconds (✕ also works), and each customer sees it only once. Poster keeps its own shape - any size works. Untick the other boxes if it should be a popup only.</p>
        </div>
        <div style="margin:0 0 10px;">
          <p class="op-note" style="margin-bottom:6px;">Open a home card or a shop when tapped? <span style="color:#1f7a3d;">(optional - pick one)</span></p>
@@ -2095,6 +2165,9 @@
        </div>
        <input type="file" id="op-poster-file" accept="image/*" multiple style="display:none" onchange="opPosterUpload(this)">
        <button type="button" class="op-btn op-btn-push" onclick="document.getElementById('op-poster-file').click()">＋ Add poster photo(s)</button>
+       <input type="file" id="op-poster-video-file" accept="video/*" multiple style="display:none" onchange="opPosterVideoUpload(this)">
+       <button type="button" class="op-btn op-btn-push" onclick="document.getElementById('op-poster-video-file').click()">🎬 Add poster video(s)</button>
+       <p class="op-note" style="margin-top:6px;">Video posters play (muted) in the customer app; when the video finishes, the slider moves to the next poster automatically. Keep videos short (under 30 sec, max 90 MB).</p>
        <div style="margin-top:10px;">
          <label style="color:#33ff66;font-size:.8rem;"><input type="checkbox" id="op-poster-autodel" checked onchange="opAutoDelSet(this)"> 🗑 Auto-delete expired posters + notification photos after 24h (also from Cloudinary)</label>
          <button type="button" class="op-btn op-btn-danger" style="margin-left:8px;" onclick="opCleanupAll()">Delete expired now</button>
@@ -2186,6 +2259,7 @@
       <h2>Restaurant Partners</h2>
     </div>
     <div class="op-section-body">
+      <div style="margin-bottom:12px;"><button type="button" class="op-btn op-btn-push" onclick="opOpenAddShop()">➕ Add shop</button></div>
       <div class="op-search-box"><input type="text" id="op-partners-search" placeholder="Search restaurants..." oninput="opRenderPartnersList()"></div>
       <div class="op-search-box"><select id="op-partners-area-filter" onchange="opRenderPartnersList()" style="width:100%; padding:9px 10px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-size:.85rem; font-family:inherit;"><option value="">All areas</option></select></div>
       <div id="op-partners-list"></div>
@@ -2639,6 +2713,38 @@
         <button type="button" class="op-btn" onclick="opOpenChatWith(opCurrentPartnerId); document.getElementById('op-partner-modal').classList.remove('show'); opOpenSection('support');">💬 Chat</button>
         <button type="button" class="op-btn op-btn-danger" onclick="opDeletePartner()">🗑 Delete Account</button>
         <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-partner-modal').classList.remove('show')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add shop (operator creates a shop account directly — already approved) -->
+  <div class="op-modal-overlay" id="op-addshop-modal">
+    <div class="op-modal-card" style="max-height:92vh; overflow-y:auto;">
+      <h3>Add shop</h3>
+      <p class="op-note" style="margin-bottom:10px;">Creates the shop account right away — no approval step. Give the username and password to the shop owner so they can log in.</p>
+      <div class="op-search-box" style="padding-bottom:8px;">
+        <select id="op-as-type" onchange="opAddShopTypeChange()" style="width:100%; padding:9px 10px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-size:.85rem; font-family:inherit;">
+          <option value="hotel">Hotel / Restaurant</option>
+          <option value="groceries">Groceries</option>
+          <option value="online_shop">Other Shop (NESH Mart)</option>
+        </select>
+      </div>
+      <div class="op-search-box" id="op-as-category-wrap" style="padding-bottom:8px; display:none;">
+        <input type="text" id="op-as-category" list="shop-category-suggestions" placeholder="Shop category e.g. Mobile Shop, Sports" maxlength="24">
+      </div>
+      <div class="op-search-box" style="padding-bottom:8px;"><input type="text" id="op-as-name" placeholder="Shop name" autocomplete="off"></div>
+      <div class="op-search-box" style="padding-bottom:8px;"><input type="text" id="op-as-address" placeholder="Address" autocomplete="off"></div>
+      <div class="op-search-box" style="padding-bottom:8px; display:flex; gap:8px;">
+        <input type="text" id="op-as-location" placeholder="Location (lat, lng)" autocomplete="off" style="flex:1;">
+        <button type="button" class="op-btn" id="op-as-gps-btn" style="margin:0;" onclick="opAddShopGps()">📍 GPS</button>
+      </div>
+      <div class="op-search-box" style="padding-bottom:8px;"><input type="text" id="op-as-gst" placeholder="GST number (optional)" autocomplete="off"></div>
+      <div class="op-search-box" style="padding-bottom:8px;"><input type="text" id="op-as-username" placeholder="Username (shop login)" autocomplete="off" autocapitalize="off"></div>
+      <div class="op-search-box" style="padding-bottom:8px;"><input type="text" id="op-as-password" placeholder="Password" autocomplete="off"></div>
+      <p class="op-note" id="op-as-status" style="min-height:1em;"></p>
+      <div style="margin-top:6px;">
+        <button type="button" class="op-btn op-btn-push" id="op-as-create-btn" onclick="opCreateShop()">✅ Create shop</button>
+        <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-addshop-modal').classList.remove('show')">Cancel</button>
       </div>
     </div>
   </div>
@@ -3751,6 +3857,7 @@ function logInRestaurant(id, data) {
   updateLocationBadge(data.location || "");
   document.getElementById('account-type-badge').textContent = data.businessType === 'groceries' ? 'Groceries' : data.businessType === 'online_shop' ? 'Other Shop' : 'Hotel';
   document.getElementById('account-details-title').textContent = bizNoun(data.businessType) + ' details';
+  if (typeof updatePopularSub === 'function') updatePopularSub();
   document.getElementById('rest-id-label-text').textContent = bizNoun(data.businessType) + ' ID (for auto-payment setup)';
   renderRestPhoto(data.photo || "");
   document.getElementById('gpay-number').value = data.gpayNumber || "";
@@ -3820,6 +3927,8 @@ function logInRestaurant(id, data) {
     state.listenersAttached = true;
     listenMenu();
     listenItemCategories();
+    listenPopularItems();
+    listenSuggestItems();
     initOrdersWindow().finally(() => {
       listenOrdersBadge();
       listenPaymentPending();
@@ -4731,6 +4840,205 @@ async function deleteItemCat(id) {
   }
 }
 
+// ---------- POPULAR PRODUCTS (the shop's own pick, max 5) ----------
+// restaurants/{shopId}/popularItems = { itemId: rank } (rank 1..5). The customer
+// app (NESH Mart -> "Popular products") shows exactly these. If nothing is set
+// (or none of them is available any more) it falls back to the shop's first 5 items.
+const POPULAR_MAX = 5;
+let popularIds = [];            // saved order
+let popularPick = [];           // ids ticked in the editor (in tick order)
+let popularShown = [];
+
+function listenPopularItems() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'restaurants/' + state.restId + '/popularItems'), snap => {
+    const v = snap.val() || {};
+    popularIds = Object.keys(v).sort((a, b) => (Number(v[a]) || 0) - (Number(v[b]) || 0));
+    updatePopularSub();
+  }, err => console.error('listenPopularItems error:', err));
+}
+function updatePopularSub() {
+  if (typeof updateSuggestSub === 'function') updateSuggestSub();
+  const wrap = document.getElementById('popular-items-wrap');
+  if (wrap) wrap.style.display = state.restaurant?.businessType === 'online_shop' ? 'block' : 'none';
+  const sub = document.getElementById('popular-items-sub');
+  if (!sub) return;
+  const valid = new Set((state.menuItems || []).map(it => it.id));
+  const n = popularIds.filter(id => valid.has(id)).length;
+  sub.textContent = n ? n + ' selected' : 'Not set — first 5 items are shown by default';
+}
+function openPopularEditor() {
+  if (!(state.menuItems || []).length) { showToast('Add some stock items first'); return; }
+  const valid = new Set(state.menuItems.map(it => it.id));
+  popularPick = popularIds.filter(id => valid.has(id)).slice(0, POPULAR_MAX);
+  document.getElementById('pop-editor-search').value = '';
+  const err = document.getElementById('pop-editor-error');
+  err.style.display = 'none'; err.textContent = '';
+  renderPopularEditorItems();
+  document.getElementById('pop-editor-overlay').classList.add('show');
+}
+function closePopularEditor() {
+  document.getElementById('pop-editor-overlay').classList.remove('show');
+}
+function renderPopularEditorItems() {
+  const wrap = document.getElementById('pop-editor-items');
+  const q = (document.getElementById('pop-editor-search').value || '').trim().toLowerCase();
+  const all = (state.menuItems || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+  popularShown = all.filter(it => !q || String(it.name || '').toLowerCase().includes(q));
+  wrap.innerHTML = popularShown.length ? popularShown.map((it, i) => `
+    <label class="icat-row">
+      <input type="checkbox" ${popularPick.includes(it.id) ? 'checked' : ''} onchange="togglePopularItem(${i}, this)">
+      <span>${escapeHtml(it.name || '(unnamed)')}</span>
+    </label>`).join('') : '<p class="hint-text" style="padding:8px 0;">No items match your search.</p>';
+  updatePopularCount();
+}
+function togglePopularItem(i, box) {
+  const it = popularShown[i];
+  if (!it) return;
+  const err = document.getElementById('pop-editor-error');
+  if (box.checked) {
+    if (popularPick.length >= POPULAR_MAX) {
+      box.checked = false;
+      err.style.display = 'block'; err.textContent = 'You can pick only ' + POPULAR_MAX + ' items. Untick one first.';
+      return;
+    }
+    popularPick.push(it.id);
+  } else {
+    popularPick = popularPick.filter(id => id !== it.id);
+  }
+  err.style.display = 'none'; err.textContent = '';
+  updatePopularCount();
+}
+function updatePopularCount() {
+  document.getElementById('pop-editor-count').textContent = popularPick.length + ' / ' + POPULAR_MAX + ' selected';
+}
+function clearPopularPick() {
+  popularPick = [];
+  renderPopularEditorItems();
+}
+async function savePopularEditor() {
+  const err = document.getElementById('pop-editor-error');
+  const btn = document.getElementById('pop-editor-save-btn');
+  btn.disabled = true;
+  try {
+    const { db, ref, set, remove } = window.fb;
+    const path = 'restaurants/' + state.restId + '/popularItems';
+    if (!popularPick.length) {
+      await remove(ref(db, path));   // nothing picked -> back to the automatic default
+    } else {
+      const obj = {};
+      popularPick.slice(0, POPULAR_MAX).forEach((id, i) => { obj[id] = i + 1; });
+      await set(ref(db, path), obj);
+    }
+    closePopularEditor();
+    showToast(popularPick.length ? 'Popular products saved — live in the customer app' : 'Using default popular products');
+  } catch (e) {
+    err.style.display = 'block';
+    err.textContent = 'Failed: ' + (e && e.message ? e.message : 'check your connection and try again.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ---------- SUGGESTED ADD-ONS (hotel shops: the shop's own pick, max 8) ----------
+// restaurants/{shopId}/suggestItems = { itemId: rank }. The customer app shows these in the
+// order summary ("Add a drink?" strip). If nothing is set, the customer app auto-suggests the shop's drinks.
+const SUGGEST_MAX = 8;
+let suggestIds = [];
+let suggestPick = [];
+let suggestShown = [];
+
+function listenSuggestItems() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'restaurants/' + state.restId + '/suggestItems'), snap => {
+    const v = snap.val() || {};
+    suggestIds = Object.keys(v).sort((a, b) => (Number(v[a]) || 0) - (Number(v[b]) || 0));
+    updateSuggestSub();
+  }, err => console.error('listenSuggestItems error:', err));
+}
+function updateSuggestSub() {
+  const t = state.restaurant?.businessType;
+  const wrap = document.getElementById('suggest-items-wrap');
+  if (wrap) wrap.style.display = (t !== 'online_shop' && t !== 'groceries') ? 'block' : 'none';
+  const sub = document.getElementById('suggest-items-sub');
+  if (!sub) return;
+  const valid = new Set((state.menuItems || []).map(it => it.id));
+  const n = suggestIds.filter(id => valid.has(id)).length;
+  sub.textContent = n ? n + ' selected' : 'Not set — your drinks are suggested automatically';
+}
+function openSuggestEditor() {
+  if (!(state.menuItems || []).length) { showToast('Add some items first'); return; }
+  const valid = new Set(state.menuItems.map(it => it.id));
+  suggestPick = suggestIds.filter(id => valid.has(id)).slice(0, SUGGEST_MAX);
+  document.getElementById('sug-editor-search').value = '';
+  const err = document.getElementById('sug-editor-error');
+  err.style.display = 'none'; err.textContent = '';
+  renderSuggestEditorItems();
+  document.getElementById('sug-editor-overlay').classList.add('show');
+}
+function closeSuggestEditor() {
+  document.getElementById('sug-editor-overlay').classList.remove('show');
+}
+function renderSuggestEditorItems() {
+  const wrap = document.getElementById('sug-editor-items');
+  const q = (document.getElementById('sug-editor-search').value || '').trim().toLowerCase();
+  const all = (state.menuItems || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+  suggestShown = all.filter(it => !q || String(it.name || '').toLowerCase().includes(q));
+  wrap.innerHTML = suggestShown.length ? suggestShown.map((it, i) => `
+    <label class="icat-row">
+      <input type="checkbox" ${suggestPick.includes(it.id) ? 'checked' : ''} onchange="toggleSuggestItem(${i}, this)">
+      <span>${escapeHtml(it.name || '(unnamed)')}</span>
+    </label>`).join('') : '<p class="hint-text" style="padding:8px 0;">No items match your search.</p>';
+  updateSuggestCount();
+}
+function toggleSuggestItem(i, box) {
+  const it = suggestShown[i];
+  if (!it) return;
+  const err = document.getElementById('sug-editor-error');
+  if (box.checked) {
+    if (suggestPick.length >= SUGGEST_MAX) {
+      box.checked = false;
+      err.style.display = 'block'; err.textContent = 'You can pick only ' + SUGGEST_MAX + ' items. Untick one first.';
+      return;
+    }
+    suggestPick.push(it.id);
+  } else {
+    suggestPick = suggestPick.filter(id => id !== it.id);
+  }
+  err.style.display = 'none'; err.textContent = '';
+  updateSuggestCount();
+}
+function updateSuggestCount() {
+  document.getElementById('sug-editor-count').textContent = suggestPick.length + ' / ' + SUGGEST_MAX + ' selected';
+}
+function clearSuggestPick() {
+  suggestPick = [];
+  renderSuggestEditorItems();
+}
+async function saveSuggestEditor() {
+  const err = document.getElementById('sug-editor-error');
+  const btn = document.getElementById('sug-editor-save-btn');
+  btn.disabled = true;
+  try {
+    const { db, ref, set, remove } = window.fb;
+    const path = 'restaurants/' + state.restId + '/suggestItems';
+    if (!suggestPick.length) {
+      await remove(ref(db, path));
+    } else {
+      const obj = {};
+      suggestPick.slice(0, SUGGEST_MAX).forEach((id, i) => { obj[id] = i + 1; });
+      await set(ref(db, path), obj);
+    }
+    closeSuggestEditor();
+    showToast(suggestPick.length ? 'Suggested add-ons saved — live in the customer app' : 'Using automatic drink suggestions');
+  } catch (e) {
+    err.style.display = 'block';
+    err.textContent = 'Failed: ' + (e && e.message ? e.message : 'check your connection and try again.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // ---------- MENU ----------
 // Reads only this restaurant's own menu path instead of the whole
 // top-level 'restaurants' node. The old code fetched every restaurant's
@@ -4744,6 +5052,7 @@ function listenMenu() {
     const menuObj = snap.val() || {};
     const items = Object.keys(menuObj).map(k => ({ id: k, ...menuObj[k] }));
     state.menuItems = items; // cached for photo-name matching in bulk photo upload
+    if (typeof updatePopularSub === 'function') updatePopularSub();
     filterMenuBySearch();
     const icatScreen = document.getElementById('screen-item-categories');
     if (icatScreen && icatScreen.classList.contains('active')) renderItemCats();
@@ -5851,6 +6160,7 @@ async function updateOrderStatus(id, newStatus, orderData) {
   try {
     const { db, ref, update } = window.fb;
     const updates = { status: newStatus };
+    if (newStatus === 'delivered') updates.deliveredAt = Date.now();   // customer app uses this for the 2-day rating reminder
     // Delivery routing normally already happened when the shop accepted
     // the order (see routeAndBroadcastDelivery, called from
     // handlePopupOrderAction). This is only a fallback for orders that
@@ -7065,6 +7375,7 @@ function opOpenSection(name) {
   if (name === 'push') opUpdateAppCodeSizeLabel();
   if (name === 'partners') { opPopulatePartnersAreaFilter(); opRenderPartnersList(); }
   if (name === 'deletions') opRenderDeletionsList();
+  if (name === 'visits') opLoadVisits();
   if (name === 'drivers') { opPopulateDriversZoneFilter(); opRenderDriversList(); }
   if (name === 'taxi-orders') { opPopulateRidesZoneFilter(); opRenderRidesList(); }
   if (name === 'app-videos') { opLoadAppVideos(); opLoadBusVideos(); }
@@ -7095,6 +7406,64 @@ function opOpenSection(name) {
     clearInterval(opOrdersLateTimer);
     opOrdersLateTimer = null;
   }
+}
+
+/* ---- Visits: customer app daily visit counts (visitCounts/<YYYY-MM-DD> = number) ---- */
+function opLoadVisits() {
+  const sumEl = document.getElementById('op-visits-summary');
+  const listEl = document.getElementById('op-visits-list');
+  sumEl.textContent = 'Loading...';
+  listEl.innerHTML = '';
+  const p = n => String(n).padStart(2, '0');
+  const keyOf = d => d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+  const todayKey = keyOf(now);
+  const { db, ref, get, query, orderByKey, startAt } = window.fb;
+  // Only the last 30 days are downloaded (a handful of tiny numbers).
+  get(query(ref(db, 'visitCounts'), orderByKey(), startAt(keyOf(start)))).then(snap => {
+    const data = snap.val() || {};
+    let total = 0, rows = '';
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const k = keyOf(d);
+      const c = Number(data[k]) || 0;
+      total += c;
+      rows += '<div class="op-partner-item" onclick="opLoadVisitors(\'' + k + '\')"><div class="op-partner-top">'
+        + '<span class="op-partner-name">' + k + (k === todayKey ? ' (today)' : '') + '</span>'
+        + '<span class="op-partner-type">' + c + ' visit' + (c === 1 ? '' : 's') + '</span></div></div>';
+    }
+    sumEl.innerHTML = '<div class="op-mc-row" style="font-size:.95rem;color:#33ff66;">Today: <b>' + (Number(data[todayKey]) || 0)
+      + '</b> &nbsp;|&nbsp; Last 30 days: <b>' + total + '</b></div>';
+    listEl.innerHTML = rows;
+    opLoadVisitors(todayKey);
+    // housekeeping: drop the visitor list of the day that just fell out of the 30-day window
+    try {
+      const old = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+      window.fb.remove(ref(db, 'visitLog/' + keyOf(old))).catch(() => {});
+    } catch (e) {}
+  }).catch(() => { sumEl.textContent = 'Failed to load — check connection and Firebase rules.'; });
+}
+function opLoadVisitors(dayKey) {
+  const box = document.getElementById('op-visitors-box');
+  box.innerHTML = '<div class="op-mc-row">Loading ' + escapeHtml(dayKey) + '...</div>';
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'visitLog/' + dayKey)).then(snap => {
+    const data = snap.val() || {};
+    const list = Object.values(data).sort((a, b) => (b.t || 0) - (a.t || 0));
+    const loggedIn = list.filter(v => v.phone).length;
+    let html = '<div class="op-mc-row" style="font-size:.9rem;color:#33ff66;"><b>' + escapeHtml(dayKey) + '</b> — '
+      + list.length + ' device' + (list.length === 1 ? '' : 's') + ' &nbsp;|&nbsp; logged in: <b>' + loggedIn
+      + '</b> &nbsp;|&nbsp; guests: <b>' + (list.length - loggedIn) + '</b></div>';
+    list.forEach(v => {
+      const time = v.t ? new Date(v.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      html += '<div class="op-partner-item" style="cursor:default;"><div class="op-partner-top">'
+        + '<span class="op-partner-name">' + (v.phone ? escapeHtml(v.name || 'Customer') : 'Guest (not logged in)') + '</span>'
+        + '<span class="op-partner-type">' + escapeHtml(time) + '</span></div>'
+        + (v.phone ? '<div class="op-partner-sub">' + escapeHtml(v.phone) + '</div>' : '') + '</div>';
+    });
+    box.innerHTML = html;
+  }).catch(() => { box.innerHTML = '<div class="op-mc-row">Failed to load — check Firebase rules for visitLog.</div>'; });
 }
 
 /* ---- Send Notification (FCM topic broadcast to every customer) ---- */
@@ -11173,6 +11542,79 @@ function opRenderPartnersList() {
     </div>
   `).join('');
 }
+// ---- Operator: add a shop directly (same record the shop's own signup writes,
+// but already approved and with a username/password the operator hands over). ----
+function opOpenAddShop() {
+  ['name','address','location','gst','username','password','category'].forEach(k => { document.getElementById('op-as-' + k).value = ''; });
+  document.getElementById('op-as-type').value = 'hotel';
+  document.getElementById('op-as-category-wrap').style.display = 'none';
+  const st = document.getElementById('op-as-status'); st.textContent = ''; st.style.color = '';
+  document.getElementById('op-as-create-btn').disabled = false;
+  document.getElementById('op-addshop-modal').classList.add('show');
+}
+function opAddShopTypeChange() {
+  document.getElementById('op-as-category-wrap').style.display = document.getElementById('op-as-type').value === 'online_shop' ? 'block' : 'none';
+}
+function opAddShopGps() {
+  const btn = document.getElementById('op-as-gps-btn');
+  const input = document.getElementById('op-as-location');
+  if (!navigator.geolocation) { input.value = ''; document.getElementById('op-as-status').textContent = 'Location unavailable on this device.'; return; }
+  btn.textContent = 'Locating…';
+  getCurrentPositionCompat({ enableHighAccuracy: true, timeout: 8000 })
+    .then(pos => { input.value = pos.coords.latitude.toFixed(5) + ', ' + pos.coords.longitude.toFixed(5); btn.textContent = '📍 GPS'; })
+    .catch(() => { document.getElementById('op-as-status').textContent = 'Location permission denied.'; btn.textContent = '📍 GPS'; });
+}
+async function opCreateShop() {
+  const status = document.getElementById('op-as-status');
+  const btn = document.getElementById('op-as-create-btn');
+  const fail = t => { status.style.color = '#f87171'; status.textContent = t; };
+  status.style.color = ''; status.textContent = '';
+  const businessType = document.getElementById('op-as-type').value;
+  const name = document.getElementById('op-as-name').value.trim();
+  const address = document.getElementById('op-as-address').value.trim();
+  const location = document.getElementById('op-as-location').value.trim();
+  const gst = document.getElementById('op-as-gst').value.trim();
+  const category = document.getElementById('op-as-category').value.trim();
+  const username = document.getElementById('op-as-username').value.trim();
+  const password = document.getElementById('op-as-password').value;
+  if (!name || !address || !username || !password) { fail('Fill shop name, address, username and password.'); return; }
+  if (/[.#$\[\]\/\s]/.test(username)) { fail('Username cannot have spaces or . # $ [ ] /'); return; }
+  if (businessType === 'groceries' && !location) { fail('Groceries shops need a location (it decides the delivery zone).'); return; }
+  if (location && !/^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(location)) { fail('Location must look like 11.0123, 76.1234'); return; }
+  btn.disabled = true;
+  status.textContent = 'Creating…';
+  try {
+    const { db, ref, get, set, update } = window.fb;
+    const snap = await get(ref(db, 'restaurants/' + username));
+    if (snap.exists()) { fail('This username is already taken.'); btn.disabled = false; return; }
+    const record = {
+      restaurantName: name, address, location, gst,
+      username, password, businessType,
+      status: 'active',
+      approvalStatus: 'approved',
+      createdAt: Date.now(),
+      addedByOperator: true
+    };
+    if (businessType === 'online_shop' && category) record.opCategory = category;
+    if (businessType === 'groceries') record.goSeries = true;
+    await set(ref(db, 'restaurants/' + username), record);
+    // Groceries shops go into the zone their location falls inside (same as approving one).
+    let zoneMsg = '';
+    if (businessType === 'groceries') {
+      const z = opZoneForLocation(location);
+      if (z) {
+        await update(ref(db, 'app_config/shopZones/' + z._id + '/shopIds'), { [username]: true });
+        zoneMsg = ' Added to zone ' + (z.name || z._id) + '.';
+      }
+    }
+    status.style.color = '#33ff66';
+    status.textContent = 'Shop created.' + zoneMsg;
+    setTimeout(() => { document.getElementById('op-addshop-modal').classList.remove('show'); }, 900);
+  } catch (e) {
+    fail('Could not create shop: ' + (e && e.message ? e.message : 'check connection'));
+    btn.disabled = false;
+  }
+}
 function opShowPartnerDetail(id) {
   const p = opAllPartners.find(x => x._id === id);
   if (!p) return;
@@ -12326,7 +12768,7 @@ function opLoadPosters(skipAuto) {
   var fb = window.fb;
   opLoadZoneNames().then(function () { return fb.get(fb.ref(fb.db, 'banners')); }).then(function (snap) {
     var v = snap.val() || {}, a = [];
-    Object.keys(v).forEach(function (k) { if (!v[k] || !v[k].img) return; var t = v[k].targets; a.push({ id: k, img: v[k].img, link: v[k].link || '', ts: v[k].ts || 0, home: t ? !!t.home : true, mart: t ? !!t.mart : false, exp: +v[k].expiresAt || 0, del: !!v[k].del, shopId: v[k].shopId || '', cardId: v[k].cardId || '', zones: Object.keys(v[k].zones || {}).filter(function (z) { return v[k].zones[z]; }) }); });
+    Object.keys(v).forEach(function (k) { if (!v[k] || !v[k].img) return; var t = v[k].targets; a.push({ id: k, img: v[k].img, video: v[k].video || '', link: v[k].link || '', ts: v[k].ts || 0, home: t ? !!t.home : true, mart: t ? !!t.mart : false, food: t ? !!t.food : false, popup: t ? !!t.popup : false, exp: +v[k].expiresAt || 0, del: !!v[k].del, shopId: v[k].shopId || '', cardId: v[k].cardId || '', zones: Object.keys(v[k].zones || {}).filter(function (z) { return v[k].zones[z]; }) }); });
     opPostersCache = a.sort(function (x, y) { return x.ts - y.ts; });
     opPosterMsg(a.length ? '' : 'No posters yet.');
     opFillShopSelect(document.getElementById('op-poster-shop'), document.getElementById('op-poster-shop') ? document.getElementById('op-poster-shop').value : '');
@@ -12342,7 +12784,9 @@ function opRenderPosters() {
     d.innerHTML = '<img style="width:100%;max-width:360px;aspect-ratio:16/9;object-fit:cover;border:1px solid #124a24;display:block;margin-bottom:8px;" alt="">' +
       '<div class="op-search-box" style="padding-bottom:8px;"><input type="url" placeholder="Tap link (optional)"></div>' +
       '<div style="margin-bottom:8px;"><label style="color:#33ff66;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="home"> 🏠 Home</label>' +
-      '<label style="color:#33ff66;font-size:.8rem;"><input type="checkbox" data-t="mart"> 🛍️ NESH Mart</label></div>' +
+      '<label style="color:#33ff66;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="mart"> 🛍️ NESH Mart</label>' +
+      '<label style="color:#33ff66;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="food"> 🍔 Food</label>' +
+      '<label style="color:#33ff66;font-size:.8rem;"><input type="checkbox" data-t="popup"> 📣 Popup</label></div>' +
       '<div style="margin-bottom:8px;"><select data-r="shop" style="max-width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:7px;font-family:inherit;font-size:.8rem;"></select></div>' +
       '<div data-r="zones" style="color:#33ff66;font-size:.8rem;line-height:1.9;margin-bottom:8px;"></div>' +
       '<p class="op-note" data-r="status" style="margin-bottom:6px;"></p>' +
@@ -12354,9 +12798,15 @@ function opRenderPosters() {
       '<button type="button" class="op-btn" data-a="up">↑</button> <button type="button" class="op-btn" data-a="down">↓</button> ' +
       '<button type="button" class="op-btn op-btn-danger" data-a="del">Delete</button>';
     d.querySelector('img').src = b.img;
+    if (b.video) {
+      var pv = document.createElement('video');
+      pv.src = b.video; pv.poster = b.img; pv.controls = true; pv.muted = true; pv.playsInline = true; pv.preload = 'metadata';
+      pv.style.cssText = 'width:100%;max-width:360px;aspect-ratio:16/9;object-fit:cover;border:1px solid #124a24;display:block;margin-bottom:8px;background:#000;';
+      d.replaceChild(pv, d.querySelector('img'));
+    }
     var inp = d.querySelector('input[type=url]'); inp.value = b.link;
-    var cbHome = d.querySelector('[data-t=home]'), cbMart = d.querySelector('[data-t=mart]');
-    cbHome.checked = !!b.home; cbMart.checked = !!b.mart;
+    var cbHome = d.querySelector('[data-t=home]'), cbMart = d.querySelector('[data-t=mart]'), cbFood = d.querySelector('[data-t=food]'), cbPopup = d.querySelector('[data-t=popup]');
+    cbHome.checked = !!b.home; cbMart.checked = !!b.mart; cbFood.checked = !!b.food; cbPopup.checked = !!b.popup;
     var durSel = d.querySelector('[data-r=dur]'), durCus = d.querySelector('[data-r=custom]');
     durSel.onchange = function () { durCus.style.display = durSel.value === 'custom' ? '' : 'none'; };
     var shopSel = d.querySelector('[data-r=shop]'); opFillShopSelect(shopSel, opPosterPickValue(b));
@@ -12364,9 +12814,9 @@ function opRenderPosters() {
     d.querySelector('[data-r=status]').textContent = opPosterStatus(b.exp) + '  |  ' + opZoneLabel(b.zones) + (b.shopId ? '  |  ' + opShopLabel(b.shopId) : '') + (!b.shopId && b.cardId ? '  |  ' + opCardLabel(b.cardId) : '');
     var fb = window.fb;
     d.querySelector('[data-a=save]').onclick = function () {
-      if (!cbHome.checked && !cbMart.checked) { opPosterMsg('Select Home screen or NESH Mart (or both).'); return; }
+      if (!cbHome.checked && !cbMart.checked && !cbFood.checked && !cbPopup.checked) { opPosterMsg('Select Home screen, NESH Mart, Food or Popup.'); return; }
       var zIds = opPosterZones.length ? opPickedZones(zBox, 'data-pz') : (b.zones || []);
-      var upd = { link: inp.value.trim(), targets: { home: cbHome.checked, mart: cbMart.checked }, zones: zIds.length ? opZonesToObj(zIds) : null, shopId: opPosterTarget(shopSel.value).shopId, cardId: opPosterTarget(shopSel.value).cardId };
+      var upd = { link: inp.value.trim(), targets: { home: cbHome.checked, mart: cbMart.checked, food: cbFood.checked, popup: cbPopup.checked }, zones: zIds.length ? opZonesToObj(zIds) : null, shopId: opPosterTarget(shopSel.value).shopId, cardId: opPosterTarget(shopSel.value).cardId };
       if (durSel.value !== 'keep') {
         var ex = opDurToExpiry(durSel.value, durCus.value);
         if (ex === null) { opPosterMsg('Enter hours (1 or more).'); return; }
@@ -12413,8 +12863,8 @@ function opPosterCompress(file) {
 async function opPosterUpload(input) {
   var files = Array.prototype.slice.call(input.files || []); input.value = '';
   var fb = window.fb; if (!fb) { opPosterMsg('Not connected yet, try again.'); return; }
-  var tHome = document.getElementById('op-poster-t-home').checked, tMart = document.getElementById('op-poster-t-mart').checked;
-  if (!tHome && !tMart) { opPosterMsg('Select Home screen or NESH Mart (or both) first.'); return; }
+  var tHome = document.getElementById('op-poster-t-home').checked, tMart = document.getElementById('op-poster-t-mart').checked, tFood = document.getElementById('op-poster-t-food').checked, tPopup = document.getElementById('op-poster-t-popup').checked;
+  if (!tHome && !tMart && !tFood && !tPopup) { opPosterMsg('Select Home screen, NESH Mart, Food or Popup first.'); return; }
   var upPick = opPosterTarget((document.getElementById('op-poster-shop') || {}).value);
   var upShop = upPick.shopId, upCard = upPick.cardId;
   var upZones = opPickedZones(document.getElementById('op-poster-zones'), 'data-uz');
@@ -12425,10 +12875,75 @@ async function opPosterUpload(input) {
       opPosterMsg('Uploading ' + (i + 1) + '/' + files.length + '...');
       var blob = await opPosterCompress(files[i]);
       var data = await uploadPhotoToCloudinary(blob);   // photo goes to Cloudinary; Firebase stores only the small URL
-      await fb.set(fb.push(fb.ref(fb.db, 'banners')), { img: data, link: '', ts: Date.now() + i, targets: { home: tHome, mart: tMart }, expiresAt: expAt, zones: upZones.length ? opZonesToObj(upZones) : null, shopId: upShop, cardId: upCard });
+      await fb.set(fb.push(fb.ref(fb.db, 'banners')), { img: data, link: '', ts: Date.now() + i, targets: { home: tHome, mart: tMart, food: tFood, popup: tPopup }, expiresAt: expAt, zones: upZones.length ? opZonesToObj(upZones) : null, shopId: upShop, cardId: upCard });
     } catch (e) { opPosterMsg('Upload failed - check internet / Cloudinary / database rules.'); return; }
   }
   opPosterMsg('Poster added ✅');
+  opLoadPosters();
+}
+
+/* ---- Video posters ---- */
+function opVideoThumb(file) {   // grab a frame of the video as a JPEG (shown before the video starts + in old app versions)
+  return new Promise(function (res, rej) {
+    var url = URL.createObjectURL(file), v = document.createElement('video');
+    v.muted = true; v.playsInline = true; v.preload = 'auto';
+    var done = false;
+    function fin(ok, val) { if (done) return; done = true; URL.revokeObjectURL(url); ok ? res(val) : rej(val); }
+    var t = setTimeout(function () { fin(false, new Error('thumb timeout')); }, 15000);
+    v.onerror = function () { clearTimeout(t); fin(false, new Error('thumb error')); };
+    v.onloadeddata = function () { try { v.currentTime = Math.min(0.3, (v.duration || 1) / 2); } catch (e) { clearTimeout(t); fin(false, e); } };
+    v.onseeked = function () {
+      clearTimeout(t);
+      try {
+        var sc = Math.min(1, 1280 / v.videoWidth), w = Math.round(v.videoWidth * sc), h = Math.round(v.videoHeight * sc);
+        var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(v, 0, 0, w, h);
+        cv.toBlob(function (b) { b ? fin(true, b) : fin(false, new Error('thumb blob')); }, 'image/jpeg', 0.8);
+      } catch (e) { fin(false, e); }
+    };
+    v.src = url;
+  });
+}
+function opUploadVideoToCloudinary(file, onProgress) {   // returns the secure video URL
+  return new Promise(function (res, rej) {
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', window.CLOUDINARY_UPLOAD_PRESET);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'https://api.cloudinary.com/v1_1/' + window.CLOUDINARY_CLOUD_NAME + '/video/upload');
+    xhr.upload.onprogress = function (e) { if (e.lengthComputable && onProgress) onProgress(Math.round(e.loaded / e.total * 100)); };
+    xhr.onerror = function () { rej(new Error('network error')); };
+    xhr.onload = function () {
+      var j = {}; try { j = JSON.parse(xhr.responseText); } catch (e) {}
+      if (xhr.status >= 200 && xhr.status < 300 && j.secure_url) res(j.secure_url);
+      else rej(new Error((j.error && j.error.message) || ('HTTP ' + xhr.status)));
+    };
+    xhr.send(fd);
+  });
+}
+async function opPosterVideoUpload(input) {
+  var files = Array.prototype.slice.call(input.files || []); input.value = '';
+  var fb = window.fb; if (!fb) { opPosterMsg('Not connected yet, try again.'); return; }
+  var tHome = document.getElementById('op-poster-t-home').checked, tMart = document.getElementById('op-poster-t-mart').checked, tFood = document.getElementById('op-poster-t-food').checked, tPopup = document.getElementById('op-poster-t-popup').checked;
+  if (!tHome && !tMart && !tFood && !tPopup) { opPosterMsg('Select Home screen, NESH Mart, Food or Popup first.'); return; }
+  var upPick = opPosterTarget((document.getElementById('op-poster-shop') || {}).value);
+  var upZones = opPickedZones(document.getElementById('op-poster-zones'), 'data-uz');
+  var expAt = opDurToExpiry(document.getElementById('op-poster-dur').value, document.getElementById('op-poster-dur-custom').value);
+  if (expAt === null) { opPosterMsg('Enter how many hours to show (1 or more).'); return; }
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i], tag = (i + 1) + '/' + files.length;
+    if (f.size > 90 * 1024 * 1024) { opPosterMsg('Video ' + tag + ' is too big (' + Math.round(f.size / 1048576) + ' MB). Max 90 MB - please use a shorter / smaller video.'); return; }
+    try {
+      opPosterMsg('Preparing video ' + tag + '...');
+      var thumbUrl = '';
+      try { thumbUrl = await uploadPhotoToCloudinary(await opVideoThumb(f)); } catch (e) { thumbUrl = ''; }
+      var vurl = await opUploadVideoToCloudinary(f, function (pc) { opPosterMsg('Uploading video ' + tag + '... ' + pc + '%'); });
+      // fallback thumbnail made by Cloudinary itself if the browser could not grab a frame
+      if (!thumbUrl) thumbUrl = vurl.replace('/video/upload/', '/video/upload/so_0,f_jpg/').replace(/\.[a-z0-9]+$/i, '.jpg');
+      await fb.set(fb.push(fb.ref(fb.db, 'banners')), { img: thumbUrl, video: vurl, link: '', ts: Date.now() + i, targets: { home: tHome, mart: tMart, food: tFood, popup: tPopup }, expiresAt: expAt, zones: upZones.length ? opZonesToObj(upZones) : null, shopId: upPick.shopId, cardId: upPick.cardId });
+    } catch (e) { opPosterMsg('Video upload failed: ' + ((e && e.message) || 'check internet / Cloudinary')); return; }
+  }
+  opPosterMsg('Video poster added ✅');
   opLoadPosters();
 }
 </script>

@@ -3928,7 +3928,7 @@ async function markDeliveryDelivered(compositeId) {
   const [restId, orderId] = compositeId.split('::');
   const { db, ref, update, get } = window.fb;
   try {
-    await update(ref(db, 'restaurants/' + restId + '/orders/' + orderId), { status: 'delivered' });
+    await update(ref(db, 'restaurants/' + restId + '/orders/' + orderId), { status: 'delivered', deliveredAt: Date.now() });   // deliveredAt = start of the customer's 2-day rating reminder
     showToast('Marked as delivered');
     // Fire-and-forget: let the customer know via a real OS-level push
     // (same Cloudflare Worker used for the ride/delivery alerts above).
