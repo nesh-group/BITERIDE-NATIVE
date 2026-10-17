@@ -2161,7 +2161,7 @@
       <div id="op-visits-summary" style="margin-bottom:14px;"></div>
       <button class="op-btn" onclick="opLoadVisits()">Refresh</button>
       <div id="op-visitors-box" style="margin:10px 0 16px;"></div>
-      <p class="op-note">Tap a day to see who visited (name + phone if they were logged in).</p>
+      <p class="op-note">Tap a day to see who visited (name + phone if they were logged in) and which zone they were in. Outside every zone shows "Out of zone" with the nearest landmark. Location is saved once per day per device, once the customer app knows where they are.</p>
       <div id="op-visits-list"></div>
     </div>
   </div>
@@ -7735,6 +7735,43 @@ function opLoadVisits() {
     } catch (e) {}
   }).catch(() => { sumEl.textContent = 'Failed to load — check connection and Firebase rules.'; });
 }
+// Landmarks (same file the customer app uses for "near <landmark>") — downloaded once, only when a visitor is outside every zone.
+let opVisitLandmarksPromise = null;
+function opLoadVisitLandmarks() {
+  if (opVisitLandmarksPromise) return opVisitLandmarksPromise;
+  opVisitLandmarksPromise = fetch('https://nesh-group.github.io/NESH-APP/export.geojson').then(r => r.json()).then(geo => {
+    const named = [], places = [];
+    (geo.features || []).forEach(f => {
+      const pr = f.properties || {}, c = f.geometry && f.geometry.coordinates;
+      if (!c || typeof c[0] !== 'number' || typeof c[1] !== 'number') return;
+      const nm = String(pr.name || pr['name:en'] || '').trim();
+      if (nm) named.push({ n: nm, lat: c[1], lng: c[0] });
+      const pl = String(pr.place_name || pr['addr:city'] || '').trim();
+      if (pl) places.push({ n: pl, lat: c[1], lng: c[0] });
+    });
+    return { named, places };
+  }).catch(() => { opVisitLandmarksPromise = null; return { named: [], places: [] }; });
+  return opVisitLandmarksPromise;
+}
+function opKmBetween(a, b) {
+  const R = 6371, rad = x => x * Math.PI / 180, dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function opNearestOf(list, pt, maxKm) {
+  let best = null, bd = Infinity;
+  list.forEach(x => { const d = opKmBetween(pt, x); if (d < bd) { bd = d; best = x; } });
+  return best && bd <= maxKm ? { n: best.n, km: bd } : null;
+}
+// Which named zone is this point in? Driver Zones first, then Shop Zones. '' = outside every zone.
+function opZoneNameForPoint(pt) {
+  const polyOf = z => Array.isArray(z.bounds) ? z.bounds : Object.values(z.bounds || {});
+  const hit = list => (list || []).filter(z => { const b = polyOf(z); return b.length >= 3 && opPointInPoly(pt, b); }).map(z => z.name || '').filter(Boolean);
+  const a = hit(typeof opAllZones !== 'undefined' ? opAllZones : []);
+  if (a.length) return a.join(', ');
+  const b = hit(typeof opShopZones !== 'undefined' ? opShopZones : []);
+  return b.join(', ');
+}
 function opLoadVisitors(dayKey) {
   const box = document.getElementById('op-visitors-box');
   box.innerHTML = '<div class="op-mc-row">Loading ' + escapeHtml(dayKey) + '...</div>';
@@ -7743,17 +7780,35 @@ function opLoadVisitors(dayKey) {
     const data = snap.val() || {};
     const list = Object.values(data).sort((a, b) => (b.t || 0) - (a.t || 0));
     const loggedIn = list.filter(v => v.phone).length;
+    const zoneCount = {}, outPending = [];
     let html = '<div class="op-mc-row" style="font-size:.9rem;color:#33ff66;"><b>' + escapeHtml(dayKey) + '</b> — '
       + list.length + ' device' + (list.length === 1 ? '' : 's') + ' &nbsp;|&nbsp; logged in: <b>' + loggedIn
       + '</b> &nbsp;|&nbsp; guests: <b>' + (list.length - loggedIn) + '</b></div>';
-    list.forEach(v => {
+    const rows = list.map((v, i) => {
       const time = v.t ? new Date(v.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-      html += '<div class="op-partner-item" style="cursor:default;"><div class="op-partner-top">'
+      let loc;
+      if (typeof v.lat === 'number' && typeof v.lng === 'number') {
+        const z = opZoneNameForPoint({ lat: v.lat, lng: v.lng });
+        if (z) { loc = '📍 Zone: <b>' + escapeHtml(z) + '</b>'; zoneCount[z] = (zoneCount[z] || 0) + 1; }
+        else { loc = '📍 <b>Out of zone</b> · <span id="op-vloc-' + i + '">finding landmark…</span>'; zoneCount['Out of zone'] = (zoneCount['Out of zone'] || 0) + 1; outPending.push({ i, lat: v.lat, lng: v.lng }); }
+      } else loc = '<span style="opacity:.6;">📍 Location not shared</span>';
+      return '<div class="op-partner-item" style="cursor:default;"><div class="op-partner-top">'
         + '<span class="op-partner-name">' + (v.phone ? escapeHtml(v.name || 'Customer') : 'Guest (not logged in)') + '</span>'
         + '<span class="op-partner-type">' + escapeHtml(time) + '</span></div>'
-        + (v.phone ? '<div class="op-partner-sub">' + escapeHtml(v.phone) + '</div>' : '') + '</div>';
+        + (v.phone ? '<div class="op-partner-sub">' + escapeHtml(v.phone) + '</div>' : '')
+        + '<div class="op-partner-sub">' + loc + '</div></div>';
+    }).join('');
+    const zs = Object.keys(zoneCount).sort((a, b) => zoneCount[b] - zoneCount[a]).map(k => escapeHtml(k) + ': <b>' + zoneCount[k] + '</b>').join(' &nbsp;|&nbsp; ');
+    if (zs) html += '<div class="op-mc-row" style="font-size:.85rem;color:#33ff66;">' + zs + '</div>';
+    box.innerHTML = html + rows;
+    if (outPending.length) opLoadVisitLandmarks().then(lm => {
+      outPending.forEach(o => {
+        const el = document.getElementById('op-vloc-' + o.i); if (!el) return;
+        const pt = { lat: o.lat, lng: o.lng };
+        const near = opNearestOf(lm.named, pt, 3) || opNearestOf(lm.places, pt, 10);
+        el.textContent = near ? ('near ' + near.n + ' (' + (near.km < 1 ? Math.round(near.km * 1000) + ' m' : near.km.toFixed(1) + ' km') + ')') : 'no landmark found nearby';
+      });
     });
-    box.innerHTML = html;
   }).catch(() => { box.innerHTML = '<div class="op-mc-row">Failed to load — check Firebase rules for visitLog.</div>'; });
 }
 
