@@ -4929,6 +4929,7 @@ async function doRegister() {
     }
     if (businessType === 'groceries') record.goSeries = true;
     await set(ref(db, 'restaurants/' + username), record);
+    try { const f = window.fb; f.get(f.ref(f.db, 'shopIds')).then(sn => { if (sn.exists()) return f.update(f.ref(f.db, 'shopIds'), { [username]: true }); }).catch(() => {}); } catch (e) {} // only once the index has been created by the Operator Panel
     logInRestaurant(username, record);
   } catch (e) {
     errEl.textContent = "Couldn't create account — check your connection and try again.";
@@ -8627,15 +8628,36 @@ function opDeletePushedAppUpdate() {
   }).catch(err => { document.getElementById('op-app-update-status').textContent = 'Error: ' + err.message; });
 }
 
+/* ---- Shop id index (shopIds/{shopId}: true) ----
+   Lets the customer app load shops one-by-one (public fields only) instead of
+   downloading the whole `restaurants` node with every order ever placed.
+   Kept in sync here: missing shops are added, deleted shops are removed. */
+let opShopIndex = null, opShopIndexBusy = false, opShopIndexFailed = false;
+function opHealShopIndex(list) {
+  if (opShopIndex === null || opShopIndexBusy || opShopIndexFailed || !Array.isArray(list) || !list.length) return;
+  const ids = new Set(list.map(p => p._id));
+  const diff = {}; let n = 0;
+  ids.forEach(id => { if (!(id in opShopIndex)) { diff[id] = true; n++; } });
+  Object.keys(opShopIndex).forEach(id => { if (!ids.has(id)) { diff[id] = null; n++; } });
+  if (!n) return;
+  opShopIndexBusy = true;
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'shopIds'), diff).catch(() => { opShopIndexFailed = true; }).finally(() => { opShopIndexBusy = false; });
+}
 /* ---- Restaurant Partners list ---- */
 function opListenPartners() {
   const { db, ref, onValue, update } = window.fb;
   opListenShopZones();
+  onValue(ref(db, 'shopIds'), snap => {
+    opShopIndex = snap.val() || {};
+    try { opHealShopIndex(opAllPartners); } catch (e) {}
+  }, () => { opShopIndexFailed = true; });
   onValue(ref(db, 'restaurants'), snap => {
     try { opMeasure('restaurants', snap); } catch (e) {}
     const list = [];
     snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
     opAllPartners = list;
+    try { opHealShopIndex(list); } catch (e) {}
     // Keep an open "assign groceries order" screen in sync when a shop marks
     // an item unavailable/available (skipped while an assignment is running).
     try {
@@ -12123,6 +12145,7 @@ async function opCreateShop() {
     if (businessType === 'online_shop' && category) record.opCategory = category;
     if (businessType === 'groceries') record.goSeries = true;
     await set(ref(db, 'restaurants/' + username), record);
+    try { const f = window.fb; f.get(f.ref(f.db, 'shopIds')).then(sn => { if (sn.exists()) return f.update(f.ref(f.db, 'shopIds'), { [username]: true }); }).catch(() => {}); } catch (e) {} // only once the index has been created by the Operator Panel
     // Groceries shops go into the zone their location falls inside (same as approving one).
     let zoneMsg = '';
     if (businessType === 'groceries') {
@@ -12860,7 +12883,9 @@ function opDeletePartner() {
   if (!opCurrentPartnerId) return;
   if (!confirm('Permanently delete this restaurant account (' + opCurrentPartnerId + ')? This removes their menu, orders and profile. This cannot be undone.')) return;
   const { db, ref, remove } = window.fb;
-  remove(ref(db, 'restaurants/' + opCurrentPartnerId)).then(() => {
+  const delId = opCurrentPartnerId;
+  remove(ref(db, 'restaurants/' + delId)).then(() => {
+    try { remove(ref(db, 'shopIds/' + delId)).catch(() => {}); } catch (e) {}
     document.getElementById('op-partner-modal').classList.remove('show');
   }).catch(err => alert('Error: ' + err.message));
 }
