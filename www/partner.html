@@ -931,6 +931,7 @@
       </div>
     </div>
 
+    <div id="od-review" style="display:none; margin:14px 0 4px;"></div>
     <div class="status-actions" id="od-status-actions"></div>
   </section>
 
@@ -1144,6 +1145,24 @@
         <button type="button" class="btn-primary" id="shop-minorder-save-btn" style="margin-bottom:8px;">Save minimum order</button>
         <button type="button" class="btn-danger" id="shop-minorder-off-btn" style="width:100%;">Remove minimum order</button>
         <p class="hint-text" id="shop-minorder-status" style="margin-top:10px; margin-bottom:0;"></p>
+      </div>
+    </div>
+
+    <div class="px" style="margin-top:16px;">
+      <div class="pay-pending-card" id="shop-eta-card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+          <p class="rest-title" style="font-size:15px; margin:0;">Estimated delivery time</p>
+          <span class="nav-badge" id="shop-eta-badge" style="background:#6E8CAE;">Not set</span>
+        </div>
+        <p class="hint-text" style="margin-bottom:12px;">Customers see this on your shop as "🛵 X min". If neither you nor the operator sets it, customers see no delivery time.</p>
+        <div class="field" style="margin-bottom:10px;">
+          <span style="font-weight:800; color:var(--ink);">🛵</span>
+          <input id="shop-eta-input" type="number" inputmode="numeric" min="5" max="180" step="1" placeholder="e.g. 30" />
+          <span style="font-weight:800; color:var(--ink);">min</span>
+        </div>
+        <button type="button" class="btn-primary" id="shop-eta-save-btn" style="margin-bottom:8px;">Save delivery time</button>
+        <button type="button" class="btn-danger" id="shop-eta-off-btn" style="width:100%;">Remove delivery time</button>
+        <p class="hint-text" id="shop-eta-status" style="margin-top:10px; margin-bottom:0;"></p>
       </div>
     </div>
 
@@ -1428,6 +1447,19 @@
         <input id="shop-discount-amount" type="number" min="0" step="1" inputmode="decimal" placeholder="e.g. 50" />
       </div>
 
+      <p class="loc-field-label" style="margin-top:16px;">Offer timer (optional)</p>
+      <p class="hint-text" style="margin-top:2px;">Customers see a live countdown in "Today's deals" on NESH Mart. When it hits zero the offer switches off by itself.</p>
+      <div class="field">
+        <select id="shop-discount-timer" style="width:100%;border:0;background:transparent;font:inherit;outline:none;">
+          <option value="0">No timer (stays on)</option>
+          <option value="1">1 hour</option>
+          <option value="3">3 hours</option>
+          <option value="6">6 hours</option>
+          <option value="12">12 hours</option>
+          <option value="24">24 hours</option>
+        </select>
+      </div>
+
       <p class="loc-field-label" style="margin-top:16px;">Scratch card photo (optional)</p>
       <p class="hint-text" style="margin-top:2px;">Add a photo to use as the scratch card's background. Leave it blank to use the default design.</p>
       <label class="photo-upload" id="shop-discount-photo-wrap">
@@ -1675,6 +1707,16 @@
           <h3>App Videos</h3>
           <p>Set a one-time welcome/promo video for the Shop app, the Driver app, and the customer app's Bus feature</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('coupons')">
+          <div class="op-home-icon">🎟️</div>
+          <h3>Coupons</h3>
+          <p>Discount codes that work only at the shops you pick</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('video-ads')">
+          <div class="op-home-icon">📺</div>
+          <h3>Video Ads</h3>
+          <p>Full-screen video ads for the customer app's Home, Food and NESH Mart screens (with Skip)</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('partners')" style="position:relative;">
           <span class="op-home-badge" id="op-partners-home-badge" style="display:none;"></span>
           <div class="op-home-icon">🏬</div>
@@ -1721,6 +1763,16 @@
           <div class="op-home-icon">🛵</div>
           <h3>Shop Delivery Charges</h3>
           <p>Set a separate delivery charge &amp; minimum order for each non-Go-Series shop</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('shop-deals')">
+          <div class="op-home-icon">⚡</div>
+          <h3>Shop Deals</h3>
+          <p>Set a ₹ off deal with a countdown timer for any shop — shows in NESH Mart "Today's deals"</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('delivery-time')">
+          <div class="op-home-icon">⏱️</div>
+          <h3>Estimated Delivery Time</h3>
+          <p>Set the delivery time customers see for any shop — overrides the shop's own</p>
         </div>
         <div class="op-home-card" onclick="opOpenSection('shop-zones')">
           <div class="op-home-icon">🗺️</div>
@@ -2195,6 +2247,79 @@
     </div>
   </div>
 
+  <!-- COUPONS — stored at app_config/coupons/{id} -->
+  <div class="op-section" id="op-section-coupons">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Coupons</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Customers type the code at checkout. It works only at the shops you tick below (or all shops). The discount is taken off the items total and saved on the order as couponCode / couponDiscount.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px;">
+        <input type="text" id="op-cpn-code" placeholder="CODE (e.g. FIRST50)" maxlength="20" style="width:170px;text-transform:uppercase;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="text" id="op-cpn-desc" placeholder="Short description (optional, e.g. First order offer)" maxlength="40" style="flex:1 1 220px;min-width:200px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <select id="op-cpn-type" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"><option value="flat">₹ Flat off</option><option value="percent">% Percent off</option></select>
+        <input type="number" id="op-cpn-value" min="1" placeholder="Amount / %" style="width:110px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="number" id="op-cpn-min" min="0" placeholder="Min order ₹" style="width:110px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="number" id="op-cpn-max" min="0" placeholder="Max ₹ off (for %)" style="width:140px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="number" id="op-cpn-uses" min="1" value="1" title="Uses per customer" style="width:80px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="number" id="op-cpn-total" min="1" placeholder="Total uses (blank = unlimited)" title="Total times this coupon can be used by ALL customers together" style="width:210px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+      </div>
+      <p class="op-note" style="margin:0 0 8px;">Last box = how many times one customer can use it.</p>
+      <div style="margin:0 0 10px;">
+        <select id="op-cpn-dur" onchange="document.getElementById('op-cpn-dur-custom').style.display=this.value==='custom'?'':'none'" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+          <option value="0">No time limit</option><option value="24">24 hours</option><option value="72">3 days</option>
+          <option value="168">7 days</option><option value="720" selected>30 days</option><option value="custom">Custom hours…</option>
+        </select>
+        <input type="number" id="op-cpn-dur-custom" min="1" max="8760" placeholder="hours" style="display:none;width:90px;margin-left:8px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+      </div>
+      <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-cpn-secret"> 🔒 Secret code (don't show as an offer card - customer must type it)</label>
+      <p class="op-note" style="margin-bottom:6px;">Works at which shops?</p>
+      <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:6px;"><input type="checkbox" id="op-cpn-all" onchange="opCpnAllToggle(this)"> 🌐 All shops</label>
+      <div id="op-cpn-shops" style="max-height:220px;overflow:auto;border:1px solid #124a24;padding:8px;margin-bottom:12px;color:#33ff66;font-size:.85rem;line-height:2;"></div>
+      <button type="button" class="op-btn op-btn-push" onclick="opCpnSave()">💾 Save coupon</button>
+      <p class="op-note" id="op-cpn-status" style="margin-top:10px;"></p>
+      <div id="op-cpn-list"></div>
+    </div>
+  </div>
+
+  <!-- VIDEO ADS — full-screen video ads in the customer app (Home / Food / NESH Mart).
+       Stored at app_config/videoAds/{id}. Separate from poster videos. -->
+  <div class="op-section" id="op-section-video-ads">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Video Ads</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Upload a short video ad. It pops up full-screen in the customer app (muted, with a Skip button) and closes by itself the moment the video ends. Each customer sees an ad at most once per the "show again after" hours, and never more than one ad every 3 minutes. Keep it short (under 20 sec) to save data.</p>
+      <div style="margin:0 0 10px;">
+        <p class="op-note" style="margin-bottom:6px;">Show the ad on:</p>
+        <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-vad-t-home" checked> 🏠 Home</label>
+        <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-vad-t-food"> 🍔 Food</label>
+        <label style="color:#33ff66;font-size:.85rem;"><input type="checkbox" id="op-vad-t-mart"> 🛍️ NESH Mart</label>
+      </div>
+      <div style="margin:0 0 10px;">
+        <p class="op-note" style="margin-bottom:6px;">Show for how long:</p>
+        <select id="op-vad-dur" onchange="opVadDurChange(this)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+          <option value="0">No time limit</option><option value="6">6 hours</option><option value="12">12 hours</option>
+          <option value="24">24 hours</option><option value="48">2 days</option><option value="72">3 days</option>
+          <option value="168" selected>7 days</option><option value="custom">Custom hours…</option>
+        </select>
+        <input type="number" id="op-vad-dur-custom" min="1" max="8760" placeholder="hours" style="display:none;width:90px;margin-left:8px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+      </div>
+      <div style="margin:0 0 10px;">
+        <label style="color:#33ff66;font-size:.85rem;">Show again to the same customer after
+          <input type="number" id="op-vad-gap" min="1" max="720" value="12" style="width:70px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:6px;font-family:inherit;font-size:.85rem;"> hours</label><br>
+        <label style="color:#33ff66;font-size:.85rem;display:inline-block;margin-top:8px;">Skip button works after
+          <input type="number" id="op-vad-skip" min="0" max="30" value="0" style="width:70px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:6px;font-family:inherit;font-size:.85rem;"> seconds (0 = right away)</label>
+      </div>
+      <input type="file" id="op-vad-file" accept="video/*" multiple style="display:none" onchange="opVideoAdUpload(this)">
+      <button type="button" class="op-btn op-btn-push" onclick="document.getElementById('op-vad-file').click()">📺 Upload video ad(s)</button>
+      <p class="op-note" id="op-vad-status" style="margin-top:10px;"></p>
+      <div id="op-vad-list"></div>
+    </div>
+  </div>
+
   <!-- APP VIDEOS — one-time welcome/promo video shown when the shop app or
        driver app opens. Separate video per app; each plays once per device,
        and re-uploading a new URL here makes it play again for everyone. -->
@@ -2485,6 +2610,77 @@
         <input type="text" id="op-sdc-search" placeholder="Search shops..." oninput="opRenderShopDeliveryList()">
       </div>
       <div id="op-sdc-list" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- SHOP DEALS — operator sets a shop's deal (₹ off + optional timer) for ANY shop.
+       Writes restaurants/{id}/discountAmount + discountEndsAt, the same fields the shop sets in its own Shop Discount screen (last save wins). -->
+  <div class="op-section" id="op-section-shop-deals">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Shop Deals</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Pick a shop and set a flat ₹ discount. Customers see it in NESH Mart "⚡ Today's deals" with a live countdown, and get it as a scratch card at checkout. When the timer ends the deal switches off by itself. This writes the same setting the shop has in its own Account → Shop Discount, so whichever was saved last wins.</p>
+      <div id="op-deal-editor" style="display:none; margin-bottom:16px; padding:14px; border:1px solid #124a24;">
+        <h2 id="op-deal-editor-title" style="margin-top:0;"></h2>
+        <div class="op-search-box" style="margin-bottom:10px;">
+          <input type="number" id="op-deal-amount" placeholder="Discount amount in ₹ (e.g. 50)" min="0" step="1">
+        </div>
+        <div class="op-search-box" style="margin-bottom:10px;">
+          <select id="op-deal-timer" onchange="document.getElementById('op-deal-custom').style.display = this.value === 'custom' ? 'block' : 'none'" style="width:100%;padding:10px;">
+            <option value="0">No timer (stays on until turned off)</option>
+            <option value="1">1 hour</option>
+            <option value="3">3 hours</option>
+            <option value="6">6 hours</option>
+            <option value="12">12 hours</option>
+            <option value="24">24 hours</option>
+            <option value="custom">Custom hours…</option>
+          </select>
+        </div>
+        <div class="op-search-box" id="op-deal-custom" style="margin-bottom:10px; display:none;">
+          <input type="number" id="op-deal-custom-hours" placeholder="Hours (e.g. 2.5)" min="0.1" step="0.1">
+        </div>
+        <div>
+          <button type="button" class="op-btn op-btn-push" onclick="opSaveShopDeal()">💾 Save deal</button>
+          <button type="button" class="op-btn op-btn-danger" onclick="opClearShopDeal()">Turn off deal</button>
+          <button type="button" class="op-btn" onclick="opCloseShopDealEditor()">Cancel</button>
+        </div>
+        <p class="op-note" id="op-deal-status" style="margin-top:10px;"></p>
+      </div>
+      <div class="op-search-box" style="margin-bottom:6px;">
+        <input type="text" id="op-deal-search" placeholder="Search shops..." oninput="opRenderShopDealsList()">
+      </div>
+      <div id="op-deal-list" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- ESTIMATED DELIVERY TIME — operator sets it for ANY shop (Go Series and groceries included).
+       Writes restaurants/{id}/opDeliveryTimeMins, which always wins over the shop's own
+       deliveryTimeMins in the customer app. -->
+  <div class="op-section" id="op-section-delivery-time">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Estimated Delivery Time</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Every shop shows an estimated delivery time to customers. Shops can set their own in Account; a time you set here always wins over the shop's. Clear yours to hand control back to the shop. Shops with no time set show no delivery time to customers.</p>
+      <div id="op-eta-editor" style="display:none; margin-bottom:16px; padding:14px; border:1px solid #124a24;">
+        <h2 id="op-eta-editor-title" style="margin-top:0;"></h2>
+        <div class="op-search-box" style="margin-bottom:10px;">
+          <input type="number" id="op-eta-input" placeholder="Delivery time in minutes (e.g. 30)" min="5" max="180" step="1">
+        </div>
+        <div>
+          <button type="button" class="op-btn op-btn-push" onclick="opSaveEta()">💾 Save for this shop</button>
+          <button type="button" class="op-btn op-btn-danger" onclick="opClearEta()">Clear operator time</button>
+          <button type="button" class="op-btn" onclick="opCloseEtaEditor()">Cancel</button>
+        </div>
+        <p class="op-note" id="op-eta-status" style="margin-top:10px;"></p>
+      </div>
+      <div class="op-search-box" style="margin-bottom:6px;">
+        <input type="text" id="op-eta-search" placeholder="Search shops..." oninput="opRenderEtaList()">
+      </div>
+      <div id="op-eta-list" style="margin-top:10px;"></div>
     </div>
   </div>
 
@@ -3950,6 +4146,7 @@ function logInRestaurant(id, data) {
   renderShopAvailability();
   renderShopHours();
   renderMinOrder();
+  renderShopEta();
   document.getElementById('support-fab').classList.add('show');
 }
 
@@ -4161,17 +4358,85 @@ document.getElementById('shop-minorder-save-btn').addEventListener('click', () =
 });
 document.getElementById('shop-minorder-off-btn').addEventListener('click', () => saveMinOrder(0));
 
+// ---------- Estimated delivery time ----------
+// The shop's own value is restaurants/{id}/deliveryTimeMins. The operator can set
+// restaurants/{id}/opDeliveryTimeMins for any shop and THAT one wins: the customer app
+// shows operator time > shop time, and nothing when neither is set. Clearing the operator's value hands
+// the shop's own value back.
+function renderShopEta() {
+  const r = state.restaurant;
+  const badge = document.getElementById('shop-eta-badge');
+  const status = document.getElementById('shop-eta-status');
+  const input = document.getElementById('shop-eta-input');
+  if (!r || !badge || !status || !input) return;
+  const own = Number(r.deliveryTimeMins) || 0, op = Number(r.opDeliveryTimeMins) || 0;
+  if (document.activeElement !== input) input.value = own > 0 ? String(own) : '';
+  if (op > 0) {
+    badge.textContent = "Operator · " + op + " min";
+    badge.style.background = "#7c3aed";
+    status.textContent = "The operator has set " + op + " min for your shop, so customers see " + op + " min. " +
+      (own > 0 ? "Your own " + own + " min applies again if the operator clears theirs." : "Your own time applies again if the operator clears theirs.");
+  } else if (own > 0) {
+    badge.textContent = "On · " + own + " min";
+    badge.style.background = "#1f7a3d";
+    status.textContent = "Customers see \"" + own + " min\" on your shop.";
+  } else {
+    badge.textContent = "Not set";
+    badge.style.background = "#6E8CAE";
+    status.textContent = "Not set — customers don't see a delivery time for your shop.";
+  }
+}
+async function saveShopEta(mins) {
+  const { db, ref, update } = window.fb;
+  const saveBtn = document.getElementById('shop-eta-save-btn');
+  const offBtn = document.getElementById('shop-eta-off-btn');
+  saveBtn.disabled = true; offBtn.disabled = true;
+  try {
+    await update(ref(db, 'restaurants/' + state.restId), { deliveryTimeMins: mins > 0 ? mins : null });
+    state.restaurant = { ...(state.restaurant || {}), deliveryTimeMins: mins > 0 ? mins : 0 };
+    renderShopEta();
+    showToast(mins > 0 ? "Delivery time saved: " + mins + " min" : "Delivery time removed");
+  } catch (e) {
+    showToast("Couldn't update — check your connection and try again.");
+  } finally {
+    saveBtn.disabled = false; offBtn.disabled = false;
+  }
+}
+document.getElementById('shop-eta-save-btn').addEventListener('click', () => {
+  const raw = document.getElementById('shop-eta-input').value.trim();
+  const mins = Math.round(Number(raw));
+  if (!raw || !isFinite(mins) || mins < 5) { showToast("Enter a time of 5 minutes or more"); return; }
+  if (mins > 180) { showToast("That looks too long — please check it (max 180 min)"); return; }
+  saveShopEta(mins);
+});
+document.getElementById('shop-eta-off-btn').addEventListener('click', () => saveShopEta(0));
+
 // ---------- SHOP DISCOUNT (one flat amount, auto-shown to every customer
 // checking out with this shop — no per-customer targeting) ----------
 function updateShopDiscountBadge() {
   const badge = document.getElementById('shop-discount-status-badge');
   if (!badge) return;
   const amt = Number(state.restaurant?.discountAmount) || 0;
-  badge.textContent = amt > 0 ? ("₹" + amt) : "Not set";
+  const ends = Number(state.restaurant?.discountEndsAt) || 0;
+  badge.textContent = (amt > 0 && ends && ends <= Date.now()) ? "Ended" : amt > 0 ? ("₹" + amt + (ends ? " ⏱" : "")) : "Not set";
 }
 
 function openShopDiscountScreen() {
   document.getElementById('shop-discount-amount').value = state.restaurant?.discountAmount || '';
+  {
+    const sel = document.getElementById('shop-discount-timer');
+    const old = sel.querySelector('option[value="keep"]'); if (old) old.remove();
+    sel.value = '0';
+    const ends = Number(state.restaurant?.discountEndsAt) || 0;
+    if (ends > Date.now() && Number(state.restaurant?.discountAmount) > 0) {
+      const mins = Math.ceil((ends - Date.now()) / 60000);
+      const o = document.createElement('option');
+      o.value = 'keep';
+      o.textContent = 'Keep current timer (' + Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm left)';
+      sel.insertBefore(o, sel.firstChild);
+      sel.value = 'keep';
+    }
+  }
   document.getElementById('shop-discount-error').style.display = 'none';
   renderShopDiscountPhoto(state.restaurant?.discountCardImage || "");
   showScreen('wallet-add');
@@ -4253,8 +4518,14 @@ document.getElementById('shop-discount-save-btn').addEventListener('click', asyn
   btn.textContent = "Saving…";
   try {
     const { db, ref, update } = window.fb;
-    await update(ref(db, 'restaurants/' + state.restId), { discountAmount: amount });
-    state.restaurant = { ...(state.restaurant || {}), discountAmount: amount };
+    const tv = document.getElementById('shop-discount-timer').value;
+    let endsAt = null;
+    if (amount > 0) {
+      if (tv === 'keep') endsAt = Number(state.restaurant?.discountEndsAt) || null;
+      else if (Number(tv) > 0) endsAt = Date.now() + Number(tv) * 3600000;
+    }
+    await update(ref(db, 'restaurants/' + state.restId), { discountAmount: amount, discountEndsAt: endsAt });
+    state.restaurant = { ...(state.restaurant || {}), discountAmount: amount, discountEndsAt: endsAt };
     updateShopDiscountBadge();
     showToast(amount > 0 ? ("Discount set to ₹" + amount + " for every customer") : "Shop discount turned off");
     showScreen('account');
@@ -6016,7 +6287,23 @@ function openOrderDetail(id) {
   showScreen('order-detail');
 }
 
+// Customer's rating + optional review for this order (written by index.html as orderRating).
+function renderOrderReview(o) {
+  const box = document.getElementById('od-review');
+  if (!box) return;
+  const r = o && o.orderRating;
+  const n = r ? Math.min(5, Number(r.stars) || 0) : 0;
+  box.textContent = '';
+  if (n < 1) { box.style.display = 'none'; return; }
+  const h = document.createElement('p'); h.className = 'detail-label'; h.textContent = 'Customer rating';
+  const st = document.createElement('p'); st.className = 'detail-value'; st.textContent = '★'.repeat(n) + '☆'.repeat(5 - n);
+  box.append(h, st);
+  if (r.comment) { const c = document.createElement('p'); c.className = 'detail-value'; c.textContent = '\u201C' + r.comment + '\u201D'; box.appendChild(c); }
+  box.style.display = 'block';
+}
+
 function renderOrderDetail(o) {
+  renderOrderReview(o);
   document.getElementById('od-order-num').textContent = o.orderNumber || o._id;
   const status = o.status || 'pending';
   document.getElementById('od-status-title').textContent = status.charAt(0).toUpperCase() + status.slice(1);
@@ -7379,6 +7666,8 @@ function opOpenSection(name) {
   if (name === 'drivers') { opPopulateDriversZoneFilter(); opRenderDriversList(); }
   if (name === 'taxi-orders') { opPopulateRidesZoneFilter(); opRenderRidesList(); }
   if (name === 'app-videos') { opLoadAppVideos(); opLoadBusVideos(); }
+  if (name === 'video-ads') opLoadVideoAds();
+  if (name === 'coupons') { opCpnBuildShops(); opLoadCoupons(); }
   if (name === 'notify') opLoadPosters();
   if (name === 'zones') opRenderZonesList();
   if (name === 'category-order') opRenderCategoryOrder();
@@ -7391,6 +7680,8 @@ function opOpenSection(name) {
   if (name === 'support-phone') opLoadSupportPhone();
   if (name === 'go-series') opLoadGoSeries();
   if (name === 'shop-delivery') { opCloseShopDeliveryEditor(); opRenderShopDeliveryList(); }
+  if (name === 'delivery-time') { opCloseEtaEditor(); opRenderEtaList(); }
+  if (name === 'shop-deals') { opCloseShopDealEditor(); opRenderShopDealsList(); }
   if (name === 'shop-zones') opRenderShopZones();
   if (name === 'report') opRenderReportShopList();
   if (name === 'groceries-queue') opRenderGroceriesQueueList();
@@ -7946,6 +8237,83 @@ function opRemoveShopFromGoSeries(id) {
   }).catch(err => alert('Error: ' + err.message));
 }
 
+/* ---- Estimated Delivery Time (operator value wins over the shop's own) ---- */
+let opEtaEditingId = null;
+function opEtaSummary(p) {
+  const op = Number(p.opDeliveryTimeMins) || 0, own = Number(p.deliveryTimeMins) || 0;
+  if (op > 0) return '⏱️ ' + op + ' min (set by operator)' + (own > 0 ? ' · shop set ' + own + ' min' : '');
+  if (own > 0) return '⏱️ ' + own + ' min (set by shop)';
+  return 'Not set · customers see no delivery time';
+}
+function opRenderEtaList() {
+  const wrap = document.getElementById('op-eta-list');
+  if (!wrap) return;
+  const q = (document.getElementById('op-eta-search').value || '').trim().toLowerCase();
+  const shops = opAllPartners
+    .filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q))
+    .sort((a, b) => (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id));
+  if (!shops.length) {
+    wrap.innerHTML = '<p class="op-note">' + (q ? 'No matching shops.' : 'No shops yet.') + '</p>';
+    return;
+  }
+  wrap.innerHTML = shops.map(p => `
+    <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div>
+        <div class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</div>
+        <div class="op-partner-sub">${escapeHtml(opTypeLabel(p.businessType))} · ${escapeHtml(opEtaSummary(p))}</div>
+      </div>
+      <button type="button" class="op-btn op-btn-push" style="margin:0;" data-id="${escapeHtml(p._id)}" onclick="opOpenEtaEditor(this.dataset.id)">✏️ Set</button>
+    </div>
+  `).join('');
+}
+function opOpenEtaEditor(id) {
+  const p = opAllPartners.find(x => x._id === id);
+  if (!p) return;
+  opEtaEditingId = id;
+  const op = Number(p.opDeliveryTimeMins) || 0;
+  document.getElementById('op-eta-editor-title').textContent = p.restaurantName || p._id;
+  document.getElementById('op-eta-input').value = op > 0 ? op : '';
+  document.getElementById('op-eta-status').textContent = Number(p.deliveryTimeMins) > 0 ? ('The shop set ' + p.deliveryTimeMins + ' min itself; yours overrides it.') : '';
+  const ed = document.getElementById('op-eta-editor');
+  ed.style.display = 'block';
+  ed.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function opCloseEtaEditor() {
+  opEtaEditingId = null;
+  const ed = document.getElementById('op-eta-editor');
+  if (ed) ed.style.display = 'none';
+}
+function opSaveEta() {
+  const id = opEtaEditingId;
+  const status = document.getElementById('op-eta-status');
+  if (!id) return;
+  const raw = document.getElementById('op-eta-input').value.trim();
+  const mins = Math.round(Number(raw));
+  if (!raw || !isFinite(mins) || mins < 5 || mins > 180) { status.textContent = 'Enter a time between 5 and 180 minutes.'; return; }
+  const { db, ref, update } = window.fb;
+  status.textContent = 'Saving...';
+  update(ref(db, 'restaurants/' + id), { opDeliveryTimeMins: mins }).then(() => {
+    const p = opAllPartners.find(x => x._id === id);
+    if (p) p.opDeliveryTimeMins = mins;
+    status.textContent = 'Saved. Customers now see ' + mins + ' min for this shop.';
+    opRenderEtaList();
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opClearEta() {
+  const id = opEtaEditingId;
+  const status = document.getElementById('op-eta-status');
+  if (!id) return;
+  const { db, ref, update } = window.fb;
+  status.textContent = 'Saving...';
+  update(ref(db, 'restaurants/' + id), { opDeliveryTimeMins: null }).then(() => {
+    const p = opAllPartners.find(x => x._id === id);
+    if (p) p.opDeliveryTimeMins = 0;
+    document.getElementById('op-eta-input').value = '';
+    status.textContent = 'Cleared. The shop\'s own time (if any) applies again.';
+    opRenderEtaList();
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
 /* ---- Shop Delivery Charges (operator sets each non-Go-Series shop's own charge) ---- */
 let opSdcEditingId = null;
 function opSdcSummary(p) {
@@ -8038,6 +8406,106 @@ function opClearShopDelivery() {
     ['op-sdc-base', 'op-sdc-perkm', 'op-sdc-freekm', 'op-sdc-freeabove'].forEach(i => { document.getElementById(i).value = ''; });
     status.textContent = 'Delivery charge cleared.';
     opRenderShopDeliveryList();
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+/* ---- Shop Deals (operator sets any shop's ₹ off deal + optional countdown timer) ---- */
+let opDealEditingId = null;
+function opDealSummary(p) {
+  const amt = Number(p.discountAmount) || 0, ends = Number(p.discountEndsAt) || 0;
+  if (amt <= 0) return 'No deal';
+  if (ends && ends <= Date.now()) return '₹' + amt + ' OFF · ended';
+  if (!ends) return '₹' + amt + ' OFF · no timer';
+  const mins = Math.ceil((ends - Date.now()) / 60000);
+  return '₹' + amt + ' OFF · ' + Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm left';
+}
+function opRenderShopDealsList() {
+  const wrap = document.getElementById('op-deal-list');
+  if (!wrap) return;
+  const q = (document.getElementById('op-deal-search').value || '').trim().toLowerCase();
+  const shops = opAllPartners
+    .filter(p => p.businessType !== 'groceries')
+    .filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q))
+    .sort((a, b) => (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id));
+  if (!shops.length) {
+    wrap.innerHTML = '<p class="op-note">' + (q ? 'No matching shops.' : 'No shops yet.') + '</p>';
+    return;
+  }
+  wrap.innerHTML = shops.map(p => `
+    <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div>
+        <div class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</div>
+        <div class="op-partner-sub">${escapeHtml(opTypeLabel(p.businessType))} · ${escapeHtml(opDealSummary(p))}</div>
+      </div>
+      <button type="button" class="op-btn op-btn-push" style="margin:0;" data-id="${escapeHtml(p._id)}" onclick="opOpenShopDealEditor(this.dataset.id)">✏️ Set</button>
+    </div>
+  `).join('');
+}
+function opOpenShopDealEditor(id) {
+  const p = opAllPartners.find(x => x._id === id);
+  if (!p) return;
+  opDealEditingId = id;
+  document.getElementById('op-deal-editor-title').textContent = p.restaurantName || p._id;
+  document.getElementById('op-deal-amount').value = Number(p.discountAmount) > 0 ? p.discountAmount : '';
+  const sel = document.getElementById('op-deal-timer');
+  const old = sel.querySelector('option[value="keep"]'); if (old) old.remove();
+  sel.value = '0';
+  const ends = Number(p.discountEndsAt) || 0;
+  if (ends > Date.now() && Number(p.discountAmount) > 0) {
+    const mins = Math.ceil((ends - Date.now()) / 60000);
+    const o = document.createElement('option');
+    o.value = 'keep';
+    o.textContent = 'Keep current timer (' + Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm left)';
+    sel.insertBefore(o, sel.firstChild);
+    sel.value = 'keep';
+  }
+  document.getElementById('op-deal-custom').style.display = 'none';
+  document.getElementById('op-deal-custom-hours').value = '';
+  document.getElementById('op-deal-status').textContent = '';
+  const ed = document.getElementById('op-deal-editor');
+  ed.style.display = 'block';
+  ed.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function opCloseShopDealEditor() {
+  opDealEditingId = null;
+  const ed = document.getElementById('op-deal-editor');
+  if (ed) ed.style.display = 'none';
+}
+function opSaveShopDeal() {
+  const id = opDealEditingId;
+  const status = document.getElementById('op-deal-status');
+  if (!id) return;
+  const p = opAllPartners.find(x => x._id === id);
+  const amount = Math.round(Number(document.getElementById('op-deal-amount').value) || 0);
+  if (!isFinite(amount) || amount <= 0) { status.textContent = 'Enter a discount amount above ₹0 (or use "Turn off deal").'; return; }
+  const tv = document.getElementById('op-deal-timer').value;
+  let endsAt = null;
+  if (tv === 'keep') endsAt = Number(p && p.discountEndsAt) || null;
+  else if (tv === 'custom') {
+    const h = Number(document.getElementById('op-deal-custom-hours').value);
+    if (!isFinite(h) || h <= 0) { status.textContent = 'Enter the number of hours for the timer.'; return; }
+    endsAt = Date.now() + Math.round(h * 3600000);
+  } else if (Number(tv) > 0) endsAt = Date.now() + Number(tv) * 3600000;
+  const { db, ref, update } = window.fb;
+  status.textContent = 'Saving...';
+  update(ref(db, 'restaurants/' + id), { discountAmount: amount, discountEndsAt: endsAt }).then(() => {
+    if (p) { p.discountAmount = amount; p.discountEndsAt = endsAt || 0; }
+    status.textContent = 'Saved.';
+    opRenderShopDealsList();
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opClearShopDeal() {
+  const id = opDealEditingId;
+  const status = document.getElementById('op-deal-status');
+  if (!id) return;
+  if (!confirm("Turn off this shop's deal? Customers will stop seeing it right away.")) return;
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'restaurants/' + id), { discountAmount: 0, discountEndsAt: null }).then(() => {
+    const p = opAllPartners.find(x => x._id === id);
+    if (p) { p.discountAmount = 0; p.discountEndsAt = 0; }
+    document.getElementById('op-deal-amount').value = '';
+    status.textContent = 'Deal turned off.';
+    opRenderShopDealsList();
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
@@ -8136,6 +8604,8 @@ function opListenPartners() {
     opUpdatePartnersHomeBadge();
     const reportDetail = document.getElementById('op-section-report-detail');
     if (reportDetail && reportDetail.classList.contains('active')) opRenderReportOrders();
+    const etaSec = document.getElementById('op-section-delivery-time');
+    if (etaSec && etaSec.classList.contains('active')) opRenderEtaList();
     const sdcSec = document.getElementById('op-section-shop-delivery');
     if (sdcSec && sdcSec.classList.contains('active')) opRenderShopDeliveryList();
     const shopOrderSec = document.getElementById('op-section-shop-order');
@@ -12945,6 +13415,136 @@ async function opPosterVideoUpload(input) {
   }
   opPosterMsg('Video poster added ✅');
   opLoadPosters();
+}
+
+/* ---- VIDEO ADS (operator) ----
+   app_config/videoAds/{id} = { video, thumb, targets:{home,food,mart}, expiresAt, gapHours, skipAfter, off, ts } */
+function opVadMsg(t) { var e = document.getElementById('op-vad-status'); if (e) e.textContent = t || ''; }
+function opVadDurChange(sel) { document.getElementById('op-vad-dur-custom').style.display = sel.value === 'custom' ? '' : 'none'; }
+async function opVideoAdUpload(input) {
+  var files = Array.prototype.slice.call(input.files || []); input.value = '';
+  var fb = window.fb; if (!fb) { opVadMsg('Not connected yet, try again.'); return; }
+  var tH = document.getElementById('op-vad-t-home').checked, tF = document.getElementById('op-vad-t-food').checked, tM = document.getElementById('op-vad-t-mart').checked;
+  if (!tH && !tF && !tM) { opVadMsg('Select Home, Food or NESH Mart first.'); return; }
+  var expAt = opDurToExpiry(document.getElementById('op-vad-dur').value, document.getElementById('op-vad-dur-custom').value);
+  if (expAt === null) { opVadMsg('Enter how many hours to show (1 or more).'); return; }
+  var gap = Math.max(1, parseFloat(document.getElementById('op-vad-gap').value) || 12);
+  var skipAfter = Math.max(0, Math.min(30, parseInt(document.getElementById('op-vad-skip').value, 10) || 0));
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i], tag = (i + 1) + '/' + files.length;
+    if (f.size > 90 * 1024 * 1024) { opVadMsg('Video ' + tag + ' is too big (' + Math.round(f.size / 1048576) + ' MB). Max 90 MB - please use a shorter / smaller video.'); return; }
+    try {
+      opVadMsg('Preparing video ' + tag + '...');
+      var thumbUrl = '';
+      try { thumbUrl = await uploadPhotoToCloudinary(await opVideoThumb(f)); } catch (e) { thumbUrl = ''; }
+      var vurl = await opUploadVideoToCloudinary(f, function (pc) { opVadMsg('Uploading video ' + tag + '... ' + pc + '%'); });
+      if (!thumbUrl) thumbUrl = vurl.replace('/video/upload/', '/video/upload/so_0,f_jpg/').replace(/\.[a-z0-9]+$/i, '.jpg');
+      await fb.set(fb.push(fb.ref(fb.db, 'app_config/videoAds')), { video: vurl, thumb: thumbUrl, targets: { home: tH, food: tF, mart: tM }, expiresAt: expAt, gapHours: gap, skipAfter: skipAfter, ts: Date.now() + i });
+    } catch (e) { opVadMsg('Video upload failed: ' + ((e && e.message) || 'check internet / Cloudinary')); return; }
+  }
+  opVadMsg('Video ad added ✅');
+  opLoadVideoAds();
+}
+function opLoadVideoAds() {
+  var fb = window.fb, box = document.getElementById('op-vad-list'); if (!fb || !box) return;
+  fb.get(fb.ref(fb.db, 'app_config/videoAds')).then(function (snap) {
+    var v = snap.val() || {}, keys = Object.keys(v).filter(function (k) { return v[k] && v[k].video; })
+      .sort(function (a, b) { return (v[b].ts || 0) - (v[a].ts || 0); });
+    box.innerHTML = '';
+    if (!keys.length) { box.innerHTML = '<p class="op-note" style="margin-top:12px;">No video ads yet.</p>'; return; }
+    keys.forEach(function (k) {
+      var o = v[k], t = o.targets || {}, row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:10px;align-items:center;margin-top:12px;padding:10px;border:1px solid #124a24;border-radius:10px;';
+      var im = document.createElement('img'); im.src = o.thumb || ''; im.style.cssText = 'width:84px;height:84px;object-fit:cover;border-radius:8px;background:#020a04;flex:none;';
+      var info = document.createElement('div'); info.style.cssText = 'flex:1;min-width:0;color:#33ff66;font-size:.8rem;line-height:1.5;';
+      var places = [t.home ? '🏠 Home' : '', t.food ? '🍔 Food' : '', t.mart ? '🛍️ NESH Mart' : ''].filter(Boolean).join(' · ');
+      info.innerHTML = '<div>' + places + '</div><div>' + (o.off ? '⏸ Paused' : opPosterStatus(+o.expiresAt || 0)) + '</div><div>Again after ' + (o.gapHours || 12) + ' h · Skip after ' + (o.skipAfter || 0) + ' s</div>';
+      var a = document.createElement('a'); a.href = o.video; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '▶ Preview'; a.style.cssText = 'color:#33ff66;';
+      info.appendChild(a);
+      var col = document.createElement('div'); col.style.cssText = 'display:flex;flex-direction:column;gap:6px;flex:none;';
+      var b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'op-btn'; b1.style.cssText = 'padding:6px 10px;margin:0;'; b1.textContent = o.off ? 'Resume' : 'Pause';
+      b1.onclick = function () { fb.update(fb.ref(fb.db, 'app_config/videoAds/' + k), { off: !o.off }).then(opLoadVideoAds).catch(function (e) { opVadMsg('Error: ' + e.message); }); };
+      var b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'op-btn'; b2.style.cssText = 'padding:6px 10px;margin:0;'; b2.textContent = 'Delete';
+      b2.onclick = function () { if (confirm('Delete this video ad?')) fb.remove(fb.ref(fb.db, 'app_config/videoAds/' + k)).then(opLoadVideoAds).catch(function (e) { opVadMsg('Error: ' + e.message); }); };
+      col.appendChild(b1); col.appendChild(b2);
+      row.appendChild(im); row.appendChild(info); row.appendChild(col); box.appendChild(row);
+    });
+  }).catch(function (e) { box.innerHTML = '<p class="op-note">Could not load: ' + (e && e.message) + '</p>'; });
+}
+
+/* ---- COUPONS (operator) ----
+   app_config/coupons/{id} = { code, type:'flat'|'percent', value, minOrder, maxDiscount, expiresAt, perCustomer, allShops, shops:{shopId:true}, off, ts } */
+function opCpnMsg(t) { var e = document.getElementById('op-cpn-status'); if (e) e.textContent = t || ''; }
+function opCpnShopList() {
+  return (typeof opAllPartners !== 'undefined' && opAllPartners ? opAllPartners : [])
+    .filter(function (s) { return s.businessType !== 'groceries'; })
+    .sort(function (a, b) { return (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id); });
+}
+function opCpnAllToggle(cb) { document.getElementById('op-cpn-shops').style.display = cb.checked ? 'none' : 'block'; }
+function opCpnBuildShops() {
+  var box = document.getElementById('op-cpn-shops'); if (!box) return;
+  box.innerHTML = '';
+  var shops = opCpnShopList();
+  if (!shops.length) { box.textContent = 'No shops loaded yet - open this page again in a moment.'; return; }
+  shops.forEach(function (s) {
+    var l = document.createElement('label'); l.style.display = 'block';
+    var c = document.createElement('input'); c.type = 'checkbox'; c.className = 'op-cpn-shop'; c.value = s._id;
+    l.appendChild(c); l.appendChild(document.createTextNode(' ' + (s.restaurantName || s._id)));
+    box.appendChild(l);
+  });
+}
+function opCpnSave() {
+  var fb = window.fb; if (!fb) { opCpnMsg('Not connected yet, try again.'); return; }
+  var code = document.getElementById('op-cpn-code').value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{3,20}$/.test(code)) { opCpnMsg('Code must be 3-20 letters/numbers (no spaces).'); return; }
+  var type = document.getElementById('op-cpn-type').value, value = parseFloat(document.getElementById('op-cpn-value').value);
+  if (!(value > 0) || (type === 'percent' && value > 100)) { opCpnMsg(type === 'percent' ? 'Enter a percent between 1 and 100.' : 'Enter the ₹ amount off.'); return; }
+  var expAt = opDurToExpiry(document.getElementById('op-cpn-dur').value, document.getElementById('op-cpn-dur-custom').value);
+  if (expAt === null) { opCpnMsg('Enter how many hours (1 or more).'); return; }
+  var all = document.getElementById('op-cpn-all').checked, shops = {}, n = 0;
+  if (!all) Array.prototype.forEach.call(document.querySelectorAll('.op-cpn-shop:checked'), function (c) { shops[c.value] = true; n++; });
+  if (!all && !n) { opCpnMsg('Tick at least one shop (or All shops).'); return; }
+  opCpnMsg('Saving...');
+  fb.get(fb.ref(fb.db, 'app_config/coupons')).then(function (snap) {
+    var v = snap.val() || {}, dup = Object.keys(v).some(function (k) { return v[k] && String(v[k].code).toUpperCase() === code && !(v[k].expiresAt && v[k].expiresAt < Date.now()); });
+    if (dup) { opCpnMsg('A live coupon with this code already exists. Delete it first or use a different code.'); return; }
+    return fb.set(fb.push(fb.ref(fb.db, 'app_config/coupons')), {
+      code: code, type: type, value: value,
+      desc: document.getElementById('op-cpn-desc').value.trim().slice(0, 40),
+      maxUses: Math.max(0, parseInt(document.getElementById('op-cpn-total').value, 10) || 0),
+      minOrder: Math.max(0, parseFloat(document.getElementById('op-cpn-min').value) || 0),
+      maxDiscount: Math.max(0, parseFloat(document.getElementById('op-cpn-max').value) || 0),
+      perCustomer: Math.max(1, parseInt(document.getElementById('op-cpn-uses').value, 10) || 1),
+      expiresAt: expAt, allShops: all, secret: document.getElementById('op-cpn-secret').checked, shops: all ? {} : shops, ts: Date.now()
+    }).then(function () { opCpnMsg('Coupon ' + code + ' saved ✅'); document.getElementById('op-cpn-code').value = ''; document.getElementById('op-cpn-desc').value = ''; document.getElementById('op-cpn-total').value = ''; opLoadCoupons(); });
+  }).catch(function (e) { opCpnMsg('Error: ' + ((e && e.message) || 'could not save')); });
+}
+function opLoadCoupons() {
+  var fb = window.fb, box = document.getElementById('op-cpn-list'); if (!fb || !box) return;
+  Promise.all([fb.get(fb.ref(fb.db, 'app_config/coupons')), fb.get(fb.ref(fb.db, 'couponTotals')).catch(function () { return null; })]).then(function (res) {
+    var snap = res[0], totals = (res[1] && res[1].val && res[1].val()) || {};
+    var v = snap.val() || {}, keys = Object.keys(v).filter(function (k) { return v[k] && v[k].code; }).sort(function (a, b) { return (v[b].ts || 0) - (v[a].ts || 0); });
+    var names = {}; opCpnShopList().forEach(function (s) { names[s._id] = s.restaurantName || s._id; });
+    box.innerHTML = '';
+    if (!keys.length) { box.innerHTML = '<p class="op-note" style="margin-top:12px;">No coupons yet.</p>'; return; }
+    keys.forEach(function (k) {
+      var o = v[k], row = document.createElement('div');
+      row.style.cssText = 'margin-top:12px;padding:10px;border:1px solid #124a24;border-radius:10px;color:#33ff66;font-size:.82rem;line-height:1.6;';
+      var off = o.type === 'percent' ? o.value + '% off' + (o.maxDiscount ? ' (max ₹' + o.maxDiscount + ')' : '') : '₹' + o.value + ' off';
+      var where = o.allShops ? '🌐 All shops' : Object.keys(o.shops || {}).map(function (id) { return names[id] || id; }).join(', ') || '—';
+      var h = document.createElement('div'); h.style.cssText = 'font-weight:700;font-size:.95rem;'; h.textContent = '🎟️ ' + o.code + ' — ' + off;
+      var d = document.createElement('div');
+      d.textContent = 'Min order ₹' + (o.minOrder || 0) + ' · ' + (o.perCustomer || 1) + 'x per customer · ' + (o.maxUses > 0 ? ((totals[k] || 0) + '/' + o.maxUses + ' used in total · ') : 'no total limit · ') + (o.off ? '⏸ Paused' : opPosterStatus(+o.expiresAt || 0)) + (o.secret ? ' · 🔒 Secret' : ' · 🎟️ Shown as card');
+      var w = document.createElement('div'); w.textContent = 'Shops: ' + where;
+      var bar = document.createElement('div'); bar.style.cssText = 'display:flex;gap:8px;margin-top:6px;';
+      var b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'op-btn'; b1.style.cssText = 'padding:6px 10px;margin:0;'; b1.textContent = o.off ? 'Resume' : 'Pause';
+      b1.onclick = function () { fb.update(fb.ref(fb.db, 'app_config/coupons/' + k), { off: !o.off }).then(opLoadCoupons).catch(function (e) { opCpnMsg('Error: ' + e.message); }); };
+      var b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'op-btn'; b2.style.cssText = 'padding:6px 10px;margin:0;'; b2.textContent = 'Delete';
+      b2.onclick = function () { if (confirm('Delete coupon ' + o.code + '?')) fb.remove(fb.ref(fb.db, 'app_config/coupons/' + k)).then(opLoadCoupons).catch(function (e) { opCpnMsg('Error: ' + e.message); }); };
+      bar.appendChild(b1); bar.appendChild(b2);
+      row.appendChild(h); row.appendChild(d); row.appendChild(w); row.appendChild(bar); box.appendChild(row);
+    });
+  }).catch(function (e) { box.innerHTML = '<p class="op-note">Could not load: ' + (e && e.message) + '</p>'; });
 }
 </script>
 </body>
