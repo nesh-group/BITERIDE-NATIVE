@@ -1338,6 +1338,12 @@
       <div class="field">
         <input id="item-price" type="number" inputmode="decimal" placeholder="Price (₹)" />
       </div>
+      <div id="item-offer-section" style="display:none;">
+        <div class="field">
+          <input id="item-offer-price" type="number" inputmode="decimal" placeholder="Offer price (₹) — optional" />
+        </div>
+        <p class="hint-text" style="margin-top:0;">🔥 Fill this to put the item in the customer app's Trending tab. It must be lower than the price above. Leave empty for no offer.</p>
+      </div>
       <div id="item-unit-section">
         <p class="loc-field-label" style="margin-top:2px;">Sold by</p>
         <div class="type-toggle" id="item-unit-toggle" style="gap:8px;">
@@ -1769,6 +1775,11 @@
           <h3>Shop Deals</h3>
           <p>Set a ₹ off deal with a countdown timer for any shop — shows in NESH Mart "Today's deals"</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('trending')">
+          <div class="op-home-icon">🔥</div>
+          <h3>Trending Offers</h3>
+          <p>Set an offer price on any Groceries / NESH Mart product — offer products show in the customer app's Trending tab</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('delivery-time')">
           <div class="op-home-icon">⏱️</div>
           <h3>Estimated Delivery Time</h3>
@@ -1784,10 +1795,36 @@
           <h3>Taxi Fare</h3>
           <p>Set the per-km taxi rate and a platform fee per ride — leave at 0 to leave off</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('rain-surge')">
+          <div class="op-home-icon">🌧️</div>
+          <h3>Rain Surge</h3>
+          <p>Switch rain surge on per zone — set what the customer pays and the extra the driver earns</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('support-phone')">
           <div class="op-home-icon">📞</div>
           <h3>Customer Support</h3>
           <p>Set the phone number the "Call Support" button in the customer app dials</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('driver-config')">
+          <div class="op-home-icon">🛠️</div>
+          <h3>Driver App Settings</h3>
+          <p>Driver help number &amp; the "₹X extra per order" banner shown on the driver app home</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('driver-posters')">
+          <div class="op-home-icon">🖼️</div>
+          <h3>Driver Posters</h3>
+          <p>Add swipeable posters to the driver app home screen (Swiggy style)</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('driver-sos')" style="position:relative;">
+          <span class="op-home-badge" id="op-sos-home-badge" style="display:none;"></span>
+          <div class="op-home-icon">🆘</div>
+          <h3>Driver SOS Alerts</h3>
+          <p>Emergency alerts sent by drivers with their live location</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('driver-shifts')">
+          <div class="op-home-icon">🗓️</div>
+          <h3>Driver Shifts</h3>
+          <p>Create shifts drivers can book from "My Shifts", and see who booked</p>
         </div>
         <div class="op-home-card" onclick="opOpenSection('support')">
           <div class="op-home-icon">💬</div>
@@ -2655,6 +2692,34 @@
     </div>
   </div>
 
+  <!-- TRENDING OFFERS — operator sets/clears restaurants/{shop}/menu/{item}/offerPrice for Groceries + NESH Mart shops.
+       Same field the shop sets in its own item form (last save wins). Customer app shows a Trending tab only while at least one offer exists. -->
+  <div class="op-section" id="op-section-trending">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Trending Offers</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">An item with an offer price shows in the customer app's 🔥 Trending tab (Groceries and NESH Mart shops only). The tab appears for customers only while at least one offer exists. Customers pay the offer price instead of the normal price. This is the same setting each shop has in its own item form (last save wins).</p>
+      <h2 style="margin:14px 0 6px;">Live offers</h2>
+      <div id="op-trend-current"></div>
+      <div id="op-trend-editor" style="display:none; margin:16px 0; padding:14px; border:1px solid #124a24;">
+        <h2 id="op-trend-editor-title" style="margin-top:0;"></h2>
+        <div class="op-search-box" style="margin-bottom:10px;">
+          <input type="text" id="op-trend-item-search" placeholder="Search items..." oninput="opTrendRenderItems()">
+        </div>
+        <div id="op-trend-items"></div>
+        <button type="button" class="op-btn" onclick="opTrendCloseShop()">Close</button>
+        <p class="op-note" id="op-trend-status" style="margin-top:10px;"></p>
+      </div>
+      <h2 style="margin:18px 0 6px;">Pick a shop to add offers</h2>
+      <div class="op-search-box" style="margin-bottom:6px;">
+        <input type="text" id="op-trend-search" placeholder="Search shops..." oninput="opRenderTrending()">
+      </div>
+      <div id="op-trend-shops" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
   <!-- ESTIMATED DELIVERY TIME — operator sets it for ANY shop (Go Series and groceries included).
        Writes restaurants/{id}/opDeliveryTimeMins, which always wins over the shop's own
        deliveryTimeMins in the customer app. -->
@@ -2726,6 +2791,19 @@
     </div>
   </div>
 
+  <!-- RAIN SURGE -->
+  <div class="op-section" id="op-section-rain-surge">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Rain Surge</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Turn rain surge ON for a zone when it's raining there. Customers whose delivery pin is inside that zone see a separate "Rain surge" line in their bill (only on orders delivered by NESH drivers), and the driver earns the driver amount on top of the delivery charge. Leave "Driver gets" blank to pay the driver the same amount the customer pays. Zones come from Shop Zones.</p>
+      <div id="op-rs-list" style="margin-top:12px;"></div>
+      <p class="op-note" id="op-rs-status" style="margin-top:8px;"></p>
+    </div>
+  </div>
+
   <!-- CUSTOMER SUPPORT PHONE -->
   <div class="op-section" id="op-section-support-phone">
     <div class="op-section-header">
@@ -2741,6 +2819,87 @@
         <button type="button" class="op-btn op-btn-push" onclick="opSaveSupportPhone()">💾 Save</button>
       </div>
       <p class="op-note" id="op-support-phone-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- DRIVER APP SETTINGS -->
+  <div class="op-section" id="op-section-driver-config">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Driver App Settings</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Help number: the driver app's Help button (Call / WhatsApp). Until it is set, drivers see "Help number isn't set up yet". Incentive: shows "₹X extra per order!" on the driver home — leave amount 0 to hide the banner.</p>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="tel" id="op-dcfg-phone" placeholder="Driver help number (e.g. 9876543210)">
+      </div>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="number" id="op-dcfg-incentive-amt" placeholder="Extra ₹ per order (0 = hide banner)" min="0" step="1">
+      </div>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="text" id="op-dcfg-incentive-text" placeholder="Banner subtext (e.g. Ramanattukara | Food orders)">
+      </div>
+      <div><button type="button" class="op-btn op-btn-push" onclick="opSaveDriverConfig()">💾 Save</button></div>
+      <p class="op-note" id="op-dcfg-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- DRIVER POSTERS -->
+  <div class="op-section" id="op-section-driver-posters">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Driver Posters</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Posters shown as a swipeable slider on the driver app home screen (auto-slides every 4 seconds, next poster peeks at the side). Best size 16:9, e.g. 1280×720 — photos are resized automatically. Stored at driver_posters. Customers never see these. Deleting a poster (or an expired one, when auto-delete is ticked in the Notify section) also deletes its photo from Cloudinary.</p>
+      <div style="margin:0 0 10px;">
+        <p class="op-note" style="margin-bottom:6px;">Show for how long:</p>
+        <select id="op-dp-dur" onchange="document.getElementById('op-dp-dur-custom').style.display = this.value === 'custom' ? '' : 'none'" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+          <option value="0" selected>No time limit</option><option value="24">24 hours</option><option value="72">3 days</option>
+          <option value="168">7 days</option><option value="720">30 days</option><option value="custom">Custom hours…</option>
+        </select>
+        <input type="number" id="op-dp-dur-custom" min="1" max="8760" placeholder="hours" style="display:none;width:90px;margin-left:8px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+      </div>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="url" id="op-dp-link" placeholder="Link opened when a driver taps the poster (optional)">
+      </div>
+      <input type="file" id="op-dp-file" accept="image/*" multiple style="display:none" onchange="opDriverPosterUpload(this)">
+      <button type="button" class="op-btn op-btn-push" onclick="document.getElementById('op-dp-file').click()">＋ Add poster photo(s)</button>
+      <p class="op-note" id="op-dp-status" style="margin-top:10px;"></p>
+      <div id="op-dp-list"></div>
+    </div>
+  </div>
+
+  <!-- DRIVER SOS ALERTS -->
+  <div class="op-section" id="op-section-driver-sos">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Driver SOS Alerts</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Sent when a driver confirms SOS in the driver app. Call the driver, open their location, then tap Resolved once handled.</p>
+      <div id="op-sos-list"></div>
+    </div>
+  </div>
+
+  <!-- DRIVER SHIFTS -->
+  <div class="op-section" id="op-section-driver-shifts">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Driver Shifts</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Create a shift (date, time window, number of driver slots). Drivers see it under "My Shifts" and can book until it is full.</p>
+      <div class="op-search-box" style="margin-bottom:10px;"><input type="date" id="op-shift-date"></div>
+      <div style="display:flex; gap:8px; margin-bottom:10px;">
+        <div class="op-search-box" style="flex:1; margin:0;"><input type="time" id="op-shift-start" value="16:00"></div>
+        <div class="op-search-box" style="flex:1; margin:0;"><input type="time" id="op-shift-end" value="19:00"></div>
+      </div>
+      <div class="op-search-box" style="margin-bottom:10px;"><input type="number" id="op-shift-slots" placeholder="Driver slots (e.g. 10)" min="1" step="1"></div>
+      <div class="op-search-box" style="margin-bottom:10px;"><input type="text" id="op-shift-note" placeholder="Note for drivers (optional, e.g. ₹15 extra per order)"></div>
+      <div><button type="button" class="op-btn op-btn-push" onclick="opCreateShift()">➕ Create shift</button></div>
+      <p class="op-note" id="op-shift-status" style="margin-top:10px;"></p>
+      <div id="op-shifts-list" style="margin-top:14px;"></div>
     </div>
   </div>
 
@@ -3525,7 +3684,7 @@ function renderOrderPopup(pendingList) {
         return `<div class="order-popup-row"><span>${it.qty} × ${it.name}${it.desc ? `<br><span style="color:#8a94a3; font-size:11px;">${it.desc}</span>` : ''}</span><span>₹${rate * it.qty}</span></div>`;
       }).join('');
       const feeHtml = order.platformFee ? `<div class="order-popup-row"><span>Platform fee</span><span>₹${order.platformFee}</span></div>` : '';
-      const deliveryHtml = order.deliveryFee ? `<div class="order-popup-row"><span>Delivery charge</span><span>₹${order.deliveryFee}</span></div>` : '';
+      const deliveryHtml = (order.deliveryFee ? `<div class="order-popup-row"><span>Delivery charge</span><span>₹${order.deliveryFee}</span></div>` : '') + (order.rainSurge ? `<div class="order-popup-row"><span>🌧️ Rain surge</span><span>₹${order.rainSurge}</span></div>` : '');
       bodyHtml = `
         ${itemsHtml}
         ${feeHtml}
@@ -5705,6 +5864,10 @@ function openItemForm(item) {
   document.getElementById('item-name').value = item ? item.name : "";
   document.getElementById('item-desc').value = item ? (item.desc || "") : "";
   document.getElementById('item-price').value = item ? item.price : "";
+  { const offSec = document.getElementById('item-offer-section');
+    const offOk = state.restaurant?.businessType === 'groceries' || state.restaurant?.businessType === 'online_shop';
+    offSec.style.display = offOk ? "block" : "none";
+    document.getElementById('item-offer-price').value = (item && Number(item.offerPrice) > 0) ? item.offerPrice : ""; }
   const groceriesShop = isGroceriesShop();
   document.getElementById('item-unit-section').style.display = groceriesShop ? "block" : "none";
   setItemUnitToggle(groceriesShop && item ? (item.unit || "piece") : "piece");
@@ -5849,6 +6012,14 @@ async function saveItem() {
     errEl.style.display = "block";
     return;
   }
+  const offerSecOn = document.getElementById('item-offer-section').style.display !== 'none';
+  const offerRaw = document.getElementById('item-offer-price').value.trim();
+  const offerPrice = offerRaw === '' ? 0 : parseFloat(offerRaw);
+  if (offerSecOn && offerRaw !== '' && (isNaN(offerPrice) || offerPrice <= 0 || offerPrice >= price)) {
+    errEl.textContent = "Offer price must be above 0 and lower than the normal price";
+    errEl.style.display = "block";
+    return;
+  }
   if (state.photoUploading) {
     errEl.textContent = "Photo is still uploading — wait a moment and try again";
     errEl.style.display = "block";
@@ -5862,6 +6033,7 @@ async function saveItem() {
       ? document.getElementById('item-sizes').value.split(',').map(s => s.trim()).filter(Boolean)
       : [];
     const data = { name, desc, price, unit: isGroceriesShop() ? (state.selectedUnit || "piece") : "piece", photo: state.photoDataUrl || "", unavailable: document.getElementById('item-unavailable').checked, sizes };
+    if (offerSecOn) data.offerPrice = offerPrice > 0 ? offerPrice : null;
     if (state.editingItemId) {
       await update(ref(db, 'restaurants/' + state.restId + '/menu/' + state.editingItemId), data);
     } else {
@@ -6393,6 +6565,12 @@ function renderOrderDetail(o) {
       row.className = "item-row";
       const kmNote = o.deliveryDistanceKm ? ` (${o.deliveryDistanceKm} km)` : '';
       row.innerHTML = `<span>Delivery charge${kmNote}</span><span>₹${o.deliveryFee}</span>`;
+      itemsEl.appendChild(row);
+    }
+    if (o.rainSurge) {
+      const row = document.createElement('div');
+      row.className = "item-row";
+      row.innerHTML = `<span>🌧️ Rain surge</span><span>₹${o.rainSurge}</span>`;
       itemsEl.appendChild(row);
     }
     document.getElementById('od-total').textContent = "₹" + (o.total || 0);
@@ -7077,7 +7255,7 @@ function listenDailyEarnings() {
       const hasShopPrices = (o.items || []).some(it => it.shopPrice != null);
       const earning = hasShopPrices
         ? (o.items || []).reduce((s, it) => s + (Number(it.shopPrice != null ? it.shopPrice : it.price) || 0) * (it.qty || 0), 0)
-        : Math.max(0, (o.total || 0) - (o.platformFee || 0) - (o.deliveryFee || 0));
+        : Math.max(0, (o.total || 0) - (o.platformFee || 0) - (o.deliveryFee || 0) - (o.rainSurge || 0));
       total += earning;
       count++;
       list.push({ _id: child.key, ...o, _earning: earning });
@@ -7646,6 +7824,8 @@ function opEnterPanel() {
   opListenNeshPrices();
   opListenGroceryQueue();
   opListenDeletionRequests();
+  opListenDriverSos();
+  opListenDriverShifts();
   setInterval(opUpdateOrdersHomeBadge, 30000); // keeps the "late" badge current even while sitting on the home screen
 }
 function opLogout() {
@@ -7678,11 +7858,17 @@ function opOpenSection(name) {
   if (name === 'support') opRenderChatConvList();
   if (name === 'pricing') opLoadExtraAmount();
   if (name === 'taxi-fare') opLoadTaxiFare();
+  if (name === 'rain-surge') opLoadRainSurge();
   if (name === 'support-phone') opLoadSupportPhone();
+  if (name === 'driver-config') opLoadDriverConfig();
+  if (name === 'driver-posters') opLoadDriverPosters();
+  if (name === 'driver-sos') opRenderSosList();
+  if (name === 'driver-shifts') { opRenderShiftsList(); const d = document.getElementById('op-shift-date'); if (d && !d.value) d.value = new Date().toISOString().slice(0,10); }
   if (name === 'go-series') opLoadGoSeries();
   if (name === 'shop-delivery') { opCloseShopDeliveryEditor(); opRenderShopDeliveryList(); }
   if (name === 'delivery-time') { opCloseEtaEditor(); opRenderEtaList(); }
   if (name === 'shop-deals') { opCloseShopDealEditor(); opRenderShopDealsList(); }
+  if (name === 'trending') { opTrendCloseShop(); opRenderTrending(); }
   if (name === 'shop-zones') opRenderShopZones();
   if (name === 'report') opRenderReportShopList();
   if (name === 'groceries-queue') opRenderGroceriesQueueList();
@@ -8011,6 +8197,58 @@ function opSaveTaxiFare() {
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
+/* ---- Rain Surge: operator switches it on per Shop Zone ----
+   Stored at app_config/rainSurge/{zoneId} = { on, amount, driverAmount, updatedAt }.
+   amount = extra ₹ the customer pays (its own "Rain surge" bill line);
+   driverAmount = extra ₹ the driver earns on top of the delivery charge
+   (blank = same as amount). Stamped on each order as rainSurge /
+   rainSurgeDriver / rainSurgeZone when the customer places it. */
+async function opLoadRainSurge() {
+  const wrap = document.getElementById('op-rs-list');
+  const status = document.getElementById('op-rs-status');
+  if (!wrap) return;
+  status.textContent = '';
+  wrap.innerHTML = '<p class="op-note">Loading zones...</p>';
+  try {
+    const { db, ref, get } = window.fb;
+    const [zSnap, rSnap] = await Promise.all([get(ref(db, 'app_config/shopZones')), get(ref(db, 'app_config/rainSurge'))]);
+    const zones = zSnap.val() || {}, cfg = rSnap.val() || {};
+    const ids = Object.keys(zones).sort((a, b) => ((zones[a] || {}).createdAt || 0) - ((zones[b] || {}).createdAt || 0));
+    if (!ids.length) { wrap.innerHTML = '<p class="op-note">No zones yet — draw a zone first in Shop Zones.</p>'; return; }
+    wrap.innerHTML = ids.map(id => {
+      const z = zones[id] || {}, c = cfg[id] || {};
+      const amt = Number(c.amount) || '';
+      const drv = (c.driverAmount === '' || c.driverAmount == null) ? '' : Number(c.driverAmount);
+      return `
+      <div class="op-partner-item" style="display:block; margin-bottom:12px;">
+        <div class="op-partner-name">${escapeHtml(z.name || id)}</div>
+        <label style="display:flex; align-items:center; gap:8px; margin:10px 0; font-size:.95rem;">
+          <input type="checkbox" id="op-rs-on-${id}" ${c.on ? 'checked' : ''} onchange="opSaveRainSurge('${id}')"> 🌧️ Rain surge ON in this zone
+        </label>
+        <div class="op-search-box" style="margin-bottom:8px;"><input type="number" id="op-rs-amt-${id}" placeholder="Customer pays extra ₹ (e.g. 20)" min="0" step="1" value="${amt}"></div>
+        <div class="op-search-box" style="margin-bottom:8px;"><input type="number" id="op-rs-drv-${id}" placeholder="Driver gets extra ₹ (blank = same as customer amount)" min="0" step="1" value="${drv}"></div>
+        <button type="button" class="op-btn op-btn-push" onclick="opSaveRainSurge('${id}')">💾 Save</button>
+        <p class="op-note" id="op-rs-st-${id}" style="margin-top:6px;">${c.on ? 'ON — customer ₹' + (Number(c.amount) || 0) + ', driver ₹' + (drv === '' ? (Number(c.amount) || 0) : drv) : 'OFF'}</p>
+      </div>`;
+    }).join('');
+  } catch (err) { wrap.innerHTML = ''; status.textContent = 'Error: ' + err.message; }
+}
+function opSaveRainSurge(id) {
+  const onEl = document.getElementById('op-rs-on-' + id);
+  const st = document.getElementById('op-rs-st-' + id);
+  const amount = Number(document.getElementById('op-rs-amt-' + id).value) || 0;
+  const drvRaw = document.getElementById('op-rs-drv-' + id).value.trim();
+  const driverAmount = drvRaw === '' ? '' : Number(drvRaw);
+  if (amount < 0 || (driverAmount !== '' && (isNaN(driverAmount) || driverAmount < 0))) { st.textContent = 'Enter valid amounts (0 or more).'; return; }
+  const on = onEl.checked;
+  if (on && amount <= 0) { onEl.checked = false; st.textContent = 'Enter the amount the customer pays (more than 0) before turning it ON.'; return; }
+  st.textContent = 'Saving...';
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'app_config/rainSurge/' + id), { on, amount, driverAmount, updatedAt: new Date().toLocaleString() })
+    .then(() => { st.textContent = on ? 'Saved — ON: customer pays ₹' + amount + ', driver gets ₹' + (driverAmount === '' ? amount : driverAmount) + '.' : 'Saved — OFF.'; })
+    .catch(err => { st.textContent = 'Error: ' + err.message; });
+}
+
 /* ---- Customer Support: operator-set phone number for the "Call Support"
    button in the customer app's account menu.
    Stored at app_config/supportPhone = { number, updatedAt }.
@@ -8037,6 +8275,164 @@ function opSaveSupportPhone() {
   }).then(() => {
     status.textContent = number ? ('Saved — customers can now call ' + number + '.') : 'Saved — number cleared, Call Support button is hidden in the customer app.';
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+
+/* ---- Driver app settings: /driver_config { supportPhone, incentiveAmount, incentiveText, updatedAt } ---- */
+function opLoadDriverConfig() {
+  const status = document.getElementById('op-dcfg-status');
+  status.textContent = 'Loading current settings...';
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'driver_config')).then(snap => {
+    const c = snap.val() || {};
+    document.getElementById('op-dcfg-phone').value = c.supportPhone || '';
+    document.getElementById('op-dcfg-incentive-amt').value = c.incentiveAmount || '';
+    document.getElementById('op-dcfg-incentive-text').value = c.incentiveText || '';
+    status.textContent = c.updatedAt ? ('Last updated ' + c.updatedAt + '.') : 'Not set yet — drivers see "Help number isn\'t set up yet" and no incentive banner.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opSaveDriverConfig() {
+  const status = document.getElementById('op-dcfg-status');
+  const supportPhone = document.getElementById('op-dcfg-phone').value.trim();
+  const incentiveAmount = Number(document.getElementById('op-dcfg-incentive-amt').value) || 0;
+  const incentiveText = document.getElementById('op-dcfg-incentive-text').value.trim();
+  if (incentiveAmount < 0) { status.textContent = 'Enter a valid amount (0 or more).'; return; }
+  status.textContent = 'Saving...';
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'driver_config'), { supportPhone, incentiveAmount, incentiveText, updatedAt: new Date().toLocaleString() })
+    .then(() => {
+      status.textContent = 'Saved — help number ' + (supportPhone || 'cleared') + ', incentive ' + (incentiveAmount > 0 ? ('₹' + incentiveAmount + ' per order shown') : 'banner hidden') + '.';
+    }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+/* ---- Driver SOS alerts: /driver_sos/{id} { driverId, driverName, phone, location:{lat,lng}, createdAt, status } ---- */
+let opSosAlerts = [];
+let opSosFirstLoad = true;
+function opListenDriverSos() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'driver_sos'), snap => {
+    const list = [];
+    snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
+    list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const prevOpen = new Set(opSosAlerts.filter(a => a.status === 'open').map(a => a._id));
+    opSosAlerts = list;
+    const newOpen = list.filter(a => a.status === 'open' && !prevOpen.has(a._id));
+    if (!opSosFirstLoad && newOpen.length) {
+      try { if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]); } catch (e) {}
+      const a = newOpen[0];
+      alert('🆘 SOS from driver ' + (a.driverName || a.driverId || '') + (a.phone ? ' — ' + a.phone : ''));
+    }
+    opSosFirstLoad = false;
+    const sec = document.getElementById('op-section-driver-sos');
+    if (sec && sec.classList.contains('active')) opRenderSosList();
+    const badge = document.getElementById('op-sos-home-badge');
+    const openCount = list.filter(a => a.status === 'open').length;
+    if (badge) { if (openCount) { badge.style.display = 'inline-block'; badge.textContent = openCount + ' open'; } else badge.style.display = 'none'; }
+  });
+}
+function opRenderSosList() {
+  const wrap = document.getElementById('op-sos-list');
+  if (!wrap) return;
+  if (!opSosAlerts.length) { wrap.innerHTML = '<div class="op-empty">No SOS alerts.</div>'; return; }
+  wrap.innerHTML = opSosAlerts.map(a => {
+    const open = a.status === 'open';
+    const loc = a.location && a.location.lat != null ? a.location : null;
+    const phone = String(a.phone || '').replace(/[^0-9+]/g, '');
+    return `
+    <div class="op-partner-item" style="cursor:default; ${open ? 'border-color:#dc2626;' : ''}">
+      <div class="op-partner-top">
+        <span class="op-partner-name">${escapeHtml(a.driverName || a.driverId || 'Driver')}</span>
+        <span class="op-partner-type">${open ? '🆘 OPEN' : '✅ Resolved'}</span>
+      </div>
+      <div class="op-partner-sub">${a.createdAt ? new Date(a.createdAt).toLocaleString() : '—'}${phone ? ' · ' + escapeHtml(phone) : ''}</div>
+      ${loc ? '<div class="op-partner-sub">Location updated ' + (loc.updatedAt ? new Date(loc.updatedAt).toLocaleTimeString() : '—') + '</div>' : '<div class="op-partner-sub">No location available</div>'}
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        ${phone ? `<a class="op-btn op-btn-push" style="text-decoration:none;" href="tel:${phone}">📞 Call</a>` : ''}
+        ${loc ? `<a class="op-btn" style="text-decoration:none;" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${loc.lat},${loc.lng}">📍 Location</a>` : ''}
+        ${open ? `<button class="op-btn" onclick="opResolveSos('${a._id}')">✅ Resolved</button>` : ''}
+        <button class="op-btn op-btn-danger" onclick="opDeleteSos('${a._id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function opResolveSos(id) {
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'driver_sos/' + id), { status: 'resolved', resolvedAt: Date.now() }).catch(err => alert('Error: ' + err.message));
+}
+function opDeleteSos(id) {
+  if (!confirm('Delete this SOS alert?')) return;
+  const { db, ref, remove } = window.fb;
+  remove(ref(db, 'driver_sos/' + id)).catch(err => alert('Error: ' + err.message));
+}
+
+/* ---- Driver shifts: /driver_shifts/{id} { date:'YYYY-MM-DD', start:'HH:MM', end:'HH:MM', slots, note, createdAt,
+   bookings:{ driverUsername:{ name, phone, bookedAt } } } — drivers book from "My Shifts" in the driver app. ---- */
+let opShifts = [];
+function opListenDriverShifts() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'driver_shifts'), snap => {
+    const list = [];
+    snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
+    list.sort((a, b) => ((a.date || '') + (a.start || '')).localeCompare((b.date || '') + (b.start || '')));
+    opShifts = list;
+    const sec = document.getElementById('op-section-driver-shifts');
+    if (sec && sec.classList.contains('active')) opRenderShiftsList();
+  });
+}
+function opFmtShiftTime(t) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t || '');
+  if (!m) return t || '';
+  let h = Number(m[1]); const ap = h >= 12 ? 'pm' : 'am'; h = h % 12 || 12;
+  return h + ':' + m[2] + ' ' + ap;
+}
+function opCreateShift() {
+  const status = document.getElementById('op-shift-status');
+  const date = document.getElementById('op-shift-date').value;
+  const start = document.getElementById('op-shift-start').value;
+  const end = document.getElementById('op-shift-end').value;
+  const slots = Math.floor(Number(document.getElementById('op-shift-slots').value));
+  const note = document.getElementById('op-shift-note').value.trim();
+  if (!date || !start || !end) { status.textContent = 'Pick a date, start time and end time.'; return; }
+  if (end <= start) { status.textContent = 'End time must be after start time.'; return; }
+  if (!(slots >= 1)) { status.textContent = 'Enter the number of driver slots (1 or more).'; return; }
+  status.textContent = 'Creating...';
+  const { db, ref, push, set } = window.fb;
+  const r = push(ref(db, 'driver_shifts'));
+  set(r, { date, start, end, slots, note, createdAt: Date.now() })
+    .then(() => { status.textContent = 'Shift created — drivers can book it now.'; document.getElementById('op-shift-note').value = ''; })
+    .catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opRenderShiftsList() {
+  const wrap = document.getElementById('op-shifts-list');
+  if (!wrap) return;
+  if (!opShifts.length) { wrap.innerHTML = '<div class="op-empty">No shifts yet — create one above.</div>'; return; }
+  const today = new Date().toISOString().slice(0, 10);
+  wrap.innerHTML = opShifts.map(s => {
+    const b = s.bookings ? Object.keys(s.bookings).map(k => Object.assign({ _id: k }, s.bookings[k])) : [];
+    const past = (s.date || '') < today;
+    const d = s.date ? new Date(s.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) : '—';
+    return `
+    <div class="op-partner-item" style="cursor:default; ${past ? 'opacity:.55;' : ''}">
+      <div class="op-partner-top">
+        <span class="op-partner-name">${escapeHtml(d)} · ${opFmtShiftTime(s.start)} – ${opFmtShiftTime(s.end)}</span>
+        <span class="op-partner-type">${b.length}/${s.slots || 0} booked</span>
+      </div>
+      ${s.note ? '<div class="op-partner-sub">' + escapeHtml(s.note) + '</div>' : ''}
+      ${b.length ? '<div class="op-partner-sub">' + b.map(x => escapeHtml(x.name || x._id) + (x.phone ? ' (' + escapeHtml(x.phone) + ')' : '')
+        + ' <a href="#" style="color:#f87171;" onclick="opRemoveShiftBooking(\'' + s._id + '\',\'' + x._id + '\'); return false;">remove</a>').join('<br>') + '</div>' : '<div class="op-partner-sub">No bookings yet.</div>'}
+      <div style="margin-top:10px;"><button class="op-btn op-btn-danger" onclick="opDeleteShift('${s._id}')">🗑 Delete shift</button></div>
+    </div>`;
+  }).join('');
+}
+function opDeleteShift(id) {
+  if (!confirm('Delete this shift? Drivers who booked it will lose their booking.')) return;
+  const { db, ref, remove } = window.fb;
+  remove(ref(db, 'driver_shifts/' + id)).catch(err => alert('Error: ' + err.message));
+}
+function opRemoveShiftBooking(shiftId, driverId) {
+  if (!confirm('Remove this driver from the shift?')) return;
+  const { db, ref, remove } = window.fb;
+  remove(ref(db, 'driver_shifts/' + shiftId + '/bookings/' + driverId)).catch(err => alert('Error: ' + err.message));
 }
 
 /* ---- Shop Zones: operator-drawn zones, each with its own list of shops.
@@ -8563,6 +8959,109 @@ function opClearShopDeal() {
     status.textContent = 'Deal turned off.';
     opRenderShopDealsList();
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+/* ---- Trending offers (item offerPrice for Groceries + NESH Mart shops) ---- */
+let opTrendShopId = null;
+function opTrendShops() { return opAllPartners.filter(p => p.businessType === 'groceries' || p.businessType === 'online_shop'); }
+function opTrendMenuList(p) {
+  const m = p && p.menu ? p.menu : {};
+  return Object.keys(m).map(k => Object.assign({ _k: k }, m[k]));
+}
+function opTrendLive() {
+  const out = [];
+  opTrendShops().forEach(p => opTrendMenuList(p).forEach(it => {
+    if (Number(it.offerPrice) > 0 && Number(it.offerPrice) < Number(it.price)) out.push({ p, it });
+  }));
+  return out;
+}
+function opRenderTrending() {
+  const cur = document.getElementById('op-trend-current');
+  if (!cur) return;
+  const live = opTrendLive();
+  cur.innerHTML = live.length ? live.map(({ p, it }) => `
+    <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div>
+        <div class="op-partner-name">${escapeHtml(it.name || 'Item')}</div>
+        <div class="op-partner-sub">${escapeHtml(p.restaurantName || p._id)} · ₹${escapeHtml(String(it.price))} → ₹${escapeHtml(String(it.offerPrice))}</div>
+      </div>
+      <button type="button" class="op-btn op-btn-danger" style="margin:0;" data-s="${escapeHtml(p._id)}" data-i="${escapeHtml(it._k)}" onclick="opTrendClear(this.dataset.s, this.dataset.i)">Remove</button>
+    </div>`).join('') : '<p class="op-note">No offer products yet — the Trending tab is hidden for customers.</p>';
+  const wrap = document.getElementById('op-trend-shops');
+  const q = (document.getElementById('op-trend-search').value || '').trim().toLowerCase();
+  const shops = opTrendShops()
+    .filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q))
+    .sort((a, b) => (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id));
+  wrap.innerHTML = shops.length ? shops.map(p => {
+    const n = opTrendMenuList(p).filter(it => Number(it.offerPrice) > 0).length;
+    return `
+    <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div>
+        <div class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</div>
+        <div class="op-partner-sub">${escapeHtml(opTypeLabel(p.businessType))} · ${n ? n + ' offer item' + (n > 1 ? 's' : '') : 'no offers'}</div>
+      </div>
+      <button type="button" class="op-btn op-btn-push" style="margin:0;" data-id="${escapeHtml(p._id)}" onclick="opTrendOpenShop(this.dataset.id)">✏️ Items</button>
+    </div>`; }).join('') : '<p class="op-note">' + (q ? 'No matching shops.' : 'No Groceries / NESH Mart shops yet.') + '</p>';
+  if (opTrendShopId) opTrendRenderItems();
+}
+function opTrendOpenShop(id) {
+  const p = opAllPartners.find(x => x._id === id);
+  if (!p) return;
+  opTrendShopId = id;
+  document.getElementById('op-trend-editor-title').textContent = p.restaurantName || p._id;
+  document.getElementById('op-trend-item-search').value = '';
+  document.getElementById('op-trend-status').textContent = '';
+  document.getElementById('op-trend-editor').style.display = 'block';
+  opTrendRenderItems();
+  document.getElementById('op-trend-editor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function opTrendCloseShop() {
+  opTrendShopId = null;
+  const ed = document.getElementById('op-trend-editor');
+  if (ed) ed.style.display = 'none';
+}
+function opTrendRenderItems() {
+  const wrap = document.getElementById('op-trend-items');
+  const p = opAllPartners.find(x => x._id === opTrendShopId);
+  if (!wrap || !p) return;
+  const q = (document.getElementById('op-trend-item-search').value || '').trim().toLowerCase();
+  const items = opTrendMenuList(p)
+    .filter(it => !q || String(it.name || '').toLowerCase().includes(q))
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+  wrap.innerHTML = items.length ? items.map(it => `
+    <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+      <div style="min-width:0; flex:1 1 140px;">
+        <div class="op-partner-name">${escapeHtml(it.name || 'Item')}</div>
+        <div class="op-partner-sub">Price ₹${escapeHtml(String(it.price))}${Number(it.offerPrice) > 0 ? ' · offer ₹' + escapeHtml(String(it.offerPrice)) : ''}</div>
+      </div>
+      <input type="number" inputmode="decimal" min="0" step="any" placeholder="Offer ₹" value="${Number(it.offerPrice) > 0 ? escapeHtml(String(it.offerPrice)) : ''}" style="width:90px;padding:8px;" id="op-trend-in-${escapeHtml(it._k)}">
+      <button type="button" class="op-btn op-btn-push" style="margin:0;" data-i="${escapeHtml(it._k)}" onclick="opTrendSave(opTrendShopId, this.dataset.i)">Save</button>
+      ${Number(it.offerPrice) > 0 ? `<button type="button" class="op-btn op-btn-danger" style="margin:0;" data-i="${escapeHtml(it._k)}" onclick="opTrendClear(opTrendShopId, this.dataset.i)">Remove</button>` : ''}
+    </div>`).join('') : '<p class="op-note">No items.</p>';
+}
+function opTrendSave(shopId, itemKey) {
+  const p = opAllPartners.find(x => x._id === shopId);
+  const it = p && p.menu && p.menu[itemKey];
+  const status = document.getElementById('op-trend-status');
+  const inp = document.getElementById('op-trend-in-' + itemKey);
+  if (!it || !inp) return;
+  const v = Number(inp.value);
+  if (!isFinite(v) || v <= 0 || v >= Number(it.price)) { status.textContent = 'Offer price must be above ₹0 and lower than the normal price (₹' + it.price + ').'; return; }
+  const { db, ref, update } = window.fb;
+  status.textContent = 'Saving...';
+  update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerPrice: v }).then(() => {
+    it.offerPrice = v; status.textContent = 'Saved — "' + (it.name || 'Item') + '" is now in Trending.'; opRenderTrending();
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opTrendClear(shopId, itemKey) {
+  const p = opAllPartners.find(x => x._id === shopId);
+  const it = p && p.menu && p.menu[itemKey];
+  if (!it) return;
+  if (!confirm('Remove the offer on "' + (it.name || 'this item') + '"? It leaves Trending right away.')) return;
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerPrice: null }).then(() => {
+    delete it.offerPrice; const st = document.getElementById('op-trend-status'); if (st) st.textContent = 'Offer removed.'; opRenderTrending();
+  }).catch(err => { alert('Error: ' + err.message); });
 }
 
 /* ---- Push App Update ---- */
@@ -10126,6 +10625,7 @@ async function opAssignGroceryOrder(orderId, shopId) {
       platformFee: order.platformFee,
       platformDue: order.platformFee,
       deliveryFee: order.deliveryFee,
+      ...(order.rainSurge ? { rainSurge: order.rainSurge, rainSurgeDriver: order.rainSurgeDriver || 0, rainSurgeZone: order.rainSurgeZone || '' } : {}),
       ...(order.freeDelivery ? { freeDelivery: true, deliveryFeeWaived: order.deliveryFeeWaived || 0 } : {}),
       shopDiscountApplied: 0,
       paymentMethod: 'Cash on Delivery',
@@ -11812,6 +12312,7 @@ function opOpenOrderCustomer(shopId, orderId) {
   const totalBits = [];
   if (o.platformFee) totalBits.push('Platform fee: ₹' + o.platformFee);
   if (o.deliveryFee) totalBits.push('Delivery: ₹' + o.deliveryFee);
+  if (o.rainSurge) totalBits.push('Rain surge: ₹' + o.rainSurge + ' (driver ₹' + (o.rainSurgeDriver || 0) + ')');
   totalBits.push('Total: ₹' + (o.total || 0));
   document.getElementById('op-oc-items-total').innerHTML = '<b>' + totalBits.join(' · ') + '</b>';
   document.getElementById('op-oc-message').value = '';
@@ -13625,6 +14126,98 @@ function opLoadCoupons() {
       row.appendChild(h); row.appendChild(d); row.appendChild(w); row.appendChild(bar); box.appendChild(row);
     });
   }).catch(function (e) { box.innerHTML = '<p class="op-note">Could not load: ' + (e && e.message) + '</p>'; });
+}
+
+/* ---- Driver posters (operator) -> Firebase RTDB 'driver_posters' node, read by the driver app home ----
+   driver_posters/{id} = { img, link, ts, expiresAt (0 = no limit), off } */
+function opDpMsg(t) { var e = document.getElementById('op-dp-status'); if (e) e.textContent = t || ''; }
+async function opDriverPosterUpload(input) {
+  var files = Array.prototype.slice.call(input.files || []); input.value = '';
+  var fb = window.fb; if (!fb) { opDpMsg('Not connected yet, try again.'); return; }
+  var expAt = opDurToExpiry(document.getElementById('op-dp-dur').value, document.getElementById('op-dp-dur-custom').value);
+  if (expAt === null) { opDpMsg('Enter how many hours to show (1 or more).'); return; }
+  var link = (document.getElementById('op-dp-link').value || '').trim();
+  if (link && !/^https?:\/\//i.test(link)) { opDpMsg('Link must start with http:// or https://'); return; }
+  for (var i = 0; i < files.length; i++) {
+    try {
+      opDpMsg('Uploading ' + (i + 1) + '/' + files.length + '...');
+      var blob = await opPosterCompress(files[i]);
+      var url = await uploadPhotoToCloudinary(blob);
+      await fb.set(fb.push(fb.ref(fb.db, 'driver_posters')), { img: url, link: link, ts: Date.now() + i, expiresAt: expAt });
+    } catch (e) { opDpMsg('Upload failed - check internet / Cloudinary / database rules (driver_posters).'); return; }
+  }
+  opDpMsg('Poster added ✅');
+  opLoadDriverPosters('noclean');
+}
+// Delete one driver poster: Cloudinary photo (through the same delete worker the notification photos use) + Firebase entry.
+// The worker only deletes photos listed in notif_images whose expiresAt has passed, so the photo is listed there
+// as already-expired first. If the Cloudinary call fails, that entry stays and opCleanupNotifImages() retries it later.
+async function opDpRemove(k, o) {
+  var fb = window.fb, cloud = 'skipped';
+  var isCloud = o && typeof o.img === 'string' && o.img.indexOf('res.cloudinary.com') > -1;
+  if (isCloud && window.POSTER_DELETE_ENDPOINT) {
+    var nref = null;
+    try {
+      nref = fb.push(fb.ref(fb.db, 'notif_images'));
+      await fb.set(nref, { img: o.img, ts: Date.now(), expiresAt: Date.now() - 1000 });
+      var r = await fetch(window.POSTER_DELETE_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'notif', id: nref.key }) });
+      var j = await r.json().catch(function () { return {}; });
+      cloud = (r.ok && j.ok) ? 'deleted' : 'failed';
+    } catch (e) { cloud = 'failed'; }
+    if (nref && cloud === 'deleted') { try { await fb.remove(nref); } catch (e) {} }
+  }
+  await fb.remove(fb.ref(fb.db, 'driver_posters/' + k));
+  return cloud;
+}
+function opDpCloudNote(c) { return c === 'deleted' ? ' (photo also deleted from Cloudinary)' : c === 'failed' ? ' (Cloudinary delete failed - will retry automatically)' : ''; }
+var opDpCleaning = false;
+async function opDpCleanupExpired(v) {
+  if (opDpCleaning || !window.fb || !opAutoDelOn()) return false;
+  var ex = Object.keys(v).filter(function (k) { return v[k] && v[k].img && +v[k].expiresAt > 0 && +v[k].expiresAt < Date.now(); });
+  if (!ex.length) return false;
+  opDpCleaning = true;
+  try {
+    for (var i = 0; i < ex.length; i++) { opDpMsg('Deleting expired ' + (i + 1) + '/' + ex.length + '...'); await opDpRemove(ex[i], v[ex[i]]); }
+    opDpMsg(ex.length + ' expired poster(s) deleted.');
+  } finally { opDpCleaning = false; }
+  return true;
+}
+function opLoadDriverPosters(keepMsg) {
+  var box = document.getElementById('op-dp-list'); if (!box) return;
+  if (!window.fb) { setTimeout(opLoadDriverPosters, 400); return; }
+  var fb = window.fb;
+  if (keepMsg !== true && keepMsg !== 'noclean') opDpMsg('Loading...');
+  fb.get(fb.ref(fb.db, 'driver_posters')).then(function (snap) {
+    var v = snap.val() || {};
+    if (keepMsg !== 'noclean') { opCleanupNotifImages(); }
+    if (keepMsg !== 'noclean' && opAutoDelOn() && Object.keys(v).some(function (k) { return v[k] && +v[k].expiresAt > 0 && +v[k].expiresAt < Date.now(); })) {
+      opDpCleanupExpired(v).then(function () { opLoadDriverPosters('noclean'); }); return;
+    }
+    var ids = Object.keys(v).filter(function (k) { return v[k] && v[k].img; })
+      .sort(function (a, b) { return (v[a].ts || 0) - (v[b].ts || 0); });
+    box.innerHTML = '';
+    if (keepMsg !== true && keepMsg !== 'noclean') opDpMsg(ids.length ? '' : 'No driver posters yet.');
+    ids.forEach(function (k, i) {
+      var o = v[k], row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:10px;align-items:center;margin-top:12px;padding:10px;border:1px solid #124a24;border-radius:10px;';
+      var im = document.createElement('img'); im.src = o.img; im.style.cssText = 'width:120px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:#020a04;flex:none;';
+      var info = document.createElement('div'); info.style.cssText = 'flex:1;min-width:0;color:#33ff66;font-size:.8rem;line-height:1.5;';
+      var st = o.off ? '⏸ Paused' : opPosterStatus(+o.expiresAt || 0);
+      info.innerHTML = '<div>#' + (i + 1) + ' · ' + st + '</div>' + (o.link ? '<div style="word-break:break-all;color:#1f7a3d;">🔗 ' + escapeHtml(o.link) + '</div>' : '');
+      var col = document.createElement('div'); col.style.cssText = 'display:flex;flex-direction:column;gap:6px;flex:none;';
+      function btn(label, fn) { var b = document.createElement('button'); b.type = 'button'; b.className = 'op-btn'; b.style.cssText = 'padding:6px 10px;margin:0;'; b.textContent = label; b.onclick = fn; col.appendChild(b); return b; }
+      function swap(j) {
+        var o2 = v[ids[j]]; if (!o2) return;
+        var u = {}; u[k + '/ts'] = o2.ts || 0; u[ids[j] + '/ts'] = o.ts || 0;
+        fb.update(fb.ref(fb.db, 'driver_posters'), u).then(function () { opLoadDriverPosters(); }).catch(function (e) { opDpMsg('Error: ' + e.message); });
+      }
+      if (i > 0) btn('▲ Up', function () { swap(i - 1); });
+      if (i < ids.length - 1) btn('▼ Down', function () { swap(i + 1); });
+      btn(o.off ? 'Resume' : 'Pause', function () { fb.update(fb.ref(fb.db, 'driver_posters/' + k), { off: !o.off }).then(function () { opLoadDriverPosters(); }).catch(function (e) { opDpMsg('Error: ' + e.message); }); });
+      btn('Delete', function () { if (!confirm('Delete this driver poster?')) return; opDpMsg('Deleting...'); opDpRemove(k, o).then(function (c) { opDpMsg('Poster deleted' + opDpCloudNote(c) + '.'); opLoadDriverPosters('noclean'); }).catch(function (e) { opDpMsg('Error: ' + e.message); }); });
+      row.appendChild(im); row.appendChild(info); row.appendChild(col); box.appendChild(row);
+    });
+  }).catch(function (e) { opDpMsg('Error: ' + e.message); });
 }
 </script>
 </body>
