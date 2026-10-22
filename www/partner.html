@@ -1780,6 +1780,11 @@
           <h3>Trending Offers</h3>
           <p>Set an offer price on any Groceries / NESH Mart product — offer products show in the customer app's Trending tab</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('free-offers')">
+          <div class="op-home-icon">🎁</div>
+          <h3>Free Item Offers</h3>
+          <p>"Buy for ₹X, get an item free" on NESH Store (Groceries) — you set the amount and the free item</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('delivery-time')">
           <div class="op-home-icon">⏱️</div>
           <h3>Estimated Delivery Time</h3>
@@ -2226,12 +2231,13 @@
       <p class="op-note" id="op-notify-status" style="margin-top:10px;"></p>
        <hr style="border:0;border-top:1px solid #124a24;margin:26px 0 16px;">
        <h3 style="color:#33ff66; font-size:14px; margin:0 0 6px;">🖼️ Home screen posters</h3>
-       <p class="op-note">Offer posters shown as a swipeable banner at the top of the customer app's home screen (auto-slides every 4 seconds). Add as many as you like. Best size: 16:9, e.g. 1280×720 — photos are resized automatically. Optional link opens when a customer taps that poster. Tick Home screen, NESH Mart, Food, or any combination — you can change it later on each poster.</p>
+       <p class="op-note">Offer posters shown as a swipeable banner at the top of the customer app's home screen (auto-slides every 4 seconds). Add as many as you like. Best size: 16:9, e.g. 1280×720 — photos are resized automatically. Optional link opens when a customer taps that poster. Tick Home screen, NESH Mart, Food, Trending (the Trending tab's top banner), or any combination — you can change it later on each poster.</p>
        <div style="margin:0 0 10px;">
          <p class="op-note" style="margin-bottom:6px;">Show new poster(s) on:</p>
          <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-home" checked> 🏠 Home screen</label>
          <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-mart" checked> 🛍️ NESH Mart</label>
          <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-food" checked> 🍔 Food</label>
+         <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-trending"> 🔥 Trending</label>
          <label style="color:#33ff66;font-size:.85rem;"><input type="checkbox" id="op-poster-t-popup"> 📣 NESH Mart popup</label>
          <p class="op-note" style="margin:6px 0 0;">📣 Popup = shows over the NESH Mart screen like Spotify's offer card, closes by itself after 4 seconds (✕ also works), and each customer sees it only once. Poster keeps its own shape - any size works. Untick the other boxes if it should be a popup only.</p>
        </div>
@@ -2242,6 +2248,10 @@
        <div style="margin:0 0 10px;">
          <p class="op-note" style="margin-bottom:6px;">Show in which zone? <span style="color:#1f7a3d;">(none ticked = 🌍 General, shows in every zone)</span></p>
          <div id="op-poster-zones" style="color:#33ff66;font-size:.85rem;line-height:1.9;">Loading zones...</div>
+       </div>
+       <div style="margin:0 0 10px;">
+         <p class="op-note" style="margin-bottom:6px;">Poster of which shop? <span style="color:#1f7a3d;">(optional - the poster then shows ONLY in the zones where that shop is available)</span></p>
+         <select id="op-poster-zshop" style="max-width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"></select>
        </div>
        <div style="margin:0 0 10px;">
          <p class="op-note" style="margin-bottom:6px;">Show for how long:</p>
@@ -2694,6 +2704,39 @@
 
   <!-- TRENDING OFFERS — operator sets/clears restaurants/{shop}/menu/{item}/offerPrice for Groceries + NESH Mart shops.
        Same field the shop sets in its own item form (last save wins). Customer app shows a Trending tab only while at least one offer exists. -->
+  <!-- FREE ITEM OFFERS — stored at app_config/freeItemOffers/{id} = { minAmount, itemKey, itemName, qty, on, expiresAt, ts }. Customer app (NESH Store cart) adds the item at ₹0 when the items total reaches minAmount. -->
+  <div class="op-section" id="op-section-free-offers">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Free Item Offers</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">When a customer's NESH Store (Groceries) items total reaches the amount you set, the free item is added to the order automatically at ₹0. The shop that fulfils the order is still paid its own full rate for it (you bear the cost). Pick the free item from the Groceries catalog (piece items). If several offers are on, the highest amount the customer has reached wins. The free item only shows for customers whose area has that item available.</p>
+      <h2 style="margin:14px 0 6px;">Your offers</h2>
+      <div id="op-fo-list"></div>
+      <div style="margin:16px 0; padding:14px; border:1px solid #124a24;">
+        <h2 style="margin-top:0;">New offer</h2>
+        <div class="op-search-box" style="margin-bottom:10px;">
+          <input type="number" id="op-fo-amount" placeholder="Items total needed, in ₹ (e.g. 500)" min="1" step="1">
+        </div>
+        <div class="op-search-box" style="margin-bottom:6px;">
+          <input type="text" id="op-fo-search" placeholder="Search the free item…" oninput="opFoRenderItemSelect()">
+        </div>
+        <div style="margin-bottom:10px;"><select id="op-fo-item" style="max-width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"></select></div>
+        <div class="op-search-box" style="margin-bottom:10px;">
+          <input type="number" id="op-fo-qty" placeholder="Free quantity" min="1" step="1" value="1">
+        </div>
+        <div style="margin-bottom:10px;">
+          <select id="op-fo-dur" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+            <option value="0">No time limit</option><option value="24">24 hours</option><option value="48">2 days</option><option value="168">7 days</option><option value="720">30 days</option>
+          </select>
+        </div>
+        <button type="button" class="op-btn op-btn-push" onclick="opFoSave()">🎁 Add offer</button>
+        <p class="op-note" id="op-fo-status" style="margin-top:10px;"></p>
+      </div>
+    </div>
+  </div>
+
   <div class="op-section" id="op-section-trending">
     <div class="op-section-header">
       <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
@@ -3684,7 +3727,7 @@ function renderOrderPopup(pendingList) {
         return `<div class="order-popup-row"><span>${it.qty} × ${it.name}${it.desc ? `<br><span style="color:#8a94a3; font-size:11px;">${it.desc}</span>` : ''}</span><span>₹${rate * it.qty}</span></div>`;
       }).join('');
       const feeHtml = order.platformFee ? `<div class="order-popup-row"><span>Platform fee</span><span>₹${order.platformFee}</span></div>` : '';
-      const deliveryHtml = (order.deliveryFee ? `<div class="order-popup-row"><span>Delivery charge</span><span>₹${order.deliveryFee}</span></div>` : '') + (order.rainSurge ? `<div class="order-popup-row"><span>🌧️ Rain surge</span><span>₹${order.rainSurge}</span></div>` : '');
+      const deliveryHtml = (order.deliveryFee ? `<div class="order-popup-row"><span>Delivery charge</span><span>₹${order.deliveryFee}</span></div>` : '') + (order.rainSurge ? `<div class="order-popup-row"><span>🌧️ Rain surge</span><span>₹${order.rainSurge}</span></div>` : '') + (order.tip ? `<div class="order-popup-row"><span>🏍️ Delivery tip</span><span>₹${order.tip}</span></div>` : '');
       bodyHtml = `
         ${itemsHtml}
         ${feeHtml}
@@ -6573,6 +6616,12 @@ function renderOrderDetail(o) {
       row.innerHTML = `<span>🌧️ Rain surge</span><span>₹${o.rainSurge}</span>`;
       itemsEl.appendChild(row);
     }
+    if (o.tip) {
+      const row = document.createElement('div');
+      row.className = "item-row";
+      row.innerHTML = `<span>🏍️ Delivery tip</span><span>₹${o.tip}</span>`;
+      itemsEl.appendChild(row);
+    }
     document.getElementById('od-total').textContent = "₹" + (o.total || 0);
   }
 
@@ -7255,7 +7304,7 @@ function listenDailyEarnings() {
       const hasShopPrices = (o.items || []).some(it => it.shopPrice != null);
       const earning = hasShopPrices
         ? (o.items || []).reduce((s, it) => s + (Number(it.shopPrice != null ? it.shopPrice : it.price) || 0) * (it.qty || 0), 0)
-        : Math.max(0, (o.total || 0) - (o.platformFee || 0) - (o.deliveryFee || 0) - (o.rainSurge || 0));
+        : Math.max(0, (o.total || 0) - (o.platformFee || 0) - (o.deliveryFee || 0) - (o.rainSurge || 0) - (o.tip || 0));
       total += earning;
       count++;
       list.push({ _id: child.key, ...o, _earning: earning });
@@ -7869,6 +7918,7 @@ function opOpenSection(name) {
   if (name === 'delivery-time') { opCloseEtaEditor(); opRenderEtaList(); }
   if (name === 'shop-deals') { opCloseShopDealEditor(); opRenderShopDealsList(); }
   if (name === 'trending') { opTrendCloseShop(); opRenderTrending(); }
+  if (name === 'free-offers') opFoLoad();
   if (name === 'shop-zones') opRenderShopZones();
   if (name === 'report') opRenderReportShopList();
   if (name === 'groceries-queue') opRenderGroceriesQueueList();
@@ -9062,6 +9112,72 @@ function opTrendClear(shopId, itemKey) {
   update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerPrice: null }).then(() => {
     delete it.offerPrice; const st = document.getElementById('op-trend-status'); if (st) st.textContent = 'Offer removed.'; opRenderTrending();
   }).catch(err => { alert('Error: ' + err.message); });
+}
+
+/* ---- Free item offers (app_config/freeItemOffers) ---- */
+let opFoOffers = [];
+function opFoLoad() {
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'app_config/freeItemOffers')).then(snap => {
+    const v = snap.val() || {};
+    opFoOffers = Object.keys(v).map(k => Object.assign({ id: k }, v[k])).sort((a, b) => (Number(a.minAmount) || 0) - (Number(b.minAmount) || 0));
+    opFoRenderList(); opFoRenderItemSelect();
+  }).catch(() => { const st = document.getElementById('op-fo-status'); if (st) st.textContent = 'Could not load - check internet / database rules.'; });
+}
+function opFoRenderList() {
+  const box = document.getElementById('op-fo-list'); if (!box) return;
+  if (!opFoOffers.length) { box.innerHTML = '<div class="op-empty">No free item offers yet.</div>'; return; }
+  box.innerHTML = '';
+  opFoOffers.forEach(o => {
+    const expired = o.expiresAt && Number(o.expiresAt) <= Date.now();
+    const off = o.on === false;
+    const row = document.createElement('div');
+    row.className = 'op-partner-row';
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #124a24;';
+    const status = expired ? '⛔ Expired' : off ? '⏸ Switched off' : '✅ Live' + (o.expiresAt ? ' until ' + new Date(Number(o.expiresAt)).toLocaleString() : ' (no time limit)');
+    row.innerHTML = '<div style="flex:1;min-width:180px;"><div class="op-partner-name">Items total ₹' + escapeHtml(String(o.minAmount)) + ' → ' + escapeHtml(String(o.qty || 1)) + ' × ' + escapeHtml(o.itemName || o.itemKey) + ' FREE</div><div class="op-partner-sub">' + status + '</div></div>';
+    const tg = document.createElement('button'); tg.type = 'button'; tg.className = 'op-btn'; tg.style.margin = '0'; tg.textContent = off ? 'Switch on' : 'Switch off';
+    tg.onclick = () => opFoToggle(o.id, off);
+    const del = document.createElement('button'); del.type = 'button'; del.className = 'op-btn op-btn-danger'; del.style.margin = '0'; del.textContent = 'Delete';
+    del.onclick = () => opFoDelete(o.id);
+    row.appendChild(tg); row.appendChild(del); box.appendChild(row);
+  });
+}
+function opFoRenderItemSelect() {
+  const sel = document.getElementById('op-fo-item'); if (!sel) return;
+  const q = ((document.getElementById('op-fo-search') || {}).value || '').trim().toLowerCase();
+  const keep = sel.value;
+  const items = opGroceriesCatalogGroups().filter(g => (g.unit || 'piece') === 'piece' && (!q || (g.name || '').toLowerCase().includes(q)))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  sel.innerHTML = '';
+  const none = document.createElement('option'); none.value = ''; none.textContent = items.length ? '— Pick the free item —' : 'No matching piece items in the Groceries catalog'; sel.appendChild(none);
+  items.slice(0, 300).forEach(g => {
+    const o = document.createElement('option'); o.value = opNeshItemKey(g); o.dataset.name = g.name; o.textContent = g.name;
+    if (o.value === keep) o.selected = true; sel.appendChild(o);
+  });
+}
+function opFoSave() {
+  const st = document.getElementById('op-fo-status');
+  const amount = parseFloat(document.getElementById('op-fo-amount').value);
+  const sel = document.getElementById('op-fo-item');
+  const qty = Math.max(1, Math.floor(parseFloat(document.getElementById('op-fo-qty').value) || 1));
+  if (!(amount > 0)) { st.textContent = 'Enter the items total needed (₹).'; return; }
+  if (!sel.value) { st.textContent = 'Pick the free item.'; return; }
+  const hours = parseFloat(document.getElementById('op-fo-dur').value) || 0;
+  const { db, ref, push, set } = window.fb;
+  const name = sel.options[sel.selectedIndex].dataset.name || sel.value;
+  set(push(ref(db, 'app_config/freeItemOffers')), { minAmount: amount, itemKey: sel.value, itemName: name, qty, on: true, expiresAt: hours > 0 ? Date.now() + hours * 3600000 : 0, ts: Date.now() })
+    .then(() => { st.textContent = 'Saved — customers get "' + name + '" free when their items total reaches ₹' + amount + '.'; document.getElementById('op-fo-amount').value = ''; opFoLoad(); })
+    .catch(err => { st.textContent = 'Error: ' + err.message; });
+}
+function opFoToggle(id, turnOn) {
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'app_config/freeItemOffers/' + id), { on: !!turnOn }).then(opFoLoad).catch(err => alert('Error: ' + err.message));
+}
+function opFoDelete(id) {
+  if (!confirm('Delete this free item offer? It stops for customers right away.')) return;
+  const { db, ref, remove } = window.fb;
+  remove(ref(db, 'app_config/freeItemOffers/' + id)).then(opFoLoad).catch(err => alert('Error: ' + err.message));
 }
 
 /* ---- Push App Update ---- */
@@ -10626,6 +10742,7 @@ async function opAssignGroceryOrder(orderId, shopId) {
       platformDue: order.platformFee,
       deliveryFee: order.deliveryFee,
       ...(order.rainSurge ? { rainSurge: order.rainSurge, rainSurgeDriver: order.rainSurgeDriver || 0, rainSurgeZone: order.rainSurgeZone || '' } : {}),
+      ...(order.tip ? { tip: order.tip } : {}),
       ...(order.freeDelivery ? { freeDelivery: true, deliveryFeeWaived: order.deliveryFeeWaived || 0 } : {}),
       shopDiscountApplied: 0,
       paymentMethod: 'Cash on Delivery',
@@ -12313,6 +12430,7 @@ function opOpenOrderCustomer(shopId, orderId) {
   if (o.platformFee) totalBits.push('Platform fee: ₹' + o.platformFee);
   if (o.deliveryFee) totalBits.push('Delivery: ₹' + o.deliveryFee);
   if (o.rainSurge) totalBits.push('Rain surge: ₹' + o.rainSurge + ' (driver ₹' + (o.rainSurgeDriver || 0) + ')');
+  if (o.tip) totalBits.push('Tip (driver): ₹' + o.tip);
   totalBits.push('Total: ₹' + (o.total || 0));
   document.getElementById('op-oc-items-total').innerHTML = '<b>' + totalBits.join(' · ') + '</b>';
   document.getElementById('op-oc-message').value = '';
@@ -13695,6 +13813,22 @@ function opFillShopSelect(sel, selectedId) {
   sel.appendChild(gS);
   if (selectedId && !found) { var m = document.createElement('option'); m.value = selectedId; m.textContent = shops.length ? '(shop not found: ' + selectedId + ')' : '(shops still loading - ' + selectedId + ')'; m.selected = true; sel.appendChild(m); }
 }
+// All shops (Food, NESH Mart, Groceries) for the "poster of which shop" picker; saved as zoneShopId.
+function opFillZoneShopSelect(sel, selectedId) {
+  if (!sel) return;
+  var shops = (typeof opAllPartners !== 'undefined' && opAllPartners ? opAllPartners : [])
+    .slice().sort(function (a, b) { return (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id); });
+  sel.innerHTML = '';
+  var none = document.createElement('option'); none.value = ''; none.textContent = '— Not tied to a shop —'; sel.appendChild(none);
+  var found = !selectedId;
+  shops.forEach(function (s) {
+    var o = document.createElement('option'); o.value = s._id;
+    o.textContent = (s.restaurantName || s._id) + (s.businessType === 'online_shop' ? '  (NESH Mart)' : s.businessType === 'groceries' ? '  (Groceries)' : '');
+    if (s._id === selectedId) { o.selected = true; found = true; }
+    sel.appendChild(o);
+  });
+  if (selectedId && !found) { var m = document.createElement('option'); m.value = selectedId; m.textContent = shops.length ? '(shop not found: ' + selectedId + ')' : '(shops still loading - ' + selectedId + ')'; m.selected = true; sel.appendChild(m); }
+}
 // dropdown value -> what is saved on the poster
 function opPosterTarget(v) {
   v = v || '';
@@ -13819,10 +13953,11 @@ function opLoadPosters(skipAuto) {
   var fb = window.fb;
   opLoadZoneNames().then(function () { return fb.get(fb.ref(fb.db, 'banners')); }).then(function (snap) {
     var v = snap.val() || {}, a = [];
-    Object.keys(v).forEach(function (k) { if (!v[k] || !v[k].img) return; var t = v[k].targets; a.push({ id: k, img: v[k].img, video: v[k].video || '', link: v[k].link || '', ts: v[k].ts || 0, home: t ? !!t.home : true, mart: t ? !!t.mart : false, food: t ? !!t.food : false, popup: t ? !!t.popup : false, exp: +v[k].expiresAt || 0, del: !!v[k].del, shopId: v[k].shopId || '', cardId: v[k].cardId || '', zones: Object.keys(v[k].zones || {}).filter(function (z) { return v[k].zones[z]; }) }); });
+    Object.keys(v).forEach(function (k) { if (!v[k] || !v[k].img) return; var t = v[k].targets; a.push({ id: k, img: v[k].img, video: v[k].video || '', link: v[k].link || '', ts: v[k].ts || 0, home: t ? !!t.home : true, mart: t ? !!t.mart : false, food: t ? !!t.food : false, trending: t ? !!t.trending : false, popup: t ? !!t.popup : false, exp: +v[k].expiresAt || 0, del: !!v[k].del, shopId: v[k].shopId || '', cardId: v[k].cardId || '', zoneShopId: v[k].zoneShopId || '', zones: Object.keys(v[k].zones || {}).filter(function (z) { return v[k].zones[z]; }) }); });
     opPostersCache = a.sort(function (x, y) { return x.ts - y.ts; });
     opPosterMsg(a.length ? '' : 'No posters yet.');
     opFillShopSelect(document.getElementById('op-poster-shop'), document.getElementById('op-poster-shop') ? document.getElementById('op-poster-shop').value : '');
+    opFillZoneShopSelect(document.getElementById('op-poster-zshop'), document.getElementById('op-poster-zshop') ? document.getElementById('op-poster-zshop').value : '');
     opRenderPosters();
     var cb = document.getElementById('op-poster-autodel'); if (cb) cb.checked = opAutoDelOn();
     if (skipAuto !== true && opAutoDelOn()) { opCleanupExpired(); opCleanupNotifImages(); }
@@ -13837,7 +13972,9 @@ function opRenderPosters() {
       '<div style="margin-bottom:8px;"><label style="color:#33ff66;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="home"> 🏠 Home</label>' +
       '<label style="color:#33ff66;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="mart"> 🛍️ NESH Mart</label>' +
       '<label style="color:#33ff66;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="food"> 🍔 Food</label>' +
+      '<label style="color:#33ff66;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="trending"> 🔥 Trending</label>' +
       '<label style="color:#33ff66;font-size:.8rem;"><input type="checkbox" data-t="popup"> 📣 Popup</label></div>' +
+      '<div style="margin-bottom:8px;"><p class="op-note" style="margin:0 0 4px;">Poster of which shop? (shows only in that shop\'s zones)</p><select data-r="zshop" style="max-width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:7px;font-family:inherit;font-size:.8rem;"></select></div>' +
       '<div style="margin-bottom:8px;"><select data-r="shop" style="max-width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:7px;font-family:inherit;font-size:.8rem;"></select></div>' +
       '<div data-r="zones" style="color:#33ff66;font-size:.8rem;line-height:1.9;margin-bottom:8px;"></div>' +
       '<p class="op-note" data-r="status" style="margin-bottom:6px;"></p>' +
@@ -13856,18 +13993,19 @@ function opRenderPosters() {
       d.replaceChild(pv, d.querySelector('img'));
     }
     var inp = d.querySelector('input[type=url]'); inp.value = b.link;
-    var cbHome = d.querySelector('[data-t=home]'), cbMart = d.querySelector('[data-t=mart]'), cbFood = d.querySelector('[data-t=food]'), cbPopup = d.querySelector('[data-t=popup]');
-    cbHome.checked = !!b.home; cbMart.checked = !!b.mart; cbFood.checked = !!b.food; cbPopup.checked = !!b.popup;
+    var cbHome = d.querySelector('[data-t=home]'), cbMart = d.querySelector('[data-t=mart]'), cbFood = d.querySelector('[data-t=food]'), cbTrending = d.querySelector('[data-t=trending]'), cbPopup = d.querySelector('[data-t=popup]');
+    cbHome.checked = !!b.home; cbMart.checked = !!b.mart; cbFood.checked = !!b.food; cbTrending.checked = !!b.trending; cbPopup.checked = !!b.popup;
     var durSel = d.querySelector('[data-r=dur]'), durCus = d.querySelector('[data-r=custom]');
     durSel.onchange = function () { durCus.style.display = durSel.value === 'custom' ? '' : 'none'; };
     var shopSel = d.querySelector('[data-r=shop]'); opFillShopSelect(shopSel, opPosterPickValue(b));
+    var zshopSel = d.querySelector('[data-r=zshop]'); opFillZoneShopSelect(zshopSel, b.zoneShopId || '');
     var zBox = d.querySelector('[data-r=zones]'); opZoneBoxes(zBox, 'data-pz', b.zones || []);
-    d.querySelector('[data-r=status]').textContent = opPosterStatus(b.exp) + '  |  ' + opZoneLabel(b.zones) + (b.shopId ? '  |  ' + opShopLabel(b.shopId) : '') + (!b.shopId && b.cardId ? '  |  ' + opCardLabel(b.cardId) : '');
+    d.querySelector('[data-r=status]').textContent = opPosterStatus(b.exp) + '  |  ' + opZoneLabel(b.zones) + (b.shopId ? '  |  ' + opShopLabel(b.shopId) : '') + (b.zoneShopId ? '  |  📍 Only where shop is available: ' + (((typeof opAllPartners !== 'undefined' ? opAllPartners : []).filter(function (x) { return x._id === b.zoneShopId; })[0] || {}).restaurantName || b.zoneShopId) : '') + (!b.shopId && b.cardId ? '  |  ' + opCardLabel(b.cardId) : '');
     var fb = window.fb;
     d.querySelector('[data-a=save]').onclick = function () {
-      if (!cbHome.checked && !cbMart.checked && !cbFood.checked && !cbPopup.checked) { opPosterMsg('Select Home screen, NESH Mart, Food or Popup.'); return; }
+      if (!cbHome.checked && !cbMart.checked && !cbFood.checked && !cbTrending.checked && !cbPopup.checked) { opPosterMsg('Select Home screen, NESH Mart, Food, Trending or Popup.'); return; }
       var zIds = opPosterZones.length ? opPickedZones(zBox, 'data-pz') : (b.zones || []);
-      var upd = { link: inp.value.trim(), targets: { home: cbHome.checked, mart: cbMart.checked, food: cbFood.checked, popup: cbPopup.checked }, zones: zIds.length ? opZonesToObj(zIds) : null, shopId: opPosterTarget(shopSel.value).shopId, cardId: opPosterTarget(shopSel.value).cardId };
+      var upd = { link: inp.value.trim(), targets: { home: cbHome.checked, mart: cbMart.checked, food: cbFood.checked, trending: cbTrending.checked, popup: cbPopup.checked }, zones: zIds.length ? opZonesToObj(zIds) : null, zoneShopId: zshopSel.value || null, shopId: opPosterTarget(shopSel.value).shopId, cardId: opPosterTarget(shopSel.value).cardId };
       if (durSel.value !== 'keep') {
         var ex = opDurToExpiry(durSel.value, durCus.value);
         if (ex === null) { opPosterMsg('Enter hours (1 or more).'); return; }
@@ -13914,9 +14052,10 @@ function opPosterCompress(file) {
 async function opPosterUpload(input) {
   var files = Array.prototype.slice.call(input.files || []); input.value = '';
   var fb = window.fb; if (!fb) { opPosterMsg('Not connected yet, try again.'); return; }
-  var tHome = document.getElementById('op-poster-t-home').checked, tMart = document.getElementById('op-poster-t-mart').checked, tFood = document.getElementById('op-poster-t-food').checked, tPopup = document.getElementById('op-poster-t-popup').checked;
-  if (!tHome && !tMart && !tFood && !tPopup) { opPosterMsg('Select Home screen, NESH Mart, Food or Popup first.'); return; }
+  var tHome = document.getElementById('op-poster-t-home').checked, tMart = document.getElementById('op-poster-t-mart').checked, tFood = document.getElementById('op-poster-t-food').checked, tTrending = document.getElementById('op-poster-t-trending').checked, tPopup = document.getElementById('op-poster-t-popup').checked;
+  if (!tHome && !tMart && !tFood && !tTrending && !tPopup) { opPosterMsg('Select Home screen, NESH Mart, Food, Trending or Popup first.'); return; }
   var upPick = opPosterTarget((document.getElementById('op-poster-shop') || {}).value);
+  var upZShop = (document.getElementById('op-poster-zshop') || {}).value || null;
   var upShop = upPick.shopId, upCard = upPick.cardId;
   var upZones = opPickedZones(document.getElementById('op-poster-zones'), 'data-uz');
   var expAt = opDurToExpiry(document.getElementById('op-poster-dur').value, document.getElementById('op-poster-dur-custom').value);
@@ -13926,7 +14065,7 @@ async function opPosterUpload(input) {
       opPosterMsg('Uploading ' + (i + 1) + '/' + files.length + '...');
       var blob = await opPosterCompress(files[i]);
       var data = await uploadPhotoToCloudinary(blob);   // photo goes to Cloudinary; Firebase stores only the small URL
-      await fb.set(fb.push(fb.ref(fb.db, 'banners')), { img: data, link: '', ts: Date.now() + i, targets: { home: tHome, mart: tMart, food: tFood, popup: tPopup }, expiresAt: expAt, zones: upZones.length ? opZonesToObj(upZones) : null, shopId: upShop, cardId: upCard });
+      await fb.set(fb.push(fb.ref(fb.db, 'banners')), { img: data, link: '', ts: Date.now() + i, targets: { home: tHome, mart: tMart, food: tFood, trending: tTrending, popup: tPopup }, expiresAt: expAt, zones: upZones.length ? opZonesToObj(upZones) : null, shopId: upShop, cardId: upCard, zoneShopId: upZShop });
     } catch (e) { opPosterMsg('Upload failed - check internet / Cloudinary / database rules.'); return; }
   }
   opPosterMsg('Poster added ✅');
@@ -13975,9 +14114,10 @@ function opUploadVideoToCloudinary(file, onProgress) {   // returns the secure v
 async function opPosterVideoUpload(input) {
   var files = Array.prototype.slice.call(input.files || []); input.value = '';
   var fb = window.fb; if (!fb) { opPosterMsg('Not connected yet, try again.'); return; }
-  var tHome = document.getElementById('op-poster-t-home').checked, tMart = document.getElementById('op-poster-t-mart').checked, tFood = document.getElementById('op-poster-t-food').checked, tPopup = document.getElementById('op-poster-t-popup').checked;
-  if (!tHome && !tMart && !tFood && !tPopup) { opPosterMsg('Select Home screen, NESH Mart, Food or Popup first.'); return; }
+  var tHome = document.getElementById('op-poster-t-home').checked, tMart = document.getElementById('op-poster-t-mart').checked, tFood = document.getElementById('op-poster-t-food').checked, tTrending = document.getElementById('op-poster-t-trending').checked, tPopup = document.getElementById('op-poster-t-popup').checked;
+  if (!tHome && !tMart && !tFood && !tTrending && !tPopup) { opPosterMsg('Select Home screen, NESH Mart, Food, Trending or Popup first.'); return; }
   var upPick = opPosterTarget((document.getElementById('op-poster-shop') || {}).value);
+  var upZShop = (document.getElementById('op-poster-zshop') || {}).value || null;
   var upZones = opPickedZones(document.getElementById('op-poster-zones'), 'data-uz');
   var expAt = opDurToExpiry(document.getElementById('op-poster-dur').value, document.getElementById('op-poster-dur-custom').value);
   if (expAt === null) { opPosterMsg('Enter how many hours to show (1 or more).'); return; }
@@ -13991,7 +14131,7 @@ async function opPosterVideoUpload(input) {
       var vurl = await opUploadVideoToCloudinary(f, function (pc) { opPosterMsg('Uploading video ' + tag + '... ' + pc + '%'); });
       // fallback thumbnail made by Cloudinary itself if the browser could not grab a frame
       if (!thumbUrl) thumbUrl = vurl.replace('/video/upload/', '/video/upload/so_0,f_jpg/').replace(/\.[a-z0-9]+$/i, '.jpg');
-      await fb.set(fb.push(fb.ref(fb.db, 'banners')), { img: thumbUrl, video: vurl, link: '', ts: Date.now() + i, targets: { home: tHome, mart: tMart, food: tFood, popup: tPopup }, expiresAt: expAt, zones: upZones.length ? opZonesToObj(upZones) : null, shopId: upPick.shopId, cardId: upPick.cardId });
+      await fb.set(fb.push(fb.ref(fb.db, 'banners')), { img: thumbUrl, video: vurl, link: '', ts: Date.now() + i, targets: { home: tHome, mart: tMart, food: tFood, trending: tTrending, popup: tPopup }, expiresAt: expAt, zones: upZones.length ? opZonesToObj(upZones) : null, shopId: upPick.shopId, cardId: upPick.cardId, zoneShopId: upZShop });
     } catch (e) { opPosterMsg('Video upload failed: ' + ((e && e.message) || 'check internet / Cloudinary')); return; }
   }
   opPosterMsg('Video poster added ✅');

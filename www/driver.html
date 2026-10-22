@@ -6,24 +6,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>NESH DRIVER</title>
 <link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#17A9E0">
+<meta name="theme-color" content="#FFFFFF">
 <link rel="apple-touch-icon" href="./icon-512.png">
 <link rel="icon" href="./icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   :root{
     --ink:#0B2545;
-    --marigold:#2F80ED;
+    --marigold:#2F6FED;
     --chili:#E5484D;
-    --leaf:#17A9E0;
-    --cloud:#FFFFFF;
-    --muted:#A9C4E0;
-    --muted-2:#6E8CAE;
-    --field-bg:#123A5E;
-    --field-border:#1D4E7A;
+    --leaf:#2F6FED;
+    --cloud:#0B2545;
+    --muted:#5B7592;
+    --muted-2:#7C91AA;
+    --field-bg:#F1F6FD;
+    --field-border:#DCE7F5;
+    --surface:#FFFFFF;
+    --page:#F4F7FC;
   }
   *{box-sizing:border-box;}
   body{
@@ -368,6 +370,117 @@
     margin-top:16px; padding:10px 28px; border-radius:999px; border:none; background:var(--marigold);
     color:var(--ink); font-weight:700; font-size:14px; cursor:pointer; display:none; font-family:'Inter',sans-serif;
   }
+
+  /* ===== White & blue theme (Swiggy-partner style layout) ===== */
+  body{ background:var(--page); }
+  #app{ background:var(--page); }
+  @media (min-width:641px){
+    body{ background:#E3ECF8; }
+    #app{ box-shadow:0 20px 60px rgba(11,37,69,.15), 0 0 0 1px rgba(11,37,69,.06); }
+  }
+  .title,.rest-title,.section-title,.earn-value,.reason-modal-title,.order-popup-title,#audio-gate h2{ font-family:'Plus Jakarta Sans','Inter',sans-serif; font-weight:800; color:var(--ink); }
+  .eyebrow,.type-badge,.order-num,.order-total,.pill,.detail-label,.earn-label,.order-popup-eyebrow,.order-popup-loc-label,.availability-note-title,.bg-location-warning-title,.otp-modal-input{ font-family:'Inter',sans-serif; }
+  .eyebrow{ color:var(--marigold); font-weight:700; letter-spacing:.4px; font-size:12px; }
+  .pill,.detail-label,.earn-label,.order-popup-loc-label,.availability-note-title,.bg-location-warning-title{ text-transform:none; letter-spacing:.2px; }
+  .field{ background:#fff; border:1.5px solid var(--field-border); }
+  .btn-primary,.status-btn.completed,#audio-gate-btn,.app-video-close-btn{ color:#fff; }
+  .btn-primary:disabled{ background:#A9C1EA; opacity:1; }
+  .gps-btn,.toast,.status-btn.arriving,.status-btn.ontrip,.order-popup-btns .btn-primary{ color:#fff; }
+  .status-btn.ontrip{ background:#1F9BD6; }
+  .toast{ background:var(--marigold); box-shadow:0 8px 24px rgba(47,111,237,.35); }
+  .switch-track{ background:#B9C6D8; }
+  .chit,.order-chit,.detail-block,.chat-msg.theirs,.order-popup,.order-popup-body,.earn-card,.online-toggle-row{ background:var(--surface); }
+  .order-chit,.chit,.detail-block,.earn-card{ border:1px solid var(--field-border); box-shadow:0 2px 10px rgba(11,37,69,.05); border-radius:16px; }
+  .order-popup{ border-radius:24px 24px 0 0; }
+  .chat-msg.theirs{ border:1px solid var(--field-border); }
+  .order-time,.order-popup-cust{ color:var(--muted); }
+  .detail-label{ color:var(--muted); }
+  .order-popup-overlay,.reason-modal-overlay{ background:rgba(11,37,69,.55); }
+  .reason-modal-card{ background:#fff; border:none; }
+  .reason-modal-card textarea,.otp-modal-input,.chat-input-bar input,.autostart-check-row{ background:var(--field-bg); color:var(--ink); }
+  .chat-input-bar{ background:#fff; }
+  #audio-gate{ background:#fff; }
+  .bell,#audio-gate .bell{ background:var(--marigold); }
+  #audio-gate .bell svg{ stroke:#fff; }
+  .availability-note{ background:#EAF1FE; border-color:#C9DBFB; }
+  .bg-location-warning{ background:#FFF3F3; border-color:#F6C9CB; }
+  .bg-location-steps b{ color:var(--ink); }
+  .pill-searching{ background:#FFF1D6; color:#8A5A0F; }
+  .pill-accepted,.pill-arriving,.pill-ontrip{ background:#E1ECFF; color:#1E4FBF; }
+  .pill-completed{ background:#E6F6EC; color:#1B7A45; }
+  .pill-cancelled{ background:#FDE8E7; color:#B3261E; }
+  .type-opt.active{ background:#E1ECFF; color:var(--marigold); }
+  .type-badge{ background:#E1ECFF; border:none; color:var(--marigold); font-weight:700; text-transform:none; }
+  #due-total-amount{ color:var(--ink) !important; }
+
+  /* Home: Swiggy-style top bar, hero card, due banner, rounded tab bar */
+  #screen-home{ background:var(--page); }
+  .home-bar{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:max(18px, env(safe-area-inset-top)) 16px 14px; background:#fff; }
+  .home-bar .online-toggle-row{ margin:0; padding:8px 14px 8px 8px; border-radius:999px; gap:12px; border:none; background:#E9EEF5; flex-direction:row-reverse; justify-content:flex-end; box-shadow:none; }
+  .home-bar .online-toggle-row:has(input:checked){ background:#E3F6EC; }
+  .home-bar .online-toggle-label{ font-size:15px; font-weight:800; font-family:'Plus Jakarta Sans','Inter',sans-serif; }
+  .home-bar .online-toggle-sub{ display:none; }
+  .home-bar .switch{ width:50px; height:30px; }
+  .home-bar .switch-track::before{ width:24px; height:24px; }
+  .home-bar .switch input:checked + .switch-track::before{ transform:translateX(20px); }
+  .home-who{ text-align:right; min-width:0; }
+  .home-who .rest-title{ font-size:15px; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .home-who .rest-sub{ margin:2px 0 4px; }
+  .home-hero{ margin:0; padding:20px 20px 22px; background:#fff; border-bottom:1px solid var(--field-border); }
+  .home-hero h2{ margin:0; font-family:'Plus Jakarta Sans','Inter',sans-serif; font-weight:800; font-size:26px; line-height:1.15; color:var(--ink); }
+  .home-hero p{ margin:6px 0 0; color:var(--muted); font-size:14px; }
+  .home-banner{ display:flex; align-items:center; gap:12px; margin:14px 16px 0; padding:14px 16px; border-radius:16px; background:linear-gradient(135deg,#2F6FED,#1F9BD6); color:#fff; }
+  .home-banner p{ margin:0; }
+  .home-banner .hb-title{ font-weight:800; font-size:15px; font-family:'Plus Jakarta Sans','Inter',sans-serif; }
+  .home-banner .hb-sub{ font-size:12px; opacity:.9; margin-top:2px; }
+  .home-banner.due{ background:#FFF4D6; color:var(--ink); border:1px solid #F5D98B; }
+  .home-banner.due .hb-btn{ background:var(--ink); color:#fff; }
+  .home-banner > div{ flex:1; min-width:0; }
+  .hb-btn{ border:none; border-radius:12px; padding:11px 14px; background:#fff; color:var(--marigold); font-weight:800; font-size:13px; cursor:pointer; font-family:'Inter',sans-serif; white-space:nowrap; }
+  .home-section-label{ padding:22px 20px 0; }
+  .section-row{ padding:22px 20px 0; }
+  .home-orders-list{ padding:14px 16px 4px; }
+  .empty-text{ padding:0 20px; }
+  .bottom-tab-bar{ background:#fff; border-top:1px solid var(--field-border); border-radius:20px 20px 0 0; box-shadow:0 -6px 20px rgba(11,37,69,.06); }
+  .tab-item{ color:var(--muted-2); font-weight:700; }
+  .tab-item.active{ color:var(--marigold); }
+  .tab-item.active svg{ stroke:var(--marigold); fill:rgba(47,111,237,.14); }
+
+  /* Help / SOS / incentive / earnings / refer */
+  .bar-actions{ display:flex; gap:8px; }
+  .bar-pill{ display:flex; align-items:center; gap:6px; padding:10px 14px; border-radius:999px; background:#fff; border:1.5px solid var(--field-border); color:var(--ink); font-weight:800; font-size:13px; cursor:pointer; font-family:'Plus Jakarta Sans','Inter',sans-serif; }
+  .bar-pill.sos{ color:var(--chili); border-color:#F6C9CB; background:#FFF6F6; }
+  .home-hero .home-who{ text-align:left; margin-bottom:12px; }
+  .home-hero .home-who .rest-title{ font-size:22px; }
+  .home-banner.promo .hb-big{ font-size:22px; font-weight:800; font-family:'Plus Jakarta Sans','Inter',sans-serif; margin:0; }
+
+  /* Driver posters: Swiggy-style swipe slider (next/previous posters peek at the sides) */
+  .dp-wrap{ margin:16px 0 0; }
+  .dp-track{ display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; padding:0 8%; scroll-padding:0 8%; scrollbar-width:none; }
+  .dp-track::-webkit-scrollbar{ display:none; }
+  .dp-slide{ flex:0 0 100%; scroll-snap-align:center; aspect-ratio:16/9; border-radius:18px; overflow:hidden; background:#E9EEF5; box-shadow:0 2px 10px rgba(11,37,69,.10); cursor:default; }
+  .dp-slide.link{ cursor:pointer; }
+  .dp-slide img{ width:100%; height:100%; object-fit:cover; display:block; -webkit-user-drag:none; }
+  .dp-dots{ display:flex; justify-content:center; align-items:center; gap:6px; margin-top:10px; }
+  .dp-count{ background:#2B2F3A; color:#fff; font-size:12px; font-weight:800; padding:4px 10px; border-radius:999px; font-family:'Plus Jakarta Sans','Inter',sans-serif; }
+  .dp-dot{ width:9px; height:9px; border-radius:50%; background:#C9CED8; }
+  .earn-tabs-card{ margin:16px 16px 0; padding:20px; border-radius:20px; background:linear-gradient(135deg,#2F6FED,#1F9BD6); color:#fff; }
+  .earn-tabs-card .big{ font-size:36px; font-weight:800; margin:2px 0 0; font-family:'Plus Jakarta Sans','Inter',sans-serif; }
+  .earn-tabs-card .lbl{ margin:0; font-size:13px; opacity:.9; }
+  .earn-mini{ display:flex; gap:10px; margin:12px 16px 0; }
+  .earn-mini > div{ flex:1; background:#fff; border:1px solid var(--field-border); border-radius:16px; padding:14px; }
+  .earn-mini .v{ margin:0; font-size:18px; font-weight:800; color:var(--ink); font-family:'Plus Jakarta Sans','Inter',sans-serif; }
+  .earn-mini .l{ margin:2px 0 0; font-size:12px; color:var(--muted); }
+  .day-row{ display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px solid var(--field-border); border-radius:14px; padding:13px 14px; }
+  .day-row .d{ margin:0; font-weight:700; font-size:14px; color:var(--ink); }
+  .day-row .t{ margin:2px 0 0; font-size:12px; color:var(--muted); }
+  .day-row .a{ margin:0; font-weight:800; font-size:15px; color:var(--ink); }
+  .refer-card{ margin:16px 16px 0; padding:22px; border-radius:20px; background:#fff; border:1px solid var(--field-border); text-align:center; }
+  .refer-card h2{ margin:10px 0 6px; font-size:22px; font-weight:800; font-family:'Plus Jakarta Sans','Inter',sans-serif; color:var(--ink); }
+  .refer-card p{ margin:0 0 16px; color:var(--muted); font-size:14px; line-height:1.5; }
+  .sheet-links{ display:flex; flex-direction:column; gap:10px; margin-top:6px; }
+  .sheet-link{ display:block; text-align:center; text-decoration:none; padding:14px; border-radius:12px; background:var(--marigold); color:#fff; font-weight:700; font-size:14px; border:none; cursor:pointer; font-family:'Inter',sans-serif; }
+  .sheet-link.alt{ background:#E1ECFF; color:var(--marigold); }
 </style>
 </head>
 <body>
@@ -643,24 +756,52 @@
 
   <!-- HOME -->
   <section class="screen screen-with-tabs" id="screen-home">
-    <div class="top-row">
-      <div>
-        <p class="eyebrow">DASHBOARD</p>
+    <div class="home-bar">
+      <div class="online-toggle-row">
+        <label class="switch">
+          <input type="checkbox" id="online-toggle-input" />
+          <span class="switch-track"></span>
+        </label>
+        <div>
+          <p class="online-toggle-label" id="online-toggle-label">You're offline</p>
+          <p class="online-toggle-sub">Go online to start receiving ride requests</p>
+        </div>
+      </div>
+      <div class="bar-actions">
+        <button type="button" class="bar-pill" id="help-btn">Help</button>
+        <button type="button" class="bar-pill sos" id="sos-btn">SOS</button>
+      </div>
+    </div>
+
+    <div class="home-hero">
+    <div class="home-who">
         <h1 class="rest-title" id="home-driver-name">Driver</h1>
         <p class="rest-sub" id="home-driver-vehicle"></p>
         <span class="type-badge" id="home-type-badge">Bike</span>
       </div>
+      <h2>Start earning with NESH</h2>
+      <p>Switch on the toggle above to get rides and deliveries near you.</p>
     </div>
 
-    <div class="online-toggle-row">
+    <div class="home-banner promo hidden" id="home-incentive-banner">
       <div>
-        <p class="online-toggle-label" id="online-toggle-label">You're offline</p>
-        <p class="online-toggle-sub">Go online to start receiving ride requests</p>
+        <p class="hb-big" id="home-incentive-big">₹0 extra per order!</p>
+        <p class="hb-sub" id="home-incentive-sub"></p>
       </div>
-      <label class="switch">
-        <input type="checkbox" id="online-toggle-input" />
-        <span class="switch-track"></span>
-      </label>
+    </div>
+
+    <!-- Posters set by the operator (Operator Panel > Driver Posters, Firebase: driver_posters) -->
+    <div class="dp-wrap hidden" id="driver-posters">
+      <div class="dp-track" id="dp-track"></div>
+      <div class="dp-dots" id="dp-dots"></div>
+    </div>
+
+    <div class="home-banner due hidden" id="home-due-banner">
+      <div>
+        <p class="hb-title">You may not get new orders!</p>
+        <p class="hb-sub" id="home-due-banner-sub">Amount due is high</p>
+      </div>
+      <button class="hb-btn" type="button" onclick="showScreen('due')">Pay due</button>
     </div>
 
     <!-- Shown only when Android's location permission is granted as "While
@@ -872,12 +1013,88 @@
     </div>
   </section>
 
+  <!-- EARNINGS -->
+  <section class="screen screen-with-tabs" id="screen-earnings">
+    <div class="header"><h1 class="title">Earnings</h1></div>
+    <div class="earn-tabs-card">
+      <p class="lbl">Today</p>
+      <p class="big" id="ep-today">₹0</p>
+      <p class="lbl" id="ep-today-trips">0 trips</p>
+    </div>
+    <div class="earn-mini">
+      <div><p class="v" id="ep-week">₹0</p><p class="l">Last 7 days</p></div>
+      <div><p class="v" id="ep-total">₹0</p><p class="l">All time</p></div>
+    </div>
+    <div class="px stack" style="margin-top:8px;">
+      <h2 class="section-title" style="margin-top:14px; font-size:16px;">Day by day</h2>
+      <div id="ep-days" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+  </section>
+
+  <!-- MY SHIFTS -->
+  <section class="screen screen-with-tabs" id="screen-shifts">
+    <div class="header"><h1 class="title">My Shifts</h1></div>
+    <div class="px stack" style="margin-top:8px;">
+      <p class="rest-sub" style="margin:0 0 6px;">Book a shift, then go online during that time.</p>
+      <div id="shifts-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+  </section>
+
+  <!-- REFER -->
+  <section class="screen screen-with-tabs" id="screen-refer">
+    <div class="header"><h1 class="title">Refer a friend</h1></div>
+    <div class="refer-card">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#2F6FED" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>
+      <h2>Bring a friend to NESH</h2>
+      <p>Share the driver app link with someone who wants to drive or deliver with NESH.</p>
+      <button type="button" class="btn-primary" id="refer-share-btn">Share invite link</button>
+    </div>
+  </section>
+
+  <!-- HELP -->
+  <div class="reason-modal-overlay" id="help-modal-overlay">
+    <div class="reason-modal-card">
+      <p class="reason-modal-title">Need help?</p>
+      <p class="reason-modal-sub">Talk to the NESH operator team.</p>
+      <div class="sheet-links">
+        <a class="sheet-link" id="help-call-link" href="#">Call operator</a>
+        <a class="sheet-link alt" id="help-wa-link" href="#" target="_blank" rel="noopener">WhatsApp operator</a>
+      </div>
+      <p class="reason-modal-error" id="help-modal-error">Help number isn't set up yet.</p>
+      <div class="reason-modal-btns"><button class="btn-danger" type="button" id="help-close-btn">Close</button></div>
+    </div>
+  </div>
+
+  <!-- SOS -->
+  <div class="reason-modal-overlay" id="sos-modal-overlay">
+    <div class="reason-modal-card">
+      <p class="reason-modal-title">Emergency SOS</p>
+      <p class="reason-modal-sub">This sends your live location to the operator and opens the phone dialer for 112.</p>
+      <div class="reason-modal-btns">
+        <button class="btn-danger" type="button" id="sos-cancel-btn" style="color:var(--ink); border-color:var(--field-border);">Cancel</button>
+        <button class="btn-primary" type="button" id="sos-confirm-btn" style="background:var(--chili);">Send SOS</button>
+      </div>
+    </div>
+  </div>
+
   <nav class="bottom-tab-bar" id="bottom-tab-bar">
     <button class="tab-item" id="tab-rides" onclick="showScreen('home')">
       <span style="position:relative;">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17h14l-1.5-6a2 2 0 0 0-2-1.5H8.5a2 2 0 0 0-2 1.5L5 17Z"/><circle cx="8" cy="19" r="1.5"/><circle cx="16" cy="19" r="1.5"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5Z"/></svg>
       </span>
-      Rides
+      Home
+    </button>
+    <button class="tab-item" id="tab-earnings" onclick="showScreen('earnings')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M16 15h2"/></svg>
+      Earnings
+    </button>
+    <button class="tab-item" id="tab-shifts" onclick="showScreen('shifts')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+      My Shifts
+    </button>
+    <button class="tab-item" id="tab-refer" onclick="showScreen('refer')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8"/></svg>
+      Refer
     </button>
     <button class="tab-item" id="tab-account" onclick="showScreen('account')">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
@@ -1878,7 +2095,7 @@ function showScreen(id) {
   window.scrollTo(0, 0);
 
   const tabBar = document.getElementById('bottom-tab-bar');
-  const tabScreens = { home: 'tab-rides', account: 'tab-account' };
+  const tabScreens = { home: 'tab-rides', earnings: 'tab-earnings', shifts: 'tab-shifts', refer: 'tab-refer', account: 'tab-account' };
   if (id in tabScreens) {
     tabBar.classList.add('show');
     document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
@@ -2021,9 +2238,11 @@ function renderOrderPopup(pendingList) {
       : '';
     if (item._kind === 'delivery') {
       card.innerHTML = `
-        <h2 class="order-popup-title">Delivery${item.orderNumber ? ' #' + item.orderNumber : ''} · ₹${item.deliveryFee || 0}</h2>
+        <h2 class="order-popup-title">Delivery${item.orderNumber ? ' #' + item.orderNumber : ''} · ₹${deliveryPayout(item)}</h2>
         <div class="order-popup-body">
           ${awayText}
+          ${item.rainSurgeDriver > 0 ? `<div class="order-popup-row"><span>🌧️ Rain bonus (included)</span><span>₹${item.rainSurgeDriver}</span></div>` : ''}
+          ${item.tip > 0 ? `<div class="order-popup-row"><span>🙏 Customer tip (included)</span><span>₹${item.tip}</span></div>` : ''}
           ${deliveryLocationsHtml(item)}
           <div class="order-popup-row order-popup-row-total"><span>Items</span><span>${item.items ? item.items.map(it => `${it.qty}x ${it.name}`).join(', ') : '—'}</span></div>
         </div>
@@ -2803,6 +3022,238 @@ async function confirmReasonModal() {
 window.closeReasonModal = closeReasonModal;
 window.confirmReasonModal = confirmReasonModal;
 window.showScreen = showScreen;
+
+// What the driver earns for a delivery: the delivery charge PLUS any rain-surge extra
+// (order.rainSurgeDriver, set from the operator's Rain Surge zone switch).
+function deliveryPayout(o) { return (Number(o && o.deliveryFee) || 0) + (Number(o && o.rainSurgeDriver) || 0) + (Number(o && o.tip) || 0); }
+// ---------- Earnings screen (Today / last 7 days / all time / per day) ----------
+function renderEarningsScreen(rides, deliveries) {
+  const items = [
+    ...rides.map(r => ({ t: r.createdAt || 0, amt: r.fare || 0 })),
+    ...deliveries.map(o => ({ t: o.createdAt || 0, amt: deliveryPayout(o) })),
+  ];
+  const dayStart = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); };
+  const today0 = dayStart(Date.now());
+  const DAY = 86400000;
+  const sum = (arr) => arr.reduce((a, i) => a + i.amt, 0);
+  const todayItems = items.filter(i => i.t >= today0);
+  const weekItems = items.filter(i => i.t >= today0 - 6 * DAY);
+  document.getElementById('ep-today').textContent = '₹' + money(sum(todayItems));
+  document.getElementById('ep-today-trips').textContent = todayItems.length + (todayItems.length === 1 ? ' trip' : ' trips');
+  document.getElementById('ep-week').textContent = '₹' + money(sum(weekItems));
+  document.getElementById('ep-total').textContent = '₹' + money(sum(items));
+  const list = document.getElementById('ep-days');
+  let html = '';
+  for (let k = 0; k < 7; k++) {
+    const from = today0 - k * DAY;
+    const dayItems = items.filter(i => i.t >= from && i.t < from + DAY);
+    const label = k === 0 ? 'Today' : k === 1 ? 'Yesterday' : new Date(from).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+    html += '<div class="day-row"><div><p class="d">' + label + '</p><p class="t">' + dayItems.length + (dayItems.length === 1 ? ' trip' : ' trips') + '</p></div><p class="a">₹' + money(sum(dayItems)) + '</p></div>';
+  }
+  list.innerHTML = html;
+}
+
+// ---------- Optional operator config: help number + per-order incentive banner ----------
+// Reads /driver_config { supportPhone, incentiveAmount, incentiveText } if the
+// operator panel sets it; nothing shows until then.
+let supportPhone = '';
+(function loadDriverConfig() {
+  try {
+    const { db, ref, onValue } = window.fb;
+    onValue(ref(db, 'driver_config'), (snap) => {
+      const c = snap.val() || {};
+      supportPhone = String(c.supportPhone || '').replace(/[^0-9+]/g, '');
+      const amt = Number(c.incentiveAmount) || 0;
+      const banner = document.getElementById('home-incentive-banner');
+      banner.classList.toggle('hidden', !(amt > 0));
+      document.getElementById('home-incentive-big').textContent = '₹' + money(amt) + ' extra per order!';
+      document.getElementById('home-incentive-sub').textContent = c.incentiveText || '';
+    }, () => {});
+  } catch (e) { console.warn('driver_config:', e); }
+})();
+
+// ---------- Driver posters (operator -> driver_posters/{id} = { img, link, ts, expiresAt, off }) ----------
+(function driverPosters() {
+  let list = [], idx = 0, timer = null, touching = false, rafId = 0;
+  const wrap = document.getElementById('driver-posters');
+  const track = document.getElementById('dp-track');
+  const dots = document.getElementById('dp-dots');
+  if (!wrap || !track) return;
+  function valid(p) { return p && p.img && !p.off && (!(+p.expiresAt) || +p.expiresAt > Date.now()); }
+  function openLink(url) { try { window.open(url, '_blank'); } catch (e) {} }
+  function renderDots() {
+    dots.innerHTML = '';
+    if (list.length < 2) return;
+    const c = document.createElement('span'); c.className = 'dp-count'; c.textContent = (idx + 1) + '/' + list.length; dots.appendChild(c);
+    for (let n = 0; n < Math.min(2, list.length - 1); n++) { const s = document.createElement('span'); s.className = 'dp-dot'; dots.appendChild(s); }
+  }
+  function slideWidth() { const s = track.firstElementChild; return s ? s.offsetWidth + 10 : 1; }
+  function goTo(n, smooth) {
+    if (!list.length) return;
+    idx = (n + list.length) % list.length;
+    track.scrollTo({ left: idx * slideWidth(), behavior: smooth === false ? 'auto' : 'smooth' });
+    renderDots();
+  }
+  function restart() {
+    clearInterval(timer);
+    if (list.length < 2) return;
+    timer = setInterval(() => { if (!touching && !document.hidden && wrap.offsetParent) goTo(idx + 1); }, 4000);
+  }
+  track.addEventListener('scroll', () => {
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      const n = Math.max(0, Math.min(list.length - 1, Math.round(track.scrollLeft / slideWidth())));
+      if (n !== idx) { idx = n; renderDots(); }
+    });
+  }, { passive: true });
+  track.addEventListener('touchstart', () => { touching = true; }, { passive: true });
+  track.addEventListener('touchend', () => { touching = false; restart(); }, { passive: true });
+  function build() {
+    track.innerHTML = '';
+    list.forEach(p => {
+      const s = document.createElement('div'); s.className = 'dp-slide' + (p.link ? ' link' : '');
+      const im = document.createElement('img'); im.src = p.img; im.alt = ''; im.loading = 'lazy'; im.draggable = false;
+      s.appendChild(im);
+      if (p.link) s.addEventListener('click', () => openLink(p.link));
+      track.appendChild(s);
+    });
+    idx = 0; track.scrollLeft = 0; renderDots(); restart();
+  }
+  try {
+    const { db, ref, onValue } = window.fb;
+    onValue(ref(db, 'driver_posters'), (snap) => {
+      const v = snap.val() || {};
+      list = Object.keys(v).map(k => Object.assign({ id: k }, v[k])).filter(valid).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+      wrap.classList.toggle('hidden', !list.length);
+      if (!list.length) { clearInterval(timer); track.innerHTML = ''; dots.innerHTML = ''; return; }
+      build();
+    }, () => {});
+  } catch (e) { console.warn('driver_posters:', e); }
+})();
+
+// ---------- Help ----------
+document.getElementById('help-btn').addEventListener('click', () => {
+  const call = document.getElementById('help-call-link');
+  const wa = document.getElementById('help-wa-link');
+  const err = document.getElementById('help-modal-error');
+  if (supportPhone) {
+    call.href = 'tel:' + supportPhone;
+    wa.href = 'https://wa.me/' + supportPhone.replace(/^\+/, '');
+    call.style.display = wa.style.display = 'block';
+    err.style.display = 'none';
+  } else {
+    call.style.display = wa.style.display = 'none';
+    err.style.display = 'block';
+  }
+  document.getElementById('help-modal-overlay').classList.add('show');
+});
+document.getElementById('help-close-btn').addEventListener('click', () => document.getElementById('help-modal-overlay').classList.remove('show'));
+
+// ---------- SOS ----------
+document.getElementById('sos-btn').addEventListener('click', () => document.getElementById('sos-modal-overlay').classList.add('show'));
+document.getElementById('sos-cancel-btn').addEventListener('click', () => document.getElementById('sos-modal-overlay').classList.remove('show'));
+document.getElementById('sos-confirm-btn').addEventListener('click', async () => {
+  document.getElementById('sos-modal-overlay').classList.remove('show');
+  try {
+    const { db, ref, push } = window.fb;
+    await push(ref(db, 'driver_sos'), {
+      driverId: state.username || '',
+      driverName: (state.driver && state.driver.name) || '',
+      phone: (state.driver && state.driver.phone) || '',
+      location: state.myLocation || null,
+      createdAt: Date.now(),
+      status: 'open',
+    });
+    showToast('SOS sent to operator');
+  } catch (e) { console.warn('SOS write failed:', e); }
+  window.location.href = 'tel:112';
+});
+
+// ---------- Refer ----------
+document.getElementById('refer-share-btn').addEventListener('click', async () => {
+  const url = location.origin + location.pathname;
+  const text = 'Drive or deliver with NESH — sign up here: ' + url;
+  try {
+    if (navigator.share) { await navigator.share({ title: 'NESH Driver', text, url }); return; }
+  } catch (e) { return; }
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+});
+
+
+// ---------- My Shifts ----------
+// Reads /driver_shifts (created in the operator panel) and lets this driver
+// book/cancel. Booking uses a transaction so two drivers can't take the last slot.
+let shiftsCache = {};
+(function listenShifts() {
+  try {
+    const { db, ref, onValue } = window.fb;
+    onValue(ref(db, 'driver_shifts'), (snap) => {
+      shiftsCache = snap.val() || {};
+      renderShifts();
+    }, () => {});
+  } catch (e) { console.warn('driver_shifts:', e); }
+})();
+function shiftTimeLabel(t) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t || '');
+  if (!m) return t || '';
+  let h = Number(m[1]); const ap = h >= 12 ? 'pm' : 'am'; h = h % 12 || 12;
+  return h + ':' + m[2] + ' ' + ap;
+}
+function renderShifts() {
+  const list = document.getElementById('shifts-list');
+  if (!list) return;
+  const now = new Date();
+  const items = Object.keys(shiftsCache).map(id => Object.assign({ id }, shiftsCache[id]))
+    .filter(s => s.date && s.end && new Date(s.date + 'T' + s.end + ':00') > now)
+    .sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
+  if (!items.length) { list.innerHTML = '<p class="empty-text" style="padding:0;">No shifts open right now. Check back later.</p>'; return; }
+  list.innerHTML = items.map(s => {
+    const bookings = s.bookings || {};
+    const booked = Object.keys(bookings).length;
+    const mine = !!(state.username && bookings[state.username]);
+    const full = booked >= (Number(s.slots) || 0);
+    const day = new Date(s.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+    const btn = mine
+      ? '<button type="button" class="btn-danger" style="padding:10px 14px;" onclick="cancelShift(\'' + s.id + '\')">Cancel booking</button>'
+      : full
+        ? '<span style="font-weight:700; color:var(--muted);">Full</span>'
+        : '<button type="button" class="btn-primary" style="padding:10px 14px;" onclick="bookShift(\'' + s.id + '\')">Book</button>';
+    return '<div class="day-row" style="gap:10px;' + (mine ? ' border-color:var(--marigold);' : '') + '">' +
+      '<div><p class="d">' + escapeHtml(day) + ' · ' + shiftTimeLabel(s.start) + ' – ' + shiftTimeLabel(s.end) + '</p>' +
+      '<p class="t">' + (Number(s.slots) - booked > 0 ? (Number(s.slots) - booked) + ' of ' + s.slots + ' slots left' : 'All slots taken') + (mine ? ' · You booked this' : '') + '</p>' +
+      (s.note ? '<p class="t">' + escapeHtml(s.note) + '</p>' : '') + '</div>' + btn + '</div>';
+  }).join('');
+}
+async function bookShift(id) {
+  if (!state.username) return;
+  try {
+    const { db, ref, runTransaction } = window.fb;
+    const res = await runTransaction(ref(db, 'driver_shifts/' + id), (cur) => {
+      if (cur === null) return cur;
+      const b = cur.bookings || {};
+      if (b[state.username]) return; // already booked — abort
+      if (Object.keys(b).length >= (Number(cur.slots) || 0)) return; // full — abort
+      b[state.username] = {
+        name: (state.driver && state.driver.name) || '',
+        phone: (state.driver && state.driver.phone) || '',
+        bookedAt: Date.now(),
+      };
+      cur.bookings = b;
+      return cur;
+    });
+    showToast(res.committed ? 'Shift booked' : 'Could not book — shift is full or already booked');
+  } catch (e) { showToast('Could not book shift'); }
+}
+async function cancelShift(id) {
+  if (!state.username) return;
+  if (!confirm('Cancel your booking for this shift?')) return;
+  try {
+    const { db, ref, remove } = window.fb;
+    await remove(ref(db, 'driver_shifts/' + id + '/bookings/' + state.username));
+    showToast('Booking cancelled');
+  } catch (e) { showToast('Could not cancel booking'); }
+}
+
 
 // ---------- OTP modal (verify pickup before starting a trip) ----------
 // Uber/Ola-style flow: the rider's app shows a 4-digit code once a driver
@@ -3850,8 +4301,10 @@ function renderHomeLists() {
       </div>
       <p class="order-time" style="margin-top:2px;">${currentDelivery.orderNumber ? '#' + currentDelivery.orderNumber : ''}${currentDelivery._restName ? ' · ' + escapeHtml(currentDelivery._restName) : ''}</p>
       <div class="order-mid" style="justify-content:flex-end;">
-        <p class="order-total">₹${currentDelivery.deliveryFee || 0}</p>
+        <p class="order-total">₹${deliveryPayout(currentDelivery)}</p>
       </div>
+      ${currentDelivery.rainSurgeDriver > 0 ? `<p style="margin:4px 0 0; text-align:right; font-size:12px; font-weight:700; color:var(--muted);">🌧️ includes ₹${currentDelivery.rainSurgeDriver} rain bonus</p>` : ''}
+      ${currentDelivery.tip > 0 ? `<p style="margin:4px 0 0; text-align:right; font-size:12px; font-weight:700; color:#0E8A5C;">🙏 includes ₹${currentDelivery.tip} customer tip</p>` : ''}
       ${collectAmount ? `<div class="order-popup-row order-popup-row-total"><span>Collect from customer</span><span>₹${collectAmount}</span></div>` : ''}
       ${giveShopAmount != null ? `<div class="order-popup-row"><span>Give to shop</span><span>₹${giveShopAmount}</span></div>` : ''}
       <p style="margin:8px 0 0; color:var(--muted); font-size:13px;">${items || ''}</p>
@@ -3889,7 +4342,7 @@ function renderHomeLists() {
       </div>
       <div class="order-mid">
         <p class="order-cust">${o.customerName || 'Customer'}</p>
-        <p class="order-total">₹${o.deliveryFee || 0}</p>
+        <p class="order-total">₹${deliveryPayout(o)}</p>
       </div>
       <div style="margin-top:8px;"><span class="pill pill-completed">delivered</span></div>
     `;
@@ -3963,12 +4416,13 @@ function renderEarnings(all) {
   // same amount shown on the delivery job card and history list) counts
   // toward this driver's earnings just like a completed ride's fare does.
   const myDeliveries = deliveriesCache.filter(o => o.deliveryDriverId === state.username && o.status === 'delivered');
-  const deliveryTotal = myDeliveries.reduce((sum, o) => sum + (o.deliveryFee || 0), 0);
-  const deliveryToday = myDeliveries.filter(o => (o.createdAt || 0) >= startOfDay.getTime()).reduce((sum, o) => sum + (o.deliveryFee || 0), 0);
+  const deliveryTotal = myDeliveries.reduce((sum, o) => sum + deliveryPayout(o), 0);
+  const deliveryToday = myDeliveries.filter(o => (o.createdAt || 0) >= startOfDay.getTime()).reduce((sum, o) => sum + deliveryPayout(o), 0);
 
   document.getElementById('earn-today').textContent = '₹' + money(rideToday + deliveryToday);
   document.getElementById('earn-total').textContent = '₹' + money(rideTotal + deliveryTotal);
   document.getElementById('earn-trips').textContent = String(mine.length + myDeliveries.length);
+  try { renderEarningsScreen(mine, myDeliveries); } catch (e) { console.warn('earnings screen:', e); }
 }
 
 function buildMapUrl(pos) {
@@ -4280,6 +4734,22 @@ async function registerForOrderPushNotifications() {
     });
   }
 })();
+</script>
+
+<script>
+  (function(){
+    var badge=document.getElementById('due-nav-badge');
+    var banner=document.getElementById('home-due-banner');
+    var sub=document.getElementById('home-due-banner-sub');
+    if(!badge||!banner) return;
+    function sync(){
+      var n=parseFloat((badge.textContent||'').replace(/[^0-9.]/g,''))||0;
+      banner.classList.toggle('hidden', n<=0);
+      if(sub) sub.textContent='Amount due: ₹'+n;
+    }
+    new MutationObserver(sync).observe(badge,{childList:true,characterData:true,subtree:true});
+    sync();
+  })();
 </script>
 </body>
 </html>
