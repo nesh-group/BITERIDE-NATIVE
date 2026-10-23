@@ -711,7 +711,7 @@
   <div class="icat-overlay" id="sug-editor-overlay">
     <div class="icat-card">
       <p class="reason-modal-title">🥤 Suggested add-ons</p>
-      <p class="reason-modal-sub">Pick up to 8 items (drinks, sides, desserts...) to suggest to customers when they place an order. If you pick none, we suggest your drinks automatically.</p>
+      <p class="reason-modal-sub" id="sug-editor-sub">Pick up to 8 items (drinks, sides, desserts...) to suggest to customers when they place an order. If you pick none, we suggest your drinks automatically.</p>
       <input class="icat-input" type="text" id="sug-editor-search" placeholder="Search items..." autocomplete="off" oninput="renderSuggestEditorItems()">
       <div id="sug-editor-items" style="max-height:42vh; overflow-y:auto;"></div>
       <p class="hint-text" id="sug-editor-count" style="margin-top:8px;"></p>
@@ -1667,6 +1667,11 @@
           <h3>NESH Store Item Order</h3>
           <p>Pick which item shows first in the customer app's merged NESH Store groceries catalog</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('nesh-suggest')">
+          <div class="op-home-icon">🥤</div>
+          <h3>NESH Store Add-ons</h3>
+          <p>Pick up to 8 items shown as "Add something extra?" when a customer orders groceries</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('nesh-sections')">
           <div class="op-home-icon">🗂️</div>
           <h3>NESH Store Sections</h3>
@@ -1914,6 +1919,23 @@
       <div id="op-nesh-item-order-list"></div>
       <button type="button" class="op-btn op-btn-push" onclick="opSaveNeshItemOrder()" style="margin-top:12px;">💾 Save order</button>
       <p class="op-note" id="op-nesh-item-order-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- NESH STORE ADD-ONS ("Add something extra?" strip for groceries orders) -->
+  <div class="op-section" id="op-section-nesh-suggest">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>NESH Store Add-ons</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note" style="margin-bottom:10px;">Pick up to 8 items to suggest in the customer app's "Add something extra?" strip on the groceries order summary. Only items sold by piece are listed. If you pick none, nothing is suggested. Items with no price / not available right now are skipped automatically for the customer.</p>
+      <div class="op-search-box"><input type="text" id="op-nesh-suggest-search" placeholder="Search items..." oninput="opRenderNeshSuggest()"></div>
+      <p class="op-note" id="op-nesh-suggest-count" style="margin-bottom:8px;"></p>
+      <div id="op-nesh-suggest-list"></div>
+      <button type="button" class="op-btn op-btn-push" onclick="opSaveNeshSuggest()" style="margin-top:12px;">💾 Save add-ons</button>
+      <button type="button" class="op-btn" onclick="opClearNeshSuggest()" style="margin-top:12px;">Clear all</button>
+      <p class="op-note" id="op-nesh-suggest-status" style="margin-top:10px;"></p>
     </div>
   </div>
 
@@ -5457,18 +5479,22 @@ function listenSuggestItems() {
 function updateSuggestSub() {
   const t = state.restaurant?.businessType;
   const wrap = document.getElementById('suggest-items-wrap');
-  if (wrap) wrap.style.display = (t !== 'online_shop' && t !== 'groceries') ? 'block' : 'none';
+  if (wrap) wrap.style.display = (t !== 'groceries') ? 'block' : 'none';   // groceries: the operator sets it (Operator Panel -> NESH Store Add-ons)
   const sub = document.getElementById('suggest-items-sub');
   if (!sub) return;
   const valid = new Set((state.menuItems || []).map(it => it.id));
   const n = suggestIds.filter(id => valid.has(id)).length;
-  sub.textContent = n ? n + ' selected' : 'Not set — your drinks are suggested automatically';
+  sub.textContent = n ? n + ' selected' : (t === 'online_shop' ? 'Not set — nothing is suggested to customers' : 'Not set — your drinks are suggested automatically');
 }
 function openSuggestEditor() {
   if (!(state.menuItems || []).length) { showToast('Add some items first'); return; }
   const valid = new Set(state.menuItems.map(it => it.id));
   suggestPick = suggestIds.filter(id => valid.has(id)).slice(0, SUGGEST_MAX);
   document.getElementById('sug-editor-search').value = '';
+  { const se = document.getElementById('sug-editor-sub');
+    if (se) se.textContent = state.restaurant?.businessType === 'online_shop'
+      ? 'Pick up to 8 items to suggest to customers in "Add something extra?" when they place an order. Only items sold by piece, with a price, are shown. If you pick none, nothing is suggested.'
+      : 'Pick up to 8 items (drinks, sides, desserts...) to suggest to customers when they place an order. If you pick none, we suggest your drinks automatically.'; }
   const err = document.getElementById('sug-editor-error');
   err.style.display = 'none'; err.textContent = '';
   renderSuggestEditorItems();
@@ -7892,6 +7918,7 @@ function opEnterPanel() {
   opListenCategoryOrder();
   opListenShopOrder();
   opListenNeshItemOrder();
+  opListenNeshSuggest();
   opListenNeshSections();
   opListenNeshCategories();
   opListenNeshPrices();
@@ -7930,6 +7957,7 @@ function opOpenSection(name) {
   if (name === 'delete-all') opOpenDeleteAllSection();
   if (name === 'support') opRenderChatConvList();
   if (name === 'pricing') opLoadExtraAmount();
+  if (name === 'nesh-suggest') { const si = document.getElementById('op-nesh-suggest-search'); if (si) si.value = ''; document.getElementById('op-nesh-suggest-status').textContent = ''; opBuildNeshSuggest(); }
   if (name === 'taxi-fare') opLoadTaxiFare();
   if (name === 'rain-surge') opLoadRainSurge();
   if (name === 'support-phone') opLoadSupportPhone();
@@ -9611,6 +9639,72 @@ function opSaveNeshItemOrder() {
   set(ref(db, 'app_config/neshStoreItemOrder'), keys)
     .then(() => { status.textContent = 'Saved — the customer app will pick this up live.'; })
     .catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+/* ==================================================================
+   NESH STORE ADD-ONS (Operator Panel -> NESH Store Add-ons)
+   The "Add something extra?" strip on the groceries order summary.
+   Stored as an array (max 8) of item keys (name+unit, lowercased - the same
+   key the Groceries Catalog / Item Order use) at app_config/neshStoreSuggest.
+   ================================================================== */
+const OP_SUGGEST_MAX = 8;
+let opNeshSuggestSaved = [];
+let opNeshSuggestPick = [];
+let opNeshSuggestShown = [];
+function opListenNeshSuggest() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'app_config/neshStoreSuggest'), snap => {
+    opNeshSuggestSaved = Array.isArray(snap.val()) ? snap.val().slice(0, OP_SUGGEST_MAX) : [];
+    const sec = document.getElementById('op-section-nesh-suggest');
+    if (sec && sec.classList.contains('active')) opBuildNeshSuggest();
+  });
+}
+function opNeshSuggestGroups() {
+  return opGroceriesCatalogGroups().filter(g => g.unit === 'piece').map(g => ({ key: g.name.trim().toLowerCase() + '|' + g.unit, name: g.name }));
+}
+function opBuildNeshSuggest() {
+  const valid = new Set(opNeshSuggestGroups().map(g => g.key));
+  opNeshSuggestPick = opNeshSuggestSaved.filter(k => valid.has(k));
+  opRenderNeshSuggest();
+}
+function opRenderNeshSuggest() {
+  const wrap = document.getElementById('op-nesh-suggest-list');
+  if (!wrap) return;
+  const q = (document.getElementById('op-nesh-suggest-search').value || '').trim().toLowerCase();
+  opNeshSuggestShown = opNeshSuggestGroups().filter(g => !q || g.name.toLowerCase().includes(q));
+  wrap.innerHTML = opNeshSuggestShown.length ? opNeshSuggestShown.map((g, i) => `
+    <label class="op-partner-item" style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+      <input type="checkbox" ${opNeshSuggestPick.includes(g.key) ? 'checked' : ''} onchange="opToggleNeshSuggest(${i}, this)">
+      <span class="op-partner-name">${escapeHtml(g.name)}</span>
+    </label>`).join('') : '<div class="op-empty">No piece-unit groceries items found.</div>';
+  document.getElementById('op-nesh-suggest-count').textContent = opNeshSuggestPick.length + ' / ' + OP_SUGGEST_MAX + ' selected';
+}
+function opToggleNeshSuggest(i, box) {
+  const g = opNeshSuggestShown[i];
+  const status = document.getElementById('op-nesh-suggest-status');
+  if (!g) return;
+  if (box.checked) {
+    if (opNeshSuggestPick.length >= OP_SUGGEST_MAX) { box.checked = false; status.textContent = 'Only ' + OP_SUGGEST_MAX + ' items allowed. Untick one first.'; return; }
+    opNeshSuggestPick.push(g.key);
+  } else {
+    opNeshSuggestPick = opNeshSuggestPick.filter(k => k !== g.key);
+  }
+  status.textContent = '';
+  document.getElementById('op-nesh-suggest-count').textContent = opNeshSuggestPick.length + ' / ' + OP_SUGGEST_MAX + ' selected';
+}
+function opClearNeshSuggest() {
+  opNeshSuggestPick = [];
+  opRenderNeshSuggest();
+}
+function opSaveNeshSuggest() {
+  const { db, ref, set, remove } = window.fb;
+  const status = document.getElementById('op-nesh-suggest-status');
+  status.textContent = 'Saving...';
+  const task = opNeshSuggestPick.length
+    ? set(ref(db, 'app_config/neshStoreSuggest'), opNeshSuggestPick.slice(0, OP_SUGGEST_MAX))
+    : remove(ref(db, 'app_config/neshStoreSuggest'));
+  task.then(() => { status.textContent = opNeshSuggestPick.length ? 'Saved — live in the customer app.' : 'Cleared — no add-ons suggested.'; })
+      .catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
 /* ==================================================================
