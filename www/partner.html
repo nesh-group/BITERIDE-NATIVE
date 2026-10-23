@@ -1810,6 +1810,11 @@
           <h3>Customer Support</h3>
           <p>Set the phone number the "Call Support" button in the customer app dials</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('test-location')">
+          <div class="op-home-icon">🧪</div>
+          <h3>Test Location</h3>
+          <p>Pick a delivery zone and switch on a "Use test location" button in the customer app's location screen</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('driver-config')">
           <div class="op-home-icon">🛠️</div>
           <h3>Driver App Settings</h3>
@@ -2862,6 +2867,25 @@
         <button type="button" class="op-btn op-btn-push" onclick="opSaveSupportPhone()">💾 Save</button>
       </div>
       <p class="op-note" id="op-support-phone-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- TEST LOCATION — stored at app_config/testLocation = { on, zoneId, zoneName, lat, lng, updatedAt } -->
+  <div class="op-section" id="op-section-test-location">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Test Location</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">For testing: pick a zone, then Save &amp; switch ON. While ON, the customer app's "Select your location" screen shows a <b>🧪 Use test location</b> button that jumps straight to a point inside this zone — handy when you are testing from outside every zone. Nothing shows until you save it here. <b>Switch it OFF when testing is done</b> (it is visible to every customer while ON).</p>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <select id="op-testloc-zone" style="width:100%; padding:10px; background:transparent; color:inherit; border:1px solid currentColor; border-radius:6px;"></select>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="op-btn op-btn-push" onclick="opSaveTestLocation()">💾 Save &amp; switch ON</button>
+        <button type="button" class="op-btn op-btn-danger" onclick="opClearTestLocation()">⏹ Switch OFF</button>
+      </div>
+      <p class="op-note" id="op-testloc-status" style="margin-top:10px;"></p>
     </div>
   </div>
 
@@ -7909,6 +7933,7 @@ function opOpenSection(name) {
   if (name === 'taxi-fare') opLoadTaxiFare();
   if (name === 'rain-surge') opLoadRainSurge();
   if (name === 'support-phone') opLoadSupportPhone();
+  if (name === 'test-location') opLoadTestLocation();
   if (name === 'driver-config') opLoadDriverConfig();
   if (name === 'driver-posters') opLoadDriverPosters();
   if (name === 'driver-sos') opRenderSosList();
@@ -8327,6 +8352,71 @@ function opSaveSupportPhone() {
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
+
+/* ---- Test Location: operator picks a zone; the customer app's location picker then shows a
+   "Use test location" button that jumps to a point INSIDE that zone.
+   Stored at app_config/testLocation = { on, zoneId, zoneName, lat, lng, updatedAt }.
+   Never set / switched off = no button in the customer app. ---- */
+function opZoneInnerPoint(bounds) {
+  const pts = (Array.isArray(bounds) ? bounds : Object.values(bounds || {})).filter(p => p && typeof p.lat === 'number' && typeof p.lng === 'number');
+  if (pts.length < 3) return null;
+  const inside = (lat, lng) => {
+    let c = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const a = pts[i], b = pts[j];
+      if (((a.lat > lat) !== (b.lat > lat)) && (lng < (b.lng - a.lng) * (lat - a.lat) / (b.lat - a.lat) + a.lng)) c = !c;
+    }
+    return c;
+  };
+  const cLat = pts.reduce((s, p) => s + p.lat, 0) / pts.length, cLng = pts.reduce((s, p) => s + p.lng, 0) / pts.length;
+  if (inside(cLat, cLng)) return { lat: cLat, lng: cLng };
+  // concave zone: take the grid point inside the polygon that is closest to the centroid
+  const minLat = Math.min(...pts.map(p => p.lat)), maxLat = Math.max(...pts.map(p => p.lat));
+  const minLng = Math.min(...pts.map(p => p.lng)), maxLng = Math.max(...pts.map(p => p.lng));
+  let best = null;
+  for (let i = 0; i <= 30; i++) for (let k = 0; k <= 30; k++) {
+    const la = minLat + (maxLat - minLat) * i / 30, ln = minLng + (maxLng - minLng) * k / 30;
+    if (!inside(la, ln)) continue;
+    const d = (la - cLat) * (la - cLat) + (ln - cLng) * (ln - cLng);
+    if (!best || d < best.d) best = { lat: la, lng: ln, d };
+  }
+  return best ? { lat: best.lat, lng: best.lng } : null;
+}
+function opLoadTestLocation() {
+  const status = document.getElementById('op-testloc-status');
+  const sel = document.getElementById('op-testloc-zone');
+  status.textContent = 'Loading...';
+  const { db, ref, get } = window.fb;
+  Promise.all([get(ref(db, 'app_config/shopZones')), get(ref(db, 'app_config/testLocation'))]).then(([zSnap, tSnap]) => {
+    const zs = zSnap.val() || {}, t = tSnap.val();
+    const ids = Object.keys(zs).filter(id => opZoneInnerPoint((zs[id] || {}).bounds));
+    sel.innerHTML = '<option value="">— Select a zone —</option>' + ids.map(id => '<option value="' + id + '">' + escapeHtml((zs[id].name || id)) + '</option>').join('');
+    if (t && t.zoneId && ids.includes(t.zoneId)) sel.value = t.zoneId;
+    status.textContent = ids.length ? (t && t.on ? ('ON — test location is "' + (t.zoneName || t.zoneId) + '" (' + Number(t.lat).toFixed(5) + ', ' + Number(t.lng).toFixed(5) + '). Last updated ' + (t.updatedAt || '') + '.') : 'OFF — the customer app shows no test location button.') : 'No zone with a drawn boundary yet — draw one in Shop Zones first.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opSaveTestLocation() {
+  const status = document.getElementById('op-testloc-status');
+  const zoneId = document.getElementById('op-testloc-zone').value;
+  if (!zoneId) { status.textContent = 'Pick a zone first.'; return; }
+  status.textContent = 'Saving...';
+  const { db, ref, get, set } = window.fb;
+  get(ref(db, 'app_config/shopZones/' + zoneId)).then(snap => {
+    const z = snap.val() || {};
+    const pt = opZoneInnerPoint(z.bounds);
+    if (!pt) { status.textContent = 'This zone has no drawn boundary.'; return; }
+    return set(ref(db, 'app_config/testLocation'), { on: true, zoneId, zoneName: z.name || '', lat: pt.lat, lng: pt.lng, updatedAt: new Date().toLocaleString() })
+      .then(() => { status.textContent = 'Saved — ON. Customers now see "Use test location (' + (z.name || zoneId) + ')" in the location screen. Switch it OFF after testing.'; });
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opClearTestLocation() {
+  const status = document.getElementById('op-testloc-status');
+  status.textContent = 'Switching off...';
+  const { db, ref, remove } = window.fb;
+  remove(ref(db, 'app_config/testLocation'))
+    .then(() => { status.textContent = 'OFF — the test location button is hidden in the customer app.'; })
+    .catch(err => { status.textContent = 'Error: ' + err.message; });
+}
 
 /* ---- Driver app settings: /driver_config { supportPhone, incentiveAmount, incentiveText, updatedAt } ---- */
 function opLoadDriverConfig() {
