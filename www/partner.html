@@ -2397,6 +2397,7 @@
         <input type="number" id="op-ls-qty" min="1" value="1" placeholder="Quantity" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:110px;">
       </div>
       <div style="margin:0 0 10px;"><input type="number" id="op-ls-min" min="0" placeholder="Min order ₹ to use reward" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:200px;"></div>
+      <div style="margin:0 0 10px;"><input type="number" id="op-ls-cmin" min="0" placeholder="Min order ₹ for an order to COUNT" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:260px;"> <span class="op-note" style="display:inline;">(items total, without delivery fee. Blank/0 = every order counts)</span></div>
       <button type="button" class="op-btn op-btn-push" onclick="opLsSave()">💾 Save Groceries reward</button>
       <button type="button" class="op-btn" style="margin-left:8px;" onclick="opLsDelete()">🗑 Remove</button>
       <p class="op-note" id="op-ls-status" style="margin-top:10px;"></p>
@@ -2426,6 +2427,7 @@
         <input type="text" id="op-loy-pname" maxlength="60" placeholder="Free product name (e.g. Cold drink 250ml)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:100%;max-width:420px;">
       </div>
       <div style="margin:0 0 10px;"><input type="number" id="op-loy-min" min="0" placeholder="Min order ₹ to use reward" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:200px;"></div>
+      <div style="margin:0 0 10px;"><input type="number" id="op-loy-cmin" min="0" placeholder="Min order ₹ for an order to COUNT" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:260px;"> <span class="op-note" style="display:inline;">(items total, without delivery fee. Blank/0 = every order counts)</span></div>
       <p class="op-note" style="margin-bottom:6px;">Reward works at which shops?</p>
       <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:6px;"><input type="checkbox" id="op-loy-all" onchange="opLoyAllToggle(this)"> 🌐 All shops</label>
       <div id="op-loy-shops" style="max-height:220px;overflow:auto;border:1px solid #124a24;padding:8px;margin-bottom:12px;color:#33ff66;font-size:.85rem;line-height:2;"></div>
@@ -14501,6 +14503,7 @@ function opLsLoad() {
     document.getElementById('op-ls-value').value = v.value || '';
     document.getElementById('op-ls-max').value = v.maxDiscount || '';
     document.getElementById('op-ls-min').value = v.minOrder || '';
+    document.getElementById('op-ls-cmin').value = v.countMin || '';
     document.getElementById('op-ls-qty').value = v.qty || 1;
     opLsTypeUi(); opLsRenderItemSelect(v.itemKey || '');
     opLsMsg(v.on === false ? 'Saved reward is currently OFF.' : 'Reward is live ✅' + (v.productName ? ' (free item: ' + v.productName + ')' : ''));
@@ -14522,6 +14525,7 @@ function opLsSave() {
     rewardType: rt, type: type, value: rt === 'discount' ? value : 0,
     maxDiscount: Math.max(0, parseFloat(document.getElementById('op-ls-max').value) || 0),
     minOrder: Math.max(0, parseFloat(document.getElementById('op-ls-min').value) || 0),
+    countMin: Math.max(0, parseFloat(document.getElementById('op-ls-cmin').value) || 0),
     productName: pname.slice(0, 60), itemKey: rt === 'product' ? sel.value : '',
     qty: Math.max(1, Math.floor(parseFloat(document.getElementById('op-ls-qty').value) || 1)), ts: Date.now()
   }).then(function () { opLsMsg('Saved ✅ — customers see the reward card in NESH Store now.'); }).catch(function (e) { opLsMsg('Error: ' + ((e && e.message) || 'could not save')); });
@@ -14565,6 +14569,7 @@ function opLoyLoad() {
     document.getElementById('op-loy-value').value = v.value || '';
     document.getElementById('op-loy-max').value = v.maxDiscount || '';
     document.getElementById('op-loy-min').value = v.minOrder || '';
+    document.getElementById('op-loy-cmin').value = v.countMin || '';
     document.getElementById('op-loy-pname').value = v.productName || '';
     var all = document.getElementById('op-loy-all'); all.checked = !!v.allShops; opLoyAllToggle(all);
     Array.prototype.forEach.call(document.querySelectorAll('.op-loy-shop'), function (c) { c.checked = !!(v.shops && v.shops[c.value]); });
@@ -14590,6 +14595,7 @@ function opLoySave() {
     rewardType: rt, type: type, value: rt === 'discount' ? value : 0,
     maxDiscount: Math.max(0, parseFloat(document.getElementById('op-loy-max').value) || 0),
     minOrder: Math.max(0, parseFloat(document.getElementById('op-loy-min').value) || 0),
+    countMin: Math.max(0, parseFloat(document.getElementById('op-loy-cmin').value) || 0),
     productName: rt === 'product' ? pname.slice(0, 60) : '',
     allShops: all, shops: all ? {} : shops, ts: Date.now()
   }).then(function () { opLoyMsg('Saved ✅ — customers see the reward card in the selected shops now.'); }).catch(function (e) { opLoyMsg('Error: ' + ((e && e.message) || 'could not save')); });
