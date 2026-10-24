@@ -504,6 +504,7 @@
   #operator-container .op-home-header p{ color:#1f7a3d; font-size:.8rem; letter-spacing:1px; text-transform:uppercase; margin-top:4px; }
   #operator-container .op-logout-btn{ background:#000; color:#8b8b8b; border:1px solid #333; padding:7px 12px; cursor:pointer; font-family:inherit; font-size:.78rem; text-transform:uppercase; }
   #operator-container .op-home-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-top:6px; }
+  #operator-container .op-home-card.op-search-hide{ display:none !important; }
   #operator-container .op-home-card{ background:#020a04; border:1px solid #124a24; padding:26px 16px; text-align:center; cursor:pointer; transition:all .2s ease; }
   #operator-container .op-home-card:hover{ background:#051f0a; border-color:#00ff41; box-shadow:0 0 15px rgba(0,255,65,.25); }
   #operator-container .op-home-icon{ font-size:2rem; margin-bottom:8px; filter:grayscale(1) brightness(1.6) sepia(1) hue-rotate(70deg) saturate(4); }
@@ -1644,6 +1645,10 @@
         <button class="op-logout-btn" onclick="opLogout()">Logout</button>
       </div>
       <p class="op-note" id="op-data-usage" style="margin:0 0 10px; display:none;"></p>
+      <div style="margin:0 0 14px;position:relative;">
+        <input type="search" id="op-home-search" placeholder="🔍 Search cards (e.g. coupon, orders, taxi…)" oninput="opHomeSearch(this.value)" autocomplete="off" style="width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:12px 14px;font-family:inherit;font-size:.95rem;">
+        <p class="op-note" id="op-home-search-empty" style="display:none;margin:10px 0 0;">No card matches your search.</p>
+      </div>
       <div class="op-home-grid">
         <div class="op-home-card" onclick="opOpenSection('orders')" style="position:relative;">
           <span class="op-home-badge" id="op-orders-home-badge" style="display:none;"></span>
@@ -1722,6 +1727,16 @@
           <div class="op-home-icon">🎟️</div>
           <h3>Coupons</h3>
           <p>Discount codes that work only at the shops you pick</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('loyalty')">
+          <div class="op-home-icon">🏆</div>
+          <h3>Loyalty Reward</h3>
+          <p>After N orders the customer unlocks a coupon or free product</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('loyalty-store')">
+          <div class="op-home-icon">🛒</div>
+          <h3>Groceries Reward</h3>
+          <p>After N Groceries orders: coupon or free item (Groceries only)</p>
         </div>
         <div class="op-home-card" onclick="opOpenSection('video-ads')">
           <div class="op-home-icon">📺</div>
@@ -2354,6 +2369,69 @@
       <button type="button" class="op-btn op-btn-push" onclick="opCpnSave()">💾 Save coupon</button>
       <p class="op-note" id="op-cpn-status" style="margin-top:10px;"></p>
       <div id="op-cpn-list"></div>
+    </div>
+  </div>
+
+  <!-- GROCERIES LOYALTY REWARD — stored at app_config/loyaltyStore. Progress: loyaltyStore/{phone} = { count, claimed } -->
+  <div class="op-section" id="op-section-loyalty-store">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Groceries Reward</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Works only in NESH Store (Groceries), with its own order count. After the customer's Groceries orders are DELIVERED (the number you set), they unlock a coupon or a free Groceries item. The reward card shows at the top of NESH Store. For a free item the shop that fulfils the order is still paid its own rate (you bear the cost).</p>
+      <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-ls-on" checked> ✅ Reward is ON</label>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px;">
+        <input type="number" id="op-ls-n" min="1" value="5" placeholder="Orders needed" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:130px;">
+        <input type="text" id="op-ls-title" maxlength="40" placeholder="Card title (e.g. Groceries Rewards)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="flex:1 1 220px;min-width:200px;">
+        <select id="op-ls-rt" onchange="opLsTypeUi()" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"><option value="discount">🎟️ Coupon (discount)</option><option value="product">🎁 Free item</option></select>
+      </div>
+      <div id="op-ls-disc" style="display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px;">
+        <select id="op-ls-type" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"><option value="flat">₹ Flat off</option><option value="percent">% Percent off</option></select>
+        <input type="number" id="op-ls-value" min="1" placeholder="Amount / %" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:120px;">
+        <input type="number" id="op-ls-max" min="0" placeholder="Max ₹ off (for %)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:150px;">
+      </div>
+      <div id="op-ls-prod" style="display:none;margin:0 0 10px;">
+        <div class="op-search-box" style="margin-bottom:6px;"><input type="text" id="op-ls-search" placeholder="Search the free item…" oninput="opLsRenderItemSelect()"></div>
+        <div style="margin-bottom:8px;"><select id="op-ls-item" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="max-width:100%;"></select></div>
+        <input type="number" id="op-ls-qty" min="1" value="1" placeholder="Quantity" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:110px;">
+      </div>
+      <div style="margin:0 0 10px;"><input type="number" id="op-ls-min" min="0" placeholder="Min order ₹ to use reward" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:200px;"></div>
+      <button type="button" class="op-btn op-btn-push" onclick="opLsSave()">💾 Save Groceries reward</button>
+      <button type="button" class="op-btn" style="margin-left:8px;" onclick="opLsDelete()">🗑 Remove</button>
+      <p class="op-note" id="op-ls-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- LOYALTY REWARD — stored at app_config/loyalty. Customer progress: loyalty/{phone} = { count, claimed } -->
+  <div class="op-section" id="op-section-loyalty">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Loyalty Reward</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">After a customer completes the number of orders you set, they unlock a coupon or a free product. A group order (many shops in one checkout) counts as ONE order. The reward card shows at the top of every shop you tick below.</p>
+      <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-loy-on" checked> ✅ Reward is ON</label>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px;">
+        <input type="number" id="op-loy-n" min="1" value="5" title="Orders needed" placeholder="Orders needed" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:130px;">
+        <input type="text" id="op-loy-title" maxlength="40" placeholder="Card title (e.g. NESH Rewards)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="flex:1 1 220px;min-width:200px;">
+        <select id="op-loy-rt" onchange="opLoyTypeUi()" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"><option value="discount">🎟️ Coupon (discount)</option><option value="product">🎁 Free product</option></select>
+      </div>
+      <div id="op-loy-disc" style="display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px;">
+        <select id="op-loy-type" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"><option value="flat">₹ Flat off</option><option value="percent">% Percent off</option></select>
+        <input type="number" id="op-loy-value" min="1" placeholder="Amount / %" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:120px;">
+        <input type="number" id="op-loy-max" min="0" placeholder="Max ₹ off (for %)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:150px;">
+      </div>
+      <div id="op-loy-prod" style="display:none;margin:0 0 10px;">
+        <input type="text" id="op-loy-pname" maxlength="60" placeholder="Free product name (e.g. Cold drink 250ml)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:100%;max-width:420px;">
+      </div>
+      <div style="margin:0 0 10px;"><input type="number" id="op-loy-min" min="0" placeholder="Min order ₹ to use reward" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:200px;"></div>
+      <p class="op-note" style="margin-bottom:6px;">Reward works at which shops?</p>
+      <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:6px;"><input type="checkbox" id="op-loy-all" onchange="opLoyAllToggle(this)"> 🌐 All shops</label>
+      <div id="op-loy-shops" style="max-height:220px;overflow:auto;border:1px solid #124a24;padding:8px;margin-bottom:12px;color:#33ff66;font-size:.85rem;line-height:2;"></div>
+      <button type="button" class="op-btn op-btn-push" onclick="opLoySave()">💾 Save loyalty reward</button>
+      <button type="button" class="op-btn" style="margin-left:8px;" onclick="opLoyDelete()">🗑 Remove</button>
+      <p class="op-note" id="op-loy-status" style="margin-top:10px;"></p>
     </div>
   </div>
 
@@ -7949,6 +8027,8 @@ function opOpenSection(name) {
   if (name === 'app-videos') { opLoadAppVideos(); opLoadBusVideos(); }
   if (name === 'video-ads') opLoadVideoAds();
   if (name === 'coupons') { opCpnBuildShops(); opLoadCoupons(); }
+  if (name === 'loyalty') { opLoyBuildShops(); opLoyLoad(); }
+  if (name === 'loyalty-store') { opLsRenderItemSelect(); opLsLoad(); }
   if (name === 'notify') opLoadPosters();
   if (name === 'zones') opRenderZonesList();
   if (name === 'category-order') opRenderCategoryOrder();
@@ -14375,6 +14455,149 @@ function opLoadVideoAds() {
       row.appendChild(im); row.appendChild(info); row.appendChild(col); box.appendChild(row);
     });
   }).catch(function (e) { box.innerHTML = '<p class="op-note">Could not load: ' + (e && e.message) + '</p>'; });
+}
+
+/* ---- Operator home: search the cards by name / description ---- */
+function opHomeSearch(q) {
+  q = String(q || '').trim().toLowerCase();
+  var cards = document.querySelectorAll('#op-section-home .op-home-card'), shown = 0;
+  Array.prototype.forEach.call(cards, function (c) {
+    var hit = !q || (c.textContent || '').toLowerCase().indexOf(q) >= 0;
+    c.classList.toggle('op-search-hide', !hit);
+    if (hit) shown++;
+  });
+  var e = document.getElementById('op-home-search-empty'); if (e) e.style.display = (q && !shown) ? 'block' : 'none';
+}
+/* ---- GROCERIES LOYALTY REWARD (operator) ---- app_config/loyaltyStore = { on, ordersNeeded, title, rewardType, type, value, maxDiscount, minOrder, productName, itemKey, qty, ts } */
+function opLsMsg(t) { var e = document.getElementById('op-ls-status'); if (e) e.textContent = t || ''; }
+function opLsTypeUi() {
+  var prod = document.getElementById('op-ls-rt').value === 'product';
+  document.getElementById('op-ls-disc').style.display = prod ? 'none' : 'flex';
+  document.getElementById('op-ls-prod').style.display = prod ? 'block' : 'none';
+  if (prod) opLsRenderItemSelect();
+}
+function opLsRenderItemSelect(wantKey) {
+  var sel = document.getElementById('op-ls-item'); if (!sel) return;
+  var q = ((document.getElementById('op-ls-search') || {}).value || '').trim().toLowerCase();
+  var keep = wantKey || sel.value;
+  var items = opGroceriesCatalogGroups().filter(function (g) { return (g.unit || 'piece') === 'piece' && (!q || (g.name || '').toLowerCase().indexOf(q) >= 0); })
+    .sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
+  sel.innerHTML = '';
+  var none = document.createElement('option'); none.value = ''; none.textContent = items.length ? '— Pick the free item —' : 'No matching piece items in the Groceries catalog'; sel.appendChild(none);
+  items.slice(0, 300).forEach(function (g) {
+    var o = document.createElement('option'); o.value = opNeshItemKey(g); o.dataset.name = g.name; o.textContent = g.name;
+    if (o.value === keep) o.selected = true; sel.appendChild(o);
+  });
+}
+function opLsLoad() {
+  var fb = window.fb; if (!fb) return;
+  fb.get(fb.ref(fb.db, 'app_config/loyaltyStore')).then(function (snap) {
+    var v = snap.val(); if (!v) { opLsMsg('Not set up yet.'); opLsTypeUi(); return; }
+    document.getElementById('op-ls-on').checked = v.on !== false;
+    document.getElementById('op-ls-n').value = v.ordersNeeded || 5;
+    document.getElementById('op-ls-title').value = v.title || '';
+    document.getElementById('op-ls-rt').value = v.rewardType === 'product' ? 'product' : 'discount';
+    document.getElementById('op-ls-type').value = v.type === 'percent' ? 'percent' : 'flat';
+    document.getElementById('op-ls-value').value = v.value || '';
+    document.getElementById('op-ls-max').value = v.maxDiscount || '';
+    document.getElementById('op-ls-min').value = v.minOrder || '';
+    document.getElementById('op-ls-qty').value = v.qty || 1;
+    opLsTypeUi(); opLsRenderItemSelect(v.itemKey || '');
+    opLsMsg(v.on === false ? 'Saved reward is currently OFF.' : 'Reward is live ✅' + (v.productName ? ' (free item: ' + v.productName + ')' : ''));
+  }).catch(function () {});
+}
+function opLsSave() {
+  var fb = window.fb; if (!fb) { opLsMsg('Not connected yet, try again.'); return; }
+  var n = parseInt(document.getElementById('op-ls-n').value, 10);
+  if (!(n >= 1)) { opLsMsg('Enter how many orders are needed (1 or more).'); return; }
+  var rt = document.getElementById('op-ls-rt').value, type = document.getElementById('op-ls-type').value;
+  var value = parseFloat(document.getElementById('op-ls-value').value) || 0, sel = document.getElementById('op-ls-item');
+  if (rt === 'product' && !sel.value) { opLsMsg('Pick the free item.'); return; }
+  if (rt === 'discount' && (!(value > 0) || (type === 'percent' && value > 100))) { opLsMsg(type === 'percent' ? 'Enter a percent between 1 and 100.' : 'Enter the ₹ amount off.'); return; }
+  var pname = rt === 'product' ? (sel.options[sel.selectedIndex].dataset.name || sel.value) : '';
+  opLsMsg('Saving...');
+  fb.set(fb.ref(fb.db, 'app_config/loyaltyStore'), {
+    on: document.getElementById('op-ls-on').checked, ordersNeeded: n,
+    title: document.getElementById('op-ls-title').value.trim().slice(0, 40),
+    rewardType: rt, type: type, value: rt === 'discount' ? value : 0,
+    maxDiscount: Math.max(0, parseFloat(document.getElementById('op-ls-max').value) || 0),
+    minOrder: Math.max(0, parseFloat(document.getElementById('op-ls-min').value) || 0),
+    productName: pname.slice(0, 60), itemKey: rt === 'product' ? sel.value : '',
+    qty: Math.max(1, Math.floor(parseFloat(document.getElementById('op-ls-qty').value) || 1)), ts: Date.now()
+  }).then(function () { opLsMsg('Saved ✅ — customers see the reward card in NESH Store now.'); }).catch(function (e) { opLsMsg('Error: ' + ((e && e.message) || 'could not save')); });
+}
+function opLsDelete() {
+  var fb = window.fb; if (!fb) return;
+  if (!confirm('Remove the Groceries reward? Customers will no longer see it.')) return;
+  fb.remove(fb.ref(fb.db, 'app_config/loyaltyStore')).then(function () { opLsMsg('Removed.'); }).catch(function (e) { opLsMsg('Error: ' + ((e && e.message) || '')); });
+}
+
+/* ---- LOYALTY REWARD (operator) ----
+   app_config/loyalty = { on, ordersNeeded, title, rewardType:'discount'|'product', type:'flat'|'percent', value, maxDiscount, minOrder, productName, allShops, shops:{shopId:true}, ts } */
+function opLoyMsg(t) { var e = document.getElementById('op-loy-status'); if (e) e.textContent = t || ''; }
+function opLoyTypeUi() {
+  var prod = document.getElementById('op-loy-rt').value === 'product';
+  document.getElementById('op-loy-disc').style.display = prod ? 'none' : 'flex';
+  document.getElementById('op-loy-prod').style.display = prod ? 'block' : 'none';
+}
+function opLoyAllToggle(cb) { document.getElementById('op-loy-shops').style.display = cb.checked ? 'none' : 'block'; }
+function opLoyBuildShops() {
+  var box = document.getElementById('op-loy-shops'); if (!box) return;
+  box.innerHTML = '';
+  var shops = opCpnShopList();
+  if (!shops.length) { box.textContent = 'No shops loaded yet - open this page again in a moment.'; return; }
+  shops.forEach(function (s) {
+    var l = document.createElement('label'); l.style.display = 'block';
+    var c = document.createElement('input'); c.type = 'checkbox'; c.className = 'op-loy-shop'; c.value = s._id;
+    l.appendChild(c); l.appendChild(document.createTextNode(' ' + (s.restaurantName || s._id)));
+    box.appendChild(l);
+  });
+}
+function opLoyLoad() {
+  var fb = window.fb; if (!fb) return;
+  fb.get(fb.ref(fb.db, 'app_config/loyalty')).then(function (snap) {
+    var v = snap.val(); if (!v) { opLoyMsg('Not set up yet.'); return; }
+    document.getElementById('op-loy-on').checked = v.on !== false;
+    document.getElementById('op-loy-n').value = v.ordersNeeded || 5;
+    document.getElementById('op-loy-title').value = v.title || '';
+    document.getElementById('op-loy-rt').value = v.rewardType === 'product' ? 'product' : 'discount';
+    document.getElementById('op-loy-type').value = v.type === 'percent' ? 'percent' : 'flat';
+    document.getElementById('op-loy-value').value = v.value || '';
+    document.getElementById('op-loy-max').value = v.maxDiscount || '';
+    document.getElementById('op-loy-min').value = v.minOrder || '';
+    document.getElementById('op-loy-pname').value = v.productName || '';
+    var all = document.getElementById('op-loy-all'); all.checked = !!v.allShops; opLoyAllToggle(all);
+    Array.prototype.forEach.call(document.querySelectorAll('.op-loy-shop'), function (c) { c.checked = !!(v.shops && v.shops[c.value]); });
+    opLoyTypeUi();
+    opLoyMsg(v.on === false ? 'Saved reward is currently OFF.' : 'Reward is live ✅');
+  }).catch(function () {});
+}
+function opLoySave() {
+  var fb = window.fb; if (!fb) { opLoyMsg('Not connected yet, try again.'); return; }
+  var n = parseInt(document.getElementById('op-loy-n').value, 10);
+  if (!(n >= 1)) { opLoyMsg('Enter how many orders are needed (1 or more).'); return; }
+  var rt = document.getElementById('op-loy-rt').value, type = document.getElementById('op-loy-type').value;
+  var value = parseFloat(document.getElementById('op-loy-value').value) || 0, pname = document.getElementById('op-loy-pname').value.trim();
+  if (rt === 'product' && !pname) { opLoyMsg('Type the free product name.'); return; }
+  if (rt === 'discount' && (!(value > 0) || (type === 'percent' && value > 100))) { opLoyMsg(type === 'percent' ? 'Enter a percent between 1 and 100.' : 'Enter the ₹ amount off.'); return; }
+  var all = document.getElementById('op-loy-all').checked, shops = {}, c = 0;
+  if (!all) Array.prototype.forEach.call(document.querySelectorAll('.op-loy-shop:checked'), function (x) { shops[x.value] = true; c++; });
+  if (!all && !c) { opLoyMsg('Tick at least one shop (or All shops).'); return; }
+  opLoyMsg('Saving...');
+  fb.set(fb.ref(fb.db, 'app_config/loyalty'), {
+    on: document.getElementById('op-loy-on').checked, ordersNeeded: n,
+    title: document.getElementById('op-loy-title').value.trim().slice(0, 40),
+    rewardType: rt, type: type, value: rt === 'discount' ? value : 0,
+    maxDiscount: Math.max(0, parseFloat(document.getElementById('op-loy-max').value) || 0),
+    minOrder: Math.max(0, parseFloat(document.getElementById('op-loy-min').value) || 0),
+    productName: rt === 'product' ? pname.slice(0, 60) : '',
+    allShops: all, shops: all ? {} : shops, ts: Date.now()
+  }).then(function () { opLoyMsg('Saved ✅ — customers see the reward card in the selected shops now.'); }).catch(function (e) { opLoyMsg('Error: ' + ((e && e.message) || 'could not save')); });
+}
+function opLoyDelete() {
+  var fb = window.fb; if (!fb) return;
+  if (!confirm('Remove the loyalty reward? Customers will no longer see it.')) return;
+  fb.remove(fb.ref(fb.db, 'app_config/loyalty')).then(function () { opLoyMsg('Removed.'); }).catch(function (e) { opLoyMsg('Error: ' + ((e && e.message) || '')); });
 }
 
 /* ---- COUPONS (operator) ----
