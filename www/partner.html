@@ -129,6 +129,22 @@
   .flex-1{ flex:1; }
   .error-text{ color:var(--chili); font-size:13px; margin:0; }
   .hint-text{ color:var(--muted-2); font-size:12px; margin:0; }
+  .ft-row{ display:grid; grid-template-columns:1fr 1fr 1fr 34px; gap:6px; align-items:end; margin-bottom:8px; }
+  .ft-cell small{ display:block; color:var(--muted-2); font-size:10px; margin:0 0 3px 2px; }
+  .ft-cell input{ width:100%; padding:10px 8px; border-radius:10px; border:1px solid var(--field-border); background:var(--field-bg); color:var(--cloud); font-size:14px; font-family:'Inter',sans-serif; outline:none; }
+  .ft-del{ height:40px; border:none; border-radius:10px; background:transparent; color:var(--chili); font-size:18px; cursor:pointer; }
+  .ft-btn{ width:100%; padding:11px; border-radius:10px; border:1.5px dashed var(--leaf); background:transparent; color:var(--leaf); font-weight:600; font-size:13px; font-family:'Inter',sans-serif; cursor:pointer; margin-top:2px; }
+  .ft-chart{ width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; color:#fff; }
+  .ft-chart th{ text-align:left; color:var(--muted-2); font-size:10px; font-weight:600; padding:4px 6px; letter-spacing:.5px; text-transform:uppercase; }
+  .ft-chart td{ padding:7px 6px; border-top:1px solid var(--field-border); }
+  .ft-chart .ft-free{ color:#5CE0A0; font-weight:700; }
+  #operator-container .ft-cell input{ background:#000; color:#33ff66; border:1px solid #124a24; border-radius:0; }
+  #operator-container .ft-cell small{ color:#64748b; }
+  #operator-container .ft-btn{ border-radius:0; border-color:#33ff66; color:#33ff66; margin-bottom:10px; }
+  #operator-container .ft-chart{ color:#cbd5e1; } #operator-container .ft-chart td{ border-color:#124a24; } #operator-container .ft-chart th{ color:#64748b; }
+  #operator-container select.fz-select{ width:100%; background:#000; color:#33ff66; border:1px solid #124a24; padding:10px; font-family:inherit; }
+  #operator-container .fz-chk{ display:flex; align-items:center; gap:10px; margin:6px 0; font-size:.85rem; color:#cbd5e1; }
+  #operator-container .fz-chk input{ width:20px; height:20px; }
   .loc-field-label{ color:var(--muted-2); font-size:11px; font-family:'IBM Plex Mono',monospace; letter-spacing:1px; margin:0 0 6px; text-transform:uppercase; }
 
   .top-row{ padding:32px 24px 8px; display:flex; align-items:flex-start; justify-content:space-between; }
@@ -1526,6 +1542,27 @@
       </div>
       <p class="hint-text" style="margin:4px 0 0;">When a customer's item total reaches this amount, they pay no delivery charge — the app shows it struck out and marked FREE.</p>
 
+      <p class="loc-field-label" style="margin-top:22px;">Free delivery by order value &amp; distance — optional</p>
+      <p class="hint-text" style="margin:0 0 10px;">Set an order-value range and how many km of delivery is free for it. e.g. ₹200–300 → free up to 2 km, ₹300–400 → free up to 3 km. Leave "To" blank for "and above".</p>
+      <div id="ft-rows"></div>
+      <button type="button" class="ft-btn" id="ft-add">+ Add range</button>
+
+      <p class="loc-field-label" style="margin-top:20px;">Profit planner — how much free delivery can I afford?</p>
+      <p class="hint-text" style="margin:0 0 10px;">Tell us your profit on an order and how much of it you want to keep. We work out how many km of delivery you can give free at each order amount (using the base fee and per-km rate above).</p>
+      <p class="loc-field-label">My profit (% of item price)</p>
+      <div class="field"><input id="ft-pct" type="number" min="0" step="0.5" inputmode="decimal" placeholder="e.g. 20" /></div>
+      <p class="loc-field-label" style="margin-top:10px;">+ Extra flat profit per order (₹) — optional</p>
+      <div class="field"><input id="ft-flat" type="number" min="0" step="1" inputmode="decimal" placeholder="e.g. 10 (blank = none)" /></div>
+      <p class="loc-field-label" style="margin-top:10px;">Profit I want to keep after free delivery (₹)</p>
+      <div class="field"><input id="ft-keep" type="number" min="0" step="1" inputmode="decimal" placeholder="e.g. 15 (blank = 0)" /></div>
+      <div id="ft-plan" style="margin-top:10px;"></div>
+      <button type="button" class="ft-btn" id="ft-autofill" style="border-style:solid; margin-top:10px;">Use these as my free-delivery ranges</button>
+
+      <div class="pay-pending-card" style="margin-top:18px; border-color:var(--leaf);">
+        <p class="hint-text" style="margin:0 0 4px;">When does delivery become free?</p>
+        <div id="ft-chart-wrap"><p class="hint-text">Add a range above to see it here.</p></div>
+      </div>
+
       <div class="pay-pending-card" style="margin-top:18px; border-color:var(--leaf);">
         <p class="hint-text" style="margin:0 0 4px;">Preview</p>
         <p style="color:#fff; font-family:'Fraunces',serif; font-size:20px; font-weight:700; margin:0;" id="delivery-charge-preview">₹20 + ₹5/km</p>
@@ -2267,8 +2304,13 @@
         <span id="op-notify-image-status" class="op-note" style="margin:0;"></span>
       </div>
       <img id="op-notify-image-preview" style="display:none;max-width:120px;max-height:120px;border-radius:6px;margin-top:8px;border:1px solid #334155;">
+      <div style="margin:14px 0 4px;">
+        <p class="op-note" style="margin-bottom:6px;">Send to which customers? <span style="color:#1f7a3d;">(a customer's zone = the zone of their last known location in the app)</span></p>
+        <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:4px;"><input type="checkbox" id="op-notify-all" checked onchange="opNotifyTargetChanged('all')"> 🌍 All customers</label>
+        <div id="op-notify-zones" style="color:#33ff66;font-size:.85rem;line-height:1.9;">Loading zones...</div>
+      </div>
       <div>
-        <button type="button" class="op-btn op-btn-push" onclick="opSendBroadcastNotification()">📢 Send to all customers</button>
+        <button type="button" class="op-btn op-btn-push" id="op-notify-send-btn" onclick="opSendBroadcastNotification()">📢 Send to all customers</button>
       </div>
       <p class="op-note" id="op-notify-status" style="margin-top:10px;"></p>
        <hr style="border:0;border-top:1px solid #124a24;margin:26px 0 16px;">
@@ -2422,18 +2464,46 @@
         <select id="op-loy-type" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"><option value="flat">₹ Flat off</option><option value="percent">% Percent off</option></select>
         <input type="number" id="op-loy-value" min="1" placeholder="Amount / %" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:120px;">
         <input type="number" id="op-loy-max" min="0" placeholder="Max ₹ off (for %)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:150px;">
+        <input type="number" id="op-loy-ddays" min="0" step="any" placeholder="Coupon valid days after claim (0 = no limit)" title="How many days the customer can use the coupon after claiming it" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem; width:290px;max-width:100%;">
       </div>
       <div id="op-loy-prod" style="display:none;margin:0 0 10px;">
         <input type="text" id="op-loy-pname" maxlength="60" placeholder="Free product name (e.g. Cold drink 250ml)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:100%;max-width:420px;">
+        <input type="number" id="op-loy-pdays" min="0" step="any" placeholder="Free item valid days after claim (0 = no limit)" title="How many days the customer can use the free item after claiming it" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem; width:320px;max-width:100%;margin-top:8px;">
       </div>
+      <div style="margin:0 0 10px;"><input type="number" id="op-loy-remind" min="0" step="any" placeholder="Auto reminder: hours left (blank = 24, 0 = off)" title="Sends a push to the customer automatically when this many hours are left on a claimed reward" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem; width:320px;max-width:100%;"> <span class="op-note" style="display:inline;">(push to the customer when their claimed reward is about to expire)</span></div>
       <div style="margin:0 0 10px;"><input type="number" id="op-loy-min" min="0" placeholder="Min order ₹ to use reward" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:200px;"></div>
       <div style="margin:0 0 10px;"><input type="number" id="op-loy-cmin" min="0" placeholder="Min order ₹ for an order to COUNT" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:260px;"> <span class="op-note" style="display:inline;">(items total, without delivery fee. Blank/0 = every order counts)</span></div>
+      <div style="margin:0 0 12px;padding:10px;border:1px dashed #124a24;">
+        <p class="op-note" style="margin:0 0 8px;">⏰ Offer time (optional) — when the whole Hero Offer starts / ends. Leave blank = no limit. (How long a CLAIMED coupon / free item stays valid is set above, in days.)</p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+          <label style="color:#33ff66;font-size:.8rem;">Starts<br><input type="datetime-local" id="op-loy-start" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;color-scheme:dark;"></label>
+          <label style="color:#33ff66;font-size:.8rem;">Ends (expires)<br><input type="datetime-local" id="op-loy-end" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;color-scheme:dark;"></label>
+          <button type="button" class="op-btn" onclick="document.getElementById('op-loy-start').value='';document.getElementById('op-loy-end').value='';">Clear time</button>
+        </div>
+      </div>
       <p class="op-note" style="margin-bottom:6px;">Reward works at which shops?</p>
       <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:6px;"><input type="checkbox" id="op-loy-all" onchange="opLoyAllToggle(this)"> 🌐 All shops</label>
       <div id="op-loy-shops" style="max-height:220px;overflow:auto;border:1px solid #124a24;padding:8px;margin-bottom:12px;color:#33ff66;font-size:.85rem;line-height:2;"></div>
       <button type="button" class="op-btn op-btn-push" onclick="opLoySave()">💾 Save loyalty reward</button>
       <button type="button" class="op-btn" style="margin-left:8px;" onclick="opLoyDelete()">🗑 Remove</button>
       <p class="op-note" id="op-loy-status" style="margin-top:10px;"></p>
+      <div style="margin-top:16px;padding:12px;border:1px solid #124a24;">
+        <h2 style="margin:0 0 6px;">📣 Claimed rewards — expiring</h2>
+        <p class="op-note">Customers who claimed the reward but have not used it yet (needs a "valid days" limit above). <b>Send</b> pushes an expiry reminder to that one customer only, with the exact expiry time. The automatic reminder goes out by itself when the hours set above are left (works while the operator panel is open on any device).</p>
+        <button type="button" class="op-btn" onclick="opLoyLoadClaims()">🔄 Refresh list</button>
+        <div id="op-loy-claims" style="margin-top:8px;color:#33ff66;font-size:.85rem;line-height:1.7;"></div>
+      </div>
+      <div style="margin-top:16px;padding:12px;border:1px solid #124a24;">
+        <h2 style="margin:0 0 6px;">🎯 Progress nudge — send manually</h2>
+        <p class="op-note">Customers who are part-way through the Hero Offer (e.g. 1 or 2 orders done), or unlocked it but have not claimed. Pick a step, then <b>Send</b> a push to one customer or to everyone shown. Nothing is sent automatically.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+          <select id="op-loy-nf" onchange="opLoyRenderNudge()" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;color-scheme:dark;"></select>
+          <button type="button" class="op-btn" onclick="opLoyLoadNudge()">🔄 Refresh</button>
+          <button type="button" class="op-btn op-btn-push" id="op-loy-nbulk" onclick="opLoyNudgeAll()">📣 Send to all shown</button>
+        </div>
+        <p class="op-note" id="op-loy-nstatus" style="margin:8px 0 0;"></p>
+        <div id="op-loy-nlist" style="margin-top:8px;color:#33ff66;font-size:.85rem;line-height:1.7;"></div>
+      </div>
     </div>
   </div>
 
@@ -2735,6 +2805,32 @@
       <h2>Shop Delivery Charges</h2>
     </div>
     <div class="op-section-body">
+      <h2 style="margin-top:0;">🗺️ Whole-zone rules</h2>
+      <p class="op-note">Set the delivery charge and free-delivery ranges once and apply them to the shops you tick in a zone. NESH Mart = the Go Series &amp; groceries shops (and NESH Store); they get this rule instead of the global Go Series charge. Food &amp; other shops get it as their own delivery charge (same as their Account → Delivery Charges).</p>
+      <div class="op-search-box"><select id="fz-zone" class="fz-select" onchange="fzLoadZone()"></select></div>
+      <div id="fz-shops"><p class="op-note">Select a zone to pick its shops.</p></div>
+      <div class="op-search-box" style="margin-top:8px;"><input type="number" id="fz-base" placeholder="Base charge in ₹ (e.g. 20)" min="0" step="0.5"></div>
+      <div class="op-search-box"><input type="number" id="fz-perkm" placeholder="Per-km rate in ₹ (e.g. 5)" min="0" step="0.5"></div>
+      <div class="op-search-box"><input type="number" id="fz-freekm" placeholder="Free delivery under __ km (blank = off)" min="0" step="0.1"></div>
+      <div class="op-search-box"><input type="number" id="fz-freeabove" placeholder="Free delivery on orders of ₹ and above (blank = off)" min="0" step="1"></div>
+      <p class="op-note" style="margin-bottom:6px;"><b>Free delivery by order value &amp; distance</b> — ₹ range → free up to N km. "To" blank = and above.</p>
+      <div id="fz-rows"></div>
+      <button type="button" class="ft-btn" onclick="fzAddRow()">+ Add range</button>
+      <p class="op-note" style="margin-bottom:6px;"><b>Profit planner</b> — profit on an order and how much to keep after free delivery; shows how many km can be free at each order amount.</p>
+      <div class="op-search-box"><input type="number" id="fz-pct" placeholder="Profit % of item price (e.g. 20)" min="0" step="0.5"></div>
+      <div class="op-search-box"><input type="number" id="fz-flat" placeholder="Extra flat profit per order ₹ (optional)" min="0" step="1"></div>
+      <div class="op-search-box"><input type="number" id="fz-keep" placeholder="Profit to keep after free delivery ₹ (e.g. 15)" min="0" step="1"></div>
+      <div id="fz-plan"></div>
+      <button type="button" class="ft-btn" onclick="fzAutofill()">Use planner as my ranges</button>
+      <p class="op-note" style="margin:8px 0 4px;"><b>When does delivery become free?</b></p>
+      <div id="fz-chart"><p class="op-note">Add a range to see it here.</p></div>
+      <div style="margin-top:10px;">
+        <button type="button" class="op-btn op-btn-push" onclick="fzApply()">✅ Apply to zone</button>
+        <button type="button" class="op-btn op-btn-danger" onclick="fzClearMart()">Remove NESH Mart rule for zone</button>
+      </div>
+      <p class="op-note" id="fz-status" style="margin-top:8px;"></p>
+      <hr style="border:0; border-top:1px solid #124a24; margin:20px 0;">
+      <h2>Single shop</h2>
       <p class="op-note">Pick any shop that is NOT in Go Series and set its own delivery charge and minimum order. This writes the same settings the shop sees in its own Account → Delivery Charges, so whichever was saved last wins. Go Series and Groceries shops always use the Go Series charge, so they are not listed here.</p>
       <div id="op-sdc-editor" style="display:none; margin-bottom:16px; padding:14px; border:1px solid #124a24;">
         <h2 id="op-sdc-editor-title" style="margin-top:0;"></h2>
@@ -2837,6 +2933,9 @@
           <select id="op-fo-dur" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
             <option value="0">No time limit</option><option value="24">24 hours</option><option value="48">2 days</option><option value="168">7 days</option><option value="720">30 days</option>
           </select>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="color:#33ff66;font-size:.8rem;">Or pick an exact end date &amp; time (overrides the list above)<br><input type="datetime-local" id="op-fo-until" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;color-scheme:dark;"></label>
         </div>
         <button type="button" class="op-btn op-btn-push" onclick="opFoSave()">🎁 Add offer</button>
         <p class="op-note" id="op-fo-status" style="margin-top:10px;"></p>
@@ -4874,6 +4973,7 @@ function openDeliveryChargesScreen() {
   document.getElementById('delivery-free-under-km').value = dc.freeUnderKm ?? '';
   document.getElementById('delivery-free-above').value = dc.freeAbove ?? '';
   document.getElementById('delivery-charges-error').style.display = "none";
+  ftLoad(Array.isArray(dc.freeTiers) ? dc.freeTiers : []);
   updateDeliveryChargePreview();
   showScreen('delivery-charges');
 }
@@ -6839,13 +6939,16 @@ async function updateOrderStatus(id, newStatus, orderData) {
 // real OS-level push (same Cloudflare Worker used for driver/restaurant
 // alerts above), on top of whatever they see live in the app itself.
 function notifyCustomerOrderStatus(o, orderId, title, body) {
-  if (!o.customerPhone) return;
+  // customerAccount = the logged-in account (where the device token is saved); customerPhone is only
+  // the delivery contact and may be a different number. Old orders have no customerAccount -> fall back.
+  const pushPhone = o.customerAccount || o.customerPhone;
+  if (!pushPhone) return;
   fetch('https://broad-paper-6445.raise3715.workers.dev', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       type: 'customer',
-      customerPhone: o.customerPhone,
+      customerPhone: pushPhone,
       title,
       body,
       orderId,
@@ -7602,7 +7705,111 @@ function updateDeliveryChargePreview() {
 }
 ['delivery-base-fee', 'delivery-per-km-fee', 'delivery-free-under-km', 'delivery-free-above'].forEach(id => {
   const el = document.getElementById(id);
-  if (el) el.addEventListener('input', updateDeliveryChargePreview);
+  if (el) el.addEventListener('input', () => { updateDeliveryChargePreview(); ftChart(); });
+});
+
+// ---------- Free delivery by order value & distance (tiers) ----------
+// Stored as restaurants/{id}/deliveryCharges.freeTiers = [{ min, max?, km }]:
+// when the item total is in [min, max) and the delivery distance is <= km, delivery is free.
+function ftRowHtml(t) {
+  const v = x => (x === undefined || x === null || x === '') ? '' : x;
+  return '<div class="ft-row">' +
+    '<div class="ft-cell"><small>From ₹</small><input type="number" class="ft-min" min="0" step="1" inputmode="decimal" value="' + v(t.min) + '"></div>' +
+    '<div class="ft-cell"><small>To ₹</small><input type="number" class="ft-max" min="0" step="1" inputmode="decimal" placeholder="& above" value="' + v(t.max) + '"></div>' +
+    '<div class="ft-cell"><small>Free up to km</small><input type="number" class="ft-km" min="0" step="0.5" inputmode="decimal" value="' + v(t.km) + '"></div>' +
+    '<button type="button" class="ft-del" aria-label="Remove">✕</button></div>';
+}
+function ftLoad(tiers) {
+  document.getElementById('ft-rows').innerHTML = tiers.map(ftRowHtml).join('');
+  ftChart();
+}
+function ftRead() {
+  const out = [];
+  document.querySelectorAll('#ft-rows .ft-row').forEach(row => {
+    const min = row.querySelector('.ft-min').value, max = row.querySelector('.ft-max').value, km = row.querySelector('.ft-km').value;
+    out.push({ min: min === '' ? NaN : Number(min), max: max === '' ? null : Number(max), km: km === '' ? NaN : Number(km) });
+  });
+  return out;
+}
+// Chart: for each distance, the delivery charge and the order value from which it is free.
+function ftChart() {
+  const wrap = document.getElementById('ft-chart-wrap');
+  if (!wrap) return;
+  const tiers = ftRead().filter(t => isFinite(t.min) && isFinite(t.km) && t.km > 0);
+  const baseFee = Number(document.getElementById('delivery-base-fee').value) || 0;
+  const perKm = Number(document.getElementById('delivery-per-km-fee').value) || 0;
+  const freeUnderRaw = document.getElementById('delivery-free-under-km').value;
+  const freeUnder = freeUnderRaw === '' ? 0 : Number(freeUnderRaw) || 0;
+  const freeAbove = Number(document.getElementById('delivery-free-above').value) || 0;
+  if (!tiers.length && !(freeAbove > 0)) { wrap.innerHTML = '<p class="hint-text">Add a range above to see it here.</p>'; return; }
+  const maxKm = Math.min(12, Math.max(5, Math.ceil(Math.max(0, ...tiers.map(t => t.km)))));
+  let rows = '';
+  for (let d = 1; d <= maxKm; d++) {
+    const charge = Math.round(baseFee + perKm * d);
+    let from = Infinity;
+    tiers.forEach(t => { if (t.km >= d && t.min < from) from = t.min; });
+    if (freeAbove > 0 && freeAbove < from) from = freeAbove;
+    let cell;
+    if (freeUnder > 0 && d < freeUnder) cell = '<span class="ft-free">Always free</span>';
+    else if (from === Infinity) cell = '<span style="color:var(--muted-2)">Not free</span>';
+    else cell = '<span class="ft-free">₹' + from + ' and above</span>';
+    rows += '<tr><td>' + d + ' km</td><td>₹' + charge + '</td><td>' + cell + '</td></tr>';
+  }
+  wrap.innerHTML = '<table class="ft-chart"><tr><th>Distance</th><th>Delivery charge</th><th>Free from</th></tr>' + rows + '</table>';
+}
+document.getElementById('ft-add').addEventListener('click', () => {
+  const rows = ftRead(), last = rows[rows.length - 1];
+  const start = last && isFinite(last.max) && last.max !== null ? last.max : (last && isFinite(last.min) ? last.min + 100 : 200);
+  document.getElementById('ft-rows').insertAdjacentHTML('beforeend', ftRowHtml({ min: start, max: start + 100 }));
+  ftChart();
+});
+document.getElementById('ft-rows').addEventListener('input', ftChart);
+document.getElementById('ft-rows').addEventListener('click', e => {
+  const b = e.target.closest('.ft-del');
+  if (b) { b.closest('.ft-row').remove(); ftChart(); }
+});
+// Profit planner: for each order amount, how many km of delivery can be free and still leave the wanted profit.
+function ftPlan() {
+  const pct = Number(document.getElementById('ft-pct').value) || 0;
+  const flat = Number(document.getElementById('ft-flat').value) || 0;
+  const keep = Number(document.getElementById('ft-keep').value) || 0;
+  const baseFee = Number(document.getElementById('delivery-base-fee').value) || 0;
+  const perKm = Number(document.getElementById('delivery-per-km-fee').value) || 0;
+  const out = [];
+  for (let min = 100; min <= 600; min += 100) {
+    const profit = min * pct / 100 + flat;           // based on the range's lower bound, so it never overspends
+    const budget = profit - keep;                     // what can go to delivery
+    let km = 0;
+    if (perKm > 0) km = Math.max(0, Math.min(15, Math.floor(((budget - baseFee) / perKm) * 2) / 2));
+    else km = budget >= baseFee ? 15 : 0;
+    const cost = km > 0 ? Math.round(baseFee + perKm * km) : 0;
+    out.push({ min, max: min === 600 ? null : min + 100, km, profit: Math.round(profit * 10) / 10, left: Math.round((profit - cost) * 10) / 10 });
+  }
+  return out;
+}
+function ftPlanRender() {
+  const box = document.getElementById('ft-plan');
+  if (!box) return;
+  const pct = Number(document.getElementById('ft-pct').value) || 0, flat = Number(document.getElementById('ft-flat').value) || 0;
+  if (pct <= 0 && flat <= 0) { box.innerHTML = ''; return; }
+  const rows = ftPlan().map(r => '<tr><td>₹' + r.min + (r.max === null ? '+' : '–' + r.max) + '</td><td>₹' + r.profit + '</td><td>' +
+    (r.km > 0 ? '<span class="ft-free">' + (r.km >= 15 ? 'any distance' : r.km + ' km') + '</span>' : '<span style="color:var(--muted-2)">none</span>') +
+    '</td><td>₹' + r.left + '</td></tr>').join('');
+  box.innerHTML = '<table class="ft-chart"><tr><th>Order</th><th>My profit</th><th>Free delivery</th><th>Profit left</th></tr>' + rows + '</table>' +
+    '<p class="hint-text" style="margin-top:6px;">Worked out on the lowest amount of each range, so you never spend more than planned.</p>';
+}
+['ft-pct', 'ft-flat', 'ft-keep', 'delivery-base-fee', 'delivery-per-km-fee'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', ftPlanRender);
+});
+document.getElementById('ft-autofill').addEventListener('click', () => {
+  const errEl = document.getElementById('delivery-charges-error');
+  errEl.style.display = 'none';
+  const pct = Number(document.getElementById('ft-pct').value) || 0, flat = Number(document.getElementById('ft-flat').value) || 0;
+  if (pct <= 0 && flat <= 0) { errEl.textContent = 'Enter your profit % (or flat profit) first.'; errEl.style.display = 'block'; return; }
+  const tiers = ftPlan().filter(r => r.km > 0).map(r => ({ min: r.min, max: r.max, km: r.km }));
+  if (!tiers.length) { errEl.textContent = 'With this profit nothing can be free yet — raise the profit, lower the profit you keep, or lower the base fee / per-km rate.'; errEl.style.display = 'block'; return; }
+  ftLoad(tiers);
 });
 
 document.getElementById('delivery-charges-save-btn').addEventListener('click', async () => {
@@ -7620,6 +7827,25 @@ document.getElementById('delivery-charges-save-btn').addEventListener('click', a
   const deliveryCharges = { baseFee, perKmFee };
   if (freeUnderKmRaw !== '') deliveryCharges.freeUnderKm = Number(freeUnderKmRaw);
   if (freeAboveRaw !== '' && Number(freeAboveRaw) > 0) deliveryCharges.freeAbove = Number(freeAboveRaw); // blank / 0 = off (not stored)
+
+  // Free-delivery ranges (order value -> free km)
+  const tierRows = ftRead().filter(t => isFinite(t.min) || isFinite(t.km) || t.max !== null);
+  for (const t of tierRows) {
+    if (!isFinite(t.min) || t.min < 0 || !isFinite(t.km) || t.km <= 0 || (t.max !== null && (!isFinite(t.max) || t.max <= t.min))) {
+      errEl.textContent = "Check the free-delivery ranges: each needs a 'From ₹', a 'Free up to km' above 0, and 'To ₹' larger than 'From ₹' (or blank).";
+      errEl.style.display = "block";
+      return;
+    }
+  }
+  tierRows.sort((a, b) => a.min - b.min);
+  for (let i = 0; i < tierRows.length - 1; i++) {
+    if (tierRows[i].max === null || tierRows[i].max > tierRows[i + 1].min) {
+      errEl.textContent = "Free-delivery ranges overlap (₹" + tierRows[i].min + "–" + (tierRows[i].max === null ? "above" : tierRows[i].max) + " and ₹" + tierRows[i + 1].min + "…). Fix them and save again.";
+      errEl.style.display = "block";
+      return;
+    }
+  }
+  if (tierRows.length) deliveryCharges.freeTiers = tierRows.map(t => t.max === null ? { min: t.min, km: t.km } : { min: t.min, max: t.max, km: t.km });
 
   const btn = document.getElementById('delivery-charges-save-btn');
   btn.disabled = true;
@@ -8007,6 +8233,7 @@ function opEnterPanel() {
   opListenDriverSos();
   opListenDriverShifts();
   setInterval(opUpdateOrdersHomeBadge, 30000); // keeps the "late" badge current even while sitting on the home screen
+  if (!window.__opLoyAutoT) { window.__opLoyAutoT = setInterval(opLoyAutoRemind, 300000); setTimeout(opLoyAutoRemind, 8000); }
 }
 function opLogout() {
   if (opDeviceKey) {
@@ -8029,9 +8256,9 @@ function opOpenSection(name) {
   if (name === 'app-videos') { opLoadAppVideos(); opLoadBusVideos(); }
   if (name === 'video-ads') opLoadVideoAds();
   if (name === 'coupons') { opCpnBuildShops(); opLoadCoupons(); }
-  if (name === 'loyalty') { opLoyBuildShops(); opLoyLoad(); }
+  if (name === 'loyalty') { opLoyBuildShops(); opLoyLoad(); opLoyLoadClaims(); opLoyLoadNudge(); }
   if (name === 'loyalty-store') { opLsRenderItemSelect(); opLsLoad(); }
-  if (name === 'notify') opLoadPosters();
+  if (name === 'notify') { opLoadPosters(); opRenderNotifyZones(); }
   if (name === 'zones') opRenderZonesList();
   if (name === 'category-order') opRenderCategoryOrder();
   if (name === 'shop-categories') opRenderShopCategoriesList();
@@ -8049,7 +8276,7 @@ function opOpenSection(name) {
   if (name === 'driver-sos') opRenderSosList();
   if (name === 'driver-shifts') { opRenderShiftsList(); const d = document.getElementById('op-shift-date'); if (d && !d.value) d.value = new Date().toISOString().slice(0,10); }
   if (name === 'go-series') opLoadGoSeries();
-  if (name === 'shop-delivery') { opCloseShopDeliveryEditor(); opRenderShopDeliveryList(); }
+  if (name === 'shop-delivery') { opCloseShopDeliveryEditor(); opRenderShopDeliveryList(); try { fzInit(); } catch (e) {} }
   if (name === 'delivery-time') { opCloseEtaEditor(); opRenderEtaList(); }
   if (name === 'shop-deals') { opCloseShopDealEditor(); opRenderShopDealsList(); }
   if (name === 'trending') { opTrendCloseShop(); opRenderTrending(); }
@@ -8184,7 +8411,41 @@ function opLoadVisitors(dayKey) {
   }).catch(() => { box.innerHTML = '<div class="op-mc-row">Failed to load — check Firebase rules for visitLog.</div>'; });
 }
 
-/* ---- Send Notification (FCM topic broadcast to every customer) ---- */
+/* ---- Send Notification (FCM topic broadcast: all customers, or only chosen zones) ----
+   Zones = Shop Zones (app_config/shopZones). A customer device joins FCM topic "zone_<zoneId>"
+   for the zone its last known location is in (see neshSyncZoneTopics in index.html). */
+function opRenderNotifyZones() {
+  const box = document.getElementById('op-notify-zones');
+  if (!box) return;
+  try { opListenShopZones(); } catch (e) {}
+  const keep = {};
+  box.querySelectorAll('input[data-zone]').forEach(c => { if (c.checked) keep[c.getAttribute('data-zone')] = true; });
+  const zones = (typeof opShopZones !== 'undefined' ? opShopZones : []).filter(z => opSzBoundsOk(z));
+  if (!zones.length) { box.innerHTML = '<span style="opacity:.7;">No zones yet — add them in Shop Zones.</span>'; opNotifyTargetChanged(); return; }
+  box.innerHTML = zones.map(z =>
+    '<label style="display:block;"><input type="checkbox" data-zone="' + escapeHtml(z._id) + '" data-name="' + escapeHtml(z.name || z._id) + '"'
+    + (keep[z._id] ? ' checked' : '') + ' onchange="opNotifyTargetChanged()"> 📍 ' + escapeHtml(z.name || z._id) + '</label>'
+  ).join('');
+  opNotifyTargetChanged();
+}
+function opNotifySelectedZones() {
+  return Array.from(document.querySelectorAll('#op-notify-zones input[data-zone]:checked'))
+    .map(c => ({ id: c.getAttribute('data-zone'), name: c.getAttribute('data-name') }));
+}
+// which: 'all' when the "All customers" box itself was toggled
+function opNotifyTargetChanged(which) {
+  const allEl = document.getElementById('op-notify-all');
+  const btn = document.getElementById('op-notify-send-btn');
+  if (!allEl || !btn) return;
+  const zs = opNotifySelectedZones();
+  if (which === 'all') {
+    if (allEl.checked) document.querySelectorAll('#op-notify-zones input[data-zone]').forEach(c => { c.checked = false; });
+  } else if (zs.length) allEl.checked = false;
+  else allEl.checked = true;           // nothing ticked = everyone, same as before
+  const sel = opNotifySelectedZones();
+  btn.textContent = allEl.checked ? '📢 Send to all customers'
+    : ('📢 Send to ' + (sel.length === 1 ? sel[0].name : sel.length + ' zones'));
+}
 function opSendBroadcastNotification() {
   const titleEl = document.getElementById('op-notify-title-input');
   const bodyEl = document.getElementById('op-notify-body-input');
@@ -8194,15 +8455,30 @@ function opSendBroadcastNotification() {
   const body = bodyEl.value.trim();
   const image = imageEl.value.trim();
   if (!title || !body) { status.textContent = 'Please fill in both title and message.'; return; }
+  const zones = document.getElementById('op-notify-all').checked ? [] : opNotifySelectedZones();
+  const payload = { type: 'broadcast', title, body };
+  if (image) payload.image = image;
+  if (zones.length) payload.zoneIds = zones.map(z => z.id);
+  const where = zones.length ? zones.map(z => z.name).join(', ') : 'all customers';
+  if (zones.length && !confirm('Send this notification ONLY to customers in: ' + where + ' ?')) return;
   status.textContent = 'Sending...';
   fetch('https://broad-paper-6445.raise3715.workers.dev', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(image ? { type: 'broadcast', title, body, image } : { type: 'broadcast', title, body }),
+    body: JSON.stringify(payload),
   })
     .then(res => res.json().catch(() => ({})))
-    .then(() => {
-      status.textContent = 'Sent! ✅';
+    .then(data => {
+      // A zone send must come back as a per-topic list; if not, the worker is still the old version
+      // (old worker ignores zoneIds and sends to everyone) — tell the operator clearly.
+      if (zones.length && !Array.isArray(data && data.result)) {
+        status.textContent = '⚠️ Worker is not updated for zone sending — this may have gone to ALL customers. Deploy the new worker code.';
+      } else if (data && data.ok === false) {
+        status.textContent = 'Send failed for some/all — ' + (zones.length ? 'zone: ' + where : 'all customers') + '. Try again.';
+        return;
+      } else {
+        status.textContent = 'Sent to ' + where + '! ✅';
+      }
       if (window.opNotifImgId && image && image === window.opNotifImgUrl) {
         try { window.fb.update(window.fb.ref(window.fb.db, 'notif_images/' + window.opNotifImgId), { expiresAt: Date.now() + 24 * 3600000, sent: true }); } catch (e3) {}
       }
@@ -8704,6 +8980,7 @@ function opListenShopZones() {
       .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     const sec = document.getElementById('op-section-shop-zones');
     if (sec && sec.classList.contains('active')) opRenderShopZones();
+    try { opRenderNotifyZones(); } catch (e) {}
   });
 }
 function opSzBoundsOk(z) {
@@ -9072,6 +9349,198 @@ function opCloseShopDeliveryEditor() {
   const ed = document.getElementById('op-sdc-editor');
   if (ed) ed.style.display = 'none';
 }
+
+/* ---- Whole-zone delivery rules (Operator → Shop Delivery Charges) ----
+   Food/other shops: writes restaurants/{id}/deliveryCharges for every shop in the zone.
+   NESH Mart: writes app_config/zoneDelivery/{zoneId} = { baseFee, perKmFee, freeAbove?, freeWithinKm?, freeTiers? },
+   which the customer app applies for customers whose pin is inside that zone. */
+function fzEl(i) { return document.getElementById(i); }
+function fzNum(i) { const v = fzEl(i).value.trim(); return v === '' ? 0 : Number(v); }
+let fzSel = {};   // shopId -> true/false (ticked in the picker)
+function fzIsMart(p) { return p.goSeries === true || p.businessType === 'groceries'; }
+function fzZone() { return (typeof opShopZones !== 'undefined' ? opShopZones : []).find(x => x._id === fzEl('fz-zone').value); }
+function fzRenderShops(martSaved) {
+  const box = fzEl('fz-shops'), z = fzZone();
+  if (!z) { box.innerHTML = '<p class="op-note">Select a zone to pick its shops.</p>'; return; }
+  const ids = Object.keys(z.shopIds || {}).filter(k => z.shopIds[k]);
+  const partners = ids.map(id => opAllPartners.find(p => p._id === id)).filter(Boolean)
+    .sort((a, b) => (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id));
+  const mart = partners.filter(fzIsMart), food = partners.filter(p => !fzIsMart(p));
+  const martIds = mart.map(p => p._id).concat(['NESH_STORE']);
+  // default: everything ticked; when a saved NESH Mart rule lists shops, only those are ticked
+  fzSel = {};
+  food.forEach(p => { fzSel[p._id] = true; });
+  martIds.forEach(id => { fzSel[id] = martSaved ? !!martSaved[id] : true; });
+  const row = (id, name, sub) => '<label class="fz-chk" style="justify-content:space-between;"><span>' + escapeHtml(name) + '<br><span style="font-size:.7rem;color:#64748b;">' + escapeHtml(sub) + '</span></span><input type="checkbox" data-fz="' + escapeHtml(id) + '" ' + (fzSel[id] ? 'checked' : '') + ' onchange="fzSel[this.dataset.fz]=this.checked; fzCount();"></label>';
+  const group = (title, list, idsOfGroup) => '<p class="op-note" style="margin:10px 0 2px;"><b>' + title + '</b> · <a href="#" style="color:#33ff66;" data-ids="' + escapeHtml(idsOfGroup.join(',')) + '" onclick="fzTick(this.dataset.ids,true); return false;">all</a> / <a href="#" style="color:#33ff66;" data-ids="' + escapeHtml(idsOfGroup.join(',')) + '" onclick="fzTick(this.dataset.ids,false); return false;">none</a></p><div style="max-height:200px; overflow-y:auto; border:1px solid #124a24; padding:4px 10px;">' + list + '</div>';
+  box.innerHTML =
+    group('🏪 Food &amp; other shops (' + food.length + ')', food.length ? food.map(p => row(p._id, p.restaurantName || p._id, opTypeLabel(p.businessType))).join('') : '<p class="op-note">None in this zone.</p>', food.map(p => p._id)) +
+    group('🛒 NESH Mart — Go Series &amp; groceries (' + mart.length + ')', mart.map(p => row(p._id, p.restaurantName || p._id, opTypeLabel(p.businessType) + (p.goSeries ? ' · Go Series' : ''))).join('') + row('NESH_STORE', 'NESH Store', 'groceries cart from the nearest shop'), martIds) +
+    '<p class="op-note" id="fz-count" style="margin-top:6px;"></p>';
+  fzCount();
+}
+function fzTick(csv, on) {
+  csv.split(',').filter(Boolean).forEach(id => { fzSel[id] = on; });
+  document.querySelectorAll('#fz-shops input[type=checkbox]').forEach(cb => { cb.checked = !!fzSel[cb.dataset.fz]; });
+  fzCount();
+}
+function fzCount() {
+  const el = fzEl('fz-count'); if (!el) return;
+  el.textContent = Object.keys(fzSel).filter(k => fzSel[k]).length + ' selected';
+}
+function fzInit() {
+  const sel = fzEl('fz-zone');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Select a zone —</option>' + (typeof opShopZones !== 'undefined' ? opShopZones : []).map(z => '<option value="' + z._id + '">' + escapeHtml(z.name || z._id) + '</option>').join('');
+  if (cur) sel.value = cur;
+  if (!fzEl('fz-rows').children.length) fzRenderRows([]);
+}
+function fzRowHtml(t) {
+  const v = x => (x === undefined || x === null || x === '') ? '' : x;
+  return '<div class="ft-row"><div class="ft-cell"><small>From ₹</small><input type="number" class="fz-min" min="0" step="1" value="' + v(t.min) + '"></div>' +
+    '<div class="ft-cell"><small>To ₹</small><input type="number" class="fz-max" min="0" step="1" placeholder="& above" value="' + v(t.max) + '"></div>' +
+    '<div class="ft-cell"><small>Free up to km</small><input type="number" class="fz-km" min="0" step="0.5" value="' + v(t.km) + '"></div>' +
+    '<button type="button" class="ft-del" onclick="this.closest(\'.ft-row\').remove(); fzChart();">✕</button></div>';
+}
+function fzRenderRows(tiers) { fzEl('fz-rows').innerHTML = tiers.map(fzRowHtml).join(''); fzChart(); }
+function fzAddRow() {
+  const rows = fzRead(), last = rows[rows.length - 1];
+  const start = last && last.max !== null && isFinite(last.max) ? last.max : (last && isFinite(last.min) ? last.min + 100 : 200);
+  fzEl('fz-rows').insertAdjacentHTML('beforeend', fzRowHtml({ min: start, max: start + 100 }));
+  fzChart();
+}
+function fzRead() {
+  const out = [];
+  document.querySelectorAll('#fz-rows .ft-row').forEach(r => {
+    const mn = r.querySelector('.fz-min').value, mx = r.querySelector('.fz-max').value, km = r.querySelector('.fz-km').value;
+    out.push({ min: mn === '' ? NaN : Number(mn), max: mx === '' ? null : Number(mx), km: km === '' ? NaN : Number(km) });
+  });
+  return out;
+}
+function fzChart() {
+  const box = fzEl('fz-chart');
+  if (!box) return;
+  const tiers = fzRead().filter(t => isFinite(t.min) && isFinite(t.km) && t.km > 0);
+  const base = fzNum('fz-base'), perKm = fzNum('fz-perkm'), freeUnder = fzNum('fz-freekm'), freeAbove = fzNum('fz-freeabove');
+  if (!tiers.length && !(freeAbove > 0)) { box.innerHTML = '<p class="op-note">Add a range to see it here.</p>'; return; }
+  const maxKm = Math.min(12, Math.max(5, Math.ceil(Math.max(0, ...tiers.map(t => t.km)))));
+  let rows = '';
+  for (let d = 1; d <= maxKm; d++) {
+    let from = Infinity;
+    tiers.forEach(t => { if (t.km >= d && t.min < from) from = t.min; });
+    if (freeAbove > 0 && freeAbove < from) from = freeAbove;
+    const cell = (freeUnder > 0 && d < freeUnder) ? '<span class="ft-free">Always free</span>' : (from === Infinity ? '<span style="color:#64748b">Not free</span>' : '<span class="ft-free">₹' + from + ' and above</span>');
+    rows += '<tr><td>' + d + ' km</td><td>₹' + Math.round(base + perKm * d) + '</td><td>' + cell + '</td></tr>';
+  }
+  box.innerHTML = '<table class="ft-chart"><tr><th>Distance</th><th>Delivery charge</th><th>Free from</th></tr>' + rows + '</table>';
+}
+function fzPlan() {
+  const pct = fzNum('fz-pct'), flat = fzNum('fz-flat'), keep = fzNum('fz-keep'), base = fzNum('fz-base'), perKm = fzNum('fz-perkm');
+  const out = [];
+  for (let min = 100; min <= 600; min += 100) {
+    const profit = min * pct / 100 + flat, budget = profit - keep;
+    let km = perKm > 0 ? Math.max(0, Math.min(15, Math.floor(((budget - base) / perKm) * 2) / 2)) : (budget >= base ? 15 : 0);
+    const cost = km > 0 ? Math.round(base + perKm * km) : 0;
+    out.push({ min, max: min === 600 ? null : min + 100, km, profit: Math.round(profit * 10) / 10, left: Math.round((profit - cost) * 10) / 10 });
+  }
+  return out;
+}
+function fzPlanRender() {
+  const box = fzEl('fz-plan');
+  if (!box) return;
+  if (fzNum('fz-pct') <= 0 && fzNum('fz-flat') <= 0) { box.innerHTML = ''; return; }
+  box.innerHTML = '<table class="ft-chart"><tr><th>Order</th><th>Profit</th><th>Free delivery</th><th>Left</th></tr>' + fzPlan().map(r =>
+    '<tr><td>₹' + r.min + (r.max === null ? '+' : '–' + r.max) + '</td><td>₹' + r.profit + '</td><td>' + (r.km > 0 ? '<span class="ft-free">' + (r.km >= 15 ? 'any distance' : r.km + ' km') + '</span>' : 'none') + '</td><td>₹' + r.left + '</td></tr>').join('') + '</table>';
+}
+function fzAutofill() {
+  const st = fzEl('fz-status');
+  if (fzNum('fz-pct') <= 0 && fzNum('fz-flat') <= 0) { st.textContent = 'Enter the profit % (or flat profit) first.'; return; }
+  const tiers = fzPlan().filter(r => r.km > 0).map(r => ({ min: r.min, max: r.max, km: r.km }));
+  if (!tiers.length) { st.textContent = 'With this profit nothing can be free yet — raise the profit, lower the profit kept, or lower the base / per-km rate.'; return; }
+  st.textContent = '';
+  fzRenderRows(tiers);
+}
+['fz-base', 'fz-perkm', 'fz-freekm', 'fz-freeabove'].forEach(i => { const e = fzEl(i); if (e) e.addEventListener('input', () => { fzChart(); fzPlanRender(); }); });
+['fz-pct', 'fz-flat', 'fz-keep'].forEach(i => { const e = fzEl(i); if (e) e.addEventListener('input', fzPlanRender); });
+const fzRowsEl = fzEl('fz-rows'); if (fzRowsEl) fzRowsEl.addEventListener('input', fzChart);
+
+// Load this zone's NESH Mart rule (if any) into the form.
+function fzLoadZone() {
+  const id = fzEl('fz-zone').value, st = fzEl('fz-status');
+  st.textContent = '';
+  fzRenderShops(null);
+  if (!id) return;
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'app_config/zoneDelivery/' + id)).then(snap => {
+    const c = snap.val();
+    if (!c) return;
+    fzEl('fz-base').value = c.baseFee || ''; fzEl('fz-perkm').value = c.perKmFee || '';
+    fzEl('fz-freekm').value = c.freeWithinKm || ''; fzEl('fz-freeabove').value = c.freeAbove || '';
+    fzRenderRows(Array.isArray(c.freeTiers) ? c.freeTiers : Object.values(c.freeTiers || {}));
+    if (c.shopIds) fzRenderShops(c.shopIds);
+    st.textContent = 'Loaded this zone\'s current NESH Mart rule.';
+  }).catch(() => {});
+}
+function fzBuild() {
+  const st = fzEl('fz-status');
+  const base = fzNum('fz-base'), perKm = fzNum('fz-perkm'), freeKm = fzNum('fz-freekm'), freeAbove = fzNum('fz-freeabove');
+  if ([base, perKm, freeKm, freeAbove].some(n => !isFinite(n) || n < 0)) { st.textContent = "Amounts can't be negative or invalid."; return null; }
+  const rows = fzRead().filter(t => isFinite(t.min) || isFinite(t.km) || t.max !== null);
+  for (const t of rows) {
+    if (!isFinite(t.min) || t.min < 0 || !isFinite(t.km) || t.km <= 0 || (t.max !== null && (!isFinite(t.max) || t.max <= t.min))) {
+      st.textContent = "Check the ranges: each needs 'From ₹', 'Free up to km' above 0, and 'To ₹' larger than 'From ₹' (or blank)."; return null;
+    }
+  }
+  rows.sort((a, b) => a.min - b.min);
+  for (let i = 0; i < rows.length - 1; i++) {
+    if (rows[i].max === null || rows[i].max > rows[i + 1].min) { st.textContent = 'Ranges overlap (₹' + rows[i].min + ' and ₹' + rows[i + 1].min + '). Fix and apply again.'; return null; }
+  }
+  const tiers = rows.map(t => t.max === null ? { min: t.min, km: t.km } : { min: t.min, max: t.max, km: t.km });
+  return { base, perKm, freeKm, freeAbove, tiers };
+}
+async function fzApply() {
+  const st = fzEl('fz-status');
+  const zoneId = fzEl('fz-zone').value;
+  const z = (typeof opShopZones !== 'undefined' ? opShopZones : []).find(x => x._id === zoneId);
+  if (!z) { st.textContent = 'Select a zone first.'; return; }
+  const cfg = fzBuild();
+  if (!cfg) return;
+  const ids = Object.keys(z.shopIds || {}).filter(k => z.shopIds[k]);
+  const partners = ids.map(id => opAllPartners.find(p => p._id === id)).filter(Boolean);
+  const foodShops = partners.filter(p => !fzIsMart(p) && fzSel[p._id]);
+  const martSel = partners.filter(p => fzIsMart(p) && fzSel[p._id]).map(p => p._id);
+  if (fzSel['NESH_STORE']) martSel.push('NESH_STORE');
+  const doMart = martSel.length > 0;
+  if (!foodShops.length && !doMart) { st.textContent = 'No shop ticked — tick the shops to apply to.'; return; }
+  if (!confirm('Apply to ' + foodShops.length + ' food/other shop' + (foodShops.length === 1 ? '' : 's') + (doMart ? ' + ' + martSel.length + ' NESH Mart shop' + (martSel.length === 1 ? '' : 's') : '') + ' in "' + (z.name || zoneId) + '"?\n\nThis REPLACES their current delivery charge and free-delivery settings.')) return;
+  const { db, ref, update, set } = window.fb;
+  st.textContent = 'Applying…';
+  try {
+    const dc = { baseFee: cfg.base, perKmFee: cfg.perKm };
+    if (cfg.freeKm > 0) dc.freeUnderKm = cfg.freeKm;
+    if (cfg.freeAbove > 0) dc.freeAbove = cfg.freeAbove;
+    if (cfg.tiers.length) dc.freeTiers = cfg.tiers;
+    await Promise.all(foodShops.map(p => update(ref(db, 'restaurants/' + p._id), { deliveryCharges: dc }).then(() => { p.deliveryCharges = dc; })));
+    if (doMart) {
+      const m = { baseFee: cfg.base, perKmFee: cfg.perKm, updatedAt: Date.now() };
+      if (cfg.freeKm > 0) m.freeWithinKm = cfg.freeKm;
+      if (cfg.freeAbove > 0) m.freeAbove = cfg.freeAbove;
+      if (cfg.tiers.length) m.freeTiers = cfg.tiers;
+      m.shopIds = {}; martSel.forEach(id => { m.shopIds[id] = true; });   // only these Mart shops get the rule
+      await set(ref(db, 'app_config/zoneDelivery/' + zoneId), m);
+    }
+    st.textContent = '✅ Applied to ' + foodShops.length + ' shop' + (foodShops.length === 1 ? '' : 's') + (doMart ? ' and ' + martSel.length + ' NESH Mart shop' + (martSel.length === 1 ? '' : 's') : '') + ' in ' + (z.name || zoneId) + '.';
+    try { opRenderShopDeliveryList(); } catch (e) {}
+  } catch (err) { st.textContent = 'Error: ' + err.message; }
+}
+function fzClearMart() {
+  const st = fzEl('fz-status'), zoneId = fzEl('fz-zone').value;
+  if (!zoneId) { st.textContent = 'Select a zone first.'; return; }
+  if (!confirm("Remove this zone's NESH Mart delivery rule? NESH Mart customers there go back to the global Go Series charge.")) return;
+  const { db, ref, remove } = window.fb;
+  remove(ref(db, 'app_config/zoneDelivery/' + zoneId)).then(() => { st.textContent = 'NESH Mart rule removed for this zone.'; }).catch(err => { st.textContent = 'Error: ' + err.message; });
+}
 function opSaveShopDelivery() {
   const id = opSdcEditingId;
   const status = document.getElementById('op-sdc-status');
@@ -9087,6 +9556,7 @@ function opSaveShopDelivery() {
   const deliveryCharges = { baseFee, perKmFee };
   if (freeUnderKm > 0) deliveryCharges.freeUnderKm = freeUnderKm;
   if (freeAbove > 0) deliveryCharges.freeAbove = freeAbove;
+  { const prevDc = (opAllPartners.find(x => x._id === id) || {}).deliveryCharges; if (prevDc && Array.isArray(prevDc.freeTiers) && prevDc.freeTiers.length) deliveryCharges.freeTiers = prevDc.freeTiers; }   // keep the shop's own free-delivery ranges
   const { db, ref, update } = window.fb;
   status.textContent = 'Saving...';
   update(ref(db, 'restaurants/' + id), { deliveryCharges, minOrderAmount: minOrder > 0 ? minOrder : null }).then(() => {
@@ -9364,10 +9834,13 @@ function opFoSave() {
   if (!(amount > 0)) { st.textContent = 'Enter the items total needed (₹).'; return; }
   if (!sel.value) { st.textContent = 'Pick the free item.'; return; }
   const hours = parseFloat(document.getElementById('op-fo-dur').value) || 0;
+  const untilV = document.getElementById('op-fo-until').value, untilMs = untilV ? new Date(untilV).getTime() : 0;
+  if (untilV && !(untilMs > Date.now())) { st.textContent = 'The end date & time must be in the future.'; return; }
+  const expAt = untilMs > 0 ? untilMs : (hours > 0 ? Date.now() + hours * 3600000 : 0);
   const { db, ref, push, set } = window.fb;
   const name = sel.options[sel.selectedIndex].dataset.name || sel.value;
-  set(push(ref(db, 'app_config/freeItemOffers')), { minAmount: amount, itemKey: sel.value, itemName: name, qty, on: true, expiresAt: hours > 0 ? Date.now() + hours * 3600000 : 0, ts: Date.now() })
-    .then(() => { st.textContent = 'Saved — customers get "' + name + '" free when their items total reaches ₹' + amount + '.'; document.getElementById('op-fo-amount').value = ''; opFoLoad(); })
+  set(push(ref(db, 'app_config/freeItemOffers')), { minAmount: amount, itemKey: sel.value, itemName: name, qty, on: true, expiresAt: expAt, ts: Date.now() })
+    .then(() => { st.textContent = 'Saved — customers get "' + name + '" free when their items total reaches ₹' + amount + '.'; document.getElementById('op-fo-amount').value = ''; document.getElementById('op-fo-until').value = ''; opFoLoad(); })
     .catch(err => { st.textContent = 'Error: ' + err.message; });
 }
 function opFoToggle(id, turnOn) {
@@ -10984,6 +11457,7 @@ async function opAssignGroceryOrder(orderId, shopId) {
       createdAt: order.createdAt,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
+      ...(order.customerAccount ? { customerAccount: order.customerAccount } : {}),
       customerAddress: order.customerAddress,
       customerLocation: order.customerLocation,
       customerPlace: order.customerPlace,
@@ -14537,7 +15011,7 @@ function opLsDelete() {
 }
 
 /* ---- LOYALTY REWARD (operator) ----
-   app_config/loyalty = { on, ordersNeeded, title, rewardType:'discount'|'product', type:'flat'|'percent', value, maxDiscount, minOrder, productName, allShops, shops:{shopId:true}, ts } */
+   app_config/loyalty = { on, ordersNeeded, title, rewardType:'discount'|'product', type:'flat'|'percent', value, maxDiscount, minOrder, productName, discDays / prodDays (days a CLAIMED coupon / free item stays valid, 0 = no limit), remindHours (auto expiry push; blank/24 default, 0 = off), startAt, endAt (ms, 0 = no limit), allShops, shops:{shopId:true}, ts } */
 function opLoyMsg(t) { var e = document.getElementById('op-loy-status'); if (e) e.textContent = t || ''; }
 function opLoyTypeUi() {
   var prod = document.getElementById('op-loy-rt').value === 'product';
@@ -14571,11 +15045,28 @@ function opLoyLoad() {
     document.getElementById('op-loy-min').value = v.minOrder || '';
     document.getElementById('op-loy-cmin').value = v.countMin || '';
     document.getElementById('op-loy-pname').value = v.productName || '';
+    document.getElementById('op-loy-remind').value = v.remindHours == null ? '' : v.remindHours;
+    document.getElementById('op-loy-ddays').value = v.discDays || '';
+    document.getElementById('op-loy-pdays').value = v.prodDays || '';
+    document.getElementById('op-loy-start').value = opLoyToLocal(v.startAt);
+    document.getElementById('op-loy-end').value = opLoyToLocal(v.endAt);
     var all = document.getElementById('op-loy-all'); all.checked = !!v.allShops; opLoyAllToggle(all);
     Array.prototype.forEach.call(document.querySelectorAll('.op-loy-shop'), function (c) { c.checked = !!(v.shops && v.shops[c.value]); });
     opLoyTypeUi();
-    opLoyMsg(v.on === false ? 'Saved reward is currently OFF.' : 'Reward is live ✅');
+    opLoyMsg(v.on === false ? 'Saved reward is currently OFF.' : opLoyTimeStatus(+v.startAt || 0, +v.endAt || 0));
   }).catch(function () {});
+}
+function opLoyToLocal(ms) {
+  ms = Number(ms) || 0; if (!ms) return '';
+  var d = new Date(ms), z = function (n) { return (n < 10 ? '0' : '') + n; };
+  return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + 'T' + z(d.getHours()) + ':' + z(d.getMinutes());
+}
+function opLoyFromLocal(v) { if (!v) return 0; var t = new Date(v).getTime(); return t > 0 ? t : 0; }
+function opLoyTimeStatus(s, e) {
+  var now = Date.now(), f = function (t) { return new Date(t).toLocaleString(); };
+  if (e && e <= now) return '⛔ Expired on ' + f(e) + ' — hidden from customers (change the end time and Save to show again).';
+  if (s && s > now) return '🕒 Not started yet — starts ' + f(s) + (e ? ', ends ' + f(e) : '') + '.';
+  return 'Reward is live ✅' + (e ? ' until ' + f(e) : ' (no time limit)');
 }
 function opLoySave() {
   var fb = window.fb; if (!fb) { opLoyMsg('Not connected yet, try again.'); return; }
@@ -14588,6 +15079,9 @@ function opLoySave() {
   var all = document.getElementById('op-loy-all').checked, shops = {}, c = 0;
   if (!all) Array.prototype.forEach.call(document.querySelectorAll('.op-loy-shop:checked'), function (x) { shops[x.value] = true; c++; });
   if (!all && !c) { opLoyMsg('Tick at least one shop (or All shops).'); return; }
+  var startAt = opLoyFromLocal(document.getElementById('op-loy-start').value), endAt = opLoyFromLocal(document.getElementById('op-loy-end').value);
+  if (endAt && startAt && endAt <= startAt) { opLoyMsg('End time must be after the start time.'); return; }
+  if (endAt && endAt <= Date.now() && !confirm('The end time is already in the past, so customers will NOT see this reward. Save anyway?')) return;
   opLoyMsg('Saving...');
   fb.set(fb.ref(fb.db, 'app_config/loyalty'), {
     on: document.getElementById('op-loy-on').checked, ordersNeeded: n,
@@ -14597,8 +15091,197 @@ function opLoySave() {
     minOrder: Math.max(0, parseFloat(document.getElementById('op-loy-min').value) || 0),
     countMin: Math.max(0, parseFloat(document.getElementById('op-loy-cmin').value) || 0),
     productName: rt === 'product' ? pname.slice(0, 60) : '',
+    remindHours: (function () { var r = document.getElementById('op-loy-remind').value; return r === '' ? 24 : Math.max(0, parseFloat(r) || 0); })(),
+    discDays: Math.max(0, parseFloat(document.getElementById('op-loy-ddays').value) || 0),
+    prodDays: Math.max(0, parseFloat(document.getElementById('op-loy-pdays').value) || 0),
+    startAt: startAt, endAt: endAt,
     allShops: all, shops: all ? {} : shops, ts: Date.now()
-  }).then(function () { opLoyMsg('Saved ✅ — customers see the reward card in the selected shops now.'); }).catch(function (e) { opLoyMsg('Error: ' + ((e && e.message) || 'could not save')); });
+  }).then(function () { opLoyMsg('Saved ✅ — ' + opLoyTimeStatus(startAt, endAt)); }).catch(function (e) { opLoyMsg('Error: ' + ((e && e.message) || 'could not save')); });
+}
+
+/* ---- Hero Offer: expiry reminder push to customers who CLAIMED but did not use the reward ----
+   claim time = loyalty/{phone}/claimedAt, auto flag = loyalty/{phone}/expNotified (= claimedAt it was sent for), manual log = loyalty/{phone}/remindedAt */
+function opLoyRewardText(v) {
+  if (!v) return 'reward';
+  if (v.rewardType === 'product') return 'FREE ' + (v.productName || 'gift');
+  var x = Number(v.value) || 0;
+  return v.type === 'percent' ? x + '% OFF' + (Number(v.maxDiscount) > 0 ? ' (up to ₹' + v.maxDiscount + ')' : '') : '₹' + x + ' OFF';
+}
+function opLoyDays(v) { return Math.max(0, Number(v && (v.rewardType === 'product' ? v.prodDays : v.discDays)) || 0); }
+function opLoyFmtDate(ms) { return new Date(ms).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); }
+function opLoyLeft(ms) {
+  if (ms <= 0) return '0m';
+  var m = Math.floor(ms / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
+  return d ? d + 'd ' + h + 'h' : (h ? h + 'h ' : '') + (m % 60) + 'm';
+}
+function opLoyBuildMsg(v, expMs) {
+  var rt = opLoyRewardText(v).replace(/ \(up to[^)]*\)/, ''), left = opLoyLeft(expMs - Date.now()), when = opLoyFmtDate(expMs);
+  if (v.rewardType === 'product') return {
+    title: '🎁 Your ' + rt + ' is waiting!',
+    body: '⏳ Only ' + left + " left — it expires on " + when + ". Order now and grab it before it's gone! 🎉"
+  };
+  return {
+    title: '⏳ Your ' + rt + ' reward expires soon!',
+    body: 'Last chance! It ends on ' + when + ' (' + left + " left). Order now & save before it's gone! 🎉"
+  };
+}
+// resolves true when the worker accepted the push
+function opLoySendReminder(phone, v, expMs) {
+  var m = opLoyBuildMsg(v, expMs);
+  return fetch('https://broad-paper-6445.raise3715.workers.dev', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'customer', customerPhone: phone, title: m.title, body: m.body, orderId: '', restId: '' })
+  }).then(function (res) { return res.text().then(function (t) { return !res.ok ? 'fail' : (/No FCM token/i.test(t) ? 'notoken' : 'ok'); }); }).catch(function () { return 'fail'; });
+}
+function opLoyLoadClaims() {
+  var box = document.getElementById('op-loy-claims'); if (!box) return;
+  var fb = window.fb; if (!fb) { box.textContent = 'Not connected yet - tap Refresh in a moment.'; return; }
+  box.textContent = 'Loading...';
+  Promise.all([fb.get(fb.ref(fb.db, 'app_config/loyalty')), fb.get(fb.ref(fb.db, 'loyalty'))]).then(function (r) {
+    var v = r[0].val(), all = r[1].val() || {};
+    if (!v) { box.textContent = 'Loyalty reward is not set up yet.'; return; }
+    var days = opLoyDays(v), now = Date.now(), rows = [];
+    Object.keys(all).forEach(function (ph) {
+      var c = all[ph] || {}, at = Number(c.claimedAt) || 0; if (!at) return;
+      rows.push({ ph: ph, at: at, exp: days > 0 ? at + days * 86400000 : 0, auto: c.expNotified === at, last: Number(c.remindedAt) || 0 });
+    });
+    rows.sort(function (a, b) { return (a.exp || 9e15) - (b.exp || 9e15); });
+    box.innerHTML = '';
+    if (!rows.length) { box.textContent = 'No customer has a claimed, unused reward right now.'; return; }
+    rows.forEach(function (x) {
+      var d = document.createElement('div'); d.style.cssText = 'border-bottom:1px solid #124a24;padding:6px 0;';
+      var expired = x.exp && x.exp <= now;
+      var t = document.createElement('div');
+      t.textContent = '📱 ' + x.ph + ' · claimed ' + opLoyFmtDate(x.at) + ' · ' + (x.exp ? (expired ? '⛔ expired ' + opLoyFmtDate(x.exp) : '⏳ expires ' + opLoyFmtDate(x.exp) + ' (' + opLoyLeft(x.exp - now) + ' left)') : 'no expiry set')
+        + (x.auto ? ' · ✅ auto-reminded' : '') + (x.last ? ' · last sent ' + opLoyFmtDate(x.last) : '');
+      d.appendChild(t);
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'op-btn op-btn-push'; b.style.marginTop = '4px';
+      b.textContent = '📣 Send expiry reminder';
+      if (!x.exp || expired) { b.disabled = true; b.title = x.exp ? 'Already expired' : 'Set "valid days after claim" first'; }
+      b.onclick = function () {
+        b.disabled = true; b.textContent = 'Sending...';
+        opLoySendReminder(x.ph, v, x.exp).then(function (ok) {
+          if (ok === 'notoken') { b.disabled = false; b.textContent = '⚠️ No notification token (customer has not allowed push)'; return; }
+          if (ok === 'ok') { try { fb.set(fb.ref(fb.db, 'loyalty/' + x.ph + '/remindedAt'), Date.now()); } catch (e) {} b.textContent = 'Sent ✅'; setTimeout(function () { b.disabled = false; b.textContent = '📣 Send again'; }, 4000); }
+          else { b.disabled = false; b.textContent = 'Failed - tap to retry'; }
+        });
+      };
+      d.appendChild(b); box.appendChild(d);
+    });
+  }).catch(function (e) { box.textContent = 'Error: ' + ((e && e.message) || 'could not load'); });
+}
+// Automatic reminder: when a claimed reward has <= remindHours left (default 24h) the customer gets one push. Runs while the operator panel is open.
+function opLoyAutoRemind() {
+  var fb = window.fb; if (!fb) return;
+  fb.get(fb.ref(fb.db, 'app_config/loyalty')).then(function (cs) {
+    var v = cs.val(); if (!v || v.on === false) return;
+    var days = opLoyDays(v), rem = v.remindHours == null ? 24 : Number(v.remindHours);
+    if (!(days > 0) || !(rem > 0) || days * 24 <= rem) return;   // no expiry, reminder off, or the reward is shorter than the reminder window
+    return fb.get(fb.ref(fb.db, 'loyalty')).then(function (snap) {
+      var all = snap.val() || {}, now = Date.now();
+      Object.keys(all).forEach(function (ph) {
+        var c = all[ph] || {}, at = Number(c.claimedAt) || 0; if (!at) return;
+        var exp = at + days * 86400000;
+        if (exp <= now || exp - now > rem * 3600000 || c.expNotified === at) return;
+        var fref = fb.ref(fb.db, 'loyalty/' + ph + '/expNotified');
+        fb.runTransaction(fref, function (cur) { return cur === at ? undefined : at; }).then(function (r) {
+          if (!r || !r.committed) return;   // another device already sent it
+          return opLoySendReminder(ph, v, exp).then(function (ok) { if (ok === 'fail') { try { fb.set(fref, null); } catch (e) {} } });
+        }).catch(function () {});
+      });
+    });
+  }).catch(function () {});
+}
+
+/* ---- Hero Offer: manual progress nudge (operator picks the step, taps Send) ---- progress = loyalty/{phone}/{count, claimed, claimedAt}, log = loyalty/{phone}/nudgedAt */
+function opLoyPush(phone, title, body) {
+  return fetch('https://broad-paper-6445.raise3715.workers.dev', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'customer', customerPhone: phone, title: title, body: body, orderId: '', restId: '' })
+  }).then(function (res) { return res.text().then(function (t) { return !res.ok ? 'fail' : (/No FCM token/i.test(t) ? 'notoken' : 'ok'); }); }).catch(function () { return 'fail'; });
+}
+function opLoyStatusOf(v, c) {
+  var n = Math.max(1, Math.round(Number(v.ordersNeeded) || 5)), count = Number(c.count) || 0, claimed = Number(c.claimed) || 0;
+  if (Math.max(0, Math.floor(count / n) - claimed) > 0) return { n: n, unlocked: true, claimed: Number(c.claimedAt) > 0, done: n, left: 0 };
+  var done = Math.max(0, count - claimed * n);
+  return { n: n, unlocked: false, done: done, left: n - done };
+}
+function opLoyBuildNudge(v, st) {
+  var rt = opLoyRewardText(v).replace(/ \(up to[^)]*\)/, '');
+  if (st.unlocked) return { title: '🎉 Your ' + rt + ' reward is ready!', body: 'You completed all ' + st.n + " orders. Open the app and claim it now — order & save! 🎁" };
+  if (st.left === 1) return { title: '🔥 Just 1 more order to unlock ' + rt + '!', body: 'You have completed ' + st.done + ' of ' + st.n + ' orders. One more and your Hero reward is yours! 🎉' };
+  return { title: '🎯 ' + st.done + ' of ' + st.n + ' done — ' + st.left + ' more to unlock ' + rt + '!', body: 'Keep ordering — complete ' + st.left + ' more orders and your reward unlocks. 🎁' };
+}
+function opLoyLoadNudge() {
+  var list = document.getElementById('op-loy-nlist'); if (!list) return;
+  var fb = window.fb; if (!fb) { list.textContent = 'Not connected yet - tap Refresh in a moment.'; return; }
+  list.textContent = 'Loading...';
+  Promise.all([fb.get(fb.ref(fb.db, 'app_config/loyalty')), fb.get(fb.ref(fb.db, 'loyalty'))]).then(function (r) {
+    var v = r[0].val(), all = r[1].val() || {};
+    if (!v) { list.textContent = 'Loyalty reward is not set up yet.'; window.__opLoyN = null; return; }
+    var rows = [];
+    Object.keys(all).forEach(function (ph) {
+      var c = all[ph] || {}, st = opLoyStatusOf(v, c);
+      if (st.unlocked ? st.claimed : st.done < 1) return;   // claimed-unused is in the list above; 0 steps = nothing to nudge
+      rows.push({ ph: ph, st: st, last: Number(c.nudgedAt) || 0 });
+    });
+    window.__opLoyN = { v: v, rows: rows };
+    var sel = document.getElementById('op-loy-nf'), keep = sel.value, n = Math.max(1, Math.round(Number(v.ordersNeeded) || 5));
+    sel.innerHTML = '<option value="all">All in progress</option>';
+    for (var i = 1; i < n; i++) sel.innerHTML += '<option value="' + i + '">' + i + ' of ' + n + ' orders done</option>';
+    sel.innerHTML += '<option value="unlocked">🎉 Unlocked, not claimed</option>';
+    if (keep && sel.querySelector('option[value="' + keep + '"]')) sel.value = keep;
+    opLoyRenderNudge();
+  }).catch(function (e) { list.textContent = 'Error: ' + ((e && e.message) || 'could not load'); });
+}
+function opLoyNudgeShown() {
+  var d = window.__opLoyN; if (!d) return [];
+  var f = document.getElementById('op-loy-nf').value;
+  return d.rows.filter(function (x) { return f === 'all' || (f === 'unlocked' ? x.st.unlocked : (!x.st.unlocked && String(x.st.done) === f)); })
+    .sort(function (a, b) { return a.st.left - b.st.left; });
+}
+function opLoyRenderNudge() {
+  var list = document.getElementById('op-loy-nlist'), d = window.__opLoyN; if (!list || !d) return;
+  var rows = opLoyNudgeShown(), fb = window.fb;
+  list.innerHTML = '';
+  document.getElementById('op-loy-nbulk').textContent = '📣 Send to all shown (' + rows.length + ')';
+  document.getElementById('op-loy-nbulk').disabled = !rows.length;
+  if (!rows.length) { list.textContent = 'No customers at this step right now.'; return; }
+  rows.forEach(function (x) {
+    var row = document.createElement('div'); row.style.cssText = 'border-bottom:1px solid #124a24;padding:6px 0;';
+    var bar = ''; for (var i = 1; i <= x.st.n; i++) bar += i <= x.st.done ? '●' : '○';
+    var t = document.createElement('div');
+    t.textContent = '📱 ' + x.ph + ' · ' + bar + ' ' + (x.st.unlocked ? 'unlocked — not claimed yet' : x.st.done + ' of ' + x.st.n + ' done · ' + x.st.left + ' more') + (x.last ? ' · last nudged ' + opLoyFmtDate(x.last) : '');
+    row.appendChild(t);
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'op-btn op-btn-push'; b.style.marginTop = '4px'; b.textContent = '📣 Send';
+    b.onclick = function () {
+      var m = opLoyBuildNudge(d.v, x.st); b.disabled = true; b.textContent = 'Sending...';
+      opLoyPush(x.ph, m.title, m.body).then(function (ok) {
+        if (ok === 'notoken') { b.disabled = false; b.textContent = '⚠️ No notification token (customer has not allowed push)'; return; }
+        if (ok === 'ok') { try { fb.set(fb.ref(fb.db, 'loyalty/' + x.ph + '/nudgedAt'), Date.now()); } catch (e) {} b.textContent = 'Sent ✅'; setTimeout(function () { b.disabled = false; b.textContent = '📣 Send again'; }, 4000); }
+        else { b.disabled = false; b.textContent = 'Failed - tap to retry'; }
+      });
+    };
+    row.appendChild(b); list.appendChild(row);
+  });
+}
+function opLoyNudgeAll() {
+  var d = window.__opLoyN, rows = opLoyNudgeShown(), st = document.getElementById('op-loy-nstatus'), fb = window.fb;
+  if (!d || !rows.length) return;
+  if (!confirm('Send this push to ' + rows.length + ' customer' + (rows.length === 1 ? '' : 's') + ' now?')) return;
+  var i = 0, ok = 0, fail = 0, noTok = 0, btn = document.getElementById('op-loy-nbulk'); btn.disabled = true;
+  (function next() {
+    if (i >= rows.length) { st.textContent = 'Done: ' + ok + ' sent' + (noTok ? ', ' + noTok + ' have no notification token' : '') + (fail ? ', ' + fail + ' failed' : '') + ' ✅'; btn.disabled = false; opLoyLoadNudge(); return; }
+    var x = rows[i++], m = opLoyBuildNudge(d.v, x.st);
+    st.textContent = 'Sending ' + i + ' of ' + rows.length + '...';
+    opLoyPush(x.ph, m.title, m.body).then(function (good) {
+      if (good === 'notoken') noTok++;
+      else if (good === 'ok') { ok++; try { fb.set(fb.ref(fb.db, 'loyalty/' + x.ph + '/nudgedAt'), Date.now()); } catch (e) {} } else fail++;
+      setTimeout(next, 250);
+    });
+  })();
 }
 function opLoyDelete() {
   var fb = window.fb; if (!fb) return;

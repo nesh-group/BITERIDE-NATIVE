@@ -2529,13 +2529,14 @@ async function handlePopupDeliveryAction(compositeId, action) {
     showToast("Delivery accepted");
     clearDeliveredNotifications();
     // Fire-and-forget: let the customer know who's picking up their order.
-    if (order.customerPhone) {
+    // customerAccount = logged-in account (push token lives there); customerPhone is only the delivery contact.
+    if (order.customerAccount || order.customerPhone) {
       fetch('https://broad-paper-6445.raise3715.workers.dev', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'customer',
-          customerPhone: order.customerPhone,
+          customerPhone: order.customerAccount || order.customerPhone,
           title: 'Driver assigned!',
           body: state.driver.name + ' is picking up your order.',
           orderId, restId,
@@ -4359,13 +4360,13 @@ async function markDeliveryPickedUp(compositeId) {
     // Fire-and-forget: let the customer know their order is on the way.
     get(ref(db, 'restaurants/' + restId + '/orders/' + orderId)).then((snap) => {
       const o = snap.val() || {};
-      if (!o.customerPhone) return;
+      if (!o.customerAccount && !o.customerPhone) return;
       fetch('https://broad-paper-6445.raise3715.workers.dev', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'customer',
-          customerPhone: o.customerPhone,
+          customerPhone: o.customerAccount || o.customerPhone,
           title: 'Out for delivery!',
           body: 'Your order has been picked up and is on the way.',
           orderId, restId,
@@ -4387,13 +4388,13 @@ async function markDeliveryDelivered(compositeId) {
     // (same Cloudflare Worker used for the ride/delivery alerts above).
     get(ref(db, 'restaurants/' + restId + '/orders/' + orderId)).then((snap) => {
       const o = snap.val() || {};
-      if (!o.customerPhone) return;
+      if (!o.customerAccount && !o.customerPhone) return;
       fetch('https://broad-paper-6445.raise3715.workers.dev', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'customer',
-          customerPhone: o.customerPhone,
+          customerPhone: o.customerAccount || o.customerPhone,
           title: 'Order delivered!',
           body: 'Enjoy your meal 🎉',
           orderId, restId,
