@@ -2809,7 +2809,7 @@
       <div class="op-search-box"><input type="number" id="fz-perkm" placeholder="Per-km rate in ₹ (e.g. 5)" min="0" step="0.5"></div>
       <div class="op-search-box"><input type="number" id="fz-freekm" placeholder="Free delivery under __ km (blank = off)" min="0" step="0.1"></div>
       <div class="op-search-box"><input type="number" id="fz-freeabove" placeholder="Free delivery on orders of ₹ and above (blank = off)" min="0" step="1"></div>
-      <p class="op-note" style="margin-bottom:6px;"><b>Price ranges</b> — for each range choose how many ₹ to ADD to items in that range (customers pay it, the shop still gets its own price). That pays for free delivery up to N km — worked out for you; or type the km and the ₹ is worked out. "to" blank = and above. (NESH Mart: item prices are not changed automatically, only the free km applies — use Go Series item profit for Mart prices.)</p>
+      <p class="op-note" style="margin-bottom:6px;"><b>Price ranges</b> — for each range choose how many ₹ to ADD to items in that range (customers pay it, the shop still gets its own price). That pays for free delivery up to N km — worked out for you; or type the km and the ₹ is worked out. "to" blank = and above. (NESH Mart / Go Series shops: the same ranges apply — Add ₹ goes on the customer price on top of the Go Series item profit, and the shop is paid price − commission.)</p>
       <div id="fz-rows"></div>
       <button type="button" class="ft-btn" onclick="fzAddRow()">+ Add range</button>
       <p class="op-note" style="margin:8px 0 4px;"><b>Add ₹ to items → how many km free?</b></p>
@@ -7841,7 +7841,12 @@ document.getElementById('delivery-charges-save-btn').addEventListener('click', a
       return;
     }
   }
-  if (tierRows.length) deliveryCharges.freeTiers = tierRows.map(t => { const o = { min: t.min, km: t.km }; if (t.max !== null) o.max = t.max; if (t.add > 0) o.add = t.add; return o; });
+  const prevTiersC = (state.restaurant && state.restaurant.deliveryCharges && state.restaurant.deliveryCharges.freeTiers) ? Object.values(state.restaurant.deliveryCharges.freeTiers) : [];
+  if (tierRows.length) deliveryCharges.freeTiers = tierRows.map(t => { const o = { min: t.min, km: t.km }; if (t.max !== null) o.max = t.max; if (t.add > 0) o.add = t.add;
+    const old = prevTiersC.find(x => x && Number(x.min) === t.min && (x.max == null ? null : Number(x.max)) === t.max);   // operator-set commission is kept
+    if (old && Number(old.commission) > 0) o.commission = Number(old.commission);
+    if (old && Number(old.profit) > 0) o.profit = Number(old.profit);
+    return o; });
 
   const btn = document.getElementById('delivery-charges-save-btn');
   btn.disabled = true;
@@ -9392,13 +9397,14 @@ function fzInit() {
   if (cur) sel.value = cur;
   if (!fzEl('fz-rows').children.length) fzRenderRows([]);
 }
-function fzKmFor(add) {
-  const base = fzNum('fz-base'), perKm = fzNum('fz-perkm');
-  if (!(add > 0)) return 0;
-  if (perKm > 0) return Math.max(0, Math.min(15, Math.floor(((add - base) / perKm) * 2) / 2));
-  return add >= base ? 15 : 0;
+// The shop commission of a range pays part of the free delivery, so Add ₹ = delivery cost for the free km − commission (never below 0).
+function fzKmFor(add, comm, profit) {
+  const base = fzNum('fz-base'), perKm = fzNum('fz-perkm'), c = Number(comm) || 0, funds = (Number(add) || 0) - (Number(profit) || 0) + c;
+  if (!(funds > 0)) return 0;
+  if (perKm > 0) return Math.max(0, Math.min(15, Math.floor(((funds - base) / perKm) * 2) / 2));
+  return funds >= base ? 15 : 0;
 }
-function fzAddFor(km) { return km > 0 ? Math.ceil(fzNum('fz-base') + fzNum('fz-perkm') * km) : ''; }
+function fzAddFor(km, comm, profit) { return km > 0 ? Math.max(0, Math.ceil(fzNum('fz-base') + fzNum('fz-perkm') * km - (Number(comm) || 0))) + (Number(profit) || 0) : ''; }
 function fzRowHtml(t) {
   const v = x => (x === undefined || x === null || x === '' || (typeof x === 'number' && isNaN(x))) ? '' : x;
   return '<div class="ft-row">' +
@@ -9407,16 +9413,31 @@ function fzRowHtml(t) {
     '<button type="button" class="ft-del" onclick="this.closest(\'.ft-row\').remove(); fzChart();">✕</button>' +
     '<div class="ft-cell"><small>Add ₹ to these items</small><input type="number" class="fz-add" min="0" step="1" value="' + v(t.add) + '"></div>' +
     '<div class="ft-cell"><small>Free delivery up to km</small><input type="number" class="fz-km" min="0" step="0.5" value="' + v(t.km) + '"></div>' +
-    '<span></span><p class="ft-note"></p></div>';
+    '<span></span>' +
+    '<div class="ft-cell"><small>Shop commission ₹ (per item, pays part of delivery)</small><input type="number" class="fz-comm" min="0" step="1" placeholder="0" value="' + v(t.commission) + '"></div>' +
+    '<div class="ft-cell"><small>My profit ₹ (per item, extra)</small><input type="number" class="fz-profit" min="0" step="1" placeholder="0" value="' + v(t.profit) + '"></div>' +
+    '<span></span>' +
+    '<p class="ft-note"></p><p class="ft-note fz-comm-note"></p></div>';
 }
 function fzNote(row) {
   const add = Number(row.querySelector('.fz-add').value) || 0, km = Number(row.querySelector('.fz-km').value) || 0, n = row.querySelector('.ft-note');
   n.classList.remove('warn');
   if (!add && !km) { n.textContent = ''; return; }
-  if (km <= 0) { n.classList.add('warn'); n.textContent = '₹' + add + ' is not enough for any free km — need at least ₹' + Math.ceil(fzNum('fz-base') + fzNum('fz-perkm') * 0.5) + '.'; return; }
-  n.textContent = 'Items +₹' + (add || fzAddFor(km)) + '  →  delivery FREE up to ' + km + ' km (costs ₹' + Math.round(fzNum('fz-base') + fzNum('fz-perkm') * km) + ' at ' + km + ' km)';
+  const comm = Number(row.querySelector('.fz-comm').value) || 0, profit = Number(row.querySelector('.fz-profit').value) || 0;
+  if (km <= 0) { n.classList.add('warn'); n.textContent = '₹' + add + (comm ? ' + commission ₹' + comm : '') + (profit ? ' − your profit ₹' + profit : '') + ' is not enough for any free km — need at least ₹' + (Math.max(0, Math.ceil(fzNum('fz-base') + fzNum('fz-perkm') * 0.5 - comm)) + profit) + ' Add ₹.'; return; }
+  const cost = Math.round(fzNum('fz-base') + fzNum('fz-perkm') * km);
+  n.textContent = 'Delivery ₹' + cost + (comm ? ' − commission ₹' + comm : '') + (profit ? ' + your profit ₹' + profit : '') + '  →  items +₹' + (add || fzAddFor(km, comm, profit)) + '  →  FREE up to ' + km + ' km';
 }
-function fzRenderRows(tiers) { fzEl('fz-rows').innerHTML = tiers.map(fzRowHtml).join(''); document.querySelectorAll('#fz-rows .ft-row').forEach(fzNote); fzChart(); }
+function fzCommNote(row) {
+  const cn = row.querySelector('.fz-comm-note'); if (!cn) return;
+  const comm = Number(row.querySelector('.fz-comm').value) || 0;
+  const mn = Number(row.querySelector('.fz-min').value), mxRaw = row.querySelector('.fz-max').value;
+  cn.classList.remove('warn');
+  if (!(comm > 0)) { cn.textContent = ''; return; }
+  if (isFinite(mn) && comm >= mn) { cn.classList.add('warn'); cn.textContent = 'Commission ₹' + comm + ' must be less than the lowest item price (₹' + mn + ').'; return; }
+  cn.textContent = 'You pay the shop (item price − ₹' + comm + '): ₹' + (isFinite(mn) ? (mn - comm) : '?') + ' to ' + (mxRaw === '' ? 'and above' : '₹' + (Number(mxRaw) - comm)) + ' per item';
+}
+function fzRenderRows(tiers) { fzEl('fz-rows').innerHTML = tiers.map(fzRowHtml).join(''); document.querySelectorAll('#fz-rows .ft-row').forEach(r => { fzNote(r); fzCommNote(r); }); fzChart(); }
 function fzAddRow() {
   const rows = fzRead(), last = rows[rows.length - 1];
   const start = last && last.max !== null && isFinite(last.max) ? last.max : (last && isFinite(last.min) ? last.min + 100 : 200);
@@ -9426,8 +9447,8 @@ function fzAddRow() {
 function fzRead() {
   const out = [];
   document.querySelectorAll('#fz-rows .ft-row').forEach(r => {
-    const mn = r.querySelector('.fz-min').value, mx = r.querySelector('.fz-max').value, ad = r.querySelector('.fz-add').value, km = r.querySelector('.fz-km').value;
-    out.push({ min: mn === '' ? NaN : Number(mn), max: mx === '' ? null : Number(mx), add: ad === '' ? 0 : Number(ad), km: km === '' ? NaN : Number(km) });
+    const mn = r.querySelector('.fz-min').value, mx = r.querySelector('.fz-max').value, ad = r.querySelector('.fz-add').value, km = r.querySelector('.fz-km').value, cm = r.querySelector('.fz-comm').value, pf = r.querySelector('.fz-profit').value;
+    out.push({ min: mn === '' ? NaN : Number(mn), max: mx === '' ? null : Number(mx), add: ad === '' ? 0 : Number(ad), km: km === '' ? NaN : Number(km), commission: cm === '' ? 0 : Number(cm), profit: pf === '' ? 0 : Number(pf) });
   });
   return out;
 }
@@ -9458,9 +9479,15 @@ const fzRowsEl = fzEl('fz-rows');
 if (fzRowsEl) fzRowsEl.addEventListener('input', e => {
   const row = e.target.closest('.ft-row');
   if (row) {
-    if (e.target.classList.contains('fz-add')) { const km = fzKmFor(Number(e.target.value) || 0); row.querySelector('.fz-km').value = km > 0 ? km : ''; }
-    else if (e.target.classList.contains('fz-km')) { row.querySelector('.fz-add').value = fzAddFor(Number(e.target.value) || 0); }
-    fzNote(row);
+    const comm = Number(row.querySelector('.fz-comm').value) || 0, profit = Number(row.querySelector('.fz-profit').value) || 0;
+    if (e.target.classList.contains('fz-add')) { const km = fzKmFor(Number(e.target.value) || 0, comm, profit); row.querySelector('.fz-km').value = km > 0 ? km : ''; }
+    else if (e.target.classList.contains('fz-km')) { row.querySelector('.fz-add').value = fzAddFor(Number(e.target.value) || 0, comm, profit); }
+    else if (e.target.classList.contains('fz-comm') || e.target.classList.contains('fz-profit')) {   // commission / profit changed: keep the km, work out the new Add ₹
+      const km = Number(row.querySelector('.fz-km').value) || 0;
+      if (km > 0) row.querySelector('.fz-add').value = fzAddFor(km, comm, profit);
+      else { const ad = Number(row.querySelector('.fz-add').value) || 0, k2 = fzKmFor(ad, comm, profit); row.querySelector('.fz-km').value = k2 > 0 ? k2 : ''; }
+    }
+    fzNote(row); fzCommNote(row);
   }
   fzChart();
 });
@@ -9492,11 +9519,17 @@ function fzBuild() {
       st.textContent = "Check the ranges: each needs 'Items priced from ₹', an 'Add ₹' big enough for some free km (or a 'Free delivery up to km' above 0), and 'to ₹' larger than 'from ₹' (or blank)."; return null;
     }
   }
+  for (const t of rows) {
+    if (!(t.profit >= 0) || !isFinite(t.profit)) { st.textContent = 'My profit must be a number, 0 or more.'; return null; }
+  }
+  for (const t of rows) {
+    if (!(t.commission >= 0) || !isFinite(t.commission) || (t.commission > 0 && t.commission >= t.min)) { st.textContent = 'Shop commission must be a number below the lowest item price of its range (range from ₹' + t.min + ').'; return null; }
+  }
   rows.sort((a, b) => a.min - b.min);
   for (let i = 0; i < rows.length - 1; i++) {
     if (rows[i].max === null || rows[i].max > rows[i + 1].min) { st.textContent = 'Ranges overlap (₹' + rows[i].min + ' and ₹' + rows[i + 1].min + '). Fix and apply again.'; return null; }
   }
-  const tiers = rows.map(t => { const o = { min: t.min, km: t.km }; if (t.max !== null) o.max = t.max; if (t.add > 0) o.add = t.add; return o; });
+  const tiers = rows.map(t => { const o = { min: t.min, km: t.km }; if (t.max !== null) o.max = t.max; if (t.add > 0) o.add = t.add; if (t.commission > 0) o.commission = t.commission; if (t.profit > 0) o.profit = t.profit; return o; });
   return { base, perKm, freeKm, freeAbove, tiers };
 }
 async function fzApply() {
@@ -9526,7 +9559,7 @@ async function fzApply() {
       const m = { baseFee: cfg.base, perKmFee: cfg.perKm, updatedAt: Date.now() };
       if (cfg.freeKm > 0) m.freeWithinKm = cfg.freeKm;
       if (cfg.freeAbove > 0) m.freeAbove = cfg.freeAbove;
-      if (cfg.tiers.length) m.freeTiers = cfg.tiers;
+      if (cfg.tiers.length) m.freeTiers = cfg.tiers.map(t => Object.assign({}, t));   // commission + profit apply to Mart shops too
       m.shopIds = {}; martSel.forEach(id => { m.shopIds[id] = true; });   // only these Mart shops get the rule
       await set(ref(db, 'app_config/zoneDelivery/' + zoneId), m);
     }
