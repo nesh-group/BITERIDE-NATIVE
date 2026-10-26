@@ -1285,7 +1285,7 @@
     </div>
 
 
-    <div class="px">
+    <div class="px" id="gpay-section">
       <div class="section-row" style="padding:0 0 8px;">
         <h2 class="section-title">Payment (UPI)</h2>
         <span class="nav-badge" id="gpay-status-badge" style="background:#6E8CAE;">Not set</span>
@@ -1544,6 +1544,16 @@
       </div>
       <p class="hint-text" style="margin:4px 0 0;">When a customer's item total reaches this amount, they pay no delivery charge — the app shows it struck out and marked FREE.</p>
 
+      <p class="loc-field-label" style="margin-top:16px;">Small order fee: orders below (₹) — optional</p>
+      <div class="field">
+        <input id="delivery-small-below" type="number" min="0" step="1" inputmode="decimal" placeholder="e.g. 100 (leave blank to disable)" />
+      </div>
+      <p class="loc-field-label" style="margin-top:10px;">Small order fee (₹) added to delivery charge</p>
+      <div class="field">
+        <input id="delivery-small-fee" type="number" min="0" step="1" inputmode="decimal" placeholder="e.g. 10" />
+      </div>
+      <p class="hint-text" style="margin:4px 0 0;">If a customer's item total is below the amount above, this fee is added to the delivery charge (shown inside the Delivery charge row). Free-delivery orders never pay it.</p>
+
       <p class="loc-field-label" style="margin-top:22px;">Free delivery by order value &amp; distance — optional</p>
       <p class="hint-text" style="margin:0 0 10px;">For each price range, choose how many ₹ to ADD to the price of items in that range (customers pay it, you still get your own price). That extra pays for free delivery — the km is worked out for you. Or type the km and the ₹ to add is worked out. e.g. items ₹200–300 + ₹40 → free delivery up to 4 km. Leave "To" blank for "and above".</p>
       <div id="ft-rows"></div>
@@ -1745,6 +1755,11 @@
           <div class="op-home-icon">⬆️</div>
           <h3>Push App Update</h3>
           <p>Push new code (index.html) live to every restaurant partner</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('online-upi')">
+          <div class="op-home-icon">💳</div>
+          <h3>Online Payment UPI</h3>
+          <p>One UPI ID for every shop's online payment (shops' own UPI is switched off)</p>
         </div>
         <div class="op-home-card" onclick="opOpenSection('pricing')">
           <div class="op-home-icon">💰</div>
@@ -2356,6 +2371,24 @@
     </div>
   </div>
 
+  <!-- ONLINE PAYMENT UPI (ONE ID FOR ALL SHOPS) -->
+  <div class="op-section" id="op-section-online-upi">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Online Payment UPI</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Set one UPI ID here. Customers' online payments for EVERY shop go to this ID, and the "Payment (UPI)" box disappears from every shop's app. Clear it and save to go back to each shop's own UPI ID.</p>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="text" id="op-online-upi-input" placeholder="UPI ID e.g. name@okaxis">
+      </div>
+      <div>
+        <button type="button" class="op-btn op-btn-push" onclick="opSaveOnlineUpi()">💾 Save</button>
+      </div>
+      <p class="op-note" id="op-online-upi-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
   <!-- EXTRA AMOUNT (PAISA) -->
   <div class="op-section" id="op-section-pricing">
     <div class="op-section-header">
@@ -2775,6 +2808,13 @@
       <div class="op-search-box" style="margin-bottom:10px;">
         <input type="number" id="op-goseries-freekm-input" placeholder="Free delivery under __ km (0 = off, e.g. 2)" min="0" step="0.1">
       </div>
+      <p class="op-note" style="margin-bottom:6px;">Small order fee — orders whose item total is BELOW the first amount pay the second amount extra, added inside the delivery charge. Free-delivery orders never pay it. 0 = off.</p>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="number" id="op-goseries-smallbelow-input" placeholder="Small order: item total below ₹ (0 = off, e.g. 100)" min="0" step="1">
+      </div>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="number" id="op-goseries-smallfee-input" placeholder="Small order fee in ₹ (e.g. 10)" min="0" step="1">
+      </div>
       <div>
         <button type="button" class="op-btn op-btn-push" onclick="opSaveGoSeriesFare()">💾 Save charge</button>
       </div>
@@ -2809,6 +2849,8 @@
       <div class="op-search-box"><input type="number" id="fz-perkm" placeholder="Per-km rate in ₹ (e.g. 5)" min="0" step="0.5"></div>
       <div class="op-search-box"><input type="number" id="fz-freekm" placeholder="Free delivery under __ km (blank = off)" min="0" step="0.1"></div>
       <div class="op-search-box"><input type="number" id="fz-freeabove" placeholder="Free delivery on orders of ₹ and above (blank = off)" min="0" step="1"></div>
+      <div class="op-search-box"><input type="number" id="fz-smallbelow" placeholder="Small order fee: item total below ₹ (blank = off)" min="0" step="1"></div>
+      <div class="op-search-box"><input type="number" id="fz-smallfee" placeholder="Small order fee in ₹ (added to delivery charge)" min="0" step="1"></div>
       <p class="op-note" style="margin-bottom:6px;"><b>Price ranges</b> — for each range choose how many ₹ to ADD to items in that range (customers pay it, the shop still gets its own price). That pays for free delivery up to N km — worked out for you; or type the km and the ₹ is worked out. "to" blank = and above. (NESH Mart / Go Series shops: the same ranges apply — Add ₹ goes on the customer price on top of the Go Series item profit, and the shop is paid price − commission.)</p>
       <div id="fz-rows"></div>
       <button type="button" class="ft-btn" onclick="fzAddRow()">+ Add range</button>
@@ -2823,7 +2865,7 @@
       <p class="op-note" id="fz-status" style="margin-top:8px;"></p>
       <hr style="border:0; border-top:1px solid #124a24; margin:20px 0;">
       <h2>Single shop</h2>
-      <p class="op-note">Pick any shop that is NOT in Go Series and set its own delivery charge and minimum order. This writes the same settings the shop sees in its own Account → Delivery Charges, so whichever was saved last wins. Go Series and Groceries shops always use the Go Series charge, so they are not listed here.</p>
+      <p class="op-note">Pick any shop that is NOT in Go Series and set its own delivery charge and minimum order. This writes the same settings the shop sees in its own Account → Delivery Charges, so whichever was saved last wins. For Go Series and Groceries shops the delivery charge stays the Mart rule — here you only set their own price ranges (commission, Add ₹, My profit), which win over the zone rule for that shop.</p>
       <div id="op-sdc-editor" style="display:none; margin-bottom:16px; padding:14px; border:1px solid #124a24;">
         <h2 id="op-sdc-editor-title" style="margin-top:0;"></h2>
         <div class="op-search-box" style="margin-bottom:10px;">
@@ -2839,8 +2881,18 @@
           <input type="number" id="op-sdc-freeabove" placeholder="Free delivery on orders of ₹ and above (blank/0 = off)" min="0" step="1">
         </div>
         <div class="op-search-box" style="margin-bottom:10px;">
+          <input type="number" id="op-sdc-smallbelow" placeholder="Small order fee: item total below ₹ (blank/0 = off)" min="0" step="1">
+        </div>
+        <div class="op-search-box" style="margin-bottom:10px;">
+          <input type="number" id="op-sdc-smallfee" placeholder="Small order fee in ₹ (added to delivery charge)" min="0" step="1">
+        </div>
+        <div class="op-search-box" style="margin-bottom:10px;">
           <input type="number" id="op-sdc-minorder" placeholder="Minimum order amount in ₹ (blank/0 = no minimum)" min="0" step="1">
         </div>
+        <p class="op-note" style="margin-bottom:6px;"><b>Price ranges for this shop only</b> — own Add ₹, free km, shop commission and My profit for this shop (uses the base charge and per-km rate above). Saving replaces this shop's ranges; it does not touch other shops. \"to\" blank = and above.</p>
+        <div id="op-sdc-rows"></div>
+        <button type="button" class="ft-btn" onclick="sdcAddRow()">+ Add range</button>
+        <div style="height:12px;"></div>
         <div>
           <button type="button" class="op-btn op-btn-push" onclick="opSaveShopDelivery()">💾 Save for this shop</button>
           <button type="button" class="op-btn op-btn-danger" onclick="opClearShopDelivery()">Clear delivery charge</button>
@@ -4477,6 +4529,17 @@ function logInRestaurant(id, data) {
   renderRestPhoto(data.photo || "");
   document.getElementById('gpay-number').value = data.gpayNumber || "";
   updateGpayBadge(data.gpayNumber || "");
+  try {
+    const { db: _d, ref: _r, onValue: _ov } = window.fb;
+    if (!window.__onlineUpiWatch) {
+      window.__onlineUpiWatch = true;
+      _ov(_r(_d, 'app_config/onlineUpi'), s => {
+        const v = s.val();
+        const sec = document.getElementById('gpay-section');
+        if (sec) sec.style.display = (v && v.upi) ? 'none' : '';
+      });
+    }
+  } catch (e) {}
   document.getElementById('rest-id-value').textContent = id;
   renderShopLink(id);
   // Weight-based (Gram/Kg) pricing tools are groceries-only — hide the bulk
@@ -4964,6 +5027,8 @@ function openDeliveryChargesScreen() {
   document.getElementById('delivery-per-km-fee').value = dc.perKmFee ?? '';
   document.getElementById('delivery-free-under-km').value = dc.freeUnderKm ?? '';
   document.getElementById('delivery-free-above').value = dc.freeAbove ?? '';
+  document.getElementById('delivery-small-below').value = dc.smallCartBelow ?? '';
+  document.getElementById('delivery-small-fee').value = dc.smallCartFee ?? '';
   document.getElementById('delivery-charges-error').style.display = "none";
   ftLoad(Array.isArray(dc.freeTiers) ? dc.freeTiers : []);
   updateDeliveryChargePreview();
@@ -7823,6 +7888,9 @@ document.getElementById('delivery-charges-save-btn').addEventListener('click', a
   const deliveryCharges = { baseFee, perKmFee };
   if (freeUnderKmRaw !== '') deliveryCharges.freeUnderKm = Number(freeUnderKmRaw);
   if (freeAboveRaw !== '' && Number(freeAboveRaw) > 0) deliveryCharges.freeAbove = Number(freeAboveRaw); // blank / 0 = off (not stored)
+  const smallBelow = Number(document.getElementById('delivery-small-below').value) || 0, smallFee = Number(document.getElementById('delivery-small-fee').value) || 0;
+  if (smallBelow < 0 || smallFee < 0) { errEl.textContent = "Small order fee can't be negative."; errEl.style.display = "block"; return; }
+  if (smallBelow > 0 && smallFee > 0) { deliveryCharges.smallCartBelow = smallBelow; deliveryCharges.smallCartFee = smallFee; }   // blank / 0 = off (not stored)
 
   // Free-delivery ranges (order value -> free km)
   const tierRows = ftRead().filter(t => isFinite(t.min) || isFinite(t.km) || t.max !== null);
@@ -8267,6 +8335,7 @@ function opOpenSection(name) {
   if (name === 'delete-all') opOpenDeleteAllSection();
   if (name === 'support') opRenderChatConvList();
   if (name === 'pricing') opLoadExtraAmount();
+  if (name === 'online-upi') opLoadOnlineUpi();
   if (name === 'nesh-suggest') { const si = document.getElementById('op-nesh-suggest-search'); if (si) si.value = ''; document.getElementById('op-nesh-suggest-status').textContent = ''; opBuildNeshSuggest(); }
   if (name === 'taxi-fare') opLoadTaxiFare();
   if (name === 'rain-surge') opLoadRainSurge();
@@ -8489,6 +8558,29 @@ function opSendBroadcastNotification() {
       imageEl.value = '';
     })
     .catch(() => { status.textContent = 'Failed to send — check your connection and try again.'; });
+}
+
+/* ---- Online Payment UPI: one UPI ID for all shops (app_config/onlineUpi = { upi, updatedAt }) ---- */
+function opLoadOnlineUpi() {
+  const status = document.getElementById('op-online-upi-status');
+  status.textContent = 'Loading...';
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'app_config/onlineUpi')).then(snap => {
+    const d = snap.val();
+    document.getElementById('op-online-upi-input').value = (d && d.upi) || '';
+    status.textContent = (d && d.upi) ? ('Active for all shops. Last updated ' + (d.updatedAt || '') + '.') : 'Not set — each shop uses its own UPI ID.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opSaveOnlineUpi() {
+  const input = document.getElementById('op-online-upi-input');
+  const status = document.getElementById('op-online-upi-status');
+  const upi = input.value.trim();
+  if (upi && !/^[\w.\-]{2,256}@[a-zA-Z]{2,64}$/.test(upi)) { status.textContent = 'Enter a valid UPI ID (e.g. name@okaxis).'; return; }
+  status.textContent = 'Saving...';
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'app_config/onlineUpi'), { upi, updatedAt: new Date().toLocaleString() }).then(() => {
+    status.textContent = upi ? 'Saved! All shops now take online payment on ' + upi + '.' : 'Cleared — each shop uses its own UPI ID again.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
 /* ---- Extra Amount (Paisa) added to every item price for customers ---- */
@@ -9102,6 +9194,8 @@ function opLoadGoSeries() {
     document.getElementById('op-goseries-itemmarkup-input').value = (data && Number(data.itemMarkup)) || 0;
     document.getElementById('op-goseries-freeabove-input').value = (data && Number(data.freeDeliveryAbove)) || 0;
     document.getElementById('op-goseries-freekm-input').value = (data && Number(data.freeDeliveryWithinKm)) || 0;
+    document.getElementById('op-goseries-smallbelow-input').value = (data && Number(data.smallCartBelow)) || 0;
+    document.getElementById('op-goseries-smallfee-input').value = (data && Number(data.smallCartFee)) || 0;
     status.textContent = data && data.updatedAt ? ('Last updated ' + data.updatedAt + '.') : 'Not set yet.';
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
   document.getElementById('op-goseries-shop-search').value = '';
@@ -9128,6 +9222,12 @@ function opSaveGoSeriesFare() {
     status.textContent = 'Enter a valid free-delivery distance in km (0 = off).';
     return;
   }
+  const smallCartBelow = Number(document.getElementById('op-goseries-smallbelow-input').value) || 0;
+  const smallCartFee = Number(document.getElementById('op-goseries-smallfee-input').value) || 0;
+  if (smallCartBelow < 0 || smallCartFee < 0) {
+    status.textContent = 'Small order fee amounts can\'t be negative.';
+    return;
+  }
   if (isNaN(baseFee) || baseFee < 0 || isNaN(perKmFee) || perKmFee < 0 || isNaN(platformFee) || platformFee < 0 || isNaN(itemMarkup) || itemMarkup < 0) {
     status.textContent = 'Enter valid amounts (0 or more).';
     return;
@@ -9141,6 +9241,8 @@ function opSaveGoSeriesFare() {
     itemMarkup,
     freeDeliveryAbove,
     freeDeliveryWithinKm,
+    smallCartBelow,
+    smallCartFee,
     updatedAt: new Date().toLocaleString()
   }).then(() => {
     status.textContent = 'Saved — ₹' + baseFee + ' + ₹' + perKmFee + '/km delivery, ₹' + platformFee + ' platform fee, ₹' + itemMarkup + ' profit per item for every Go Series shop.' +
@@ -9296,7 +9398,13 @@ function opClearEta() {
 
 /* ---- Shop Delivery Charges (operator sets each non-Go-Series shop's own charge) ---- */
 let opSdcEditingId = null;
+let opSdcMart = false;   // editing a Go Series / groceries shop: only its own price ranges are saved (restaurants/{id}/martRanges)
+function opSdcIsMart(p) { return !!p.goSeries || p.businessType === 'groceries'; }
 function opSdcSummary(p) {
+  if (opSdcIsMart(p)) {
+    const n = Array.isArray(p.martRanges) ? p.martRanges.length : (p.martRanges ? Object.keys(p.martRanges).length : 0);
+    return 'Go Series / Mart · ' + (n ? (n + ' own price range' + (n === 1 ? '' : 's')) : 'uses zone / Go Series rule');
+  }
   const dc = p.deliveryCharges;
   const has = dc && (Number(dc.baseFee) > 0 || Number(dc.perKmFee) > 0);
   let s = has ? ('₹' + (Number(dc.baseFee) || 0) + ' + ₹' + (Number(dc.perKmFee) || 0) + '/km') : 'Delivery charge not set';
@@ -9311,11 +9419,10 @@ function opRenderShopDeliveryList() {
   if (!wrap) return;
   const q = (document.getElementById('op-sdc-search').value || '').trim().toLowerCase();
   const shops = opAllPartners
-    .filter(p => !p.goSeries && p.businessType !== 'groceries')
     .filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q))
     .sort((a, b) => (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id));
   if (!shops.length) {
-    wrap.innerHTML = '<p class="op-note">' + (q ? 'No matching shops.' : 'No shops outside Go Series yet.') + '</p>';
+    wrap.innerHTML = '<p class="op-note">' + (q ? 'No matching shops.' : 'No shops yet.') + '</p>';
     return;
   }
   wrap.innerHTML = shops.map(p => `
@@ -9332,18 +9439,93 @@ function opOpenShopDeliveryEditor(id) {
   const p = opAllPartners.find(x => x._id === id);
   if (!p) return;
   opSdcEditingId = id;
-  const dc = p.deliveryCharges || {};
+  opSdcMart = opSdcIsMart(p);
+  ['op-sdc-freekm', 'op-sdc-freeabove', 'op-sdc-smallbelow', 'op-sdc-smallfee', 'op-sdc-minorder'].forEach(i => { const e = document.getElementById(i); if (e && e.parentElement) e.parentElement.style.display = opSdcMart ? 'none' : ''; });
+  const dc = opSdcMart ? {} : (p.deliveryCharges || {});
   const val = v => (v === undefined || v === null || Number(v) === 0) ? '' : v;
   document.getElementById('op-sdc-editor-title').textContent = p.restaurantName || p._id;
   document.getElementById('op-sdc-base').value = val(dc.baseFee);
   document.getElementById('op-sdc-perkm').value = val(dc.perKmFee);
   document.getElementById('op-sdc-freekm').value = val(dc.freeUnderKm);
   document.getElementById('op-sdc-freeabove').value = val(dc.freeAbove);
+  document.getElementById('op-sdc-smallbelow').value = val(dc.smallCartBelow);
+  document.getElementById('op-sdc-smallfee').value = val(dc.smallCartFee);
   document.getElementById('op-sdc-minorder').value = val(p.minOrderAmount);
   document.getElementById('op-sdc-status').textContent = '';
+  if (opSdcMart) {
+    const mr = p.martRanges ? (Array.isArray(p.martRanges) ? p.martRanges : Object.values(p.martRanges)) : [];
+    sdcRenderRows(mr);
+    document.getElementById('op-sdc-status').textContent = 'Go Series / Mart shop: the delivery charge itself is not changed here — the base charge and per-km below only work out Add ₹ (filled in from this shop\'s Mart rule). Only the ranges are saved.';
+    opSdcMartBase(id);
+  } else {
+    sdcRenderRows(Array.isArray(dc.freeTiers) ? dc.freeTiers : Object.values(dc.freeTiers || {}));
+  }
   const ed = document.getElementById('op-sdc-editor');
   ed.style.display = 'block';
   ed.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+/* ---- Per-shop price ranges (Single shop editor) ---- */
+function sdcCfg() { return { base: Number(document.getElementById('op-sdc-base').value) || 0, perKm: Number(document.getElementById('op-sdc-perkm').value) || 0 }; }
+function sdcRenderRows(tiers) {
+  const box = document.getElementById('op-sdc-rows'); if (!box) return;
+  box.innerHTML = (tiers || []).map(fzRowHtml).join('');
+  box.querySelectorAll('.ft-row').forEach(r => { fzNote(r, sdcCfg()); fzCommNote(r); });
+}
+function sdcRead() {
+  const out = [];
+  document.querySelectorAll('#op-sdc-rows .ft-row').forEach(r => {
+    const mn = r.querySelector('.fz-min').value, mx = r.querySelector('.fz-max').value, ad = r.querySelector('.fz-add').value, km = r.querySelector('.fz-km').value, cm = r.querySelector('.fz-comm').value, pf = r.querySelector('.fz-profit').value;
+    out.push({ min: mn === '' ? NaN : Number(mn), max: mx === '' ? null : Number(mx), add: ad === '' ? 0 : Number(ad), km: km === '' ? NaN : Number(km), commission: cm === '' ? 0 : Number(cm), profit: pf === '' ? 0 : Number(pf) });
+  });
+  return out;
+}
+function sdcAddRow() {
+  const rows = sdcRead(), last = rows[rows.length - 1];
+  const start = last && last.max !== null && isFinite(last.max) ? last.max : (last && isFinite(last.min) ? last.min + 100 : 200);
+  document.getElementById('op-sdc-rows').insertAdjacentHTML('beforeend', fzRowHtml({ min: start, max: start + 100 }));
+}
+// Returns { tiers } or { error } for this shop's ranges.
+function sdcBuildTiers() {
+  const rows = sdcRead().filter(t => isFinite(t.min) || isFinite(t.km) || t.max !== null);
+  for (const t of rows) {
+    if (!isFinite(t.min) || t.min < 0 || !isFinite(t.km) || t.km <= 0 || !(t.add >= 0) || (t.max !== null && (!isFinite(t.max) || t.max <= t.min))) return { error: "Check the ranges: each needs 'Items priced from ₹', a 'Free delivery up to km' above 0, and 'to ₹' larger than 'from ₹' (or blank)." };
+    if (!(t.profit >= 0) || !isFinite(t.profit)) return { error: 'My profit must be a number, 0 or more.' };
+    if (!(t.commission >= 0) || !isFinite(t.commission) || (t.commission > 0 && t.commission >= t.min)) return { error: 'Shop commission must be below the lowest item price of its range (range from ₹' + t.min + ').' };
+  }
+  rows.sort((a, b) => a.min - b.min);
+  for (let i = 0; i < rows.length - 1; i++) {
+    if (rows[i].max === null || rows[i].max > rows[i + 1].min) return { error: 'Ranges overlap (₹' + rows[i].min + ' and ₹' + rows[i + 1].min + '). Fix and save again.' };
+  }
+  return { tiers: rows.map(t => { const o = { min: t.min, km: t.km }; if (t.max !== null) o.max = t.max; if (t.add > 0) o.add = t.add; if (t.commission > 0) o.commission = t.commission; if (t.profit > 0) o.profit = t.profit; return o; }) };
+}
+(function () {
+  const box = document.getElementById('op-sdc-rows');
+  if (!box) return;
+  box.addEventListener('input', e => {
+    const row = e.target.closest('.ft-row'); if (!row) return;
+    const cfg = sdcCfg(), comm = Number(row.querySelector('.fz-comm').value) || 0, profit = Number(row.querySelector('.fz-profit').value) || 0;
+    if (e.target.classList.contains('fz-add')) { const km = fzKmFor(Number(e.target.value) || 0, comm, profit, cfg); row.querySelector('.fz-km').value = km > 0 ? km : ''; }
+    else if (e.target.classList.contains('fz-km')) { row.querySelector('.fz-add').value = fzAddFor(Number(e.target.value) || 0, comm, profit, cfg); }
+    else if (e.target.classList.contains('fz-comm') || e.target.classList.contains('fz-profit')) {
+      const km = Number(row.querySelector('.fz-km').value) || 0;
+      if (km > 0) row.querySelector('.fz-add').value = fzAddFor(km, comm, profit, cfg);
+      else { const ad = Number(row.querySelector('.fz-add').value) || 0, k2 = fzKmFor(ad, comm, profit, cfg); row.querySelector('.fz-km').value = k2 > 0 ? k2 : ''; }
+    }
+    fzNote(row, cfg); fzCommNote(row);
+  });
+  ['op-sdc-base', 'op-sdc-perkm'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', () => document.querySelectorAll('#op-sdc-rows .ft-row').forEach(r => fzNote(r, sdcCfg()))); });
+})();
+// Fill the base charge / per-km boxes from this Mart shop's zone rule (or the global Go Series charge) so Add ₹ is worked out right.
+function opSdcMartBase(id) {
+  const { db, ref, get } = window.fb;
+  const zones = (typeof opShopZones !== 'undefined' ? opShopZones : []).filter(z => z.shopIds && z.shopIds[id]);
+  const setBoxes = (b, k) => { if (opSdcEditingId !== id) return; document.getElementById('op-sdc-base').value = b || ''; document.getElementById('op-sdc-perkm').value = k || ''; document.querySelectorAll('#op-sdc-rows .ft-row').forEach(r => fzNote(r, sdcCfg())); };
+  const useGlobal = () => get(ref(db, 'app_config/goSeriesDelivery')).then(s => { const d = s.val() || {}; setBoxes(Number(d.baseFee) || 0, Number(d.perKmFee) || 0); }).catch(() => {});
+  if (!zones.length) { useGlobal(); return; }
+  Promise.all(zones.map(z => get(ref(db, 'app_config/zoneDelivery/' + z._id)).then(s => s.val()).catch(() => null))).then(list => {
+    const c = list.find(x => x && (!x.shopIds || x.shopIds[id]));
+    if (c) setBoxes(Number(c.baseFee) || 0, Number(c.perKmFee) || 0); else useGlobal();
+  });
 }
 function opCloseShopDeliveryEditor() {
   opSdcEditingId = null;
@@ -9398,13 +9580,15 @@ function fzInit() {
   if (!fzEl('fz-rows').children.length) fzRenderRows([]);
 }
 // The shop commission of a range pays part of the free delivery, so Add ₹ = delivery cost for the free km − commission (never below 0).
-function fzKmFor(add, comm, profit) {
-  const base = fzNum('fz-base'), perKm = fzNum('fz-perkm'), c = Number(comm) || 0, funds = (Number(add) || 0) - (Number(profit) || 0) + c;
+function fzCfg(cfg) { return (cfg && typeof cfg === 'object') ? cfg : { base: fzNum('fz-base'), perKm: fzNum('fz-perkm') }; }
+function fzKmFor(add, comm, profit, cfg) {
+  cfg = fzCfg(cfg);
+  const base = cfg.base, perKm = cfg.perKm, c = Number(comm) || 0, funds = (Number(add) || 0) - (Number(profit) || 0) + c;
   if (!(funds > 0)) return 0;
   if (perKm > 0) return Math.max(0, Math.min(15, Math.floor(((funds - base) / perKm) * 2) / 2));
   return funds >= base ? 15 : 0;
 }
-function fzAddFor(km, comm, profit) { return km > 0 ? Math.max(0, Math.ceil(fzNum('fz-base') + fzNum('fz-perkm') * km - (Number(comm) || 0))) + (Number(profit) || 0) : ''; }
+function fzAddFor(km, comm, profit, cfg) { cfg = fzCfg(cfg); return km > 0 ? Math.max(0, Math.ceil(cfg.base + cfg.perKm * km - (Number(comm) || 0))) + (Number(profit) || 0) : ''; }
 function fzRowHtml(t) {
   const v = x => (x === undefined || x === null || x === '' || (typeof x === 'number' && isNaN(x))) ? '' : x;
   return '<div class="ft-row">' +
@@ -9419,14 +9603,15 @@ function fzRowHtml(t) {
     '<span></span>' +
     '<p class="ft-note"></p><p class="ft-note fz-comm-note"></p></div>';
 }
-function fzNote(row) {
+function fzNote(row, cfg) {
+  cfg = fzCfg(cfg);
   const add = Number(row.querySelector('.fz-add').value) || 0, km = Number(row.querySelector('.fz-km').value) || 0, n = row.querySelector('.ft-note');
   n.classList.remove('warn');
   if (!add && !km) { n.textContent = ''; return; }
   const comm = Number(row.querySelector('.fz-comm').value) || 0, profit = Number(row.querySelector('.fz-profit').value) || 0;
-  if (km <= 0) { n.classList.add('warn'); n.textContent = '₹' + add + (comm ? ' + commission ₹' + comm : '') + (profit ? ' − your profit ₹' + profit : '') + ' is not enough for any free km — need at least ₹' + (Math.max(0, Math.ceil(fzNum('fz-base') + fzNum('fz-perkm') * 0.5 - comm)) + profit) + ' Add ₹.'; return; }
-  const cost = Math.round(fzNum('fz-base') + fzNum('fz-perkm') * km);
-  n.textContent = 'Delivery ₹' + cost + (comm ? ' − commission ₹' + comm : '') + (profit ? ' + your profit ₹' + profit : '') + '  →  items +₹' + (add || fzAddFor(km, comm, profit)) + '  →  FREE up to ' + km + ' km';
+  if (km <= 0) { n.classList.add('warn'); n.textContent = '₹' + add + (comm ? ' + commission ₹' + comm : '') + (profit ? ' − your profit ₹' + profit : '') + ' is not enough for any free km — need at least ₹' + (Math.max(0, Math.ceil(cfg.base + cfg.perKm * 0.5 - comm)) + profit) + ' Add ₹.'; return; }
+  const cost = Math.round(cfg.base + cfg.perKm * km);
+  n.textContent = 'Delivery ₹' + cost + (comm ? ' − commission ₹' + comm : '') + (profit ? ' + your profit ₹' + profit : '') + '  →  items +₹' + (add || fzAddFor(km, comm, profit, cfg)) + '  →  FREE up to ' + km + ' km';
 }
 function fzCommNote(row) {
   const cn = row.querySelector('.fz-comm-note'); if (!cn) return;
@@ -9504,6 +9689,7 @@ function fzLoadZone() {
     if (!c) return;
     fzEl('fz-base').value = c.baseFee || ''; fzEl('fz-perkm').value = c.perKmFee || '';
     fzEl('fz-freekm').value = c.freeWithinKm || ''; fzEl('fz-freeabove').value = c.freeAbove || '';
+    fzEl('fz-smallbelow').value = c.smallCartBelow || ''; fzEl('fz-smallfee').value = c.smallCartFee || '';
     fzRenderRows(Array.isArray(c.freeTiers) ? c.freeTiers : Object.values(c.freeTiers || {}));
     if (c.shopIds) fzRenderShops(c.shopIds);
     st.textContent = 'Loaded this zone\'s current NESH Mart rule.';
@@ -9530,7 +9716,9 @@ function fzBuild() {
     if (rows[i].max === null || rows[i].max > rows[i + 1].min) { st.textContent = 'Ranges overlap (₹' + rows[i].min + ' and ₹' + rows[i + 1].min + '). Fix and apply again.'; return null; }
   }
   const tiers = rows.map(t => { const o = { min: t.min, km: t.km }; if (t.max !== null) o.max = t.max; if (t.add > 0) o.add = t.add; if (t.commission > 0) o.commission = t.commission; if (t.profit > 0) o.profit = t.profit; return o; });
-  return { base, perKm, freeKm, freeAbove, tiers };
+  const smallBelow = fzNum('fz-smallbelow'), smallFee = fzNum('fz-smallfee');
+  if ([smallBelow, smallFee].some(n => !isFinite(n) || n < 0)) { st.textContent = "Small order fee can't be negative or invalid."; return null; }
+  return { base, perKm, freeKm, freeAbove, tiers, smallBelow, smallFee };
 }
 async function fzApply() {
   const st = fzEl('fz-status');
@@ -9553,12 +9741,14 @@ async function fzApply() {
     const dc = { baseFee: cfg.base, perKmFee: cfg.perKm };
     if (cfg.freeKm > 0) dc.freeUnderKm = cfg.freeKm;
     if (cfg.freeAbove > 0) dc.freeAbove = cfg.freeAbove;
+    if (cfg.smallBelow > 0 && cfg.smallFee > 0) { dc.smallCartBelow = cfg.smallBelow; dc.smallCartFee = cfg.smallFee; }
     if (cfg.tiers.length) dc.freeTiers = cfg.tiers;
     await Promise.all(foodShops.map(p => update(ref(db, 'restaurants/' + p._id), { deliveryCharges: dc }).then(() => { p.deliveryCharges = dc; })));
     if (doMart) {
       const m = { baseFee: cfg.base, perKmFee: cfg.perKm, updatedAt: Date.now() };
       if (cfg.freeKm > 0) m.freeWithinKm = cfg.freeKm;
       if (cfg.freeAbove > 0) m.freeAbove = cfg.freeAbove;
+      if (cfg.smallBelow > 0 && cfg.smallFee > 0) { m.smallCartBelow = cfg.smallBelow; m.smallCartFee = cfg.smallFee; }
       if (cfg.tiers.length) m.freeTiers = cfg.tiers.map(t => Object.assign({}, t));   // commission + profit apply to Mart shops too
       m.shopIds = {}; martSel.forEach(id => { m.shopIds[id] = true; });   // only these Mart shops get the rule
       await set(ref(db, 'app_config/zoneDelivery/' + zoneId), m);
@@ -9578,6 +9768,19 @@ function opSaveShopDelivery() {
   const id = opSdcEditingId;
   const status = document.getElementById('op-sdc-status');
   if (!id) return;
+  if (opSdcMart) {
+    const built = sdcBuildTiers();
+    if (built.error) { status.textContent = built.error; return; }
+    const { db, ref, set } = window.fb;
+    status.textContent = 'Saving...';
+    set(ref(db, 'restaurants/' + id + '/martRanges'), built.tiers.length ? built.tiers : null).then(() => {
+      const p = opAllPartners.find(x => x._id === id);
+      if (p) p.martRanges = built.tiers;
+      status.textContent = built.tiers.length ? 'Saved. This shop now uses its own ranges.' : 'Saved. No own ranges — this shop uses the zone / Go Series rule.';
+      opRenderShopDeliveryList();
+    }).catch(err => { status.textContent = 'Error: ' + err.message; });
+    return;
+  }
   const num = elId => { const raw = document.getElementById(elId).value.trim(); return raw === '' ? 0 : Number(raw); };
   const baseFee = num('op-sdc-base'), perKmFee = num('op-sdc-perkm');
   const freeUnderKm = num('op-sdc-freekm'), freeAbove = num('op-sdc-freeabove');
@@ -9589,7 +9792,12 @@ function opSaveShopDelivery() {
   const deliveryCharges = { baseFee, perKmFee };
   if (freeUnderKm > 0) deliveryCharges.freeUnderKm = freeUnderKm;
   if (freeAbove > 0) deliveryCharges.freeAbove = freeAbove;
-  { const prevDc = (opAllPartners.find(x => x._id === id) || {}).deliveryCharges; if (prevDc && Array.isArray(prevDc.freeTiers) && prevDc.freeTiers.length) deliveryCharges.freeTiers = prevDc.freeTiers; }   // keep the shop's own free-delivery ranges
+  const smallBelow = num('op-sdc-smallbelow'), smallFee = num('op-sdc-smallfee');
+  if (!isFinite(smallBelow) || !isFinite(smallFee) || smallBelow < 0 || smallFee < 0) { status.textContent = "Small order fee can't be negative or invalid."; return; }
+  if (smallBelow > 0 && smallFee > 0) { deliveryCharges.smallCartBelow = smallBelow; deliveryCharges.smallCartFee = smallFee; }
+  const built = sdcBuildTiers();
+  if (built.error) { status.textContent = built.error; return; }
+  if (built.tiers.length) deliveryCharges.freeTiers = built.tiers;   // this shop's own price ranges (as shown in the editor)
   const { db, ref, update } = window.fb;
   status.textContent = 'Saving...';
   update(ref(db, 'restaurants/' + id), { deliveryCharges, minOrderAmount: minOrder > 0 ? minOrder : null }).then(() => {
@@ -9603,12 +9811,25 @@ function opClearShopDelivery() {
   const id = opSdcEditingId;
   const status = document.getElementById('op-sdc-status');
   if (!id) return;
+  if (opSdcMart) {
+    if (!confirm("Remove this shop's own price ranges? It goes back to the zone / Go Series rule.")) return;
+    const { db, ref, set } = window.fb;
+    set(ref(db, 'restaurants/' + id + '/martRanges'), null).then(() => {
+      const p = opAllPartners.find(x => x._id === id);
+      if (p) p.martRanges = [];
+      sdcRenderRows([]);
+      status.textContent = 'Own ranges removed.';
+      opRenderShopDeliveryList();
+    }).catch(err => { status.textContent = 'Error: ' + err.message; });
+    return;
+  }
   if (!confirm("Clear this shop's delivery charge? Customers will see no delivery charge for it until one is set again.")) return;
   const { db, ref, update } = window.fb;
   update(ref(db, 'restaurants/' + id), { deliveryCharges: null }).then(() => {
     const p = opAllPartners.find(x => x._id === id);
     if (p) p.deliveryCharges = null;
-    ['op-sdc-base', 'op-sdc-perkm', 'op-sdc-freekm', 'op-sdc-freeabove'].forEach(i => { document.getElementById(i).value = ''; });
+    ['op-sdc-base', 'op-sdc-perkm', 'op-sdc-freekm', 'op-sdc-freeabove', 'op-sdc-smallbelow', 'op-sdc-smallfee'].forEach(i => { document.getElementById(i).value = ''; });
+    sdcRenderRows([]);
     status.textContent = 'Delivery charge cleared.';
     opRenderShopDeliveryList();
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
