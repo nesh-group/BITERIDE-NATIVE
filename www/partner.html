@@ -129,7 +129,9 @@
   .flex-1{ flex:1; }
   .error-text{ color:var(--chili); font-size:13px; margin:0; }
   .hint-text{ color:var(--muted-2); font-size:12px; margin:0; }
-  .ft-row{ display:grid; grid-template-columns:1fr 1fr 1fr 34px; gap:6px; align-items:end; margin-bottom:8px; }
+  .ft-row{ display:grid; grid-template-columns:1fr 1fr 34px; gap:6px; align-items:end; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--field-border); }
+  .ft-note{ grid-column:1 / -1; font-size:12px; color:#5CE0A0; margin:0; }
+  .ft-note.warn{ color:#FFB84D; }
   .ft-cell small{ display:block; color:var(--muted-2); font-size:10px; margin:0 0 3px 2px; }
   .ft-cell input{ width:100%; padding:10px 8px; border-radius:10px; border:1px solid var(--field-border); background:var(--field-bg); color:var(--cloud); font-size:14px; font-family:'Inter',sans-serif; outline:none; }
   .ft-del{ height:40px; border:none; border-radius:10px; background:transparent; color:var(--chili); font-size:18px; cursor:pointer; }
@@ -1543,20 +1545,14 @@
       <p class="hint-text" style="margin:4px 0 0;">When a customer's item total reaches this amount, they pay no delivery charge — the app shows it struck out and marked FREE.</p>
 
       <p class="loc-field-label" style="margin-top:22px;">Free delivery by order value &amp; distance — optional</p>
-      <p class="hint-text" style="margin:0 0 10px;">Set an order-value range and how many km of delivery is free for it. e.g. ₹200–300 → free up to 2 km, ₹300–400 → free up to 3 km. Leave "To" blank for "and above".</p>
+      <p class="hint-text" style="margin:0 0 10px;">For each price range, choose how many ₹ to ADD to the price of items in that range (customers pay it, you still get your own price). That extra pays for free delivery — the km is worked out for you. Or type the km and the ₹ to add is worked out. e.g. items ₹200–300 + ₹40 → free delivery up to 4 km. Leave "To" blank for "and above".</p>
       <div id="ft-rows"></div>
       <button type="button" class="ft-btn" id="ft-add">+ Add range</button>
 
-      <p class="loc-field-label" style="margin-top:20px;">Profit planner — how much free delivery can I afford?</p>
-      <p class="hint-text" style="margin:0 0 10px;">Tell us your profit on an order and how much of it you want to keep. We work out how many km of delivery you can give free at each order amount (using the base fee and per-km rate above).</p>
-      <p class="loc-field-label">My profit (% of item price)</p>
-      <div class="field"><input id="ft-pct" type="number" min="0" step="0.5" inputmode="decimal" placeholder="e.g. 20" /></div>
-      <p class="loc-field-label" style="margin-top:10px;">+ Extra flat profit per order (₹) — optional</p>
-      <div class="field"><input id="ft-flat" type="number" min="0" step="1" inputmode="decimal" placeholder="e.g. 10 (blank = none)" /></div>
-      <p class="loc-field-label" style="margin-top:10px;">Profit I want to keep after free delivery (₹)</p>
-      <div class="field"><input id="ft-keep" type="number" min="0" step="1" inputmode="decimal" placeholder="e.g. 15 (blank = 0)" /></div>
-      <div id="ft-plan" style="margin-top:10px;"></div>
-      <button type="button" class="ft-btn" id="ft-autofill" style="border-style:solid; margin-top:10px;">Use these as my free-delivery ranges</button>
+      <div class="pay-pending-card" style="margin-top:16px; border-color:var(--leaf);">
+        <p class="hint-text" style="margin:0 0 4px;">Add ₹ to items → how many km free?</p>
+        <div id="ft-addchart-wrap"></div>
+      </div>
 
       <div class="pay-pending-card" style="margin-top:18px; border-color:var(--leaf);">
         <p class="hint-text" style="margin:0 0 4px;">When does delivery become free?</p>
@@ -2813,15 +2809,11 @@
       <div class="op-search-box"><input type="number" id="fz-perkm" placeholder="Per-km rate in ₹ (e.g. 5)" min="0" step="0.5"></div>
       <div class="op-search-box"><input type="number" id="fz-freekm" placeholder="Free delivery under __ km (blank = off)" min="0" step="0.1"></div>
       <div class="op-search-box"><input type="number" id="fz-freeabove" placeholder="Free delivery on orders of ₹ and above (blank = off)" min="0" step="1"></div>
-      <p class="op-note" style="margin-bottom:6px;"><b>Free delivery by order value &amp; distance</b> — ₹ range → free up to N km. "To" blank = and above.</p>
+      <p class="op-note" style="margin-bottom:6px;"><b>Price ranges</b> — for each range choose how many ₹ to ADD to items in that range (customers pay it, the shop still gets its own price). That pays for free delivery up to N km — worked out for you; or type the km and the ₹ is worked out. "to" blank = and above. (NESH Mart: item prices are not changed automatically, only the free km applies — use Go Series item profit for Mart prices.)</p>
       <div id="fz-rows"></div>
       <button type="button" class="ft-btn" onclick="fzAddRow()">+ Add range</button>
-      <p class="op-note" style="margin-bottom:6px;"><b>Profit planner</b> — profit on an order and how much to keep after free delivery; shows how many km can be free at each order amount.</p>
-      <div class="op-search-box"><input type="number" id="fz-pct" placeholder="Profit % of item price (e.g. 20)" min="0" step="0.5"></div>
-      <div class="op-search-box"><input type="number" id="fz-flat" placeholder="Extra flat profit per order ₹ (optional)" min="0" step="1"></div>
-      <div class="op-search-box"><input type="number" id="fz-keep" placeholder="Profit to keep after free delivery ₹ (e.g. 15)" min="0" step="1"></div>
-      <div id="fz-plan"></div>
-      <button type="button" class="ft-btn" onclick="fzAutofill()">Use planner as my ranges</button>
+      <p class="op-note" style="margin:8px 0 4px;"><b>Add ₹ to items → how many km free?</b></p>
+      <div id="fz-addchart"></div>
       <p class="op-note" style="margin:8px 0 4px;"><b>When does delivery become free?</b></p>
       <div id="fz-chart"><p class="op-note">Add a range to see it here.</p></div>
       <div style="margin-top:10px;">
@@ -7708,44 +7700,74 @@ function updateDeliveryChargePreview() {
   if (el) el.addEventListener('input', () => { updateDeliveryChargePreview(); ftChart(); });
 });
 
-// ---------- Free delivery by order value & distance (tiers) ----------
-// Stored as restaurants/{id}/deliveryCharges.freeTiers = [{ min, max?, km }]:
-// when the item total is in [min, max) and the delivery distance is <= km, delivery is free.
+// ---------- Free delivery by price range: "add ₹ to items" <-> "free up to N km" ----------
+// freeTiers = [{ min, max?, add?, km }]
+//  - items whose own price is in [min, max) get +add on the price customers pay (the shop is still paid its own price)
+//  - an order whose item total is in [min, max) gets free delivery up to km
+function ftCfg() { return { base: Number(document.getElementById('delivery-base-fee').value) || 0, perKm: Number(document.getElementById('delivery-per-km-fee').value) || 0 }; }
+function ftKmFor(add) {            // how many km can ₹add pay for (half-km steps)
+  const c = ftCfg();
+  if (!(add > 0)) return 0;
+  if (c.perKm > 0) return Math.max(0, Math.min(15, Math.floor(((add - c.base) / c.perKm) * 2) / 2));
+  return add >= c.base ? 15 : 0;
+}
+function ftAddFor(km) {            // ₹ needed to pay for km of delivery
+  const c = ftCfg();
+  if (!(km > 0)) return '';
+  return Math.ceil(c.base + c.perKm * km);
+}
 function ftRowHtml(t) {
-  const v = x => (x === undefined || x === null || x === '') ? '' : x;
+  const v = x => (x === undefined || x === null || x === '' || (typeof x === 'number' && isNaN(x))) ? '' : x;
   return '<div class="ft-row">' +
-    '<div class="ft-cell"><small>From ₹</small><input type="number" class="ft-min" min="0" step="1" inputmode="decimal" value="' + v(t.min) + '"></div>' +
-    '<div class="ft-cell"><small>To ₹</small><input type="number" class="ft-max" min="0" step="1" inputmode="decimal" placeholder="& above" value="' + v(t.max) + '"></div>' +
-    '<div class="ft-cell"><small>Free up to km</small><input type="number" class="ft-km" min="0" step="0.5" inputmode="decimal" value="' + v(t.km) + '"></div>' +
-    '<button type="button" class="ft-del" aria-label="Remove">✕</button></div>';
+    '<div class="ft-cell"><small>Items priced from ₹</small><input type="number" class="ft-min" min="0" step="1" inputmode="decimal" value="' + v(t.min) + '"></div>' +
+    '<div class="ft-cell"><small>to ₹</small><input type="number" class="ft-max" min="0" step="1" inputmode="decimal" placeholder="& above" value="' + v(t.max) + '"></div>' +
+    '<button type="button" class="ft-del" aria-label="Remove">✕</button>' +
+    '<div class="ft-cell"><small>Add ₹ to these items</small><input type="number" class="ft-add" min="0" step="1" inputmode="decimal" value="' + v(t.add) + '"></div>' +
+    '<div class="ft-cell"><small>Free delivery up to km</small><input type="number" class="ft-km" min="0" step="0.5" inputmode="decimal" value="' + v(t.km) + '"></div>' +
+    '<span></span><p class="ft-note"></p></div>';
+}
+function ftNote(row) {
+  const add = Number(row.querySelector('.ft-add').value) || 0, km = Number(row.querySelector('.ft-km').value) || 0;
+  const n = row.querySelector('.ft-note'), c = ftCfg();
+  n.classList.remove('warn');
+  if (!add && !km) { n.textContent = ''; return; }
+  if (km <= 0) { n.classList.add('warn'); n.textContent = '₹' + add + ' is not enough for any free km — you need at least ₹' + Math.ceil(c.base + c.perKm * 0.5) + ' (base fee ₹' + c.base + ' + ₹' + c.perKm + '/km).'; return; }
+  const cost = Math.round(c.base + c.perKm * km);
+  n.textContent = 'Items +₹' + (add || ftAddFor(km)) + '  →  delivery FREE up to ' + km + ' km (delivery costs you ₹' + cost + ' at ' + km + ' km)';
 }
 function ftLoad(tiers) {
   document.getElementById('ft-rows').innerHTML = tiers.map(ftRowHtml).join('');
+  document.querySelectorAll('#ft-rows .ft-row').forEach(ftNote);
   ftChart();
 }
 function ftRead() {
   const out = [];
   document.querySelectorAll('#ft-rows .ft-row').forEach(row => {
-    const min = row.querySelector('.ft-min').value, max = row.querySelector('.ft-max').value, km = row.querySelector('.ft-km').value;
-    out.push({ min: min === '' ? NaN : Number(min), max: max === '' ? null : Number(max), km: km === '' ? NaN : Number(km) });
+    const min = row.querySelector('.ft-min').value, max = row.querySelector('.ft-max').value, add = row.querySelector('.ft-add').value, km = row.querySelector('.ft-km').value;
+    out.push({ min: min === '' ? NaN : Number(min), max: max === '' ? null : Number(max), add: add === '' ? 0 : Number(add), km: km === '' ? NaN : Number(km) });
   });
   return out;
 }
-// Chart: for each distance, the delivery charge and the order value from which it is free.
+// Charts: (1) per distance: delivery charge and the order value from which it is free; (2) ₹ to add -> km free.
 function ftChart() {
   const wrap = document.getElementById('ft-chart-wrap');
   if (!wrap) return;
   const tiers = ftRead().filter(t => isFinite(t.min) && isFinite(t.km) && t.km > 0);
-  const baseFee = Number(document.getElementById('delivery-base-fee').value) || 0;
-  const perKm = Number(document.getElementById('delivery-per-km-fee').value) || 0;
+  const c = ftCfg();
   const freeUnderRaw = document.getElementById('delivery-free-under-km').value;
   const freeUnder = freeUnderRaw === '' ? 0 : Number(freeUnderRaw) || 0;
   const freeAbove = Number(document.getElementById('delivery-free-above').value) || 0;
+  const ac = document.getElementById('ft-addchart-wrap');
+  if (ac) {
+    let r = '';
+    for (let km = 1; km <= 6; km++) r += '<tr><td>' + km + ' km</td><td><span class="ft-free">+ ₹' + ftAddFor(km) + '</span></td></tr>';
+    ac.innerHTML = (c.base > 0 || c.perKm > 0) ? '<table class="ft-chart"><tr><th>Free delivery up to</th><th>Add to item price</th></tr>' + r + '</table>' : '<p class="hint-text">Enter the base fee and per-km rate above first.</p>';
+  }
   if (!tiers.length && !(freeAbove > 0)) { wrap.innerHTML = '<p class="hint-text">Add a range above to see it here.</p>'; return; }
   const maxKm = Math.min(12, Math.max(5, Math.ceil(Math.max(0, ...tiers.map(t => t.km)))));
   let rows = '';
   for (let d = 1; d <= maxKm; d++) {
-    const charge = Math.round(baseFee + perKm * d);
+    const charge = Math.round(c.base + c.perKm * d);
     let from = Infinity;
     tiers.forEach(t => { if (t.km >= d && t.min < from) from = t.min; });
     if (freeAbove > 0 && freeAbove < from) from = freeAbove;
@@ -7759,57 +7781,31 @@ function ftChart() {
 }
 document.getElementById('ft-add').addEventListener('click', () => {
   const rows = ftRead(), last = rows[rows.length - 1];
-  const start = last && isFinite(last.max) && last.max !== null ? last.max : (last && isFinite(last.min) ? last.min + 100 : 200);
+  const start = last && last.max !== null && isFinite(last.max) ? last.max : (last && isFinite(last.min) ? last.min + 100 : 200);
   document.getElementById('ft-rows').insertAdjacentHTML('beforeend', ftRowHtml({ min: start, max: start + 100 }));
   ftChart();
 });
-document.getElementById('ft-rows').addEventListener('input', ftChart);
+// ₹ to add and km stay in step: change one, the other is worked out
+document.getElementById('ft-rows').addEventListener('input', e => {
+  const row = e.target.closest('.ft-row');
+  if (row) {
+    if (e.target.classList.contains('ft-add')) {
+      const km = ftKmFor(Number(e.target.value) || 0);
+      row.querySelector('.ft-km').value = km > 0 ? km : '';
+    } else if (e.target.classList.contains('ft-km')) {
+      row.querySelector('.ft-add').value = ftAddFor(Number(e.target.value) || 0);
+    }
+    ftNote(row);
+  }
+  ftChart();
+});
 document.getElementById('ft-rows').addEventListener('click', e => {
   const b = e.target.closest('.ft-del');
   if (b) { b.closest('.ft-row').remove(); ftChart(); }
 });
-// Profit planner: for each order amount, how many km of delivery can be free and still leave the wanted profit.
-function ftPlan() {
-  const pct = Number(document.getElementById('ft-pct').value) || 0;
-  const flat = Number(document.getElementById('ft-flat').value) || 0;
-  const keep = Number(document.getElementById('ft-keep').value) || 0;
-  const baseFee = Number(document.getElementById('delivery-base-fee').value) || 0;
-  const perKm = Number(document.getElementById('delivery-per-km-fee').value) || 0;
-  const out = [];
-  for (let min = 100; min <= 600; min += 100) {
-    const profit = min * pct / 100 + flat;           // based on the range's lower bound, so it never overspends
-    const budget = profit - keep;                     // what can go to delivery
-    let km = 0;
-    if (perKm > 0) km = Math.max(0, Math.min(15, Math.floor(((budget - baseFee) / perKm) * 2) / 2));
-    else km = budget >= baseFee ? 15 : 0;
-    const cost = km > 0 ? Math.round(baseFee + perKm * km) : 0;
-    out.push({ min, max: min === 600 ? null : min + 100, km, profit: Math.round(profit * 10) / 10, left: Math.round((profit - cost) * 10) / 10 });
-  }
-  return out;
-}
-function ftPlanRender() {
-  const box = document.getElementById('ft-plan');
-  if (!box) return;
-  const pct = Number(document.getElementById('ft-pct').value) || 0, flat = Number(document.getElementById('ft-flat').value) || 0;
-  if (pct <= 0 && flat <= 0) { box.innerHTML = ''; return; }
-  const rows = ftPlan().map(r => '<tr><td>₹' + r.min + (r.max === null ? '+' : '–' + r.max) + '</td><td>₹' + r.profit + '</td><td>' +
-    (r.km > 0 ? '<span class="ft-free">' + (r.km >= 15 ? 'any distance' : r.km + ' km') + '</span>' : '<span style="color:var(--muted-2)">none</span>') +
-    '</td><td>₹' + r.left + '</td></tr>').join('');
-  box.innerHTML = '<table class="ft-chart"><tr><th>Order</th><th>My profit</th><th>Free delivery</th><th>Profit left</th></tr>' + rows + '</table>' +
-    '<p class="hint-text" style="margin-top:6px;">Worked out on the lowest amount of each range, so you never spend more than planned.</p>';
-}
-['ft-pct', 'ft-flat', 'ft-keep', 'delivery-base-fee', 'delivery-per-km-fee'].forEach(id => {
+['delivery-base-fee', 'delivery-per-km-fee'].forEach(id => {
   const el = document.getElementById(id);
-  if (el) el.addEventListener('input', ftPlanRender);
-});
-document.getElementById('ft-autofill').addEventListener('click', () => {
-  const errEl = document.getElementById('delivery-charges-error');
-  errEl.style.display = 'none';
-  const pct = Number(document.getElementById('ft-pct').value) || 0, flat = Number(document.getElementById('ft-flat').value) || 0;
-  if (pct <= 0 && flat <= 0) { errEl.textContent = 'Enter your profit % (or flat profit) first.'; errEl.style.display = 'block'; return; }
-  const tiers = ftPlan().filter(r => r.km > 0).map(r => ({ min: r.min, max: r.max, km: r.km }));
-  if (!tiers.length) { errEl.textContent = 'With this profit nothing can be free yet — raise the profit, lower the profit you keep, or lower the base fee / per-km rate.'; errEl.style.display = 'block'; return; }
-  ftLoad(tiers);
+  if (el) el.addEventListener('input', () => document.querySelectorAll('#ft-rows .ft-row').forEach(ftNote));
 });
 
 document.getElementById('delivery-charges-save-btn').addEventListener('click', async () => {
@@ -7831,8 +7827,8 @@ document.getElementById('delivery-charges-save-btn').addEventListener('click', a
   // Free-delivery ranges (order value -> free km)
   const tierRows = ftRead().filter(t => isFinite(t.min) || isFinite(t.km) || t.max !== null);
   for (const t of tierRows) {
-    if (!isFinite(t.min) || t.min < 0 || !isFinite(t.km) || t.km <= 0 || (t.max !== null && (!isFinite(t.max) || t.max <= t.min))) {
-      errEl.textContent = "Check the free-delivery ranges: each needs a 'From ₹', a 'Free up to km' above 0, and 'To ₹' larger than 'From ₹' (or blank).";
+    if (!isFinite(t.min) || t.min < 0 || !isFinite(t.km) || t.km <= 0 || !(t.add >= 0) || (t.max !== null && (!isFinite(t.max) || t.max <= t.min))) {
+      errEl.textContent = "Check the ranges: each needs 'Items priced from ₹', 'Add ₹' big enough for some free km (or a 'Free delivery up to km' above 0), and 'to ₹' larger than 'from ₹' (or blank).";
       errEl.style.display = "block";
       return;
     }
@@ -7845,7 +7841,7 @@ document.getElementById('delivery-charges-save-btn').addEventListener('click', a
       return;
     }
   }
-  if (tierRows.length) deliveryCharges.freeTiers = tierRows.map(t => t.max === null ? { min: t.min, km: t.km } : { min: t.min, max: t.max, km: t.km });
+  if (tierRows.length) deliveryCharges.freeTiers = tierRows.map(t => { const o = { min: t.min, km: t.km }; if (t.max !== null) o.max = t.max; if (t.add > 0) o.add = t.add; return o; });
 
   const btn = document.getElementById('delivery-charges-save-btn');
   btn.disabled = true;
@@ -9396,14 +9392,31 @@ function fzInit() {
   if (cur) sel.value = cur;
   if (!fzEl('fz-rows').children.length) fzRenderRows([]);
 }
-function fzRowHtml(t) {
-  const v = x => (x === undefined || x === null || x === '') ? '' : x;
-  return '<div class="ft-row"><div class="ft-cell"><small>From ₹</small><input type="number" class="fz-min" min="0" step="1" value="' + v(t.min) + '"></div>' +
-    '<div class="ft-cell"><small>To ₹</small><input type="number" class="fz-max" min="0" step="1" placeholder="& above" value="' + v(t.max) + '"></div>' +
-    '<div class="ft-cell"><small>Free up to km</small><input type="number" class="fz-km" min="0" step="0.5" value="' + v(t.km) + '"></div>' +
-    '<button type="button" class="ft-del" onclick="this.closest(\'.ft-row\').remove(); fzChart();">✕</button></div>';
+function fzKmFor(add) {
+  const base = fzNum('fz-base'), perKm = fzNum('fz-perkm');
+  if (!(add > 0)) return 0;
+  if (perKm > 0) return Math.max(0, Math.min(15, Math.floor(((add - base) / perKm) * 2) / 2));
+  return add >= base ? 15 : 0;
 }
-function fzRenderRows(tiers) { fzEl('fz-rows').innerHTML = tiers.map(fzRowHtml).join(''); fzChart(); }
+function fzAddFor(km) { return km > 0 ? Math.ceil(fzNum('fz-base') + fzNum('fz-perkm') * km) : ''; }
+function fzRowHtml(t) {
+  const v = x => (x === undefined || x === null || x === '' || (typeof x === 'number' && isNaN(x))) ? '' : x;
+  return '<div class="ft-row">' +
+    '<div class="ft-cell"><small>Items priced from ₹</small><input type="number" class="fz-min" min="0" step="1" value="' + v(t.min) + '"></div>' +
+    '<div class="ft-cell"><small>to ₹</small><input type="number" class="fz-max" min="0" step="1" placeholder="& above" value="' + v(t.max) + '"></div>' +
+    '<button type="button" class="ft-del" onclick="this.closest(\'.ft-row\').remove(); fzChart();">✕</button>' +
+    '<div class="ft-cell"><small>Add ₹ to these items</small><input type="number" class="fz-add" min="0" step="1" value="' + v(t.add) + '"></div>' +
+    '<div class="ft-cell"><small>Free delivery up to km</small><input type="number" class="fz-km" min="0" step="0.5" value="' + v(t.km) + '"></div>' +
+    '<span></span><p class="ft-note"></p></div>';
+}
+function fzNote(row) {
+  const add = Number(row.querySelector('.fz-add').value) || 0, km = Number(row.querySelector('.fz-km').value) || 0, n = row.querySelector('.ft-note');
+  n.classList.remove('warn');
+  if (!add && !km) { n.textContent = ''; return; }
+  if (km <= 0) { n.classList.add('warn'); n.textContent = '₹' + add + ' is not enough for any free km — need at least ₹' + Math.ceil(fzNum('fz-base') + fzNum('fz-perkm') * 0.5) + '.'; return; }
+  n.textContent = 'Items +₹' + (add || fzAddFor(km)) + '  →  delivery FREE up to ' + km + ' km (costs ₹' + Math.round(fzNum('fz-base') + fzNum('fz-perkm') * km) + ' at ' + km + ' km)';
+}
+function fzRenderRows(tiers) { fzEl('fz-rows').innerHTML = tiers.map(fzRowHtml).join(''); document.querySelectorAll('#fz-rows .ft-row').forEach(fzNote); fzChart(); }
 function fzAddRow() {
   const rows = fzRead(), last = rows[rows.length - 1];
   const start = last && last.max !== null && isFinite(last.max) ? last.max : (last && isFinite(last.min) ? last.min + 100 : 200);
@@ -9413,16 +9426,21 @@ function fzAddRow() {
 function fzRead() {
   const out = [];
   document.querySelectorAll('#fz-rows .ft-row').forEach(r => {
-    const mn = r.querySelector('.fz-min').value, mx = r.querySelector('.fz-max').value, km = r.querySelector('.fz-km').value;
-    out.push({ min: mn === '' ? NaN : Number(mn), max: mx === '' ? null : Number(mx), km: km === '' ? NaN : Number(km) });
+    const mn = r.querySelector('.fz-min').value, mx = r.querySelector('.fz-max').value, ad = r.querySelector('.fz-add').value, km = r.querySelector('.fz-km').value;
+    out.push({ min: mn === '' ? NaN : Number(mn), max: mx === '' ? null : Number(mx), add: ad === '' ? 0 : Number(ad), km: km === '' ? NaN : Number(km) });
   });
   return out;
 }
 function fzChart() {
-  const box = fzEl('fz-chart');
+  const box = fzEl('fz-chart'), ac = fzEl('fz-addchart');
+  const base = fzNum('fz-base'), perKm = fzNum('fz-perkm'), freeUnder = fzNum('fz-freekm'), freeAbove = fzNum('fz-freeabove');
+  if (ac) {
+    let r = '';
+    for (let km = 1; km <= 6; km++) r += '<tr><td>' + km + ' km</td><td><span class="ft-free">+ ₹' + fzAddFor(km) + '</span></td></tr>';
+    ac.innerHTML = (base > 0 || perKm > 0) ? '<table class="ft-chart"><tr><th>Free delivery up to</th><th>Add to item price</th></tr>' + r + '</table>' : '<p class="op-note">Enter the base charge and per-km rate first.</p>';
+  }
   if (!box) return;
   const tiers = fzRead().filter(t => isFinite(t.min) && isFinite(t.km) && t.km > 0);
-  const base = fzNum('fz-base'), perKm = fzNum('fz-perkm'), freeUnder = fzNum('fz-freekm'), freeAbove = fzNum('fz-freeabove');
   if (!tiers.length && !(freeAbove > 0)) { box.innerHTML = '<p class="op-note">Add a range to see it here.</p>'; return; }
   const maxKm = Math.min(12, Math.max(5, Math.ceil(Math.max(0, ...tiers.map(t => t.km)))));
   let rows = '';
@@ -9435,35 +9453,17 @@ function fzChart() {
   }
   box.innerHTML = '<table class="ft-chart"><tr><th>Distance</th><th>Delivery charge</th><th>Free from</th></tr>' + rows + '</table>';
 }
-function fzPlan() {
-  const pct = fzNum('fz-pct'), flat = fzNum('fz-flat'), keep = fzNum('fz-keep'), base = fzNum('fz-base'), perKm = fzNum('fz-perkm');
-  const out = [];
-  for (let min = 100; min <= 600; min += 100) {
-    const profit = min * pct / 100 + flat, budget = profit - keep;
-    let km = perKm > 0 ? Math.max(0, Math.min(15, Math.floor(((budget - base) / perKm) * 2) / 2)) : (budget >= base ? 15 : 0);
-    const cost = km > 0 ? Math.round(base + perKm * km) : 0;
-    out.push({ min, max: min === 600 ? null : min + 100, km, profit: Math.round(profit * 10) / 10, left: Math.round((profit - cost) * 10) / 10 });
+['fz-base', 'fz-perkm', 'fz-freekm', 'fz-freeabove'].forEach(i => { const e = fzEl(i); if (e) e.addEventListener('input', () => { document.querySelectorAll('#fz-rows .ft-row').forEach(fzNote); fzChart(); }); });
+const fzRowsEl = fzEl('fz-rows');
+if (fzRowsEl) fzRowsEl.addEventListener('input', e => {
+  const row = e.target.closest('.ft-row');
+  if (row) {
+    if (e.target.classList.contains('fz-add')) { const km = fzKmFor(Number(e.target.value) || 0); row.querySelector('.fz-km').value = km > 0 ? km : ''; }
+    else if (e.target.classList.contains('fz-km')) { row.querySelector('.fz-add').value = fzAddFor(Number(e.target.value) || 0); }
+    fzNote(row);
   }
-  return out;
-}
-function fzPlanRender() {
-  const box = fzEl('fz-plan');
-  if (!box) return;
-  if (fzNum('fz-pct') <= 0 && fzNum('fz-flat') <= 0) { box.innerHTML = ''; return; }
-  box.innerHTML = '<table class="ft-chart"><tr><th>Order</th><th>Profit</th><th>Free delivery</th><th>Left</th></tr>' + fzPlan().map(r =>
-    '<tr><td>₹' + r.min + (r.max === null ? '+' : '–' + r.max) + '</td><td>₹' + r.profit + '</td><td>' + (r.km > 0 ? '<span class="ft-free">' + (r.km >= 15 ? 'any distance' : r.km + ' km') + '</span>' : 'none') + '</td><td>₹' + r.left + '</td></tr>').join('') + '</table>';
-}
-function fzAutofill() {
-  const st = fzEl('fz-status');
-  if (fzNum('fz-pct') <= 0 && fzNum('fz-flat') <= 0) { st.textContent = 'Enter the profit % (or flat profit) first.'; return; }
-  const tiers = fzPlan().filter(r => r.km > 0).map(r => ({ min: r.min, max: r.max, km: r.km }));
-  if (!tiers.length) { st.textContent = 'With this profit nothing can be free yet — raise the profit, lower the profit kept, or lower the base / per-km rate.'; return; }
-  st.textContent = '';
-  fzRenderRows(tiers);
-}
-['fz-base', 'fz-perkm', 'fz-freekm', 'fz-freeabove'].forEach(i => { const e = fzEl(i); if (e) e.addEventListener('input', () => { fzChart(); fzPlanRender(); }); });
-['fz-pct', 'fz-flat', 'fz-keep'].forEach(i => { const e = fzEl(i); if (e) e.addEventListener('input', fzPlanRender); });
-const fzRowsEl = fzEl('fz-rows'); if (fzRowsEl) fzRowsEl.addEventListener('input', fzChart);
+  fzChart();
+});
 
 // Load this zone's NESH Mart rule (if any) into the form.
 function fzLoadZone() {
@@ -9488,15 +9488,15 @@ function fzBuild() {
   if ([base, perKm, freeKm, freeAbove].some(n => !isFinite(n) || n < 0)) { st.textContent = "Amounts can't be negative or invalid."; return null; }
   const rows = fzRead().filter(t => isFinite(t.min) || isFinite(t.km) || t.max !== null);
   for (const t of rows) {
-    if (!isFinite(t.min) || t.min < 0 || !isFinite(t.km) || t.km <= 0 || (t.max !== null && (!isFinite(t.max) || t.max <= t.min))) {
-      st.textContent = "Check the ranges: each needs 'From ₹', 'Free up to km' above 0, and 'To ₹' larger than 'From ₹' (or blank)."; return null;
+    if (!isFinite(t.min) || t.min < 0 || !isFinite(t.km) || t.km <= 0 || !(t.add >= 0) || (t.max !== null && (!isFinite(t.max) || t.max <= t.min))) {
+      st.textContent = "Check the ranges: each needs 'Items priced from ₹', an 'Add ₹' big enough for some free km (or a 'Free delivery up to km' above 0), and 'to ₹' larger than 'from ₹' (or blank)."; return null;
     }
   }
   rows.sort((a, b) => a.min - b.min);
   for (let i = 0; i < rows.length - 1; i++) {
     if (rows[i].max === null || rows[i].max > rows[i + 1].min) { st.textContent = 'Ranges overlap (₹' + rows[i].min + ' and ₹' + rows[i + 1].min + '). Fix and apply again.'; return null; }
   }
-  const tiers = rows.map(t => t.max === null ? { min: t.min, km: t.km } : { min: t.min, max: t.max, km: t.km });
+  const tiers = rows.map(t => { const o = { min: t.min, km: t.km }; if (t.max !== null) o.max = t.max; if (t.add > 0) o.add = t.add; return o; });
   return { base, perKm, freeKm, freeAbove, tiers };
 }
 async function fzApply() {
