@@ -1868,6 +1868,16 @@
           <h3>Taxi Fare</h3>
           <p>Set the per-km taxi rate and a platform fee per ride — leave at 0 to leave off</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('extra-km')">
+          <div class="op-home-icon">📏</div>
+          <h3>Free Delivery: Extra km Only</h3>
+          <p>Beyond the free-delivery distance, charge only the per-km rate for the extra km (never free)</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('gst')">
+          <div class="op-home-icon">🧾</div>
+          <h3>GST</h3>
+          <p>Set the GST % separately for Food, Groceries, NESH Mart and Taxi — 0 = no GST</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('rain-surge')">
           <div class="op-home-icon">🌧️</div>
           <h3>Rain Surge</h3>
@@ -2434,6 +2444,7 @@
         <input type="number" id="op-cpn-dur-custom" min="1" max="8760" placeholder="hours" style="display:none;width:90px;margin-left:8px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
       </div>
       <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-cpn-secret"> 🔒 Secret code (don't show as an offer card - customer must type it)</label>
+      <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-cpn-auto"> ⚡ Auto-apply at checkout (applied automatically when the customer qualifies — no code needed)</label>
       <p class="op-note" style="margin-bottom:6px;">Works at which shops?</p>
       <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:6px;"><input type="checkbox" id="op-cpn-all" onchange="opCpnAllToggle(this)"> 🌐 All shops</label>
       <div id="op-cpn-shops" style="max-height:220px;overflow:auto;border:1px solid #124a24;padding:8px;margin-bottom:12px;color:#33ff66;font-size:.85rem;line-height:2;"></div>
@@ -3081,6 +3092,43 @@
         <button type="button" class="op-btn op-btn-push" onclick="opSaveTaxiFare()">💾 Save</button>
       </div>
       <p class="op-note" id="op-taxi-fare-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- FREE DELIVERY: EXTRA KM ONLY -->
+  <div class="op-section" id="op-section-extra-km">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Free Delivery: Extra km Only</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note"><b>OFF</b> (normal): a customer beyond the free-delivery distance pays the full delivery charge (base fee + per-km rate for the whole distance).<br><b>ON</b>: they pay only the per-km rate for the km beyond the free distance (no base fee) — and never free once past it (minimum ₹1). The charge is always rounded UP to the next whole rupee. Example: free within 2 km, ₹5/km, customer 3.5 km away → ₹5 × 1.5 = ₹7.5 → ₹8. Works for every shop/zone that has a free-delivery distance and a per-km rate.</p>
+      <label style="display:flex;align-items:center;gap:10px;margin:14px 0;font-weight:700;"><input type="checkbox" id="op-extra-km-on" style="width:22px;height:22px;"> Charge only the extra km beyond free delivery</label>
+      <div><button type="button" class="op-btn op-btn-push" onclick="opSaveExtraKm()">💾 Save</button></div>
+      <p class="op-note" id="op-extra-km-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- GST -->
+  <div class="op-section" id="op-section-gst">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>GST</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Set the GST percentage for each customer-app card separately. Enter a percent (e.g. 5 means 5% GST). Leave at 0 to keep GST off for that card.</p>
+      <div class="op-note" style="margin:10px 0 4px;"><b>🍔 Food</b> — GST %</div>
+      <div class="op-search-box" style="margin-bottom:10px;"><input type="number" id="op-gst-food-input" placeholder="Food GST % (0 = off, e.g. 5)" min="0" max="100" step="0.01"></div>
+      <div class="op-note" style="margin:10px 0 4px;"><b>🛒 Groceries</b> — GST %</div>
+      <div class="op-search-box" style="margin-bottom:10px;"><input type="number" id="op-gst-groceries-input" placeholder="Groceries GST % (0 = off, e.g. 5)" min="0" max="100" step="0.01"></div>
+      <div class="op-note" style="margin:10px 0 4px;"><b>🏪 NESH Mart</b> — GST %</div>
+      <div class="op-search-box" style="margin-bottom:10px;"><input type="number" id="op-gst-mart-input" placeholder="NESH Mart GST % (0 = off, e.g. 5)" min="0" max="100" step="0.01"></div>
+      <div class="op-note" style="margin:10px 0 4px;"><b>🛺 Taxi</b> — GST %</div>
+      <div class="op-search-box" style="margin-bottom:10px;"><input type="number" id="op-gst-taxi-input" placeholder="Taxi GST % (0 = off, e.g. 5)" min="0" max="100" step="0.01"></div>
+      <div>
+        <button type="button" class="op-btn op-btn-push" onclick="opSaveGst()">💾 Save GST</button>
+      </div>
+      <p class="op-note" id="op-gst-status" style="margin-top:10px;"></p>
     </div>
   </div>
 
@@ -8338,6 +8386,8 @@ function opOpenSection(name) {
   if (name === 'online-upi') opLoadOnlineUpi();
   if (name === 'nesh-suggest') { const si = document.getElementById('op-nesh-suggest-search'); if (si) si.value = ''; document.getElementById('op-nesh-suggest-status').textContent = ''; opBuildNeshSuggest(); }
   if (name === 'taxi-fare') opLoadTaxiFare();
+  if (name === 'gst') opLoadGst();
+  if (name === 'extra-km') opLoadExtraKm();
   if (name === 'rain-surge') opLoadRainSurge();
   if (name === 'support-phone') opLoadSupportPhone();
   if (name === 'test-location') opLoadTestLocation();
@@ -8748,6 +8798,58 @@ function opSaveTaxiFare() {
     const perKmMsg = perKm > 0 ? ('₹' + perKm + '/km') : 'fare turned OFF — free rides, no rate shown';
     const feeMsg = platformFee > 0 ? ('₹' + platformFee + ' platform fee/ride') : 'no platform fee (off)';
     status.textContent = 'Saved — ' + perKmMsg + ', ' + feeMsg + '.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+/* ---- GST: operator-set GST % per customer-app card ----
+   Stored at app_config/gst = { food, groceries, mart, taxi, updatedAt }
+   (each a percent, 0 = no GST for that card). */
+/* ---- Free delivery: extra km only. Stored at app_config/deliveryExtraKmOnly = { on, updatedAt } ---- */
+function opLoadExtraKm() {
+  const status = document.getElementById('op-extra-km-status');
+  status.textContent = 'Loading current setting...';
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'app_config/deliveryExtraKmOnly')).then(snap => {
+    const d = snap.val();
+    document.getElementById('op-extra-km-on').checked = !!(d && d.on);
+    status.textContent = d && d.updatedAt ? ('Last updated ' + d.updatedAt + '.') : 'Not set yet — currently OFF (full delivery charge beyond the free distance).';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opSaveExtraKm() {
+  const status = document.getElementById('op-extra-km-status');
+  const on = document.getElementById('op-extra-km-on').checked;
+  status.textContent = 'Saving...';
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'app_config/deliveryExtraKmOnly'), { on, updatedAt: new Date().toLocaleString() })
+    .then(() => { status.textContent = on ? 'Saved — ON: beyond the free distance customers pay per-km × extra km only (no base fee).' : 'Saved — OFF: full delivery charge beyond the free distance.'; })
+    .catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+const OP_GST_FIELDS = [['food', 'op-gst-food-input'], ['groceries', 'op-gst-groceries-input'], ['mart', 'op-gst-mart-input'], ['taxi', 'op-gst-taxi-input']];
+function opLoadGst() {
+  const status = document.getElementById('op-gst-status');
+  status.textContent = 'Loading current settings...';
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'app_config/gst')).then(snap => {
+    const data = snap.val() || {};
+    OP_GST_FIELDS.forEach(([k, id]) => { document.getElementById(id).value = Number(data[k]) || 0; });
+    status.textContent = data.updatedAt ? ('Last updated ' + data.updatedAt + '.') : 'Not set yet — GST is off for every card.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opSaveGst() {
+  const status = document.getElementById('op-gst-status');
+  const out = {};
+  for (const [k, id] of OP_GST_FIELDS) {
+    const raw = document.getElementById(id).value;
+    const v = raw === '' ? 0 : Number(raw);
+    if (isNaN(v) || v < 0 || v > 100) { status.textContent = 'Enter a GST % between 0 and 100 for every card.'; return; }
+    out[k] = Math.round(v * 100) / 100;
+  }
+  status.textContent = 'Saving...';
+  const { db, ref, set } = window.fb;
+  out.updatedAt = new Date().toLocaleString();
+  set(ref(db, 'app_config/gst'), out).then(() => {
+    const names = { food: 'Food', groceries: 'Groceries', mart: 'NESH Mart', taxi: 'Taxi' };
+    status.textContent = 'Saved — ' + OP_GST_FIELDS.map(([k]) => names[k] + ' ' + (out[k] > 0 ? out[k] + '%' : 'off')).join(', ') + '.';
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
@@ -15586,7 +15688,7 @@ function opCpnSave() {
       minOrder: Math.max(0, parseFloat(document.getElementById('op-cpn-min').value) || 0),
       maxDiscount: Math.max(0, parseFloat(document.getElementById('op-cpn-max').value) || 0),
       perCustomer: Math.max(1, parseInt(document.getElementById('op-cpn-uses').value, 10) || 1),
-      expiresAt: expAt, allShops: all, secret: document.getElementById('op-cpn-secret').checked, shops: all ? {} : shops, ts: Date.now()
+      expiresAt: expAt, allShops: all, secret: document.getElementById('op-cpn-secret').checked, auto: document.getElementById('op-cpn-auto').checked, shops: all ? {} : shops, ts: Date.now()
     }).then(function () { opCpnMsg('Coupon ' + code + ' saved ✅'); document.getElementById('op-cpn-code').value = ''; document.getElementById('op-cpn-desc').value = ''; document.getElementById('op-cpn-total').value = ''; opLoadCoupons(); });
   }).catch(function (e) { opCpnMsg('Error: ' + ((e && e.message) || 'could not save')); });
 }
@@ -15603,7 +15705,7 @@ function opLoadCoupons() {
       row.style.cssText = 'margin-top:12px;padding:10px;border:1px solid #124a24;border-radius:10px;color:#33ff66;font-size:.82rem;line-height:1.6;';
       var off = o.type === 'percent' ? o.value + '% off' + (o.maxDiscount ? ' (max ₹' + o.maxDiscount + ')' : '') : '₹' + o.value + ' off';
       var where = o.allShops ? '🌐 All shops' : Object.keys(o.shops || {}).map(function (id) { return names[id] || id; }).join(', ') || '—';
-      var h = document.createElement('div'); h.style.cssText = 'font-weight:700;font-size:.95rem;'; h.textContent = '🎟️ ' + o.code + ' — ' + off;
+      var h = document.createElement('div'); h.style.cssText = 'font-weight:700;font-size:.95rem;'; h.textContent = '🎟️ ' + o.code + ' — ' + off + (o.auto ? '  ⚡ AUTO-APPLY' : '');
       var d = document.createElement('div');
       d.textContent = 'Min order ₹' + (o.minOrder || 0) + ' · ' + (o.perCustomer || 1) + 'x per customer · ' + (o.maxUses > 0 ? ((totals[k] || 0) + '/' + o.maxUses + ' used in total · ') : 'no total limit · ') + (o.off ? '⏸ Paused' : opPosterStatus(+o.expiresAt || 0)) + (o.secret ? ' · 🔒 Secret' : ' · 🎟️ Shown as card');
       var w = document.createElement('div'); w.textContent = 'Shops: ' + where;
@@ -15612,7 +15714,9 @@ function opLoadCoupons() {
       b1.onclick = function () { fb.update(fb.ref(fb.db, 'app_config/coupons/' + k), { off: !o.off }).then(opLoadCoupons).catch(function (e) { opCpnMsg('Error: ' + e.message); }); };
       var b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'op-btn'; b2.style.cssText = 'padding:6px 10px;margin:0;'; b2.textContent = 'Delete';
       b2.onclick = function () { if (confirm('Delete coupon ' + o.code + '?')) fb.remove(fb.ref(fb.db, 'app_config/coupons/' + k)).then(opLoadCoupons).catch(function (e) { opCpnMsg('Error: ' + e.message); }); };
-      bar.appendChild(b1); bar.appendChild(b2);
+      var b3 = document.createElement('button'); b3.type = 'button'; b3.className = 'op-btn'; b3.style.cssText = 'padding:6px 10px;margin:0;'; b3.textContent = o.auto ? '⚡ Auto: ON (turn off)' : '⚡ Auto: OFF (turn on)';
+      b3.onclick = function () { fb.update(fb.ref(fb.db, 'app_config/coupons/' + k), { auto: !o.auto }).then(opLoadCoupons).catch(function (e) { opCpnMsg('Error: ' + e.message); }); };
+      bar.appendChild(b1); bar.appendChild(b3); bar.appendChild(b2);
       row.appendChild(h); row.appendChild(d); row.appendChild(w); row.appendChild(bar); box.appendChild(row);
     });
   }).catch(function (e) { box.innerHTML = '<p class="op-note">Could not load: ' + (e && e.message) + '</p>'; });
