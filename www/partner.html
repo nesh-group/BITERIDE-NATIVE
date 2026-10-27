@@ -3328,6 +3328,13 @@
         <button type="button" class="op-btn op-btn-push" onclick="opSaveCommissionTiers()">💾 Save commission</button>
         <p class="op-note" id="op-pm-commission-status" style="margin-top:4px;"></p>
       </div>
+      <div style="margin-top:14px;" id="op-pm-markup-block">
+        <p class="op-note" style="margin-bottom:6px;"><b>Customer price markup (this shop only)</b> — pick a range of an ITEM's price and how much to add to what the customer pays for items in it. Example: items priced 100 to 200 → add ₹10 (or 5%). The shop is still paid its own price. Separate from delivery charge and from the shop's commission. "To" blank = no upper limit; both From and To are included, and if ranges touch (e.g. 200) the first range wins.</p>
+        <div id="op-pm-markup-rows"></div>
+        <button type="button" class="op-btn" onclick="opAddMarkupRow()">+ Add range</button>
+        <button type="button" class="op-btn op-btn-push" onclick="opSaveMarkupTiers()">💾 Save markup</button>
+        <p class="op-note" id="op-pm-markup-status" style="margin-top:4px;"></p>
+      </div>
       <div style="margin-top:14px;">
         <p class="op-note" style="margin-bottom:6px;">Shop photo — shown on this shop's card in the customer app list.</p>
         <button type="button" class="op-btn" id="op-pm-shop-photo-show-btn" style="display:none;" onclick="opShowShopPhoto()">👁️ Show shop photo</button>
@@ -13942,7 +13949,7 @@ function opShowPartnerDetail(id) {
   document.getElementById('op-pm-address').textContent = p.address || '—';
   document.getElementById('op-pm-gpay').textContent = p.gpayNumber || '—';
   document.getElementById('op-pm-due').textContent = '₹' + opComputeDue(p);
-  opRenderCommissionRows(p);
+  opRenderCommissionRows(p); opRenderMarkupRows(p);
   const dh = document.getElementById('op-pm-due-history'); if (dh) { dh.style.display = 'none'; dh.innerHTML = ''; }
   document.getElementById('op-pm-settle-input').value = '';
   document.getElementById('op-pm-settle-status').textContent = '';
@@ -14123,6 +14130,23 @@ function opRenderAvailabilityList() {
 function opCustomerPriceRowHtml(it) {
   const part = opAllPartners.find(x => x._id === opCurrentPartnerId);
   if (!part || part.businessType === 'groceries') return '';
+  // Portion items (Quarter / Half / Full): the operator can set a customer price for EACH portion.
+  const spx = (it.sizePrices && typeof it.sizePrices === 'object') ? it.sizePrices : null;
+  const pNames = spx ? Object.keys(spx).filter(n => Number(spx[n]) > 0) : [];
+  if (pNames.length > 1) {
+    const csp = (it.customerSizePrices && typeof it.customerSizePrices === 'object') ? it.customerSizePrices : {};
+    const boxes = pNames.map(n => `
+        <label style="display:flex; flex-direction:column; gap:2px; font-size:.7rem; color:#94a3b8;">${escapeHtml(n)} <span style="color:#64748b;">(shop ₹${Number(spx[n]) || 0})</span>
+          <input type="number" min="0" step="any" inputmode="decimal" id="op-pm-csp-${it.id}-${escapeHtml(n)}" value="${Number(csp[n]) > 0 ? Number(csp[n]) : ''}" placeholder="same as shop" style="width:84px; padding:5px 8px; border-radius:6px; border:1px solid #374151; background:#0f172a; color:#e2e8f0; font-size:.8rem;">
+        </label>`).join('');
+    return `
+      <div style="margin-top:6px;">
+        <span style="font-size:.75rem; color:#a78bfa;">Customer price per portion</span>
+        <div style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; margin-top:4px;">${boxes}
+          <button type="button" class="op-btn op-btn-push" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opSaveItemPortionCustomerPrices('${it.id}')">💾 Save portion prices</button>
+        </div>
+      </div>`;
+  }
   const cp = Number(it.customerPrice) || 0;
   return `
       <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px;">
@@ -14146,6 +14170,30 @@ function opSaveItemCustomerPrice(itemId) {
       status.textContent = val > 0
         ? 'Customer price saved: ' + (item.name || itemId) + ' → customers pay ₹' + val + ', shop gets ₹' + (Number(item.price) || 0) + '.'
         : 'Customer price removed: ' + (item.name || itemId) + ' — customers see the shop price again.';
+    })
+    .catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opSaveItemPortionCustomerPrices(itemId) {
+  const item = opAvailItems.find(it => it.id === itemId);
+  if (!item || !opCurrentPartnerId) return;
+  const status = document.getElementById('op-pm-avail-status');
+  const spx = (item.sizePrices && typeof item.sizePrices === 'object') ? item.sizePrices : {};
+  const out = {};
+  for (const n of Object.keys(spx).filter(n => Number(spx[n]) > 0)) {
+    const inp = document.getElementById('op-pm-csp-' + itemId + '-' + n);
+    const raw = inp ? String(inp.value).trim() : '';
+    if (raw === '') continue;
+    const v = Number(raw);
+    if (isNaN(v) || v < 0) { status.textContent = 'Enter a valid customer price for ' + n + ' (or leave it empty).'; return; }
+    if (v > 0) out[n] = v;
+  }
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu/' + itemId), { customerSizePrices: Object.keys(out).length ? out : null })
+    .then(() => {
+      item.customerSizePrices = Object.keys(out).length ? out : null;
+      status.textContent = Object.keys(out).length
+        ? 'Saved for ' + (item.name || itemId) + ': ' + Object.keys(out).map(n => n + ' ₹' + out[n]).join(', ') + '. The shop is still paid its own portion prices.'
+        : 'Portion customer prices removed for ' + (item.name || itemId) + ' — customers see the shop prices again.';
     })
     .catch(err => { status.textContent = 'Error: ' + err.message; });
 }
@@ -14252,6 +14300,67 @@ function opSaveCommissionTiers() {
       status.textContent = tiers.length ? ('Saved ' + tiers.length + ' range' + (tiers.length === 1 ? '' : 's') + '. Applies only to orders placed from now on.') : 'Cleared — nothing is due from this shop for new orders.';
       const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
       if (p) { p.commissionTiers = tiers; p.commissionHistory = Object.assign({}, p.commissionHistory || {}, { [verRef.key]: { from, tiers } }); document.getElementById('op-pm-due').textContent = '₹' + opComputeDue(p); }
+    })
+    .catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+// ---- Per-shop customer price markup (Operator Panel -> partner -> Customer price markup) ----
+// Stored at restaurants/{id}/priceMarkup as [{min, max?, add, type}] (type 'flat' = ₹, 'pct' = %). The customer app
+// (index.html markupFor) adds it to each item whose shop price is in [min, max] (both included). Shop is paid its own price.
+function opMarkupRowHtml(t) {
+  const v = (x) => (x === 0 || x === undefined || x === null || x === '') ? '' : x;
+  const inp = 'style="width:24%; padding:7px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-family:inherit; font-size:.8rem; margin-right:4px;"';
+  const isPct = t && t.type === 'pct';
+  return '<div class="op-mk-row" style="display:flex; align-items:center; gap:4px; margin-bottom:6px;">' +
+    '<input type="number" class="op-mk-min" min="0" step="any" inputmode="decimal" placeholder="From ₹" value="' + v(t.min) + '" ' + inp + '>' +
+    '<input type="number" class="op-mk-max" min="0" step="any" inputmode="decimal" placeholder="To ₹" value="' + v(t.max) + '" ' + inp + '>' +
+    '<input type="number" class="op-mk-add" min="0" step="any" inputmode="decimal" placeholder="Add" value="' + v(t.add) + '" ' + inp + '>' +
+    '<select class="op-mk-type" ' + inp + '><option value="flat"' + (isPct ? '' : ' selected') + '>₹</option><option value="pct"' + (isPct ? ' selected' : '') + '>%</option></select>' +
+    '<button type="button" class="op-btn op-btn-danger" style="padding:6px 9px; margin:0;" onclick="this.closest(\'.op-mk-row\').remove()">✕</button>' +
+    '</div>';
+}
+function opRenderMarkupRows(p) {
+  const wrap = document.getElementById('op-pm-markup-rows');
+  if (!wrap) return;
+  const raw = p && p.priceMarkup;
+  const tiers = raw ? (Array.isArray(raw) ? raw : Object.values(raw)).filter(Boolean) : [];
+  wrap.innerHTML = tiers.map(opMarkupRowHtml).join('');
+  document.getElementById('op-pm-markup-status').textContent = tiers.length ? '' : 'No markup set — customers pay the shop\'s own prices.';
+}
+function opAddMarkupRow() {
+  document.getElementById('op-pm-markup-rows').insertAdjacentHTML('beforeend', opMarkupRowHtml({}));
+}
+function opSaveMarkupTiers() {
+  const status = document.getElementById('op-pm-markup-status');
+  if (!opCurrentPartnerId) return;
+  const rows = Array.from(document.querySelectorAll('#op-pm-markup-rows .op-mk-row'));
+  const tiers = [];
+  for (const r of rows) {
+    const minRaw = r.querySelector('.op-mk-min').value, maxRaw = r.querySelector('.op-mk-max').value, addRaw = r.querySelector('.op-mk-add').value;
+    const type = r.querySelector('.op-mk-type').value === 'pct' ? 'pct' : 'flat';
+    if (minRaw === '' && maxRaw === '' && addRaw === '') continue; // blank row — skip
+    const min = minRaw === '' ? 0 : Number(minRaw), max = maxRaw === '' ? 0 : Number(maxRaw), add = Number(addRaw);
+    if (isNaN(min) || isNaN(max) || isNaN(add) || min < 0 || max < 0 || addRaw === '' || add < 0) {
+      status.textContent = 'Check every row — From, To and Add must be valid numbers (To can be blank).'; return;
+    }
+    if (max && max < min) { status.textContent = 'In each row "To" must not be less than "From".'; return; }
+    if (type === 'pct' && add > 100) { status.textContent = 'A % markup cannot be more than 100.'; return; }
+    const t = { min, add, type };
+    if (max) t.max = max;
+    tiers.push(t);
+  }
+  tiers.sort((a, b) => a.min - b.min);
+  for (let i = 1; i < tiers.length; i++) {
+    const prev = tiers[i - 1];
+    if (prev.max == null || tiers[i].min < prev.max) { status.textContent = 'Ranges overlap (₹' + prev.min + (prev.max != null ? '–' + prev.max : '+') + ' and ₹' + tiers[i].min + '…). Fix them and save again.'; return; }
+  }
+  status.textContent = 'Saving...';
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'restaurants/' + opCurrentPartnerId + '/priceMarkup'), tiers.length ? tiers : null)
+    .then(() => {
+      status.textContent = tiers.length ? ('Saved ' + tiers.length + ' range' + (tiers.length === 1 ? '' : 's') + '. Customers see the new prices from now on.') : 'Cleared — customers pay the shop\'s own prices.';
+      const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
+      if (p) p.priceMarkup = tiers.length ? tiers : null;
     })
     .catch(err => { status.textContent = 'Error: ' + err.message; });
 }
