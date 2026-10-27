@@ -1432,6 +1432,12 @@ function deliveryLocRowHtml(kind, label, mainText, subText, url) {
     `</span></div>`;
 }
 // Both rows (shop pickup + customer drop) for a delivery job.
+function deliveryInstrHtml(o) {
+  const l = (o && Array.isArray(o.deliveryInstructions)) ? o.deliveryInstructions.filter(Boolean) : [];
+  if (!l.length) return '';
+  const dir = o.deliveryDirections ? '<div style="margin-top:4px;">📍 ' + escapeHtml(String(o.deliveryDirections)) + '</div>' : '';
+  return '<div style="margin:8px 0 0;padding:8px 10px;border-radius:10px;background:#FFF4E5;color:#8A4B00;font-size:12.5px;font-weight:700;line-height:1.5;">📝 Customer instructions: ' + l.map(x => escapeHtml(String(x))).join(' · ') + dir + '</div>';
+}
 function deliveryLocationsHtml(o) {
   const pickupPos = deliveryPickupPos(o);
   const dropPos = deliveryDropPos(o);
@@ -2244,6 +2250,7 @@ function renderOrderPopup(pendingList) {
           ${item.rainSurgeDriver > 0 ? `<div class="order-popup-row"><span>🌧️ Rain bonus (included)</span><span>₹${item.rainSurgeDriver}</span></div>` : ''}
           ${item.tip > 0 ? `<div class="order-popup-row"><span>🙏 Customer tip (included)</span><span>₹${item.tip}</span></div>` : ''}
           ${deliveryLocationsHtml(item)}
+          ${deliveryInstrHtml(item)}
           <div class="order-popup-row order-popup-row-total"><span>Items</span><span>${item.items ? item.items.map(it => `${it.qty}x ${it.name}`).join(', ') : '—'}</span></div>
         </div>
         <p class="order-popup-cust">${item.customerName || 'Customer'}</p>
@@ -4310,6 +4317,7 @@ function renderHomeLists() {
       ${giveShopAmount != null ? `<div class="order-popup-row"><span>Give to shop</span><span>₹${giveShopAmount}</span></div>` : ''}
       <p style="margin:8px 0 0; color:var(--muted); font-size:13px;">${items || ''}</p>
       <div style="margin-top:8px;">${deliveryLocationsHtml(currentDelivery)}</div>
+      ${deliveryInstrHtml(currentDelivery)}
       ${actionHtml}
     `;
     dWrap.appendChild(card);

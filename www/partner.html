@@ -1379,6 +1379,18 @@
         </div>
         <p class="hint-text" style="margin-top:0;">Comma-separated (e.g. S, M, L, XL, 2XL or 6, 7, 8, 9, 10). Customers will pick one before ordering.</p>
       </div>
+      <div id="item-portions-section" style="display:none;">
+        <div class="field" style="cursor:pointer;" id="item-portions-wrap">
+          <input id="item-portions-on" type="checkbox" style="width:16px; height:16px; accent-color:var(--chili); margin:0; flex-shrink:0;" />
+          <label for="item-portions-on" style="cursor:pointer; color:var(--cloud); font-size:14px;">🍗 Sold in portions (Quarter / Half / Full)</label>
+        </div>
+        <div id="item-portions-fields" style="display:none;">
+          <div class="field"><input id="item-p-quarter" type="number" inputmode="decimal" min="0" placeholder="Quarter price (₹) — optional" /></div>
+          <div class="field"><input id="item-p-half" type="number" inputmode="decimal" min="0" placeholder="Half price (₹)" /></div>
+          <div class="field"><input id="item-p-full" type="number" inputmode="decimal" min="0" placeholder="Full price (₹)" /></div>
+          <p class="hint-text" style="margin-top:0;">Fill at least 2 prices (e.g. Half and Full). Customers pick one before adding to the cart. The "Price" box above is ignored while this is on.</p>
+        </div>
+      </div>
       <div class="field" style="cursor:pointer;" id="item-unavailable-wrap">
         <input id="item-unavailable" type="checkbox" style="width:16px; height:16px; accent-color:var(--chili); margin:0; flex-shrink:0;" />
         <label for="item-unavailable" style="cursor:pointer; color:var(--cloud); font-size:14px;">Mark unavailable (hidden from customers)</label>
@@ -2431,11 +2443,12 @@
         <select id="op-cpn-type" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"><option value="flat">₹ Flat off</option><option value="percent">% Percent off</option></select>
         <input type="number" id="op-cpn-value" min="1" placeholder="Amount / %" style="width:110px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
         <input type="number" id="op-cpn-min" min="0" placeholder="Min order ₹" style="width:110px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="number" id="op-cpn-maxorder" min="0" placeholder="Max order ₹" title="Coupon will NOT apply when the items total is above this amount (blank = no limit)" style="width:110px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
         <input type="number" id="op-cpn-max" min="0" placeholder="Max ₹ off (for %)" style="width:140px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
         <input type="number" id="op-cpn-uses" min="1" value="1" title="Uses per customer" style="width:80px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
         <input type="number" id="op-cpn-total" min="1" placeholder="Total uses (blank = unlimited)" title="Total times this coupon can be used by ALL customers together" style="width:210px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
       </div>
-      <p class="op-note" style="margin:0 0 8px;">Last box = how many times one customer can use it.</p>
+      <p class="op-note" style="margin:0 0 8px;">Min order / Max order = the coupon works only when the items total is between these two amounts (Max blank = no upper limit). Max ₹ off = cap on the discount for % coupons. Box after that = how many times one customer can use it.</p>
       <div style="margin:0 0 10px;">
         <select id="op-cpn-dur" onchange="document.getElementById('op-cpn-dur-custom').style.display=this.value==='custom'?'':'none'" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
           <option value="0">No time limit</option><option value="24">24 hours</option><option value="72">3 days</option>
@@ -3387,7 +3400,7 @@
       </div>
       </div>
       <div style="margin-top:14px;">
-        <p class="op-note" style="margin-bottom:4px;">Bulk import stock — Excel/CSV with Name, Discription, Price, Unit (optional), Photo link (optional). Adds items to this shop's menu.</p>
+        <p class="op-note" style="margin-bottom:4px;">Bulk import stock — Excel/CSV with Name, Discription, Price, Unit (optional), Photo link (optional). For Half/Full items add Quarter, Half, Full price columns (at least 2 filled; Price can then be empty). Adds items to this shop's menu.</p>
         <input type="file" id="op-pm-bulk-import-input" accept=".xlsx,.xls,.csv" style="display:none;" onchange="opHandleBulkImportFile(event)" />
         <button type="button" class="op-btn op-btn-push" id="op-pm-bulk-import-btn" onclick="document.getElementById('op-pm-bulk-import-input').click()">📥 Bulk import stock</button>
         <p class="op-note" id="op-pm-bulk-import-status" style="margin-top:4px; display:none;"></p>
@@ -4636,7 +4649,7 @@ function logInRestaurant(id, data) {
   const importColumnsHint = document.getElementById('bulk-import-columns-hint');
   if (importColumnsHint) {
     importColumnsHint.style.display = groceriesShop ? "none" : "block";
-    importColumnsHint.innerHTML = "Excel columns: <b>Name</b>, <b>Discription</b> (or Description), <b>Price</b>, <b>Photo</b> (optional — image link)";
+    importColumnsHint.innerHTML = "Excel columns: <b>Name</b>, <b>Discription</b> (or Description), <b>Price</b>, <b>Photo</b> (optional — image link). For Half/Full items add <b>Quarter</b>, <b>Half</b>, <b>Full</b> price columns (fill at least 2; Price can then be left empty).";
   }
   let restoreScreen = 'home';
   try {
@@ -6252,6 +6265,17 @@ function openItemForm(item) {
   const sportsShop = isSportsShop();
   document.getElementById('item-sizes-section').style.display = sportsShop ? "block" : "none";
   document.getElementById('item-sizes').value = (sportsShop && item && Array.isArray(item.sizes)) ? item.sizes.join(', ') : "";
+  { // Quarter / Half / Full portions — ordinary food shops only
+    const bt = state.restaurant?.businessType;
+    const portionsOk = bt !== 'groceries' && bt !== 'online_shop';
+    document.getElementById('item-portions-section').style.display = portionsOk ? "block" : "none";
+    const sp = (item && item.sizePrices && typeof item.sizePrices === 'object') ? item.sizePrices : null;
+    document.getElementById('item-portions-on').checked = !!(portionsOk && sp);
+    document.getElementById('item-portions-fields').style.display = (portionsOk && sp) ? "block" : "none";
+    document.getElementById('item-p-quarter').value = (sp && sp.Quarter) ? sp.Quarter : "";
+    document.getElementById('item-p-half').value = (sp && sp.Half) ? sp.Half : "";
+    document.getElementById('item-p-full').value = (sp && sp.Full) ? sp.Full : "";
+  }
   document.getElementById('item-unavailable').checked = !!(item && item.unavailable);
   document.getElementById('item-error').style.display = "none";
   document.getElementById('item-delete-btn').style.display = item ? "block" : "none";
@@ -6379,12 +6403,30 @@ function handlePhotoSelect(e) {
   reader.readAsDataURL(file);
 }
 
+document.getElementById('item-portions-on').addEventListener('change', function () {
+  document.getElementById('item-portions-fields').style.display = this.checked ? 'block' : 'none';
+});
 async function saveItem() {
   const name = document.getElementById('item-name').value.trim();
   const desc = document.getElementById('item-desc').value.trim();
-  const price = parseFloat(document.getElementById('item-price').value);
+  let price = parseFloat(document.getElementById('item-price').value);
   const errEl = document.getElementById('item-error');
   errEl.style.display = "none";
+  // Portions (Quarter / Half / Full): each filled price becomes a size with its own price; the first one is the item's base price.
+  const portionNames = [], portionPrices = {};
+  const portionsOn = document.getElementById('item-portions-section').style.display !== 'none' && document.getElementById('item-portions-on').checked;
+  if (portionsOn) {
+    [['Quarter', 'item-p-quarter'], ['Half', 'item-p-half'], ['Full', 'item-p-full']].forEach(function (pp) {
+      const v = parseFloat(document.getElementById(pp[1]).value);
+      if (!isNaN(v) && v > 0) { portionNames.push(pp[0]); portionPrices[pp[0]] = v; }
+    });
+    if (portionNames.length < 2) {
+      errEl.textContent = "Enter at least 2 portion prices (e.g. Half and Full)";
+      errEl.style.display = "block";
+      return;
+    }
+    price = portionPrices[portionNames[0]];
+  }
   if (!name || isNaN(price) || price < 0) {
     errEl.textContent = "Enter a valid item name and price";
     errEl.style.display = "block";
@@ -6407,10 +6449,10 @@ async function saveItem() {
   btn.disabled = true;
   try {
     const { db, ref, push, set, update } = window.fb;
-    const sizes = isSportsShop()
+    const sizes = portionsOn ? portionNames : (isSportsShop()
       ? document.getElementById('item-sizes').value.split(',').map(s => s.trim()).filter(Boolean)
-      : [];
-    const data = { name, desc, price, unit: isGroceriesShop() ? (state.selectedUnit || "piece") : "piece", photo: state.photoDataUrl || "", unavailable: document.getElementById('item-unavailable').checked, sizes };
+      : []);
+    const data = { name, desc, price, unit: isGroceriesShop() ? (state.selectedUnit || "piece") : "piece", photo: state.photoDataUrl || "", unavailable: document.getElementById('item-unavailable').checked, sizes, sizePrices: portionsOn ? portionPrices : null };
     if (offerSecOn) data.offerPrice = offerPrice > 0 ? offerPrice : null;
     if (state.editingItemId) {
       await update(ref(db, 'restaurants/' + state.restId + '/menu/' + state.editingItemId), data);
@@ -6614,8 +6656,13 @@ async function importMenuFileForShop(file, targetRestId, groceriesShop, statusEl
     const priceKey = findKey('price', 'rate', 'amount');
     const photoKey = findKey('photo', 'photourl', 'photolink', 'image', 'imageurl', 'imagelink', 'img', 'picture');
     const unitKey = findKey('unit', 'soldby', 'perunit', 'uom');
+    // Optional portion columns (food shops): Quarter / Half / Full price. Two or more filled in a row = that item is sold in portions.
+    const qKey = groceriesShop ? null : findKey('quarter', 'quarterprice', 'qtr');
+    const hKey = groceriesShop ? null : findKey('half', 'halfprice');
+    const fKey = groceriesShop ? null : findKey('full', 'fullprice');
+    const portionKeys = [['Quarter', qKey], ['Half', hKey], ['Full', fKey]].filter(x => x[1]);
 
-    if (!nameKey || !priceKey) {
+    if (!nameKey || (!priceKey && portionKeys.length < 2)) {
       statusEl.style.color = "var(--chili)";
       statusEl.textContent = "Couldn't find Name/Price columns. Check your file's header row.";
       return;
@@ -6633,7 +6680,14 @@ async function importMenuFileForShop(file, targetRestId, groceriesShop, statusEl
       const row = rows[i];
       const name = String(row[nameKey] || "").trim();
       const desc = descKey ? String(row[descKey] || "").trim() : "";
-      const price = parseFloat(row[priceKey]);
+      let price = priceKey ? parseFloat(row[priceKey]) : NaN;
+      const portionNames = [], portionPrices = {};
+      portionKeys.forEach(function (pk) {
+        const pv = parseFloat(row[pk[1]]);
+        if (!isNaN(pv) && pv > 0) { portionNames.push(pk[0]); portionPrices[pk[0]] = pv; }
+      });
+      const hasPortions = portionNames.length >= 2;
+      if (hasPortions) price = portionPrices[portionNames[0]];   // base price = first portion
       // Photo column holds a direct image link (e.g. a Cloudinary/Google Drive/
       // any public image URL) — stored as-is, same as how single-item photos
       // are saved (state.photoDataUrl is just a URL string too).
@@ -6651,7 +6705,7 @@ async function importMenuFileForShop(file, targetRestId, groceriesShop, statusEl
       // specific restaurant's menu node, and avoids permission issues that
       // a root-level ref(db) update can hit under path-scoped security rules.
       const newKey = push(menuRef).key;
-      updates[newKey] = { name, desc, price, photo, unit };
+      updates[newKey] = hasPortions ? { name, desc, price, photo, unit, sizes: portionNames, sizePrices: portionPrices } : { name, desc, price, photo, unit };
       added++;
       if (photo) withPhoto++;
       pending++;
@@ -14261,13 +14315,18 @@ function opExportStock() {
   status.style.color = 'var(--marigold)';
   const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
   const menuObj = (p && p.menu) || {};
-  const rows = Object.values(menuObj).map(it => ({
-    Name: it.name || '',
-    Discription: it.desc || '',
-    Price: it.price != null ? it.price : '',
-    Unit: it.unit || 'piece',
-    Photo: it.photo || ''
-  }));
+  const anyPortions = Object.values(menuObj).some(it => it && it.sizePrices && typeof it.sizePrices === 'object');
+  const rows = Object.values(menuObj).map(it => {
+    const r = {
+      Name: it.name || '',
+      Discription: it.desc || '',
+      Price: it.price != null ? it.price : '',
+      Unit: it.unit || 'piece',
+      Photo: it.photo || ''
+    };
+    if (anyPortions) { const sp = (it.sizePrices && typeof it.sizePrices === 'object') ? it.sizePrices : {}; r.Quarter = sp.Quarter || ''; r.Half = sp.Half || ''; r.Full = sp.Full || ''; }
+    return r;
+  });
   if (!rows.length) {
     status.style.color = 'var(--chili)';
     status.textContent = 'This shop has no stock items to export.';
@@ -15646,7 +15705,7 @@ function opLoyDelete() {
 }
 
 /* ---- COUPONS (operator) ----
-   app_config/coupons/{id} = { code, type:'flat'|'percent', value, minOrder, maxDiscount, expiresAt, perCustomer, allShops, shops:{shopId:true}, off, ts } */
+   app_config/coupons/{id} = { code, type:'flat'|'percent', value, minOrder, maxDiscount, expiresAt, perCustomer, maxOrder (0 = no limit), allShops, shops:{shopId:true}, off, ts } */
 function opCpnMsg(t) { var e = document.getElementById('op-cpn-status'); if (e) e.textContent = t || ''; }
 function opCpnShopList() {
   return (typeof opAllPartners !== 'undefined' && opAllPartners ? opAllPartners : [])
@@ -15672,6 +15731,8 @@ function opCpnSave() {
   if (!/^[A-Z0-9]{3,20}$/.test(code)) { opCpnMsg('Code must be 3-20 letters/numbers (no spaces).'); return; }
   var type = document.getElementById('op-cpn-type').value, value = parseFloat(document.getElementById('op-cpn-value').value);
   if (!(value > 0) || (type === 'percent' && value > 100)) { opCpnMsg(type === 'percent' ? 'Enter a percent between 1 and 100.' : 'Enter the ₹ amount off.'); return; }
+  var minO = Math.max(0, parseFloat(document.getElementById('op-cpn-min').value) || 0), maxO = Math.max(0, parseFloat(document.getElementById('op-cpn-maxorder').value) || 0);
+  if (maxO > 0 && maxO < minO) { opCpnMsg('Max order must be greater than Min order.'); return; }
   var expAt = opDurToExpiry(document.getElementById('op-cpn-dur').value, document.getElementById('op-cpn-dur-custom').value);
   if (expAt === null) { opCpnMsg('Enter how many hours (1 or more).'); return; }
   var all = document.getElementById('op-cpn-all').checked, shops = {}, n = 0;
@@ -15685,11 +15746,12 @@ function opCpnSave() {
       code: code, type: type, value: value,
       desc: document.getElementById('op-cpn-desc').value.trim().slice(0, 40),
       maxUses: Math.max(0, parseInt(document.getElementById('op-cpn-total').value, 10) || 0),
-      minOrder: Math.max(0, parseFloat(document.getElementById('op-cpn-min').value) || 0),
+      minOrder: minO,
+      maxOrder: maxO,
       maxDiscount: Math.max(0, parseFloat(document.getElementById('op-cpn-max').value) || 0),
       perCustomer: Math.max(1, parseInt(document.getElementById('op-cpn-uses').value, 10) || 1),
       expiresAt: expAt, allShops: all, secret: document.getElementById('op-cpn-secret').checked, auto: document.getElementById('op-cpn-auto').checked, shops: all ? {} : shops, ts: Date.now()
-    }).then(function () { opCpnMsg('Coupon ' + code + ' saved ✅'); document.getElementById('op-cpn-code').value = ''; document.getElementById('op-cpn-desc').value = ''; document.getElementById('op-cpn-total').value = ''; opLoadCoupons(); });
+    }).then(function () { opCpnMsg('Coupon ' + code + ' saved ✅'); document.getElementById('op-cpn-code').value = ''; document.getElementById('op-cpn-desc').value = ''; document.getElementById('op-cpn-total').value = ''; document.getElementById('op-cpn-maxorder').value = ''; opLoadCoupons(); });
   }).catch(function (e) { opCpnMsg('Error: ' + ((e && e.message) || 'could not save')); });
 }
 function opLoadCoupons() {
@@ -15707,7 +15769,7 @@ function opLoadCoupons() {
       var where = o.allShops ? '🌐 All shops' : Object.keys(o.shops || {}).map(function (id) { return names[id] || id; }).join(', ') || '—';
       var h = document.createElement('div'); h.style.cssText = 'font-weight:700;font-size:.95rem;'; h.textContent = '🎟️ ' + o.code + ' — ' + off + (o.auto ? '  ⚡ AUTO-APPLY' : '');
       var d = document.createElement('div');
-      d.textContent = 'Min order ₹' + (o.minOrder || 0) + ' · ' + (o.perCustomer || 1) + 'x per customer · ' + (o.maxUses > 0 ? ((totals[k] || 0) + '/' + o.maxUses + ' used in total · ') : 'no total limit · ') + (o.off ? '⏸ Paused' : opPosterStatus(+o.expiresAt || 0)) + (o.secret ? ' · 🔒 Secret' : ' · 🎟️ Shown as card');
+      d.textContent = 'Min order ₹' + (o.minOrder || 0) + (o.maxOrder > 0 ? ' · Max order ₹' + o.maxOrder : '') + ' · ' + (o.perCustomer || 1) + 'x per customer · ' + (o.maxUses > 0 ? ((totals[k] || 0) + '/' + o.maxUses + ' used in total · ') : 'no total limit · ') + (o.off ? '⏸ Paused' : opPosterStatus(+o.expiresAt || 0)) + (o.secret ? ' · 🔒 Secret' : ' · 🎟️ Shown as card');
       var w = document.createElement('div'); w.textContent = 'Shops: ' + where;
       var bar = document.createElement('div'); bar.style.cssText = 'display:flex;gap:8px;margin-top:6px;';
       var b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'op-btn'; b1.style.cssText = 'padding:6px 10px;margin:0;'; b1.textContent = o.off ? 'Resume' : 'Pause';
