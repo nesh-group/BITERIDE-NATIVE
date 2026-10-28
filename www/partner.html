@@ -1900,6 +1900,11 @@
           <h3>Customer Support</h3>
           <p>Set the phone number the "Call Support" button in the customer app dials</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('home-popup')">
+          <div class="op-home-icon">🎉</div>
+          <h3>Home Popup Banner</h3>
+          <p>Offer popup on the customer app home screen (like "FREE DELIVERY") — set the text, image and which card "Order Now" opens</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('test-location')">
           <div class="op-home-icon">🧪</div>
           <h3>Test Location</h3>
@@ -2436,7 +2441,7 @@
       <h2>Coupons</h2>
     </div>
     <div class="op-section-body">
-      <p class="op-note">Customers type the code at checkout. It works only at the shops you tick below (or all shops). The discount is taken off the items total and saved on the order as couponCode / couponDiscount.</p>
+      <p class="op-note">Customers type the code at checkout. It works only at the shops you tick below (or all shops), and you can limit it to a card (Food / Groceries / NESH Mart) and to zones. The discount is taken off the items total and saved on the order as couponCode / couponDiscount.</p>
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px;">
         <input type="text" id="op-cpn-code" placeholder="CODE (e.g. FIRST50)" maxlength="20" style="width:170px;text-transform:uppercase;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
         <input type="text" id="op-cpn-desc" placeholder="Short description (optional, e.g. First order offer)" maxlength="40" style="flex:1 1 220px;min-width:200px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
@@ -2458,6 +2463,14 @@
       </div>
       <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-cpn-secret"> 🔒 Secret code (don't show as an offer card - customer must type it)</label>
       <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-cpn-auto"> ⚡ Auto-apply at checkout (applied automatically when the customer qualifies — no code needed)</label>
+      <p class="op-note" style="margin-bottom:6px;">Works in which card? <span style="color:#1f7a3d;">(none ticked = all cards)</span></p>
+      <div style="color:#33ff66;font-size:.85rem;line-height:2;margin-bottom:10px;">
+        <label style="display:inline-block;margin-right:14px;"><input type="checkbox" class="op-cpn-card" value="food"> 🍔 Food</label>
+        <label style="display:inline-block;margin-right:14px;"><input type="checkbox" class="op-cpn-card" value="groceries"> 🛒 Groceries</label>
+        <label style="display:inline-block;margin-right:14px;"><input type="checkbox" class="op-cpn-card" value="mart"> 🏪 NESH Mart</label>
+      </div>
+      <p class="op-note" style="margin-bottom:6px;">Works in which zone? <span style="color:#1f7a3d;">(none ticked = 🌍 all zones · zone = the customer's delivery location)</span></p>
+      <div id="op-cpn-zones" style="color:#33ff66;font-size:.85rem;line-height:1.9;margin-bottom:10px;">Loading zones...</div>
       <p class="op-note" style="margin-bottom:6px;">Works at which shops?</p>
       <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:6px;"><input type="checkbox" id="op-cpn-all" onchange="opCpnAllToggle(this)"> 🌐 All shops</label>
       <div id="op-cpn-shops" style="max-height:220px;overflow:auto;border:1px solid #124a24;padding:8px;margin-bottom:12px;color:#33ff66;font-size:.85rem;line-height:2;"></div>
@@ -3176,6 +3189,66 @@
     </div>
   </div>
 
+  <!-- HOME POPUP BANNER — stored at app_config/homePopup = { on, bg, title, line, chip, image, btn, target, freq, version, updatedAt } -->
+  <div class="op-section" id="op-section-home-popup">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Home Popup Banner</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">An offer popup that opens over the customer app's home screen. Fill it in, then <b>Save &amp; switch ON</b>. Every save counts as a new offer, so people who already saw the old one will see this one again.</p>
+      <style>#op-section-home-popup .hp-f{width:100%;padding:10px;background:transparent;color:inherit;border:1px solid currentColor;border-radius:6px;font:inherit;box-sizing:border-box;margin-bottom:10px}#op-section-home-popup .hp-l{display:block;font-size:12px;opacity:.8;margin:6px 0 4px}</style>
+
+      <label class="hp-l">Big heading (use Enter for a 2nd line)</label>
+      <textarea id="op-hp-title" class="hp-f" rows="2" maxlength="60" placeholder="FREE&#10;DELIVERY"></textarea>
+      <label class="hp-l">Small line under it</label>
+      <input type="text" id="op-hp-line" class="hp-f" maxlength="70" placeholder="on all orders above ₹129">
+      <label class="hp-l">Highlight tag (optional)</label>
+      <input type="text" id="op-hp-chip" class="hp-f" maxlength="50" placeholder="& free cash of ₹20">
+
+      <label class="hp-l">Picture (optional)</label>
+      <input type="file" id="op-hp-file" accept="image/*" onchange="opHpPickImage(event)" style="margin-bottom:8px;">
+      <input type="text" id="op-hp-image" class="hp-f" placeholder="…or paste an image link (https://…)" oninput="opHpPreview()">
+      <img id="op-hp-preview" alt="" style="display:none;max-width:100%;max-height:160px;border-radius:10px;margin-bottom:10px;">
+
+      <label class="hp-l">Button text</label>
+      <input type="text" id="op-hp-btn" class="hp-f" maxlength="24" placeholder="ORDER NOW">
+
+      <label class="hp-l">When the button is tapped, open…</label>
+      <select id="op-hp-target" class="hp-f">
+        <option value="food">🍔 Food card</option>
+        <option value="groceries">🛒 Groceries card</option>
+        <option value="online_shop">🛍️ Other Shop card</option>
+        <option value="taxi">🚖 Taxi card</option>
+        <option value="bus">🚌 Bus card</option>
+        <option value="orders">📦 Your Orders</option>
+        <option value="none">Just close the popup</option>
+      </select>
+
+      <label class="hp-l">Colour</label>
+      <select id="op-hp-bg" class="hp-f">
+        <option value="pink">Pink</option>
+        <option value="green">Green</option>
+        <option value="orange">Orange</option>
+        <option value="purple">Purple</option>
+        <option value="yellow">Yellow</option>
+      </select>
+
+      <label class="hp-l">How often to show</label>
+      <select id="op-hp-freq" class="hp-f">
+        <option value="always">Every time the app opens</option>
+        <option value="daily">Once a day</option>
+        <option value="once">Only once per offer</option>
+      </select>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
+        <button type="button" class="op-btn op-btn-push" onclick="opSaveHomePopup(true)">💾 Save &amp; switch ON</button>
+        <button type="button" class="op-btn op-btn-danger" onclick="opSaveHomePopup(false)">⏹ Switch OFF</button>
+      </div>
+      <p class="op-note" id="op-hp-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
   <!-- TEST LOCATION — stored at app_config/testLocation = { on, zoneId, zoneName, lat, lng, updatedAt } -->
   <div class="op-section" id="op-section-test-location">
     <div class="op-section-header">
@@ -3419,7 +3492,7 @@
         <p class="op-note" id="op-pm-bulk-photo-status" style="margin-top:4px; display:none;"></p>
       </div>
       <div style="margin-top:14px;">
-        <p class="op-note" style="margin-bottom:4px;">Export stock — downloads this shop's full stock as an Excel file, in the same column format (Name, Discription, Price, Unit, Photo) the Bulk import above expects.</p>
+        <p class="op-note" style="margin-bottom:4px;">Export stock — downloads this shop's full stock as an Excel file in the same format the Bulk import above expects (Name, Discription, Price, Unit, Photo, Quarter/Half/Full, Category), sorted by category order.</p>
         <button type="button" class="op-btn op-btn-push" id="op-pm-export-stock-btn" onclick="opExportStock()">📤 Export stock (Excel)</button>
         <p class="op-note" id="op-pm-export-stock-status" style="margin-top:4px; display:none;"></p>
       </div>
@@ -4656,7 +4729,7 @@ function logInRestaurant(id, data) {
   const importColumnsHint = document.getElementById('bulk-import-columns-hint');
   if (importColumnsHint) {
     importColumnsHint.style.display = groceriesShop ? "none" : "block";
-    importColumnsHint.innerHTML = "Excel columns: <b>Name</b>, <b>Discription</b> (or Description), <b>Price</b>, <b>Photo</b> (optional — image link). For Half/Full items add <b>Quarter</b>, <b>Half</b>, <b>Full</b> price columns (fill at least 2; Price can then be left empty).";
+    importColumnsHint.innerHTML = "Excel columns: <b>Name</b>, <b>Discription</b> (or Description), <b>Price</b>, <b>Photo</b> (optional — image link). For portions add a <b>Portions</b> column like <i>6 pcs=90, 10 pcs=140</i> (or Quarter/Half/Full columns). Optional <b>Category</b> column makes menu tabs.";
   }
   let restoreScreen = 'home';
   try {
@@ -6617,6 +6690,21 @@ function normalizeUnitCell(val) {
   return 'piece';
 }
 
+// Parses a free-text "Portions" cell like "6 pcs=90, 10 pcs=140" or
+// "Small=250, Large=350" into { names:[...], prices:{label:price} }.
+// Two or more valid label=price pairs = the item is sold in portions.
+function parsePortionsCell(val) {
+  const names = [], prices = {};
+  String(val || "").split(/[,;\n]+/).forEach(function (part) {
+    const m = part.split("=");
+    if (m.length < 2) return;
+    const label = m[0].replace(/[.$#\[\]\/]/g, " ").replace(/\s+/g, " ").trim();
+    const pv = parseFloat(m.slice(1).join("=").replace(/[^0-9.]/g, ""));
+    if (label && !isNaN(pv) && pv > 0 && !(label in prices)) { names.push(label); prices[label] = pv; }
+  });
+  return { names, prices };
+}
+
 async function handleBulkImportFile(e) {
   const file = e.target.files[0];
   e.target.value = ""; // allow re-selecting the same file later
@@ -6668,8 +6756,11 @@ async function importMenuFileForShop(file, targetRestId, groceriesShop, statusEl
     const hKey = groceriesShop ? null : findKey('half', 'halfprice');
     const fKey = groceriesShop ? null : findKey('full', 'fullprice');
     const portionKeys = [['Quarter', qKey], ['Half', hKey], ['Full', fKey]].filter(x => x[1]);
+    // Free-text "Portions" column (e.g. "6 pcs=90, 10 pcs=140") and optional "Category" column (item category tabs).
+    const portionsTextKey = groceriesShop ? null : findKey('portions', 'portion', 'sizes');
+    const catKey = findKey('category', 'categories', 'itemcategory', 'section', 'group');
 
-    if (!nameKey || (!priceKey && portionKeys.length < 2)) {
+    if (!nameKey || (!priceKey && portionKeys.length < 2 && !portionsTextKey)) {
       statusEl.style.color = "var(--chili)";
       statusEl.textContent = "Couldn't find Name/Price columns. Check your file's header row.";
       return;
@@ -6682,6 +6773,9 @@ async function importMenuFileForShop(file, targetRestId, groceriesShop, statusEl
     const BATCH_SIZE = 300; // keep each Firebase update() payload reasonably sized
     let updates = {};
     let pending = 0;
+    const catItems = {}; // category name -> { itemId: true }
+    const catDisplay = {}; // lowercase -> name as typed
+    let lastCat = "";
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -6693,6 +6787,10 @@ async function importMenuFileForShop(file, targetRestId, groceriesShop, statusEl
         const pv = parseFloat(row[pk[1]]);
         if (!isNaN(pv) && pv > 0) { portionNames.push(pk[0]); portionPrices[pk[0]] = pv; }
       });
+      if (portionsTextKey && portionNames.length < 2) {
+        const pp = parsePortionsCell(row[portionsTextKey]);
+        if (pp.names.length >= 2) { pp.names.forEach(n => { portionNames.push(n); portionPrices[n] = pp.prices[n]; }); }
+      }
       const hasPortions = portionNames.length >= 2;
       if (hasPortions) price = portionPrices[portionNames[0]];   // base price = first portion
       // Photo column holds a direct image link (e.g. a Cloudinary/Google Drive/
@@ -6713,6 +6811,16 @@ async function importMenuFileForShop(file, targetRestId, groceriesShop, statusEl
       // a root-level ref(db) update can hit under path-scoped security rules.
       const newKey = push(menuRef).key;
       updates[newKey] = hasPortions ? { name, desc, price, photo, unit, sizes: portionNames, sizePrices: portionPrices } : { name, desc, price, photo, unit };
+      if (catKey) {
+        // Blank category cell = same category as the row above (so a category only needs typing once).
+        let cn = String(row[catKey] || "").trim().slice(0, 30) || lastCat;
+        if (cn) {
+          lastCat = cn;
+          const lk = cn.toLowerCase();
+          if (!catDisplay[lk]) { catDisplay[lk] = cn; catItems[lk] = {}; }
+          catItems[lk][newKey] = true;
+        }
+      }
       added++;
       if (photo) withPhoto++;
       pending++;
@@ -6728,8 +6836,37 @@ async function importMenuFileForShop(file, targetRestId, groceriesShop, statusEl
       await update(menuRef, updates);
     }
 
+    // Item categories (tabs on the shop's menu): add to an existing category with the same name, else create a new one.
+    let catsTouched = 0;
+    const catKeys = Object.keys(catItems);
+    if (catKeys.length) {
+      const { get, set } = window.fb;
+      const catBase = 'restaurants/' + targetRestId + '/itemCategories';
+      const snap = await get(ref(db, catBase));
+      const existingCats = {};
+      let maxOrder = 0;
+      snap.forEach(ch => {
+        const v = ch.val() || {};
+        existingCats[String(v.name || "").trim().toLowerCase()] = ch.key;
+        maxOrder = Math.max(maxOrder, Number(v.order) || 0);
+      });
+      const catUpdates = {};
+      catKeys.forEach(lk => {
+        const existingId = existingCats[lk];
+        if (existingId) {
+          Object.keys(catItems[lk]).forEach(id => { catUpdates[existingId + '/items/' + id] = true; });
+        } else {
+          maxOrder += 1;
+          const cid = push(ref(db, catBase)).key;
+          catUpdates[cid] = { name: catDisplay[lk], order: maxOrder, items: catItems[lk] };
+        }
+        catsTouched++;
+      });
+      await update(ref(db, catBase), catUpdates);
+    }
+
     statusEl.style.color = added > 0 ? "#2C4A37" : "var(--chili)";
-    statusEl.textContent = `Done — ${added} item${added === 1 ? '' : 's'} added` + (withPhoto > 0 ? ` (${withPhoto} with photo)` : '') + (skipped > 0 ? `, ${skipped} row${skipped === 1 ? '' : 's'} skipped (missing name/price)` : '');
+    statusEl.textContent = `Done — ${added} item${added === 1 ? '' : 's'} added` + (withPhoto > 0 ? ` (${withPhoto} with photo)` : '') + (catsTouched > 0 ? `, ${catsTouched} categor${catsTouched === 1 ? 'y' : 'ies'} set` : '') + (skipped > 0 ? `, ${skipped} row${skipped === 1 ? '' : 's'} skipped (missing name/price)` : '');
     showToast(added > 0 ? `${added} items imported` : "No valid rows to import");
   } catch (err) {
     statusEl.style.color = "var(--chili)";
@@ -8433,7 +8570,7 @@ function opOpenSection(name) {
   if (name === 'taxi-orders') { opPopulateRidesZoneFilter(); opRenderRidesList(); }
   if (name === 'app-videos') { opLoadAppVideos(); opLoadBusVideos(); }
   if (name === 'video-ads') opLoadVideoAds();
-  if (name === 'coupons') { opCpnBuildShops(); opLoadCoupons(); }
+  if (name === 'coupons') { opCpnBuildShops(); opLoadZoneNames().then(function () { opCpnBuildZones(); opLoadCoupons(); }); }
   if (name === 'loyalty') { opLoyBuildShops(); opLoyLoad(); opLoyLoadClaims(); opLoyLoadNudge(); }
   if (name === 'loyalty-store') { opLsRenderItemSelect(); opLsLoad(); }
   if (name === 'notify') { opLoadPosters(); opRenderNotifyZones(); }
@@ -8452,6 +8589,7 @@ function opOpenSection(name) {
   if (name === 'rain-surge') opLoadRainSurge();
   if (name === 'support-phone') opLoadSupportPhone();
   if (name === 'test-location') opLoadTestLocation();
+  if (name === 'home-popup') opLoadHomePopup();
   if (name === 'driver-config') opLoadDriverConfig();
   if (name === 'driver-posters') opLoadDriverPosters();
   if (name === 'driver-sos') opRenderSosList();
@@ -9057,6 +9195,81 @@ function opClearTestLocation() {
   const { db, ref, remove } = window.fb;
   remove(ref(db, 'app_config/testLocation'))
     .then(() => { status.textContent = 'OFF — the test location button is hidden in the customer app.'; })
+    .catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+/* ---- Home popup banner: /app_config/homePopup { on, bg, title, line, chip, image, btn, target, freq, version, updatedAt } ---- */
+var opHpUploading = false;
+function opHpPreview() {
+  const url = document.getElementById('op-hp-image').value.trim();
+  const img = document.getElementById('op-hp-preview');
+  if (url) { img.src = url; img.style.display = 'block'; } else { img.removeAttribute('src'); img.style.display = 'none'; }
+}
+function opHpPickImage(e) {
+  const file = e.target.files && e.target.files[0];
+  const status = document.getElementById('op-hp-status');
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = async () => {
+      opHpUploading = true;
+      status.textContent = 'Uploading picture...';
+      try {
+        const blob = await resizeImageToBlob(img, 800, 0.8);
+        const url = await uploadPhotoToCloudinary(blob);
+        document.getElementById('op-hp-image').value = url;
+        opHpPreview();
+        status.textContent = 'Picture uploaded. Now press Save.';
+      } catch (err) {
+        status.textContent = 'Could not upload the picture — check your connection and try again.';
+      } finally { opHpUploading = false; }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function opLoadHomePopup() {
+  const status = document.getElementById('op-hp-status');
+  status.textContent = 'Loading current popup...';
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'app_config/homePopup')).then(snap => {
+    const c = snap.val() || {};
+    document.getElementById('op-hp-title').value = c.title || '';
+    document.getElementById('op-hp-line').value = c.line || '';
+    document.getElementById('op-hp-chip').value = c.chip || '';
+    document.getElementById('op-hp-image').value = c.image || '';
+    document.getElementById('op-hp-btn').value = c.btn || '';
+    document.getElementById('op-hp-target').value = c.target || 'food';
+    document.getElementById('op-hp-bg').value = c.bg || 'pink';
+    document.getElementById('op-hp-freq').value = c.freq || 'always';
+    opHpPreview();
+    status.textContent = c.updatedAt ? ('Popup is ' + (c.on ? 'ON' : 'OFF') + ' — last saved ' + c.updatedAt + '.') : 'Not set yet — customers see no popup.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opSaveHomePopup(on) {
+  const status = document.getElementById('op-hp-status');
+  if (opHpUploading) { status.textContent = 'Wait — the picture is still uploading.'; return; }
+  const title = document.getElementById('op-hp-title').value.trim();
+  const image = document.getElementById('op-hp-image').value.trim();
+  if (on && !title && !image) { status.textContent = 'Add a heading or a picture first.'; return; }
+  const data = {
+    on: !!on,
+    title,
+    line: document.getElementById('op-hp-line').value.trim(),
+    chip: document.getElementById('op-hp-chip').value.trim(),
+    image,
+    btn: document.getElementById('op-hp-btn').value.trim() || 'ORDER NOW',
+    target: document.getElementById('op-hp-target').value,
+    bg: document.getElementById('op-hp-bg').value,
+    freq: document.getElementById('op-hp-freq').value,
+    version: Date.now(),
+    updatedAt: new Date().toLocaleString()
+  };
+  status.textContent = 'Saving...';
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'app_config/homePopup'), data)
+    .then(() => { status.textContent = on ? 'Saved — popup is ON. Customers see it the next time they open the home screen.' : 'Saved — popup is OFF.'; })
     .catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
@@ -14424,16 +14637,38 @@ function opExportStock() {
   status.style.color = 'var(--marigold)';
   const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
   const menuObj = (p && p.menu) || {};
+  const QHF = ['Quarter', 'Half', 'Full'];
+  const spOf = it => (it && it.sizePrices && typeof it.sizePrices === 'object') ? it.sizePrices : {};
   const anyPortions = Object.values(menuObj).some(it => it && it.sizePrices && typeof it.sizePrices === 'object');
-  const rows = Object.values(menuObj).map(it => {
+  // Portions with other labels (e.g. "6 pcs", "Small") can't fit Quarter/Half/Full columns — they go in one Portions column ("label=price, ...").
+  const anyOtherPortions = Object.values(menuObj).some(it => Object.keys(spOf(it)).some(k => !QHF.includes(k)));
+  // Item categories (menu tabs): item -> first category by tab order; export is sorted by category order, uncategorized last.
+  const cats = Object.keys((p && p.itemCategories) || {}).map(id => {
+    const v = p.itemCategories[id] || {};
+    return { name: v.name || '', order: Number(v.order) || 0, items: v.items || {} };
+  }).filter(c => c.name).sort((a, b) => (a.order - b.order) || a.name.localeCompare(b.name));
+  const anyCats = cats.length > 0;
+  const entries = Object.keys(menuObj).map((id, idx) => {
+    const ci = cats.findIndex(c => c.items && c.items[id]);
+    return { id, it: menuObj[id], idx, ci: ci < 0 ? 9999 : ci };
+  }).filter(e => e.it);
+  entries.sort((x, y) => (x.ci - y.ci) || (x.idx - y.idx));
+  const rows = entries.map(e => {
+    const it = e.it, sp = spOf(it);
+    const isPortion = it.sizePrices && typeof it.sizePrices === 'object' && Object.keys(sp).length >= 2;
     const r = {
       Name: it.name || '',
       Discription: it.desc || '',
-      Price: it.price != null ? it.price : '',
+      Price: isPortion ? '' : (it.price != null ? it.price : ''),   // portion items: price lives in the portion columns
       Unit: it.unit || 'piece',
       Photo: it.photo || ''
     };
-    if (anyPortions) { const sp = (it.sizePrices && typeof it.sizePrices === 'object') ? it.sizePrices : {}; r.Quarter = sp.Quarter || ''; r.Half = sp.Half || ''; r.Full = sp.Full || ''; }
+    if (anyPortions) { r.Quarter = sp.Quarter || ''; r.Half = sp.Half || ''; r.Full = sp.Full || ''; }
+    if (anyOtherPortions) {
+      const others = Object.keys(sp).filter(k => !QHF.includes(k));
+      r.Portions = others.length ? others.map(k => k + '=' + sp[k]).join(', ') : '';
+    }
+    if (anyCats) r.Category = e.ci === 9999 ? '' : cats[e.ci].name;
     return r;
   });
   if (!rows.length) {
@@ -15814,13 +16049,25 @@ function opLoyDelete() {
 }
 
 /* ---- COUPONS (operator) ----
-   app_config/coupons/{id} = { code, type:'flat'|'percent', value, minOrder, maxDiscount, expiresAt, perCustomer, maxOrder (0 = no limit), allShops, shops:{shopId:true}, off, ts } */
+   app_config/coupons/{id} = { code, type:'flat'|'percent', value, minOrder, maxDiscount, expiresAt, perCustomer, maxOrder (0 = no limit), allShops, shops:{shopId:true}, cards:{food|groceries|mart:true} (empty = all cards), zones:{shopZoneId:true} (empty = all zones), off, ts } */
 function opCpnMsg(t) { var e = document.getElementById('op-cpn-status'); if (e) e.textContent = t || ''; }
 function opCpnShopList() {
   return (typeof opAllPartners !== 'undefined' && opAllPartners ? opAllPartners : [])
     .filter(function (s) { return s.businessType !== 'groceries'; })
     .sort(function (a, b) { return (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id); });
 }
+function opCpnBuildZones() {
+  var box = document.getElementById('op-cpn-zones'); if (!box) return;
+  var keep = Array.prototype.map.call(box.querySelectorAll('input:checked'), function (c) { return c.value; });
+  box.innerHTML = '';
+  if (!opPosterZones.length) { box.textContent = 'No shop zones created yet — coupon works in every area.'; return; }
+  opPosterZones.forEach(function (z) {
+    var l = document.createElement('label'); l.style.cssText = 'display:inline-block;margin-right:14px;';
+    var c = document.createElement('input'); c.type = 'checkbox'; c.className = 'op-cpn-zone'; c.value = z.id; c.checked = keep.indexOf(z.id) > -1;
+    l.appendChild(c); l.appendChild(document.createTextNode(' 📍 ' + z.name)); box.appendChild(l);
+  });
+}
+var OP_CPN_CARDS = { food: '🍔 Food', groceries: '🛒 Groceries', mart: '🏪 NESH Mart' };
 function opCpnAllToggle(cb) { document.getElementById('op-cpn-shops').style.display = cb.checked ? 'none' : 'block'; }
 function opCpnBuildShops() {
   var box = document.getElementById('op-cpn-shops'); if (!box) return;
@@ -15846,7 +16093,10 @@ function opCpnSave() {
   if (expAt === null) { opCpnMsg('Enter how many hours (1 or more).'); return; }
   var all = document.getElementById('op-cpn-all').checked, shops = {}, n = 0;
   if (!all) Array.prototype.forEach.call(document.querySelectorAll('.op-cpn-shop:checked'), function (c) { shops[c.value] = true; n++; });
-  if (!all && !n) { opCpnMsg('Tick at least one shop (or All shops).'); return; }
+  var cards = {}, zones = {}, nc = 0, nz = 0;
+  Array.prototype.forEach.call(document.querySelectorAll('.op-cpn-card:checked'), function (c) { cards[c.value] = true; nc++; });
+  Array.prototype.forEach.call(document.querySelectorAll('.op-cpn-zone:checked'), function (c) { zones[c.value] = true; nz++; });
+  if (!all && !n) { if (nc || nz) { all = true; shops = {}; } else { opCpnMsg('Tick at least one shop (or All shops) — or pick a card / zone.'); return; } }
   opCpnMsg('Saving...');
   fb.get(fb.ref(fb.db, 'app_config/coupons')).then(function (snap) {
     var v = snap.val() || {}, dup = Object.keys(v).some(function (k) { return v[k] && String(v[k].code).toUpperCase() === code && !(v[k].expiresAt && v[k].expiresAt < Date.now()); });
@@ -15859,7 +16109,7 @@ function opCpnSave() {
       maxOrder: maxO,
       maxDiscount: Math.max(0, parseFloat(document.getElementById('op-cpn-max').value) || 0),
       perCustomer: Math.max(1, parseInt(document.getElementById('op-cpn-uses').value, 10) || 1),
-      expiresAt: expAt, allShops: all, secret: document.getElementById('op-cpn-secret').checked, auto: document.getElementById('op-cpn-auto').checked, shops: all ? {} : shops, ts: Date.now()
+      expiresAt: expAt, allShops: all, secret: document.getElementById('op-cpn-secret').checked, auto: document.getElementById('op-cpn-auto').checked, shops: all ? {} : shops, cards: cards, zones: zones, ts: Date.now()
     }).then(function () { opCpnMsg('Coupon ' + code + ' saved ✅'); document.getElementById('op-cpn-code').value = ''; document.getElementById('op-cpn-desc').value = ''; document.getElementById('op-cpn-total').value = ''; document.getElementById('op-cpn-maxorder').value = ''; opLoadCoupons(); });
   }).catch(function (e) { opCpnMsg('Error: ' + ((e && e.message) || 'could not save')); });
 }
@@ -15879,7 +16129,10 @@ function opLoadCoupons() {
       var h = document.createElement('div'); h.style.cssText = 'font-weight:700;font-size:.95rem;'; h.textContent = '🎟️ ' + o.code + ' — ' + off + (o.auto ? '  ⚡ AUTO-APPLY' : '');
       var d = document.createElement('div');
       d.textContent = 'Min order ₹' + (o.minOrder || 0) + (o.maxOrder > 0 ? ' · Max order ₹' + o.maxOrder : '') + ' · ' + (o.perCustomer || 1) + 'x per customer · ' + (o.maxUses > 0 ? ((totals[k] || 0) + '/' + o.maxUses + ' used in total · ') : 'no total limit · ') + (o.off ? '⏸ Paused' : opPosterStatus(+o.expiresAt || 0)) + (o.secret ? ' · 🔒 Secret' : ' · 🎟️ Shown as card');
-      var w = document.createElement('div'); w.textContent = 'Shops: ' + where;
+      var w = document.createElement('div');
+      var cardTxt = Object.keys(o.cards || {}).filter(function (k) { return o.cards[k]; }).map(function (k) { return OP_CPN_CARDS[k] || k; }).join(', ') || '🌐 All cards';
+      var zoneTxt = Object.keys(o.zones || {}).filter(function (k) { return o.zones[k]; }).map(function (id) { var z = opPosterZones.filter(function (x) { return x.id === id; })[0]; return '📍 ' + (z ? z.name : '(deleted zone)'); }).join(', ') || '🌍 All zones';
+      w.textContent = 'Shops: ' + where + ' · Card: ' + cardTxt + ' · Zone: ' + zoneTxt;
       var bar = document.createElement('div'); bar.style.cssText = 'display:flex;gap:8px;margin-top:6px;';
       var b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'op-btn'; b1.style.cssText = 'padding:6px 10px;margin:0;'; b1.textContent = o.off ? 'Resume' : 'Pause';
       b1.onclick = function () { fb.update(fb.ref(fb.db, 'app_config/coupons/' + k), { off: !o.off }).then(opLoadCoupons).catch(function (e) { opCpnMsg('Error: ' + e.message); }); };
