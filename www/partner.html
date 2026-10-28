@@ -2474,7 +2474,8 @@
       <p class="op-note" style="margin-bottom:6px;">Works at which shops?</p>
       <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:6px;"><input type="checkbox" id="op-cpn-all" onchange="opCpnAllToggle(this)"> 🌐 All shops</label>
       <div id="op-cpn-shops" style="max-height:220px;overflow:auto;border:1px solid #124a24;padding:8px;margin-bottom:12px;color:#33ff66;font-size:.85rem;line-height:2;"></div>
-      <button type="button" class="op-btn op-btn-push" onclick="opCpnSave()">💾 Save coupon</button>
+      <button type="button" class="op-btn op-btn-push" id="op-cpn-save-btn" onclick="opCpnSave()">💾 Save coupon</button>
+      <button type="button" class="op-btn" id="op-cpn-cancel-btn" style="display:none;margin-left:8px;" onclick="opCpnEditReset(true)">✖ Cancel edit</button>
       <p class="op-note" id="op-cpn-status" style="margin-top:10px;"></p>
       <div id="op-cpn-list"></div>
     </div>
@@ -8570,7 +8571,7 @@ function opOpenSection(name) {
   if (name === 'taxi-orders') { opPopulateRidesZoneFilter(); opRenderRidesList(); }
   if (name === 'app-videos') { opLoadAppVideos(); opLoadBusVideos(); }
   if (name === 'video-ads') opLoadVideoAds();
-  if (name === 'coupons') { opCpnBuildShops(); opLoadZoneNames().then(function () { opCpnBuildZones(); opLoadCoupons(); }); }
+  if (name === 'coupons') { opCpnBuildShops(); try { opCpnEditReset(false); } catch (e) {} opLoadZoneNames().then(function () { opCpnBuildZones(); opLoadCoupons(); }); }
   if (name === 'loyalty') { opLoyBuildShops(); opLoyLoad(); opLoyLoadClaims(); opLoyLoadNudge(); }
   if (name === 'loyalty-store') { opLsRenderItemSelect(); opLsLoad(); }
   if (name === 'notify') { opLoadPosters(); opRenderNotifyZones(); }
@@ -16081,27 +16082,87 @@ function opCpnBuildShops() {
     box.appendChild(l);
   });
 }
+var opCpnEditKey = null, opCpnEditData = null;   // set while an existing coupon is being edited
+function opCpnEditReset(clearMsg) {   // leave edit mode and put the form back to its blank/default state
+  opCpnEditKey = null; opCpnEditData = null;
+  var $ = function (id) { return document.getElementById(id); };
+  ['op-cpn-code', 'op-cpn-desc', 'op-cpn-value', 'op-cpn-min', 'op-cpn-maxorder', 'op-cpn-max', 'op-cpn-total', 'op-cpn-dur-custom'].forEach(function (id) { if ($(id)) $(id).value = ''; });
+  if ($('op-cpn-type')) $('op-cpn-type').value = 'flat';
+  if ($('op-cpn-uses')) $('op-cpn-uses').value = '1';
+  if ($('op-cpn-secret')) $('op-cpn-secret').checked = false;
+  if ($('op-cpn-auto')) $('op-cpn-auto').checked = false;
+  var dur = $('op-cpn-dur');
+  if (dur) { var keep = dur.querySelector('option[value="keep"]'); if (keep) keep.remove(); dur.value = '720'; }
+  if ($('op-cpn-dur-custom')) $('op-cpn-dur-custom').style.display = 'none';
+  Array.prototype.forEach.call(document.querySelectorAll('.op-cpn-card, .op-cpn-zone, .op-cpn-shop'), function (c) { c.checked = false; });
+  if ($('op-cpn-all')) { $('op-cpn-all').checked = false; opCpnAllToggle($('op-cpn-all')); }
+  if ($('op-cpn-save-btn')) $('op-cpn-save-btn').textContent = '💾 Save coupon';
+  if ($('op-cpn-cancel-btn')) $('op-cpn-cancel-btn').style.display = 'none';
+  if (clearMsg) opCpnMsg('');
+}
+function opCpnEdit(k, o) {   // load an existing coupon into the form; Save then UPDATES it (zone / shops / cards / limits can all be changed)
+  opCpnEditReset(false);
+  opCpnEditKey = k; opCpnEditData = o;
+  var $ = function (id) { return document.getElementById(id); };
+  $('op-cpn-code').value = o.code || '';
+  $('op-cpn-desc').value = o.desc || '';
+  $('op-cpn-type').value = o.type === 'percent' ? 'percent' : 'flat';
+  $('op-cpn-value').value = o.value || '';
+  $('op-cpn-min').value = o.minOrder > 0 ? o.minOrder : '';
+  $('op-cpn-maxorder').value = o.maxOrder > 0 ? o.maxOrder : '';
+  $('op-cpn-max').value = o.maxDiscount > 0 ? o.maxDiscount : '';
+  $('op-cpn-uses').value = Math.max(1, +o.perCustomer || 1);
+  $('op-cpn-total').value = o.maxUses > 0 ? o.maxUses : '';
+  $('op-cpn-secret').checked = !!o.secret;
+  $('op-cpn-auto').checked = !!o.auto;
+  // time: keep the current expiry unless the operator picks a new duration
+  var dur = $('op-cpn-dur'), opt = document.createElement('option'); opt.value = 'keep';
+  opt.textContent = 'Keep current time (' + (o.expiresAt ? (o.expiresAt > Date.now() ? 'until ' + new Date(+o.expiresAt).toLocaleString() : 'expired') : 'no time limit') + ')';
+  dur.insertBefore(opt, dur.firstChild); dur.value = 'keep';
+  $('op-cpn-dur-custom').style.display = 'none';
+  // cards / zones / shops
+  Array.prototype.forEach.call(document.querySelectorAll('.op-cpn-card'), function (c) { c.checked = !!(o.cards && o.cards[c.value]); });
+  Array.prototype.forEach.call(document.querySelectorAll('.op-cpn-zone'), function (c) { c.checked = !!(o.zones && o.zones[c.value]); });
+  $('op-cpn-all').checked = !!o.allShops; opCpnAllToggle($('op-cpn-all'));
+  Array.prototype.forEach.call(document.querySelectorAll('.op-cpn-shop'), function (c) { c.checked = !!(o.shops && o.shops[c.value]); });
+  $('op-cpn-save-btn').textContent = '💾 Update coupon';
+  $('op-cpn-cancel-btn').style.display = '';
+  opCpnMsg('✏️ Editing coupon ' + o.code + ' — change what you need (zone, shops, card...) and press Update coupon.');
+  try { $('op-cpn-code').scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+}
 function opCpnSave() {
   var fb = window.fb; if (!fb) { opCpnMsg('Not connected yet, try again.'); return; }
+  var editKey = opCpnEditKey, editOld = opCpnEditData || {};
   var code = document.getElementById('op-cpn-code').value.trim().toUpperCase();
   if (!/^[A-Z0-9]{3,20}$/.test(code)) { opCpnMsg('Code must be 3-20 letters/numbers (no spaces).'); return; }
   var type = document.getElementById('op-cpn-type').value, value = parseFloat(document.getElementById('op-cpn-value').value);
   if (!(value > 0) || (type === 'percent' && value > 100)) { opCpnMsg(type === 'percent' ? 'Enter a percent between 1 and 100.' : 'Enter the ₹ amount off.'); return; }
   var minO = Math.max(0, parseFloat(document.getElementById('op-cpn-min').value) || 0), maxO = Math.max(0, parseFloat(document.getElementById('op-cpn-maxorder').value) || 0);
   if (maxO > 0 && maxO < minO) { opCpnMsg('Max order must be greater than Min order.'); return; }
-  var expAt = opDurToExpiry(document.getElementById('op-cpn-dur').value, document.getElementById('op-cpn-dur-custom').value);
+  var durVal = document.getElementById('op-cpn-dur').value;
+  var expAt = (editKey && durVal === 'keep') ? (+editOld.expiresAt || 0) : opDurToExpiry(durVal, document.getElementById('op-cpn-dur-custom').value);
   if (expAt === null) { opCpnMsg('Enter how many hours (1 or more).'); return; }
   var all = document.getElementById('op-cpn-all').checked, shops = {}, n = 0;
   if (!all) Array.prototype.forEach.call(document.querySelectorAll('.op-cpn-shop:checked'), function (c) { shops[c.value] = true; n++; });
+  // editing: shops that are not in the tick-list (e.g. a removed shop) keep their old value so nothing is silently lost
+  if (editKey && !all) {
+    var listed = {}; Array.prototype.forEach.call(document.querySelectorAll('.op-cpn-shop'), function (c) { listed[c.value] = true; });
+    Object.keys(editOld.shops || {}).forEach(function (id) { if (editOld.shops[id] && !listed[id] && !shops[id]) { shops[id] = true; n++; } });
+  }
   var cards = {}, zones = {}, nc = 0, nz = 0;
   Array.prototype.forEach.call(document.querySelectorAll('.op-cpn-card:checked'), function (c) { cards[c.value] = true; nc++; });
   Array.prototype.forEach.call(document.querySelectorAll('.op-cpn-zone:checked'), function (c) { zones[c.value] = true; nz++; });
+  if (editKey && !nz && Object.keys(editOld.zones || {}).some(function (z) { return editOld.zones[z]; })) {
+    if (!confirm('No zone is ticked now, so this coupon will work in ALL zones. Continue?')) { opCpnMsg('Not saved — tick a zone and press Update coupon.'); return; }
+  }
   if (!all && !n) { if (nc || nz) { all = true; shops = {}; } else { opCpnMsg('Tick at least one shop (or All shops) — or pick a card / zone.'); return; } }
   opCpnMsg('Saving...');
   fb.get(fb.ref(fb.db, 'app_config/coupons')).then(function (snap) {
-    var v = snap.val() || {}, dup = Object.keys(v).some(function (k) { return v[k] && String(v[k].code).toUpperCase() === code && !(v[k].expiresAt && v[k].expiresAt < Date.now()); });
+    var v = snap.val() || {};
+    if (editKey && !v[editKey]) { opCpnMsg('This coupon was deleted meanwhile. Press Cancel edit and create it again if needed.'); return; }
+    var dup = Object.keys(v).some(function (k) { return k !== editKey && v[k] && String(v[k].code).toUpperCase() === code && !(v[k].expiresAt && v[k].expiresAt < Date.now()); });
     if (dup) { opCpnMsg('A live coupon with this code already exists. Delete it first or use a different code.'); return; }
-    return fb.set(fb.push(fb.ref(fb.db, 'app_config/coupons')), {
+    var data = {
       code: code, type: type, value: value,
       desc: document.getElementById('op-cpn-desc').value.trim().slice(0, 40),
       maxUses: Math.max(0, parseInt(document.getElementById('op-cpn-total').value, 10) || 0),
@@ -16109,8 +16170,16 @@ function opCpnSave() {
       maxOrder: maxO,
       maxDiscount: Math.max(0, parseFloat(document.getElementById('op-cpn-max').value) || 0),
       perCustomer: Math.max(1, parseInt(document.getElementById('op-cpn-uses').value, 10) || 1),
-      expiresAt: expAt, allShops: all, secret: document.getElementById('op-cpn-secret').checked, auto: document.getElementById('op-cpn-auto').checked, shops: all ? {} : shops, cards: cards, zones: zones, ts: Date.now()
-    }).then(function () { opCpnMsg('Coupon ' + code + ' saved ✅'); document.getElementById('op-cpn-code').value = ''; document.getElementById('op-cpn-desc').value = ''; document.getElementById('op-cpn-total').value = ''; document.getElementById('op-cpn-maxorder').value = ''; opLoadCoupons(); });
+      expiresAt: expAt, allShops: all, secret: document.getElementById('op-cpn-secret').checked, auto: document.getElementById('op-cpn-auto').checked, shops: all ? {} : shops, cards: cards, zones: zones
+    };
+    if (editKey) {
+      // update in place: id, ts, paused state and the customers' use counts stay exactly as they were
+      return fb.update(fb.ref(fb.db, 'app_config/coupons/' + editKey), data).then(function () {
+        opCpnEditReset(false); opCpnMsg('Coupon ' + code + ' updated ✅'); opLoadCoupons();
+      });
+    }
+    data.ts = Date.now();
+    return fb.set(fb.push(fb.ref(fb.db, 'app_config/coupons')), data).then(function () { opCpnMsg('Coupon ' + code + ' saved ✅'); document.getElementById('op-cpn-code').value = ''; document.getElementById('op-cpn-desc').value = ''; document.getElementById('op-cpn-total').value = ''; document.getElementById('op-cpn-maxorder').value = ''; opLoadCoupons(); });
   }).catch(function (e) { opCpnMsg('Error: ' + ((e && e.message) || 'could not save')); });
 }
 function opLoadCoupons() {
@@ -16137,10 +16206,12 @@ function opLoadCoupons() {
       var b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'op-btn'; b1.style.cssText = 'padding:6px 10px;margin:0;'; b1.textContent = o.off ? 'Resume' : 'Pause';
       b1.onclick = function () { fb.update(fb.ref(fb.db, 'app_config/coupons/' + k), { off: !o.off }).then(opLoadCoupons).catch(function (e) { opCpnMsg('Error: ' + e.message); }); };
       var b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'op-btn'; b2.style.cssText = 'padding:6px 10px;margin:0;'; b2.textContent = 'Delete';
-      b2.onclick = function () { if (confirm('Delete coupon ' + o.code + '?')) fb.remove(fb.ref(fb.db, 'app_config/coupons/' + k)).then(opLoadCoupons).catch(function (e) { opCpnMsg('Error: ' + e.message); }); };
+      b2.onclick = function () { if (confirm('Delete coupon ' + o.code + '?')) fb.remove(fb.ref(fb.db, 'app_config/coupons/' + k)).then(function () { if (opCpnEditKey === k) opCpnEditReset(true); opLoadCoupons(); }).catch(function (e) { opCpnMsg('Error: ' + e.message); }); };
       var b3 = document.createElement('button'); b3.type = 'button'; b3.className = 'op-btn'; b3.style.cssText = 'padding:6px 10px;margin:0;'; b3.textContent = o.auto ? '⚡ Auto: ON (turn off)' : '⚡ Auto: OFF (turn on)';
       b3.onclick = function () { fb.update(fb.ref(fb.db, 'app_config/coupons/' + k), { auto: !o.auto }).then(opLoadCoupons).catch(function (e) { opCpnMsg('Error: ' + e.message); }); };
-      bar.appendChild(b1); bar.appendChild(b3); bar.appendChild(b2);
+      var b4 = document.createElement('button'); b4.type = 'button'; b4.className = 'op-btn'; b4.style.cssText = 'padding:6px 10px;margin:0;'; b4.textContent = '✏️ Edit';
+      b4.onclick = function () { opCpnEdit(k, o); };
+      bar.appendChild(b4); bar.appendChild(b1); bar.appendChild(b3); bar.appendChild(b2);
       row.appendChild(h); row.appendChild(d); row.appendChild(w); row.appendChild(bar); box.appendChild(row);
     });
   }).catch(function (e) { box.innerHTML = '<p class="op-note">Could not load: ' + (e && e.message) + '</p>'; });
