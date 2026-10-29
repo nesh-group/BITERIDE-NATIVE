@@ -512,14 +512,14 @@
   .chat-send-btn{ background:var(--marigold); color:#fff; border:none; width:40px; height:40px; border-radius:50%; font-size:1rem; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
 
   /* ===== Operator Panel (terminal / hacker theme, scoped) ===== */
-  #operator-container{ display:none; position:fixed; inset:0; z-index:7000; background:#ffffff; font-family:'Courier New',Consolas,monospace; color:#15803d; }
+  #operator-container{ display:none; position:fixed; inset:0; z-index:7000; background:#ffffff; font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif; color:#15803d; }
   #operator-container.show{ display:block; }
   #operator-container *{ box-sizing:border-box; }
   #operator-container .op-home{ height:100vh; max-width:900px; margin:0 auto; display:flex; flex-direction:column; padding:30px 20px; overflow-y:auto; }
   #operator-container .op-home-header{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:26px; border-bottom:1px solid #cfe6d5; padding-bottom:16px; }
   #operator-container .op-home-header h2{ font-size:1.7rem; color:#16a34a; letter-spacing:2px;  }
-  #operator-container .op-home-header h2::before{ content:'~/ '; color:#5f8a6c; }
-  #operator-container .op-home-header p{ color:#5f8a6c; font-size:.8rem; letter-spacing:1px; text-transform:uppercase; margin-top:4px; }
+  #operator-container .op-home-header h2::before{ content:'~/ '; color:#475569; }
+  #operator-container .op-home-header p{ color:#475569; font-size:.8rem; letter-spacing:1px; text-transform:uppercase; margin-top:4px; }
   #operator-container .op-logout-btn{ background:#ffffff; color:#6b7280; border:1px solid #d1d5db; padding:7px 12px; cursor:pointer; font-family:inherit; font-size:.78rem; text-transform:uppercase; }
   #operator-container .op-home-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-top:6px; }
   #operator-container .op-home-card.op-search-hide{ display:none !important; }
@@ -527,7 +527,7 @@
   #operator-container .op-home-card:hover{ background:#e6f4ea; border-color:#16a34a; box-shadow:0 0 15px rgba(22,163,74,.18); }
   #operator-container .op-home-icon{ font-size:2rem; margin-bottom:8px; filter:grayscale(1) sepia(1) hue-rotate(70deg) saturate(3); }
   #operator-container .op-home-card h3{ color:#15803d; font-size:.98rem; margin-bottom:4px; text-transform:uppercase; letter-spacing:1px; }
-  #operator-container .op-home-card p{ color:#5f8a6c; font-size:.76rem; line-height:1.4; }
+  #operator-container .op-home-card p{ color:#475569; font-size:.76rem; line-height:1.4; }
   #operator-container .op-section{ display:none; height:100vh; max-width:900px; margin:0 auto; flex-direction:column; }
   #operator-container .op-section.active{ display:flex; }
   #operator-container .op-section-header{ background:#f4faf5; padding:16px 18px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #cfe6d5; flex-shrink:0; }
@@ -547,12 +547,12 @@
   #operator-container .op-partner-item:hover{ background:#eef7f0; }
   #operator-container .op-partner-top{ display:flex; justify-content:space-between; align-items:baseline; }
   #operator-container .op-partner-name{ font-weight:700; font-size:.92rem; color:#15803d; }
-  #operator-container .op-partner-name::before{ content:'$ '; color:#5f8a6c; }
-  #operator-container .op-partner-type{ font-size:.68rem; color:#5f8a6c; text-transform:uppercase; letter-spacing:.5px; }
-  #operator-container .op-partner-sub{ font-size:.76rem; color:#5f8a6c; margin-top:2px; }
+  #operator-container .op-partner-name::before{ content:'$ '; color:#475569; }
+  #operator-container .op-partner-type{ font-size:.68rem; color:#475569; text-transform:uppercase; letter-spacing:.5px; }
+  #operator-container .op-partner-sub{ font-size:.76rem; color:#475569; margin-top:2px; }
   #operator-container .op-search-box{ padding:0 0 12px; }
   #operator-container .op-search-box input{ width:100%; padding:9px 10px; background:#f4faf5; color:#15803d; border:1px solid #cfe6d5; font-size:.85rem; font-family:inherit; }
-  #operator-container .op-search-box input::placeholder{ color:#5f8a6c; }
+  #operator-container .op-search-box input::placeholder{ color:#475569; }
   #operator-container .op-search-box input:focus{ outline:none; border-color:#16a34a; }
   #operator-container .op-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; justify-content:center; align-items:center; z-index:7500; padding:20px; }
   #operator-container .op-modal-overlay.show{ display:flex; }
@@ -563,36 +563,36 @@
   #operator-container .op-modal-card.op-modal-card-wide{ max-width:640px; }
   #operator-container .op-zone-map-wrap{ position:relative; margin-top:10px; }
   #operator-container .op-zone-map{ width:100%; height:340px; border:1px solid #cfe6d5; background:#f4faf5; }
-  #operator-container .op-zone-map-hint{ font-size:.72rem; color:#5f8a6c; margin-top:6px; text-transform:uppercase; letter-spacing:.5px; }
+  #operator-container .op-zone-map-hint{ font-size:.72rem; color:#475569; margin-top:6px; text-transform:uppercase; letter-spacing:.5px; }
   #operator-container .op-zone-search-results{ max-height:180px; overflow-y:auto; border:1px solid #cfe6d5; margin-top:6px; display:none; }
   #operator-container .op-zone-search-results.show{ display:block; }
   #operator-container .op-zone-search-item{ padding:8px 10px; font-size:.78rem; color:#15803d; border-bottom:1px solid #dcefe1; cursor:pointer; }
   #operator-container .op-zone-search-item:last-child{ border-bottom:none; }
   #operator-container .op-zone-search-item:hover{ background:#e6f4ea; }
-  #operator-container .op-zone-search-item .op-zone-search-item-sub{ color:#5f8a6c; font-size:.68rem; margin-top:2px; }
+  #operator-container .op-zone-search-item .op-zone-search-item-sub{ color:#475569; font-size:.68rem; margin-top:2px; }
   #operator-container .op-zone-pt-label{ background:none !important; border:none !important; box-shadow:none !important; color:#16a34a !important; font-size:11px !important; font-weight:bold; }
-  #operator-container .op-empty{ padding:24px 10px; text-align:center; color:#5f8a6c; font-size:.85rem; }
+  #operator-container .op-empty{ padding:24px 10px; text-align:center; color:#475569; font-size:.85rem; }
   #operator-container .op-groceries-card{ margin-top:14px; padding:14px; border:1px solid #8fc79d; background:#f4faf5; box-shadow:0 0 10px rgba(22,163,74,.08); }
   #operator-container .op-groceries-card-title{ color:#16a34a; font-size:.85rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid #cfe6d5; }
   /* Operator: Orders (all shops) */
   #operator-container .op-home-badge{ position:absolute; top:10px; right:10px; background:#dc2626; color:#fff; font-size:.66rem; font-weight:700; padding:2px 8px; border-radius:20px; }
   #operator-container .op-order-tabs{ display:flex; gap:8px; margin-bottom:12px; }
-  #operator-container .op-order-tab{ flex:1; padding:9px 6px; text-align:center; background:#f4faf5; border:1px solid #cfe6d5; color:#5f8a6c; font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; cursor:pointer; font-family:inherit; }
+  #operator-container .op-order-tab{ flex:1; padding:9px 6px; text-align:center; background:#f4faf5; border:1px solid #cfe6d5; color:#475569; font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; cursor:pointer; font-family:inherit; }
   #operator-container .op-order-tab.active{ background:#16a34a; color:#ffffff; border-color:#16a34a; font-weight:700; }
   #operator-container .op-order-item{ padding:12px 14px; border:1px solid #cfe6d5; margin-bottom:8px; }
   #operator-container .op-order-item.late{ border-color:#dc2626; background:#fef2f2; }
   #operator-container .op-order-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
   #operator-container .op-order-shop{ font-weight:700; font-size:.9rem; color:#15803d; }
   #operator-container .op-order-shop::before{ content:'🏬 '; }
-  #operator-container .op-order-status-pill{ font-size:.62rem; padding:3px 9px; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; border:1px solid #cfe6d5; color:#5f8a6c; flex-shrink:0; }
-  #operator-container .op-order-status-preparing, #operator-container .op-order-status-ready{ color:#15803d; border-color:#5f8a6c; }
+  #operator-container .op-order-status-pill{ font-size:.62rem; padding:3px 9px; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; border:1px solid #cfe6d5; color:#475569; flex-shrink:0; }
+  #operator-container .op-order-status-preparing, #operator-container .op-order-status-ready{ color:#15803d; border-color:#475569; }
   #operator-container .op-order-status-pending{ color:#b45309; border-color:#e9c27a; }
   #operator-container .op-order-status-delivered, #operator-container .op-order-status-completed, #operator-container .op-order-status-done{ color:#6b7280; border-color:#d1d5db; }
   #operator-container .op-order-status-cancelled, #operator-container .op-order-status-rejected{ color:#dc2626; border-color:#f2b8b0; }
-  #operator-container .op-order-sub{ font-size:.76rem; color:#5f8a6c; margin-top:4px; }
+  #operator-container .op-order-sub{ font-size:.76rem; color:#475569; margin-top:4px; }
   #operator-container .op-order-amt{ font-size:.95rem; color:#15803d; margin-top:6px; display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
   #operator-container .op-order-amt b{ font-size:1.05rem; }
-  #operator-container .op-order-no{ font-size:.72rem; color:#5f8a6c; }
+  #operator-container .op-order-no{ font-size:.72rem; color:#475569; }
   #operator-container .op-order-items{ font-size:.8rem; color:#1f2937; margin-top:4px; line-height:1.4; }
   #operator-container .op-order-status-picked_up{ color:#15803d; border-color:#8fc79d; }
   #operator-container .op-order-late-tag{ display:inline-block; margin-top:8px; padding:3px 9px; background:#dc2626; color:#fff; font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
@@ -602,7 +602,7 @@
   #operator-container .op-report-summary{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
   #operator-container .op-report-summary-item{ flex:1; min-width:76px; background:#f4faf5; border:1px solid #cfe6d5; padding:10px 6px; text-align:center; }
   #operator-container .op-report-summary-item .n{ font-size:1.15rem; font-weight:700; color:#15803d; }
-  #operator-container .op-report-summary-item .l{ font-size:.62rem; color:#5f8a6c; text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }
+  #operator-container .op-report-summary-item .l{ font-size:.62rem; color:#475569; text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }
   /* Operator conversation list / chat panel */
   #operator-container .op-app{ display:flex; height:100vh; max-width:900px; margin:0 auto; }
   #operator-container .op-sidebar{ width:280px; flex-shrink:0; border-right:1px solid #cfe6d5; display:flex; flex-direction:column; background:#ffffff; }
@@ -611,8 +611,8 @@
   #operator-container .op-conv-item:hover{ background:#eef7f0; }
   #operator-container .op-conv-item.active{ background:#dff1e4; border-left:3px solid #16a34a; }
   #operator-container .op-conv-name{ font-weight:700; font-size:.88rem; color:#15803d; }
-  #operator-container .op-conv-name::before{ content:'$ '; color:#5f8a6c; }
-  #operator-container .op-conv-preview{ font-size:.74rem; color:#5f8a6c; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #operator-container .op-conv-name::before{ content:'$ '; color:#475569; }
+  #operator-container .op-conv-preview{ font-size:.74rem; color:#475569; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #operator-container .op-chat-panel{ flex:1; display:none; flex-direction:column; background:#ffffff; }
   #operator-container .op-chat-panel.active{ display:flex; }
   #operator-container .op-chat-header{ background:#f4faf5; padding:14px 16px; border-bottom:1px solid #cfe6d5; display:flex; align-items:center; gap:10px; }
@@ -622,13 +622,13 @@
   #operator-container .op-chat-bubble-row.me{ justify-content:flex-end; }
   #operator-container .op-chat-bubble-row.them{ justify-content:flex-start; }
   #operator-container .op-chat-bubble{ max-width:70%; padding:9px 12px; font-size:.85rem; line-height:1.4; border:1px solid #cfe6d5; word-wrap:break-word; }
-  #operator-container .op-chat-bubble-row.me .op-chat-bubble{ background:#e6f4ea; color:#16a34a; border-color:#5f8a6c; }
+  #operator-container .op-chat-bubble-row.me .op-chat-bubble{ background:#e6f4ea; color:#16a34a; border-color:#475569; }
   #operator-container .op-chat-bubble-row.them .op-chat-bubble{ background:#f4faf5; color:#15803d; border-color:#d1d5db; }
-  #operator-container .op-chat-bubble .op-chat-time{ display:block; text-align:right; font-size:.65rem; color:#5f8a6c; margin-top:3px; }
+  #operator-container .op-chat-bubble .op-chat-time{ display:block; text-align:right; font-size:.65rem; color:#475569; margin-top:3px; }
   #operator-container .op-chat-input-bar{ display:flex; gap:10px; align-items:flex-end; padding:12px 14px; background:#f4faf5; border-top:1px solid #cfe6d5; }
   #operator-container .op-chat-input-bar textarea{ flex:1; margin:0; max-height:90px; }
   #operator-container .op-chat-send-btn{ background:#ffffff; color:#16a34a; border:1px solid #16a34a; width:40px; height:40px; font-size:1rem; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-family:inherit; }
-  #operator-container .op-no-chat-selected{ flex:1; display:flex; align-items:center; justify-content:center; color:#5f8a6c; font-size:.9rem; text-align:center; padding:20px; }
+  #operator-container .op-no-chat-selected{ flex:1; display:flex; align-items:center; justify-content:center; color:#475569; font-size:.9rem; text-align:center; padding:20px; }
   @media (max-width:640px){
     #operator-container .op-app{ max-width:100%; position:relative; }
     #operator-container .op-sidebar{ width:100%; position:absolute; top:0; left:0; height:100%; z-index:5; transition:transform .25s ease; }
@@ -651,6 +651,65 @@
     margin-top:16px; padding:10px 28px; border-radius:999px; border:none; background:var(--marigold);
     color:var(--ink); font-weight:700; font-size:14px; cursor:pointer; display:none; font-family:'Inter',sans-serif;
   }
+
+  /* ===== Operator Panel – readability fixes (clean sans font, dark text, no terminal styling) ===== */
+  #operator-container{ font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif !important; color:#111827; line-height:1.5; }
+  #operator-container *{ letter-spacing:normal !important; }
+  #operator-container .op-home{ padding:20px 16px; }
+  #operator-container .op-home-header h2{ font-size:1.6rem; color:#14532d; font-weight:700; text-transform:none; }
+  #operator-container .op-home-header h2::before{ content:none; }
+  #operator-container .op-home-header p{ color:#475569; font-size:.95rem; text-transform:none; }
+  #operator-container .op-logout-btn{ color:#374151; border-color:#9ca3af; font-size:.9rem; text-transform:none; padding:9px 14px; }
+  #operator-container .op-home-grid{ grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); }
+  #operator-container .op-home-card{ padding:20px 16px; border-color:#b7d3be; }
+  #operator-container .op-home-card h3{ color:#14532d; font-size:1.1rem; font-weight:700; text-transform:none; margin-bottom:6px; }
+  #operator-container .op-home-card p{ color:#374151; font-size:.92rem; line-height:1.5; }
+  #operator-container .op-section-header h2{ color:#14532d; font-size:1.15rem; font-weight:700; text-transform:none; }
+  #operator-container .op-back-btn, #operator-container .op-back-to-list{ color:#14532d; }
+  #operator-container p.op-note{ font-size:.9rem; color:#475569; line-height:1.55; }
+  #operator-container .op-btn{ font-size:.95rem; padding:11px 16px; }
+  #operator-container .op-partner-name{ color:#14532d; font-size:1rem; }
+  #operator-container .op-partner-name::before, #operator-container .op-conv-name::before{ content:none; }
+  #operator-container .op-partner-type{ font-size:.8rem; text-transform:none; color:#475569; }
+  #operator-container .op-partner-sub, #operator-container .op-conv-preview, #operator-container .op-order-sub{ font-size:.88rem; color:#475569; }
+  #operator-container .op-conv-name, #operator-container .op-chat-header .op-name{ color:#14532d; font-size:1rem; }
+  #operator-container .op-order-tab{ font-size:.82rem; text-transform:none; color:#374151; }
+  #operator-container .op-order-tab.active{ color:#fff; }
+  #operator-container .op-order-shop{ color:#14532d; font-size:1rem; }
+  #operator-container .op-order-status-pill{ font-size:.75rem; text-transform:none; }
+  #operator-container .op-order-no{ font-size:.82rem; color:#475569; }
+  #operator-container .op-order-items{ font-size:.92rem; color:#111827; }
+  #operator-container .op-order-amt{ color:#14532d; }
+  #operator-container .op-order-late-tag{ font-size:.75rem; text-transform:none; }
+  #operator-container .op-report-summary-item .n{ color:#14532d; }
+  #operator-container .op-report-summary-item .l{ font-size:.78rem; text-transform:none; color:#475569; }
+  #operator-container .op-modal-card h3, #operator-container .op-groceries-card-title{ text-transform:none; font-size:1.05rem; color:#14532d; }
+  #operator-container .op-modal-card .op-mc-row{ font-size:.92rem; color:#374151; }
+  #operator-container .op-modal-card .op-mc-row b{ color:#14532d; }
+  #operator-container .op-zone-map-hint{ font-size:.82rem; text-transform:none; color:#475569; }
+  #operator-container .op-zone-search-item{ font-size:.9rem; color:#111827; }
+  #operator-container .op-zone-search-item .op-zone-search-item-sub{ color:#475569; font-size:.8rem; }
+  #operator-container .op-empty, #operator-container .op-no-chat-selected{ color:#475569; font-size:.95rem; }
+  #operator-container .op-chat-bubble{ font-size:.95rem; }
+  #operator-container .op-chat-bubble-row.me .op-chat-bubble{ color:#14532d; }
+  #operator-container .op-chat-bubble-row.them .op-chat-bubble{ color:#111827; }
+  #operator-container .op-chat-bubble .op-chat-time{ color:#475569; }
+  #operator-container .op-search-box input::placeholder, #operator-container input::placeholder, #operator-container textarea::placeholder{ color:#6b7280; opacity:1; }
+  #operator-container input:not([type=checkbox]):not([type=radio]):not([type=file]), #operator-container select, #operator-container textarea{
+    font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif !important; font-size:16px !important; color:#111827 !important; }
+  #operator-container label{ color:#1f2937 !important; font-size:.95rem !important; }
+  #operator-container table{ font-size:.9rem; }
+
+  /* ON/OFF switches for the order-alert sound & vibration */
+  #operator-container .op-switch-row{ display:flex !important; align-items:center; justify-content:space-between; gap:12px; margin:0 0 12px; cursor:pointer; }
+  #operator-container .op-switch-text{ font-size:1rem; font-weight:600; color:#111827; line-height:1.3; }
+  #operator-container .op-switch-text small{ display:block; font-size:.8rem; font-weight:400; color:#475569; margin-top:2px; }
+  #operator-container input.op-switch{ -webkit-appearance:none; appearance:none; flex-shrink:0; width:52px !important; height:30px !important; margin:0; border-radius:30px; background:#9ca3af; position:relative; cursor:pointer; transition:background .2s; border:none; }
+  #operator-container input.op-switch::before{ content:''; position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.35); transition:transform .2s; }
+  #operator-container input.op-switch:checked{ background:#16a34a; }
+  #operator-container input.op-switch:checked::before{ transform:translateX(22px); }
+  /* Cancelled tab turns red when selected */
+  #operator-container .op-order-tab[data-tab="cancelled"].active{ background:#dc2626; border-color:#dc2626; color:#fff; }
 </style>
 </head>
 <body>
@@ -1706,7 +1765,7 @@
       </div>
       <p class="op-note" id="op-data-usage" style="margin:0 0 10px; display:none;"></p>
       <div style="margin:0 0 14px;position:relative;">
-        <input type="search" id="op-home-search" placeholder="🔍 Search cards (e.g. coupon, orders, taxi…)" oninput="opHomeSearch(this.value)" autocomplete="off" style="width:100%;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:12px 14px;font-family:inherit;font-size:.95rem;">
+        <input type="search" id="op-home-search" placeholder="Search: coupon, orders, taxi…" oninput="opHomeSearch(this.value)" autocomplete="off" style="width:100%;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:12px 14px;font-family:inherit;font-size:.95rem;">
         <p class="op-note" id="op-home-search-empty" style="display:none;margin:10px 0 0;">No card matches your search.</p>
       </div>
       <div class="op-home-grid">
@@ -1968,12 +2027,17 @@
       <h2>Orders</h2>
     </div>
     <div class="op-section-body">
+      <div style="padding:10px 12px;margin-bottom:12px;border:1px solid #cfe6d5;background:#f4faf5;">
+        <p class="op-note" style="margin:0 0 8px;"><b>New-order alerts on this phone</b></p>
+      <label class="op-switch-row"><span class="op-switch-text">🔔 Sound on new order<small>This phone only · off by default</small></span><input type="checkbox" class="op-switch" id="op-alert-sound" onchange="opSetAlertSound(this.checked)"></label>
+      <label class="op-switch-row"><span class="op-switch-text">📳 Vibration on new order<small>This phone only · off by default</small></span><input type="checkbox" class="op-switch" id="op-alert-vibrate" onchange="opSetAlertVibrate(this.checked)"></label>
+      </div>
       <div class="op-order-tabs">
         <button type="button" class="op-order-tab active" data-tab="inprogress" onclick="opSwitchOrdersTab('inprogress')">In Progress</button>
         <button type="button" class="op-order-tab" data-tab="delivered" onclick="opSwitchOrdersTab('delivered')">Delivered</button>
         <button type="button" class="op-order-tab" data-tab="cancelled" onclick="opSwitchOrdersTab('cancelled')">Cancelled</button>
       </div>
-      <div class="op-search-box"><input type="text" id="op-orders-search" placeholder="Search by shop, order # or customer..." oninput="opRenderOrdersList()"></div>
+      <div class="op-search-box"><input type="text" id="op-orders-search" placeholder="Shop, order # or customer" oninput="opRenderOrdersList()"></div>
       <div id="op-orders-list"></div>
     </div>
   </div>
@@ -2045,7 +2109,7 @@
 
       <div style="margin-bottom:22px;">
         <p class="op-note" style="margin-bottom:6px;">Add stock item to a section — only the item itself (name, photo, unit) is added, at ₹0 and marked unavailable. Each shop sets its own price and marks it available from its own Stock screen. A shop that already has the same item (same name and unit) is skipped.</p>
-        <select id="op-sec-add-select" onchange="opUpdateSectionAddHint()" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:6px;"></select>
+        <select id="op-sec-add-select" onchange="opUpdateSectionAddHint()" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Inter',monospace; font-size:.8rem; margin-bottom:6px;"></select>
         <p class="op-note" id="op-sec-add-hint" style="margin-bottom:8px;"></p>
         <div class="op-search-box" style="margin-bottom:0;">
           <input type="text" id="op-sec-item-name" placeholder="Item name" autocomplete="off">
@@ -2053,7 +2117,7 @@
         <div class="op-search-box" style="margin-bottom:0;">
           <input type="text" id="op-sec-item-desc" placeholder="Description (optional)" autocomplete="off">
         </div>
-        <select id="op-sec-item-unit" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;">
+        <select id="op-sec-item-unit" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Inter',monospace; font-size:.8rem; margin-bottom:8px;">
           <option value="piece">Piece</option>
           <option value="gram">Gram</option>
           <option value="kg">Kg</option>
@@ -2348,7 +2412,7 @@
       </div>
       <img id="op-notify-image-preview" style="display:none;max-width:120px;max-height:120px;border-radius:6px;margin-top:8px;border:1px solid #b7d3be;">
       <div style="margin:14px 0 4px;">
-        <p class="op-note" style="margin-bottom:6px;">Send to which customers? <span style="color:#5f8a6c;">(a customer's zone = the zone of their last known location in the app)</span></p>
+        <p class="op-note" style="margin-bottom:6px;">Send to which customers? <span style="color:#475569;">(a customer's zone = the zone of their last known location in the app)</span></p>
         <label style="color:#15803d;font-size:.85rem;display:block;margin-bottom:4px;"><input type="checkbox" id="op-notify-all" checked onchange="opNotifyTargetChanged('all')"> 🌍 All customers</label>
         <div id="op-notify-zones" style="color:#15803d;font-size:.85rem;line-height:1.9;">Loading zones...</div>
       </div>
@@ -2369,15 +2433,15 @@
          <p class="op-note" style="margin:6px 0 0;">📣 Popup = shows over the NESH Mart screen like Spotify's offer card, closes by itself after 4 seconds (✕ also works), and each customer sees it only once. Poster keeps its own shape - any size works. Untick the other boxes if it should be a popup only.</p>
        </div>
        <div style="margin:0 0 10px;">
-         <p class="op-note" style="margin-bottom:6px;">Open a home card or a shop when tapped? <span style="color:#5f8a6c;">(optional - pick one)</span></p>
+         <p class="op-note" style="margin-bottom:6px;">Open a home card or a shop when tapped? <span style="color:#475569;">(optional - pick one)</span></p>
          <select id="op-poster-shop" style="max-width:100%;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;"></select>
        </div>
        <div style="margin:0 0 10px;">
-         <p class="op-note" style="margin-bottom:6px;">Show in which zone? <span style="color:#5f8a6c;">(none ticked = 🌍 General, shows in every zone)</span></p>
+         <p class="op-note" style="margin-bottom:6px;">Show in which zone? <span style="color:#475569;">(none ticked = 🌍 General, shows in every zone)</span></p>
          <div id="op-poster-zones" style="color:#15803d;font-size:.85rem;line-height:1.9;">Loading zones...</div>
        </div>
        <div style="margin:0 0 10px;">
-         <p class="op-note" style="margin-bottom:6px;">Poster of which shop? <span style="color:#5f8a6c;">(optional - the poster then shows ONLY in the zones where that shop is available)</span></p>
+         <p class="op-note" style="margin-bottom:6px;">Poster of which shop? <span style="color:#475569;">(optional - the poster then shows ONLY in the zones where that shop is available)</span></p>
          <select id="op-poster-zshop" style="max-width:100%;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;"></select>
        </div>
        <div style="margin:0 0 10px;">
@@ -2468,13 +2532,13 @@
       </div>
       <label style="color:#15803d;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-cpn-secret"> 🔒 Secret code (don't show as an offer card - customer must type it)</label>
       <label style="color:#15803d;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-cpn-auto"> ⚡ Auto-apply at checkout (applied automatically when the customer qualifies — no code needed)</label>
-      <p class="op-note" style="margin-bottom:6px;">Works in which card? <span style="color:#5f8a6c;">(none ticked = all cards)</span></p>
+      <p class="op-note" style="margin-bottom:6px;">Works in which card? <span style="color:#475569;">(none ticked = all cards)</span></p>
       <div style="color:#15803d;font-size:.85rem;line-height:2;margin-bottom:10px;">
         <label style="display:inline-block;margin-right:14px;"><input type="checkbox" class="op-cpn-card" value="food"> 🍔 Food</label>
         <label style="display:inline-block;margin-right:14px;"><input type="checkbox" class="op-cpn-card" value="groceries"> 🛒 Groceries</label>
         <label style="display:inline-block;margin-right:14px;"><input type="checkbox" class="op-cpn-card" value="mart"> 🏪 NESH Mart</label>
       </div>
-      <p class="op-note" style="margin-bottom:6px;">Works in which zone? <span style="color:#5f8a6c;">(none ticked = 🌍 all zones · zone = the customer's delivery location)</span></p>
+      <p class="op-note" style="margin-bottom:6px;">Works in which zone? <span style="color:#475569;">(none ticked = 🌍 all zones · zone = the customer's delivery location)</span></p>
       <div id="op-cpn-zones" style="color:#15803d;font-size:.85rem;line-height:1.9;margin-bottom:10px;">Loading zones...</div>
       <p class="op-note" style="margin-bottom:6px;">Works at which shops?</p>
       <label style="color:#15803d;font-size:.85rem;display:block;margin-bottom:6px;"><input type="checkbox" id="op-cpn-all" onchange="opCpnAllToggle(this)"> 🌐 All shops</label>
@@ -2694,7 +2758,7 @@
       <h2>Account Deletions</h2>
     </div>
     <div class="op-section-body">
-      <p style="color:#5f8a6c; font-size:.78rem; margin:0 0 14px; line-height:1.5;">Customers submit these from the app's public "Delete Account" page. Verify the number is genuinely theirs (e.g. call to confirm) before deleting — the request itself isn't identity-verified.</p>
+      <p style="color:#475569; font-size:.78rem; margin:0 0 14px; line-height:1.5;">Customers submit these from the app's public "Delete Account" page. Verify the number is genuinely theirs (e.g. call to confirm) before deleting — the request itself isn't identity-verified.</p>
       <div id="op-deletions-list"></div>
     </div>
   </div>
@@ -3433,14 +3497,14 @@
       </div>
       <div style="margin-top:14px;">
         <p class="op-note" style="margin-bottom:4px;">Area — mark which area this shop is in. Use the area filter on the Restaurant Partners list to see all shops in one area.</p>
-        <select id="op-pm-area-select" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
+        <select id="op-pm-area-select" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Inter',monospace; font-size:.8rem; margin-bottom:8px;"></select>
         <button type="button" class="op-btn op-btn-push" onclick="opSavePartnerArea()">💾 Save area</button>
         <p class="op-note" id="op-pm-area-status" style="margin-top:4px;"></p>
       </div>
       <div style="margin-top:14px; display:none;" id="op-pm-shopzone-block">
         <p class="op-note" style="margin-bottom:4px;">Shop zone — groceries shops don't draw their own zone. Pick the zone (from Shop Zones) this shop serves. A customer inside that zone is only matched to shops in it.</p>
         <p class="op-note" id="op-pm-shopzone-requested" style="margin-bottom:6px; display:none;"></p>
-        <select id="op-pm-shopzone-select" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
+        <select id="op-pm-shopzone-select" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Inter',monospace; font-size:.8rem; margin-bottom:8px;"></select>
         <button type="button" class="op-btn op-btn-push" onclick="opSavePartnerShopZone()">💾 Save zone</button>
         <p class="op-note" id="op-pm-shopzone-status" style="margin-top:4px;"></p>
       </div>
@@ -3585,7 +3649,7 @@
       </div>
       <div class="op-mc-row"><b>Zone:</b> <span id="op-dm-zone">—</span></div>
       <div style="margin-top:10px;">
-        <select id="op-dm-zone-select" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
+        <select id="op-dm-zone-select" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Inter',monospace; font-size:.8rem; margin-bottom:8px;"></select>
         <button type="button" class="op-btn op-btn-push" onclick="opSaveDriverZone()">💾 Save zone</button>
         <p class="op-note" id="op-dm-zone-status" style="margin-top:6px;"></p>
       </div>
@@ -3600,7 +3664,7 @@
       </div>
       <div style="margin-top:14px; border-top:1px solid #cfe6d5; padding-top:12px;">
         <p class="op-note" style="margin-bottom:6px;">Assign a pending order/ride directly to this driver — it'll be offered to them once they're online.</p>
-        <select id="op-dm-order-select" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
+        <select id="op-dm-order-select" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Inter',monospace; font-size:.8rem; margin-bottom:8px;"></select>
         <button type="button" class="op-btn op-btn-push" onclick="opAssignOrderToDriver()">📦 Assign to this driver</button>
         <p class="op-note" id="op-dm-assign-status" style="margin-top:6px;"></p>
       </div>
@@ -3625,7 +3689,7 @@
       <div class="op-mc-row" id="op-oc-block-status" style="margin-top:10px;"></div>
       <div style="margin-top:10px;">
         <p class="op-note" style="margin-bottom:6px;">Message shown to the customer if blocked (also used as the reason):</p>
-        <textarea id="op-oc-message" rows="3" placeholder="e.g. Blocked for repeated fake/abusive orders. Contact support to appeal." style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; resize:vertical;"></textarea>
+        <textarea id="op-oc-message" rows="3" placeholder="e.g. Blocked for repeated fake/abusive orders. Contact support to appeal." style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Inter',monospace; font-size:.8rem; resize:vertical;"></textarea>
       </div>
       <div style="margin-top:14px;">
         <button type="button" class="op-btn op-btn-danger" id="op-oc-block-btn" onclick="opBlockOrderCustomer()">⛔ Block user &amp; device</button>
@@ -8484,11 +8548,26 @@ async function opRegisterOperatorPush() {
     let perm = await PN.checkPermissions();
     if (perm.receive !== 'granted') perm = await PN.requestPermissions();
     if (perm.receive !== 'granted') return;
+    // Ask once per app start for "Display over other apps", so the full-screen
+    // order alert also opens while the phone is unlocked (not only when locked).
+    try {
+      const RC = window.Capacitor.Plugins.RingControl;
+      if (RC && RC.canShowOverApps) {
+        const ov = await RC.canShowOverApps();
+        if (ov && ov.granted === false) {
+          setTimeout(() => {
+            if (confirm('Order alert full-screen aayi (phone unlock aayirikkumbolum) varan "Display over other apps" allow cheyyanam. Settings open cheyyatte?')) {
+              RC.requestOverlayPermission().catch(() => {});
+            }
+          }, 1500);
+        }
+      }
+    } catch (e) {}
     PN.addListener('registration', async token => {
       try {
         const { db, ref, set } = window.fb;
         opDeviceKey = String(token.value).replace(/[.$#\[\]\/]/g, '_');
-        await set(ref(db, 'operator_devices/' + opDeviceKey), { token: token.value, updatedAt: Date.now(), fs: 2 });
+        await set(ref(db, 'operator_devices/' + opDeviceKey), { token: token.value, updatedAt: Date.now(), fs: 2, sound: localStorage.getItem('op_alert_sound') === '1' ? 1 : 0, vibrate: localStorage.getItem('op_alert_vibrate') === '1' ? 1 : 0 });
       } catch (e) {}
     });
     await PN.register();
@@ -8497,6 +8576,7 @@ async function opRegisterOperatorPush() {
 // Short two-tone beep for the panel when it's open in the foreground
 // (push notifications aren't shown while the app is in front).
 function opBeep() {
+  try { if (localStorage.getItem('op_alert_sound') !== '1') return; } catch (e) { return; } // sound switch OFF = no beep
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
     const ctx = new AC();
@@ -8530,8 +8610,29 @@ function opMeasure(label, snap) {
   }, 1500);
 }
 
+// Operator order-alert sound: OFF by default; each phone turns it on for itself.
+// The choice is saved on the phone and on its operator_devices record, which the
+// Worker reads to decide whether the alert should make a sound.
+function opSetAlertSound(on) {
+  try { localStorage.setItem('op_alert_sound', on ? '1' : '0'); } catch (e) {}
+  if (!opDeviceKey) return;
+  try {
+    const { db, ref, update } = window.fb;
+    update(ref(db, 'operator_devices/' + opDeviceKey), { sound: on ? 1 : 0 }).catch(() => {});
+  } catch (e) {}
+}
+function opSetAlertVibrate(on) {
+  try { localStorage.setItem('op_alert_vibrate', on ? '1' : '0'); } catch (e) {}
+  if (!opDeviceKey) return;
+  try {
+    const { db, ref, update } = window.fb;
+    update(ref(db, 'operator_devices/' + opDeviceKey), { vibrate: on ? 1 : 0 }).catch(() => {});
+  } catch (e) {}
+}
 function opEnterPanel() {
   opRegisterOperatorPush();
+  try { const vb = document.getElementById('op-alert-vibrate'); if (vb) vb.checked = localStorage.getItem('op_alert_vibrate') === '1'; } catch (e) {}
+  try { const cb = document.getElementById('op-alert-sound'); if (cb) cb.checked = localStorage.getItem('op_alert_sound') === '1'; } catch (e) {}
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('operator-container').classList.add('show');
   opOpenSection('home');
@@ -10751,7 +10852,7 @@ function opRenderGroceriesCatalog() {
       return `
         <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:5px 0; border-top:1px solid #cfe6d5; opacity:${dim ? '0.55' : '1'};">
           <span style="font-size:.82rem; color:${isWinner ? '#16a34a' : '#4b5d51'};">${isWinner ? '⭐ ' : ''}${escapeHtml(s.shopName)}${tags ? ' ' + tags : ''}</span>
-          <span style="font-size:.78rem; color:#5f8a6c; text-align:right; white-space:nowrap;">₹${s.price} · ${escapeHtml(updatedText)}</span>
+          <span style="font-size:.78rem; color:#475569; text-align:right; white-space:nowrap;">₹${s.price} · ${escapeHtml(updatedText)}</span>
         </div>`;
     }).join('');
     return `
@@ -11014,7 +11115,7 @@ function opRenderSectionEditorShops() {
       return `
         <label style="display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #cfe6d5; cursor:pointer;">
           <input type="checkbox" style="width:20px; height:20px; margin:0; accent-color:#15803d;" ${opSectionPickSet.has(p._id) ? 'checked' : ''} onchange="opToggleSectionShop('${p._id}', this.checked)">
-          <span style="font-size:.85rem; color:#15803d;">${escapeHtml(opShopLabel(p))}${others.length ? ` <span style="color:#5f8a6c; font-size:.72rem;">(also in ${escapeHtml(others.join(', '))})</span>` : ''}</span>
+          <span style="font-size:.85rem; color:#15803d;">${escapeHtml(opShopLabel(p))}${others.length ? ` <span style="color:#475569; font-size:.72rem;">(also in ${escapeHtml(others.join(', '))})</span>` : ''}</span>
         </label>`;
     }).join('');
   }
@@ -11436,7 +11537,7 @@ function opRenderCategoryEditorItems() {
       return `
         <label style="display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #cfe6d5; cursor:pointer;">
           <input type="checkbox" style="width:20px; height:20px; margin:0; accent-color:#15803d;" ${opCatPickSet.has(g.key) ? 'checked' : ''} onchange="opToggleCategoryItem(${i}, this.checked)">
-          <span style="font-size:.85rem; color:#15803d;">${escapeHtml(g.name)} <span style="color:#5f8a6c; font-size:.72rem;">per ${escapeHtml(g.unit)}${suffix[g.unit] || ''}${others.length ? ' · also in ' + escapeHtml(others.join(', ')) : ''}</span></span>
+          <span style="font-size:.85rem; color:#15803d;">${escapeHtml(g.name)} <span style="color:#475569; font-size:.72rem;">per ${escapeHtml(g.unit)}${suffix[g.unit] || ''}${others.length ? ' · also in ' + escapeHtml(others.join(', ')) : ''}</span></span>
         </label>`;
     }).join('');
   }
@@ -11653,7 +11754,7 @@ function opRenderItemCategoryEditorItems() {
       return `
         <label style="display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #cfe6d5; cursor:pointer;">
           <input type="checkbox" style="width:20px; height:20px; margin:0; accent-color:#15803d;" ${opItemCatPickSet.has(it.id) ? 'checked' : ''} onchange="opToggleItemCategoryItem(${i}, this.checked)">
-          <span style="font-size:.85rem; color:#15803d;">${escapeHtml(it.name)}${others.length ? ` <span style="color:#5f8a6c; font-size:.72rem;">also in ${escapeHtml(others.join(', '))}</span>` : ''}</span>
+          <span style="font-size:.85rem; color:#15803d;">${escapeHtml(it.name)}${others.length ? ` <span style="color:#475569; font-size:.72rem;">also in ${escapeHtml(others.join(', '))}</span>` : ''}</span>
         </label>`;
     }).join('');
   }
@@ -11792,7 +11893,7 @@ function opCustomerPriceLineHtml(g, maxPrice) {
   if (ov > 0) {
     line = `Customer price: ₹${ov} <span style="color:#7c3aed;">✍️ set by you</span>` +
       (auto != null
-        ? ` <span style="color:#5f8a6c; font-weight:400;">· auto would be ₹${auto}</span>`
+        ? ` <span style="color:#475569; font-weight:400;">· auto would be ₹${auto}</span>`
         : ` <span style="color:#dc2626; font-weight:400;">· hidden — no shop has it available</span>`);
   } else {
     line = `Customer price: ${auto != null ? '₹' + auto : '— no shop has it available'}`;
@@ -12401,7 +12502,7 @@ function opRenderZonesList() {
         <div class="op-partner-sub">${hasBounds ? '📍 Boundary set' : '⚠️ No boundary — using distance fallback'}</div>
       </div>
       <div style="display:flex; gap:6px; flex-shrink:0; align-items:center;">
-        <select onchange="opSetZoneGroup('${z._id}', this.value)" style="padding:6px 8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.72rem;">
+        <select onchange="opSetZoneGroup('${z._id}', this.value)" style="padding:6px 8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Inter',monospace; font-size:.72rem;">
           <option value="">No group</option>
           ${groupOptions}
         </select>
@@ -14479,7 +14580,7 @@ function opToggleDueHistory() {
   const sets = p.settlements ? Object.values(p.settlements).sort((a, b) => (b.settledAt || 0) - (a.settledAt || 0)) : [];
   const rows = hist.map(h => `
     <div class="op-order-item" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-      <div style="font-size:.78rem; line-height:1.5;"><b>Order #${escapeHtml(String(h.no))}</b><br><span style="color:#5f8a6c;">${h.at ? new Date(h.at).toLocaleString() : ''}<br>Order amount ₹${Math.round(h.amount * 100) / 100}</span></div>
+      <div style="font-size:.78rem; line-height:1.5;"><b>Order #${escapeHtml(String(h.no))}</b><br><span style="color:#475569;">${h.at ? new Date(h.at).toLocaleString() : ''}<br>Order amount ₹${Math.round(h.amount * 100) / 100}</span></div>
       <div style="font-size:1.3rem; font-weight:800; color:#16a34a; white-space:nowrap;">₹${h.commission}</div>
     </div>`).join('');
   const setRows = sets.map(x => `
@@ -15073,7 +15174,7 @@ function opRenderChatMessages(msgs) {
   const el = document.getElementById('op-chat-messages');
   if (!el) return;
   if (!msgs.length) {
-    el.innerHTML = '<p style="color:#5f8a6c;text-align:center;margin-top:20px;">No messages yet.</p>';
+    el.innerHTML = '<p style="color:#475569;text-align:center;margin-top:20px;">No messages yet.</p>';
     return;
   }
   el.innerHTML = msgs.map(m => {
@@ -16310,7 +16411,7 @@ function opLoadDriverPosters(keepMsg) {
       var im = document.createElement('img'); im.src = o.img; im.style.cssText = 'width:120px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:#f4faf5;flex:none;';
       var info = document.createElement('div'); info.style.cssText = 'flex:1;min-width:0;color:#15803d;font-size:.8rem;line-height:1.5;';
       var st = o.off ? '⏸ Paused' : opPosterStatus(+o.expiresAt || 0);
-      info.innerHTML = '<div>#' + (i + 1) + ' · ' + st + '</div>' + (o.link ? '<div style="word-break:break-all;color:#5f8a6c;">🔗 ' + escapeHtml(o.link) + '</div>' : '');
+      info.innerHTML = '<div>#' + (i + 1) + ' · ' + st + '</div>' + (o.link ? '<div style="word-break:break-all;color:#475569;">🔗 ' + escapeHtml(o.link) + '</div>' : '');
       var col = document.createElement('div'); col.style.cssText = 'display:flex;flex-direction:column;gap:6px;flex:none;';
       function btn(label, fn) { var b = document.createElement('button'); b.type = 'button'; b.className = 'op-btn'; b.style.cssText = 'padding:6px 10px;margin:0;'; b.textContent = label; b.onclick = fn; col.appendChild(b); return b; }
       function swap(j) {
