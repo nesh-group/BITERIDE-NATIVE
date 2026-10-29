@@ -3,6 +3,15 @@
 <head>
 <script>window.NESH_BUILD_NUMBER = 0; /* replaced by CI at build time */</script>
 <meta charset="UTF-8" />
+<script>
+  /* Saved session: hide the login screen until init() has restored it
+     (init() only runs after Firebase loads, so login used to flash first). */
+  try { if (localStorage.getItem('nesh_driver_id')) document.documentElement.classList.add('session-boot'); } catch (e) {}
+</script>
+<style>
+  html.session-boot #screen-login{ display:none !important; }
+</style>
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>NESH DRIVER</title>
 <link rel="manifest" href="./manifest.json">
@@ -985,7 +994,7 @@
       <button class="btn-primary" id="account-service-save-btn">Save work type</button>
     </div>
     <div class="logout-row">
-      <a href="./index.html" onclick="try{localStorage.removeItem('nesh_last_app');}catch(e){}" style="display:block;text-align:center;color:var(--muted-2);font-size:13px;margin-bottom:12px;text-decoration:none;">&larr; Switch app</a>
+      <a href="./index.html" onclick="try{localStorage.removeItem('nesh_last_app');localStorage.removeItem('nesh_portal');}catch(e){}" style="display:block;text-align:center;color:var(--muted-2);font-size:13px;margin-bottom:12px;text-decoration:none;">&larr; Switch app</a>
       <button class="btn-danger" id="logout-btn">Logout</button>
     </div>
   </section>
@@ -2096,6 +2105,7 @@ setInterval(() => { if (state.isOnline) refreshRidePopupFromCache(); }, 5000);
 
 // ---------- Screens ----------
 function showScreen(id) {
+  if (id === 'login') document.documentElement.classList.remove('session-boot');
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + id).classList.add('active');
   window.scrollTo(0, 0);

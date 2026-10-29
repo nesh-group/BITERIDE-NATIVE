@@ -9,6 +9,19 @@
 <link rel="apple-touch-icon" href="./icon-512.png">
 <link rel="icon" href="./icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+  // Decide BEFORE first paint: if a portal was chosen earlier, hide this
+  // page and jump straight there so the chooser never flashes.
+  (function(){
+    try {
+      var last = localStorage.getItem('nesh_portal');
+      if (last === 'driver' || last === 'partner' || last === 'bus') {
+        document.documentElement.style.visibility = 'hidden';
+        window.location.replace(last + '.html');
+      }
+    } catch (e) {}
+  })();
+</script>
 <style>
   *{box-sizing:border-box;}
   body{
@@ -54,12 +67,6 @@
     localStorage.setItem('nesh_portal', portal);
     window.location.href = portal + '.html';
   }
-  (function(){
-    var last = localStorage.getItem('nesh_portal');
-    if (last === 'driver' || last === 'partner' || last === 'bus') {
-      window.location.href = last + '.html';
-    }
-  })();
 </script>
 </body>
 </html>

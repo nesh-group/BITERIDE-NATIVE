@@ -15,7 +15,15 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+  /* Already logged in as operator: skip the login screen flash and show the Operator Panel straight away.
+     (init() runs only after Firebase has loaded, so until then the login screen used to be visible.) */
+  try { if (localStorage.getItem('asfood_is_operator') === '1') document.documentElement.classList.add('op-boot'); } catch (e) {}
+  try { if (localStorage.getItem('asfood_partner_id')) document.documentElement.classList.add('session-boot'); } catch (e) {}
+</script>
 <style>
+  html.op-boot #screen-login, html.session-boot #screen-login{ display:none !important; }
+  html.op-boot #operator-container{ display:block; }
   :root{
     --ink:#0B2545;
     --marigold:#2F80ED;
@@ -1371,7 +1379,7 @@
     <div class="menu-list" id="payment-pending-list"></div>
 
     <div class="px" style="margin-top:24px;">
-      <a href="./index.html" onclick="try{localStorage.removeItem('nesh_last_app');}catch(e){}" style="display:block;text-align:center;color:var(--muted-2);font-size:13px;margin-bottom:12px;text-decoration:none;">&larr; Switch app</a>
+      <a href="./index.html" onclick="try{localStorage.removeItem('nesh_last_app');localStorage.removeItem('nesh_portal');}catch(e){}" style="display:block;text-align:center;color:var(--muted-2);font-size:13px;margin-bottom:12px;text-decoration:none;">&larr; Switch app</a>
       <button class="btn-danger" id="logout-btn">Logout</button>
     </div>
   </section>
@@ -4024,6 +4032,7 @@ function formatItemPrice(it) {
 const RESTORABLE_SCREENS = ['home', 'stock', 'account'];
 
 function showScreen(id) {
+  if (id === 'login') document.documentElement.classList.remove('session-boot');
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + id).classList.add('active');
   window.scrollTo(0, 0);
@@ -8687,6 +8696,7 @@ function opLogout() {
     opDeviceKey = null;
   }
   localStorage.removeItem('asfood_is_operator');
+  document.documentElement.classList.remove('op-boot');
   document.getElementById('operator-container').classList.remove('show');
   showScreen('login');
 }
