@@ -237,6 +237,13 @@ jobs:
             sed -i '/<manifest /a\    <uses-permission android:name="android.permission.VIBRATE" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />\n    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />' "$MANIFEST"
           fi
 
+          # Lets the Operator alert open its full-screen screen even while the
+          # phone is unlocked and in use (needs the person to allow "Display over
+          # other apps" once - the app asks for it when the Operator Panel opens).
+          if ! grep -q "android.permission.SYSTEM_ALERT_WINDOW" "$MANIFEST"; then
+            sed -i '/<manifest /a\    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />' "$MANIFEST"
+          fi
+
           # Lets the app trigger the system "Install this app?" prompt
           # itself (for the in-app auto-update banner) instead of routing
           # the person through their browser's download flow first. The
@@ -770,6 +777,7 @@ jobs:
           package com.yourcompany.neshapp;
 
           import android.content.Intent;
+          import com.getcapacitor.JSObject;
           import com.getcapacitor.Plugin;
           import com.getcapacitor.PluginCall;
           import com.getcapacitor.PluginMethod;
@@ -790,6 +798,29 @@ jobs:
               @PluginMethod
               public void stopRinging(PluginCall call) {
                   getContext().stopService(new Intent(getContext(), RingingService.class));
+                  call.resolve();
+              }
+
+              // Operator Panel: is "Display over other apps" allowed? Without it the
+              // full-screen alert only opens while the phone is locked.
+              @PluginMethod
+              public void canShowOverApps(PluginCall call) {
+                  JSObject r = new JSObject();
+                  r.put("granted", android.os.Build.VERSION.SDK_INT < 23 || android.provider.Settings.canDrawOverlays(getContext()));
+                  call.resolve(r);
+              }
+
+              // Opens the system "Display over other apps" screen for this app.
+              @PluginMethod
+              public void requestOverlayPermission(PluginCall call) {
+                  try {
+                      Intent i = new Intent(
+                          android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                          android.net.Uri.parse("package:" + getContext().getPackageName())
+                      );
+                      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                      getContext().startActivity(i);
+                  } catch (Exception ignored) {}
                   call.resolve();
               }
           }
@@ -957,6 +988,8 @@ jobs:
 
                   String kind;
                   String id;
+                  boolean operatorSound = false; // only ever true for operator alerts the Operator Panel asked to hear
+                  boolean operatorVibrate = false; // same, for vibration
                   if ("new_ride".equals(type)) {
                       kind = "ride";
                       id = data.get("rideId");
@@ -971,6 +1004,8 @@ jobs:
                       // (no ringtone, no vibration) — see RingingService.
                       kind = "operator";
                       id = data.get("orderId");
+                      operatorSound = "1".equals(data.get("sound"));
+                      operatorVibrate = "1".equals(data.get("vibrate"));
                   } else {
                       return;
                   }
@@ -989,6 +1024,8 @@ jobs:
                   serviceIntent.putExtra("id", id);
                   serviceIntent.putExtra("title", data.get("title"));
                   serviceIntent.putExtra("body", data.get("body"));
+                  serviceIntent.putExtra("sound", operatorSound);
+                  serviceIntent.putExtra("vibrate", operatorVibrate);
                   ContextCompat.startForegroundService(this, serviceIntent);
               }
           }
@@ -1035,6 +1072,9 @@ jobs:
               private Vibrator vibrator;
               private final Handler timeoutHandler = new Handler(Looper.getMainLooper());
               private Runnable timeoutRunnable;
+              // Operator alerts get their own notification id per order, so each
+              // new order stays in the tray instead of replacing the last one.
+              private int currentNotifId = NOTIF_ID;
 
               // What this service is currently ringing for, if anything —
               // checked by cancelIfMatches() so a stray/late cancel_ring
@@ -1075,13 +1115,49 @@ jobs:
                   stopRingLoop();
                   if (timeoutRunnable != null) timeoutHandler.removeCallbacks(timeoutRunnable);
 
-                  startForeground(NOTIF_ID, buildNotification(kind, id, title, body));
+                  currentNotifId = "operator".equals(kind) ? (5000 + Math.abs((id == null ? "" : id).hashCode() % 90000)) : NOTIF_ID;
+                  startForeground(currentNotifId, buildNotification(kind, id, title, body));
                   // Operator alerts are full-screen but SILENT: no sound, no vibration.
-                  if (!"operator".equals(kind)) startRingLoop(kind);
+                  // Operator alerts are silent unless this phone's Operator Panel has the
+                  // "alert sound" switch on (sound only - no vibration).
+                  if (!"operator".equals(kind) || intent.getBooleanExtra("sound", false)) startRingLoop(kind);
+                  // Operator vibration: off unless this phone's Operator Panel switched it on.
+                  // One short double-buzz (not a loop).
+                  if ("operator".equals(kind) && intent.getBooleanExtra("vibrate", false)) vibrateOnce();
+
+                  // Operator alert while the phone is UNLOCKED: Android only shows a
+                  // full-screen notification when the phone is locked/idle (otherwise
+                  // just a small pop-up). With "Display over other apps" allowed, the
+                  // app may open its alert screen itself, so it covers the screen
+                  // every time, locked or not.
+                  if ("operator".equals(kind) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                          && android.provider.Settings.canDrawOverlays(this)) {
+                      try {
+                          Intent showAlert = new Intent(this, RingingActivity.class);
+                          showAlert.putExtra("kind", kind);
+                          showAlert.putExtra("id", id);
+                          showAlert.putExtra("title", title);
+                          showAlert.putExtra("body", body);
+                          showAlert.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                          startActivity(showAlert);
+                      } catch (Exception ignored) {}
+                  }
 
                   boolean isDriverSide = "ride".equals(kind) || "delivery".equals(kind) || "operator".equals(kind);
                   if (isDriverSide) {
-                      timeoutRunnable = this::stopSelf;
+                      if ("operator".equals(kind)) {
+                          // After the full-screen alert times out, keep the order
+                          // notification in the tray (detach it) until the operator
+                          // taps or swipes it away.
+                          timeoutRunnable = () -> {
+                              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                  stopForeground(Service.STOP_FOREGROUND_DETACH);
+                              }
+                              stopSelf();
+                          };
+                      } else {
+                          timeoutRunnable = this::stopSelf;
+                      }
                       timeoutHandler.postDelayed(timeoutRunnable, AUTO_STOP_MS);
                   } else {
                       timeoutRunnable = null;
@@ -1126,17 +1202,63 @@ jobs:
                       PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                   );
 
-                  return new NotificationCompat.Builder(this, channelId)
+                  boolean isOperatorAlert = "operator".equals(kind);
+                  PendingIntent contentPi = fullScreenPendingIntent;
+                  if (isOperatorAlert) {
+                      // Tapping the (persistent) operator notification just opens the app.
+                      Intent openApp = new Intent(this, MainActivity.class);
+                      openApp.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                      contentPi = PendingIntent.getActivity(
+                          this, 1, openApp,
+                          PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                      );
+                  }
+
+                  NotificationCompat.Builder nb = new NotificationCompat.Builder(this, channelId)
                       .setSmallIcon(android.R.drawable.ic_menu_call)
                       .setContentTitle(title != null ? title : defaultTitle)
                       .setContentText(body != null ? body : "Tap to view")
                       .setPriority(NotificationCompat.PRIORITY_MAX)
                       .setCategory(NotificationCompat.CATEGORY_CALL)
                       .setFullScreenIntent(fullScreenPendingIntent, true)
-                      .setContentIntent(fullScreenPendingIntent)
-                      .setOngoing(true)
-                      .setAutoCancel(false)
-                      .build();
+                      .setContentIntent(contentPi)
+                      .setOngoing(!isOperatorAlert)
+                      .setAutoCancel(isOperatorAlert);
+                  // Operator: bold text, the Malayalam "new order" heading in green, and when
+                  // expanded each detail (order #, items, customer) on its own line.
+                  if (isOperatorAlert) {
+                      final int spanFlag = android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE;
+                      String t = title != null ? title : "\u0d2a\u0d41\u0d24\u0d3f\u0d2f \u0d13\u0d7c\u0d21\u0d7c";
+                      android.text.SpannableString st = new android.text.SpannableString(t);
+                      st.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, t.length(), spanFlag);
+                      int sepN = t.indexOf(" \u2014 ");
+                      st.setSpan(new android.text.style.ForegroundColorSpan(android.graphics.Color.parseColor("#16a34a")), 0, sepN > 0 ? sepN : t.length(), spanFlag);
+                      nb.setContentTitle(st);
+                      nb.setColor(android.graphics.Color.parseColor("#16a34a"));
+                      if (body != null) {
+                          android.text.SpannableString sc = new android.text.SpannableString(body);
+                          sc.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, body.length(), spanFlag);
+                          nb.setContentText(sc);
+                          String big = body.replace(" \u00b7 ", "\n");
+                          android.text.SpannableString sbig = new android.text.SpannableString(big);
+                          sbig.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, big.length(), spanFlag);
+                          nb.setStyle(new NotificationCompat.BigTextStyle().bigText(sbig));
+                      }
+                  }
+                  return nb.build();
+              }
+
+              private void vibrateOnce() {
+                  try {
+                      Vibrator v = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+                      if (v == null) return;
+                      long[] p = {0, 300, 150, 300};
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          v.vibrate(VibrationEffect.createWaveform(p, -1));
+                      } else {
+                          v.vibrate(p, -1);
+                      }
+                  } catch (Exception ignored) {}
               }
 
               private void startRingLoop(String kind) {
@@ -1161,6 +1283,7 @@ jobs:
                       // below still runs — the user still gets alerted.
                   }
 
+                  if ("operator".equals(kind)) return; // operator alert: sound only, never vibrates
                   vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
                   if (vibrator != null) {
                       long[] pattern = {0, 800, 300, 800, 300, 800, 300, 800};
@@ -1333,11 +1456,20 @@ jobs:
                   root.setOrientation(LinearLayout.VERTICAL);
                   root.setBackgroundColor(Color.WHITE);
 
+                  // Title arrives as "<Malayalam new-order text> \u2014 <shop> \u00b7 <total>":
+                  // the first part is the big green header, the rest is the card title.
+                  String headerText = "\u0d2a\u0d41\u0d24\u0d3f\u0d2f \u0d13\u0d7c\u0d21\u0d7c";
+                  String cardTitle = title;
+                  int sepIdx = title != null ? title.indexOf(" \u2014 ") : -1;
+                  if (sepIdx > 0) {
+                      headerText = title.substring(0, sepIdx);
+                      cardTitle = title.substring(sepIdx + 3);
+                  }
+
                   TextView header = new TextView(this);
-                  header.setText("NEW ORDER");
+                  header.setText(headerText);
                   header.setTextColor(Color.WHITE);
-                  header.setTextSize(15);
-                  header.setLetterSpacing(0.15f);
+                  header.setTextSize(24);
                   header.setTypeface(null, android.graphics.Typeface.BOLD);
                   header.setGravity(Gravity.CENTER);
                   header.setBackgroundColor(GREEN);
@@ -1357,9 +1489,9 @@ jobs:
                   center.addView(card, new LinearLayout.LayoutParams(MATCH, WRAP));
 
                   TextView titleView = new TextView(this);
-                  titleView.setText(title);
+                  titleView.setText(cardTitle);
                   titleView.setTextColor(DARK_GREEN);
-                  titleView.setTextSize(21);
+                  titleView.setTextSize(22);
                   titleView.setTypeface(null, android.graphics.Typeface.BOLD);
                   card.addView(titleView, new LinearLayout.LayoutParams(MATCH, WRAP));
 
@@ -1374,8 +1506,9 @@ jobs:
                       if (part.trim().isEmpty()) continue;
                       TextView t = new TextView(this);
                       t.setText(part.trim());
-                      t.setTextColor(Color.parseColor("#374151"));
-                      t.setTextSize(16);
+                      t.setTextColor(Color.parseColor("#1f2937"));
+                      t.setTextSize(17);
+                      t.setTypeface(null, android.graphics.Typeface.BOLD);
                       t.setPadding(0, dp(4), 0, dp(4));
                       card.addView(t, new LinearLayout.LayoutParams(MATCH, WRAP));
                   }
