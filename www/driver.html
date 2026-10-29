@@ -3031,9 +3031,15 @@ window.closeReasonModal = closeReasonModal;
 window.confirmReasonModal = confirmReasonModal;
 window.showScreen = showScreen;
 
-// What the driver earns for a delivery: the delivery charge PLUS any rain-surge extra
-// (order.rainSurgeDriver, set from the operator's Rain Surge zone switch).
-function deliveryPayout(o) { return (Number(o && o.deliveryFee) || 0) + (Number(o && o.rainSurgeDriver) || 0) + (Number(o && o.tip) || 0); }
+// What the driver earns for a delivery: the REAL delivery charge PLUS any rain-surge extra
+// (order.rainSurgeDriver, set from the operator's Rain Surge zone switch) and tip.
+// When the customer got free delivery, order.deliveryFee is 0 but the order keeps what the charge
+// would have been in order.deliveryFeeWaived - the driver is still paid that real charge.
+function deliveryPayout(o) {
+  const paid = Number(o && o.deliveryFee) || 0;
+  const real = paid || Number(o && o.deliveryFeeWaived) || 0;
+  return real + (Number(o && o.rainSurgeDriver) || 0) + (Number(o && o.tip) || 0);
+}
 // ---------- Earnings screen (Today / last 7 days / all time / per day) ----------
 function renderEarningsScreen(rides, deliveries) {
   const items = [

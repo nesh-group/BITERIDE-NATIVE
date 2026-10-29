@@ -1775,6 +1775,11 @@
           <h3>Orders</h3>
           <p>All orders from every shop — Delivered, In Progress, Cancelled</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('profit')">
+          <div class="op-home-icon">💰</div>
+          <h3>Order Profit</h3>
+          <p>How much each delivered order earns you, after the delivery boy's charge and the coupon</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('groceries-queue')" style="position:relative;">
           <span class="op-home-badge" id="op-groceries-queue-home-badge" style="display:none;"></span>
           <div class="op-home-icon">🛒</div>
@@ -2338,6 +2343,24 @@
       <div id="op-report-orders-list"></div>
       <button type="button" class="op-btn op-btn-danger" id="op-report-delete-btn" style="margin-top:16px;width:100%;display:none;" onclick="opDeleteReportDate()">🗑 Delete this date's data from Firebase</button>
       <p class="op-note" id="op-report-delete-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- ORDER PROFIT — what each delivered order earns the operator -->
+  <div class="op-section" id="op-section-profit">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Order Profit</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Profit per order = your item amount + GST + shop commission (if you set one for that shop) + delivery charge the customer paid − the real delivery charge given to the delivery boy (even when delivery was free for the customer) − coupon. Only delivered orders are counted.</p>
+      <p class="op-note" id="op-profit-start" style="font-weight:600;color:#14532d;">Loading…</p>
+      <div class="op-search-box" style="margin-bottom:10px;">
+        <input type="date" id="op-profit-date" onchange="opRenderProfit()">
+      </div>
+      <label class="op-switch-row" style="margin-bottom:12px;"><span class="op-switch-text">Show all dates<small>Ignore the date above</small></span><input type="checkbox" class="op-switch" id="op-profit-all" onchange="opRenderProfit()" checked></label>
+      <div class="op-report-summary" id="op-profit-summary"></div>
+      <div id="op-profit-list"></div>
     </div>
   </div>
 
@@ -8631,6 +8654,7 @@ function opSetAlertVibrate(on) {
 }
 function opEnterPanel() {
   opRegisterOperatorPush();
+  opLoadProfitStart();
   try { const vb = document.getElementById('op-alert-vibrate'); if (vb) vb.checked = localStorage.getItem('op_alert_vibrate') === '1'; } catch (e) {}
   try { const cb = document.getElementById('op-alert-sound'); if (cb) cb.checked = localStorage.getItem('op_alert_sound') === '1'; } catch (e) {}
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -8709,6 +8733,7 @@ function opOpenSection(name) {
   if (name === 'free-offers') opFoLoad();
   if (name === 'shop-zones') opRenderShopZones();
   if (name === 'report') opRenderReportShopList();
+  if (name === 'profit') { const d = document.getElementById('op-profit-date'); if (d && !d.value) d.value = new Date().toLocaleDateString('en-CA'); opRenderProfit(); }
   if (name === 'groceries-queue') opRenderGroceriesQueueList();
   if (name === 'groceries-catalog') opRenderGroceriesCatalog();
   if (name === 'nesh-item-order') opBuildNeshItemOrderWorking();
@@ -10704,6 +10729,8 @@ function opListenPartners() {
     opRenderOrdersList();
     opUpdateOrdersHomeBadge();
     opUpdatePartnersHomeBadge();
+    const profitSec = document.getElementById('op-section-profit');
+    if (profitSec && profitSec.classList.contains('active')) opRenderProfit();
     const reportDetail = document.getElementById('op-section-report-detail');
     if (reportDetail && reportDetail.classList.contains('active')) opRenderReportOrders();
     const etaSec = document.getElementById('op-section-delivery-time');
@@ -13822,6 +13849,87 @@ function opUpdateDriversHomeBadge() {
   const pendingCount = opAllDrivers.filter(d => d.approvalStatus === 'pending').length;
   if (pendingCount > 0) { badge.style.display = 'inline-block'; badge.textContent = pendingCount + ' waiting'; }
   else { badge.style.display = 'none'; }
+}
+/* ---- Order Profit: what each delivered order earns the operator ----
+   net = item amount the operator added (price - shop's own price) + GST
+         + delivery charge the customer paid - REAL delivery charge given to the delivery boy
+         - coupon discount.
+   When delivery was free for the customer, deliveryFee is 0 but the order stores deliveryFeeWaived
+   (what the charge would have been) - that is the real charge the delivery boy still gets. */
+function opOrderProfit(o, commissionHistory) {
+  let markup = 0;
+  (Array.isArray(o.items) ? o.items : Object.values(o.items || {})).forEach(it => {
+    if (!it || it.freeItem || it.shopPrice == null) return;
+    markup += ((Number(it.price) || 0) - (Number(it.shopPrice) || 0)) * (Number(it.qty) || 0);
+  });
+  markup = Math.round(markup * 100) / 100;
+  const gst = Number(o.gst) || 0;
+  const delPaid = Number(o.deliveryFee) || 0;
+  const delReal = delPaid || Number(o.deliveryFeeWaived) || 0;
+  const coupon = Number(o.couponDiscount) || 0;
+  // Shop commission set for this shop in the Operator Panel (partner -> Commission): a flat amount picked by the order's
+  // item total (at the shop's own prices), using the version that was live when the order was placed.
+  let commission = 0;
+  try { commission = Number(neshCommissionForOrder(o, commissionHistory)) || 0; } catch (e) {}
+  const net = Math.round((markup + gst + commission + delPaid - delReal - coupon) * 100) / 100;
+  return { markup, gst, commission, delPaid, delReal, coupon, net, freeDel: delReal > 0 && delPaid === 0 };
+}
+/* Order Profit only records orders placed from the moment this feature was first opened on any operator phone.
+   The start time is saved once at app_config/profitStartAt, so every phone shares the same start. */
+let opProfitStartAt = null;
+function opLoadProfitStart() {
+  try {
+    const { db, ref, get, set } = window.fb;
+    get(ref(db, 'app_config/profitStartAt')).then(snap => {
+      let v = Number(snap.val()) || 0;
+      if (!v) { v = Date.now(); set(ref(db, 'app_config/profitStartAt'), v).catch(() => {}); }
+      opProfitStartAt = v;
+      const sec = document.getElementById('op-section-profit');
+      if (sec && sec.classList.contains('active')) opRenderProfit();
+    }).catch(() => {});
+  } catch (e) {}
+}
+function opFmtMoney(n) { n = Math.round(n * 100) / 100; return (n < 0 ? '-' : '') + '₹' + Math.abs(n); }
+function opRenderProfit() {
+  const listEl = document.getElementById('op-profit-list');
+  const sumEl = document.getElementById('op-profit-summary');
+  if (!listEl || !sumEl) return;
+  const dateEl = document.getElementById('op-profit-date');
+  const allEl = document.getElementById('op-profit-all');
+  const day = (dateEl && dateEl.value) || '';
+  const allDates = !!(allEl && allEl.checked);
+  const startNote = document.getElementById('op-profit-start');
+  if (startNote) startNote.textContent = opProfitStartAt ? 'Recording orders placed from ' + new Date(opProfitStartAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' onwards.' : 'Loading…';
+  if (!opProfitStartAt) { sumEl.innerHTML = ''; listEl.innerHTML = '<div class="op-empty">Loading…</div>'; return; }
+  let list = opFlattenAllOrders().filter(o => ['delivered', 'completed', 'done'].includes((o.status || '').toLowerCase()) && (Number(o.createdAt) || 0) >= opProfitStartAt);
+  if (!allDates && day) list = list.filter(o => o.createdAt && new Date(o.createdAt).toLocaleDateString('en-CA') === day);
+  list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  let total = 0;
+  const histByShop = {};
+  opAllPartners.forEach(pt => { histByShop[pt._id] = pt.commissionHistory; });
+  const rows = list.map(o => { const r = opOrderProfit(o, histByShop[o._shopId]); total += r.net; return { o, r }; });
+  total = Math.round(total * 100) / 100;
+  sumEl.innerHTML =
+    '<div class="op-report-summary-item"><div class="n">' + list.length + '</div><div class="l">Delivered orders</div></div>' +
+    '<div class="op-report-summary-item"><div class="n" style="color:' + (total < 0 ? '#dc2626' : '#14532d') + '">' + opFmtMoney(total) + '</div><div class="l">Total profit</div></div>';
+  if (!rows.length) { listEl.innerHTML = '<div class="op-empty">No delivered orders for this date.</div>'; return; }
+  const line = (label, val, sign) => '<div style="display:flex;justify-content:space-between;gap:10px;font-size:.9rem;padding:2px 0;color:#374151;"><span>' + label + '</span><span style="white-space:nowrap;">' + sign + ' ₹' + Math.abs(Math.round(val * 100) / 100) + '</span></div>';
+  listEl.innerHTML = rows.map(({ o, r }) =>
+    '<div class="op-order-item">' +
+      '<div class="op-order-top"><span class="op-order-shop">' + escapeHtml(o._shopName || '') + '</span>' +
+      '<span class="op-order-no">#' + escapeHtml(String(o.orderNumber || o._id || '')) + '</span></div>' +
+      '<div class="op-order-sub">' + escapeHtml(o.customerName || '') + ' · ' + (o.createdAt ? new Date(o.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '') + '</div>' +
+      '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #cfe6d5;">' +
+        line('Your item amount', r.markup, '+') +
+        line('GST', r.gst, '+') +
+        (r.commission > 0 ? line('Shop commission', r.commission, '+') : '') +
+        line('Delivery charge from customer' + (r.freeDel ? ' (free)' : ''), r.delPaid, '+') +
+        line('Delivery boy charge' + (r.freeDel ? ' (real charge)' : ''), r.delReal, '−') +
+        line('Coupon', r.coupon, '−') +
+      '</div>' +
+      '<div class="op-order-amt" style="border-top:1px solid #cfe6d5;margin-top:6px;padding-top:6px;"><span>You earn</span><b style="color:' + (r.net < 0 ? '#dc2626' : '#14532d') + '">' + opFmtMoney(r.net) + '</b></div>' +
+    '</div>'
+  ).join('');
 }
 function opSwitchOrdersTab(tab) {
   opOrdersTab = tab;
