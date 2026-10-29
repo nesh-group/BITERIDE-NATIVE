@@ -966,6 +966,11 @@ jobs:
                   } else if ("new_order".equals(type)) {
                       kind = "order";
                       id = data.get("orderId");
+                  } else if ("new_operator_order".equals(type)) {
+                      // Operator Panel phones: full-screen alert, but SILENT
+                      // (no ringtone, no vibration) — see RingingService.
+                      kind = "operator";
+                      id = data.get("orderId");
                   } else {
                       return;
                   }
@@ -1071,9 +1076,10 @@ jobs:
                   if (timeoutRunnable != null) timeoutHandler.removeCallbacks(timeoutRunnable);
 
                   startForeground(NOTIF_ID, buildNotification(kind, id, title, body));
-                  startRingLoop(kind);
+                  // Operator alerts are full-screen but SILENT: no sound, no vibration.
+                  if (!"operator".equals(kind)) startRingLoop(kind);
 
-                  boolean isDriverSide = "ride".equals(kind) || "delivery".equals(kind);
+                  boolean isDriverSide = "ride".equals(kind) || "delivery".equals(kind) || "operator".equals(kind);
                   if (isDriverSide) {
                       timeoutRunnable = this::stopSelf;
                       timeoutHandler.postDelayed(timeoutRunnable, AUTO_STOP_MS);
@@ -1091,6 +1097,8 @@ jobs:
                       channelId = "ride_alerts"; channelName = "Ride Alerts"; defaultTitle = "New Ride Request";
                   } else if ("delivery".equals(kind)) {
                       channelId = "delivery_alerts"; channelName = "Delivery Alerts"; defaultTitle = "New Delivery";
+                  } else if ("operator".equals(kind)) {
+                      channelId = "operator_silent_alerts"; channelName = "Operator Order Alerts"; defaultTitle = "New order";
                   } else {
                       channelId = "order_ring_alerts"; channelName = "Order Ring Alerts"; defaultTitle = "New Order";
                   }
@@ -1202,6 +1210,7 @@ jobs:
           import android.os.Build;
           import android.os.Bundle;
           import android.view.Gravity;
+          import android.view.View;
           import android.view.WindowManager;
           import android.widget.Button;
           import android.widget.LinearLayout;
@@ -1239,12 +1248,21 @@ jobs:
                   String title = getIntent().getStringExtra("title");
                   String body = getIntent().getStringExtra("body");
                   String defaultTitle = "delivery".equals(kind) ? "New Delivery"
-                      : "order".equals(kind) ? "New Order" : "New Ride Request";
+                      : "order".equals(kind) ? "New Order"
+                      : "operator".equals(kind) ? "New order" : "New Ride Request";
 
-                  setContentView(buildLayout(
-                      title != null ? title : defaultTitle,
-                      body != null ? body : ""
-                  ));
+                  if ("operator".equals(kind)) {
+                      if (Build.VERSION.SDK_INT >= 21) getWindow().setStatusBarColor(Color.parseColor("#16a34a"));
+                      setContentView(buildOperatorLayout(
+                          title != null ? title : defaultTitle,
+                          body != null ? body : ""
+                      ));
+                  } else {
+                      setContentView(buildLayout(
+                          title != null ? title : defaultTitle,
+                          body != null ? body : ""
+                      ));
+                  }
               }
 
               private LinearLayout buildLayout(String title, String body) {
@@ -1280,10 +1298,129 @@ jobs:
                   openBtn.setOnClickListener(v -> finishWith("open"));
                   root.addView(openBtn);
 
+                  if ("operator".equals(kind)) {
+                      Button dismissBtn = new Button(this);
+                      dismissBtn.setText("DISMISS");
+                      dismissBtn.setOnClickListener(v -> finishWith("dismiss"));
+                      root.addView(dismissBtn);
+                  }
+
+                  return root;
+              }
+
+              private int dp(int v) {
+                  return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
+              }
+
+              private android.graphics.drawable.GradientDrawable rounded(int fill, int radiusDp, int stroke) {
+                  android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+                  g.setColor(fill);
+                  g.setCornerRadius(dp(radiusDp));
+                  if (stroke != 0) g.setStroke(dp(2), stroke);
+                  return g;
+              }
+
+              // Operator Panel order alert: clean white + green screen.
+              private LinearLayout buildOperatorLayout(String title, String body) {
+                  final int GREEN = Color.parseColor("#16a34a");
+                  final int DARK_GREEN = Color.parseColor("#14532d");
+                  final int SOFT_GREEN = Color.parseColor("#f0fdf4");
+                  final int LINE_GREEN = Color.parseColor("#bbf7d0");
+                  final int MATCH = android.view.ViewGroup.LayoutParams.MATCH_PARENT;
+                  final int WRAP = android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setBackgroundColor(Color.WHITE);
+
+                  TextView header = new TextView(this);
+                  header.setText("NEW ORDER");
+                  header.setTextColor(Color.WHITE);
+                  header.setTextSize(15);
+                  header.setLetterSpacing(0.15f);
+                  header.setTypeface(null, android.graphics.Typeface.BOLD);
+                  header.setGravity(Gravity.CENTER);
+                  header.setBackgroundColor(GREEN);
+                  header.setPadding(dp(20), dp(18), dp(20), dp(18));
+                  root.addView(header, new LinearLayout.LayoutParams(MATCH, WRAP));
+
+                  LinearLayout center = new LinearLayout(this);
+                  center.setOrientation(LinearLayout.VERTICAL);
+                  center.setGravity(Gravity.CENTER);
+                  center.setPadding(dp(22), dp(22), dp(22), dp(22));
+                  root.addView(center, new LinearLayout.LayoutParams(MATCH, 0, 1f));
+
+                  LinearLayout card = new LinearLayout(this);
+                  card.setOrientation(LinearLayout.VERTICAL);
+                  card.setBackground(rounded(SOFT_GREEN, 20, LINE_GREEN));
+                  card.setPadding(dp(22), dp(22), dp(22), dp(22));
+                  center.addView(card, new LinearLayout.LayoutParams(MATCH, WRAP));
+
+                  TextView titleView = new TextView(this);
+                  titleView.setText(title);
+                  titleView.setTextColor(DARK_GREEN);
+                  titleView.setTextSize(21);
+                  titleView.setTypeface(null, android.graphics.Typeface.BOLD);
+                  card.addView(titleView, new LinearLayout.LayoutParams(MATCH, WRAP));
+
+                  View line = new View(this);
+                  line.setBackgroundColor(LINE_GREEN);
+                  LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(MATCH, dp(1));
+                  lineLp.setMargins(0, dp(14), 0, dp(10));
+                  card.addView(line, lineLp);
+
+                  // body arrives as "items . Total: Rs.. . customer" -> one tidy line each
+                  for (String part : body.split(" \u00b7 ")) {
+                      if (part.trim().isEmpty()) continue;
+                      TextView t = new TextView(this);
+                      t.setText(part.trim());
+                      t.setTextColor(Color.parseColor("#374151"));
+                      t.setTextSize(16);
+                      t.setPadding(0, dp(4), 0, dp(4));
+                      card.addView(t, new LinearLayout.LayoutParams(MATCH, WRAP));
+                  }
+
+                  LinearLayout buttons = new LinearLayout(this);
+                  buttons.setOrientation(LinearLayout.VERTICAL);
+                  buttons.setPadding(dp(22), 0, dp(22), dp(28));
+                  root.addView(buttons, new LinearLayout.LayoutParams(MATCH, WRAP));
+
+                  Button openBtn = new Button(this);
+                  openBtn.setText("OPEN APP");
+                  openBtn.setTextColor(Color.WHITE);
+                  openBtn.setTextSize(16);
+                  openBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+                  openBtn.setBackground(rounded(GREEN, 14, 0));
+                  openBtn.setOnClickListener(v -> finishWith("open"));
+                  LinearLayout.LayoutParams openLp = new LinearLayout.LayoutParams(MATCH, dp(54));
+                  buttons.addView(openBtn, openLp);
+
+                  Button dismissBtn = new Button(this);
+                  dismissBtn.setText("DISMISS");
+                  dismissBtn.setTextColor(GREEN);
+                  dismissBtn.setTextSize(15);
+                  dismissBtn.setBackground(rounded(Color.WHITE, 14, GREEN));
+                  dismissBtn.setOnClickListener(v -> finishWith("dismiss"));
+                  LinearLayout.LayoutParams disLp = new LinearLayout.LayoutParams(MATCH, dp(50));
+                  disLp.setMargins(0, dp(12), 0, 0);
+                  buttons.addView(dismissBtn, disLp);
+
                   return root;
               }
 
               private void finishWith(String action) {
+                  // Operator alert: just open the app (no portal/action forwarding)
+                  // and clear the silent notification.
+                  if ("operator".equals(kind)) {
+                      stopService(new Intent(this, RingingService.class));
+                      if (!"dismiss".equals(action)) {
+                          Intent open = new Intent(this, MainActivity.class);
+                          open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                          startActivity(open);
+                      }
+                      finish();
+                      return;
+                  }
                   // Deliberately NOT stopping RingingService here anymore —
                   // tapping OPEN APP should only open the app, not close the
                   // alert. The sound/vibration/notification keep going until
