@@ -140,12 +140,12 @@
   .ft-chart th{ text-align:left; color:var(--muted-2); font-size:10px; font-weight:600; padding:4px 6px; letter-spacing:.5px; text-transform:uppercase; }
   .ft-chart td{ padding:7px 6px; border-top:1px solid var(--field-border); }
   .ft-chart .ft-free{ color:#5CE0A0; font-weight:700; }
-  #operator-container .ft-cell input{ background:#000; color:#33ff66; border:1px solid #124a24; border-radius:0; }
+  #operator-container .ft-cell input{ background:#ffffff; color:#15803d; border:1px solid #cfe6d5; border-radius:0; }
   #operator-container .ft-cell small{ color:#64748b; }
-  #operator-container .ft-btn{ border-radius:0; border-color:#33ff66; color:#33ff66; margin-bottom:10px; }
-  #operator-container .ft-chart{ color:#cbd5e1; } #operator-container .ft-chart td{ border-color:#124a24; } #operator-container .ft-chart th{ color:#64748b; }
-  #operator-container select.fz-select{ width:100%; background:#000; color:#33ff66; border:1px solid #124a24; padding:10px; font-family:inherit; }
-  #operator-container .fz-chk{ display:flex; align-items:center; gap:10px; margin:6px 0; font-size:.85rem; color:#cbd5e1; }
+  #operator-container .ft-btn{ border-radius:0; border-color:#15803d; color:#15803d; margin-bottom:10px; }
+  #operator-container .ft-chart{ color:#374151; } #operator-container .ft-chart td{ border-color:#cfe6d5; } #operator-container .ft-chart th{ color:#64748b; }
+  #operator-container select.fz-select{ width:100%; background:#ffffff; color:#15803d; border:1px solid #cfe6d5; padding:10px; font-family:inherit; }
+  #operator-container .fz-chk{ display:flex; align-items:center; gap:10px; margin:6px 0; font-size:.85rem; color:#374151; }
   #operator-container .fz-chk input{ width:20px; height:20px; }
   .loc-field-label{ color:var(--muted-2); font-size:11px; font-family:'IBM Plex Mono',monospace; letter-spacing:1px; margin:0 0 6px; text-transform:uppercase; }
 
@@ -512,124 +512,129 @@
   .chat-send-btn{ background:var(--marigold); color:#fff; border:none; width:40px; height:40px; border-radius:50%; font-size:1rem; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
 
   /* ===== Operator Panel (terminal / hacker theme, scoped) ===== */
-  #operator-container{ display:none; position:fixed; inset:0; z-index:7000; background:#000000; font-family:'Courier New',Consolas,monospace; color:#33ff66; }
+  #operator-container{ display:none; position:fixed; inset:0; z-index:7000; background:#ffffff; font-family:'Courier New',Consolas,monospace; color:#15803d; }
   #operator-container.show{ display:block; }
   #operator-container *{ box-sizing:border-box; }
   #operator-container .op-home{ height:100vh; max-width:900px; margin:0 auto; display:flex; flex-direction:column; padding:30px 20px; overflow-y:auto; }
-  #operator-container .op-home-header{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:26px; border-bottom:1px solid #124a24; padding-bottom:16px; }
-  #operator-container .op-home-header h2{ font-size:1.7rem; color:#00ff41; letter-spacing:2px; text-shadow:0 0 8px rgba(0,255,65,.5); }
-  #operator-container .op-home-header h2::before{ content:'~/ '; color:#1f7a3d; }
-  #operator-container .op-home-header p{ color:#1f7a3d; font-size:.8rem; letter-spacing:1px; text-transform:uppercase; margin-top:4px; }
-  #operator-container .op-logout-btn{ background:#000; color:#8b8b8b; border:1px solid #333; padding:7px 12px; cursor:pointer; font-family:inherit; font-size:.78rem; text-transform:uppercase; }
+  #operator-container .op-home-header{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:26px; border-bottom:1px solid #cfe6d5; padding-bottom:16px; }
+  #operator-container .op-home-header h2{ font-size:1.7rem; color:#16a34a; letter-spacing:2px;  }
+  #operator-container .op-home-header h2::before{ content:'~/ '; color:#5f8a6c; }
+  #operator-container .op-home-header p{ color:#5f8a6c; font-size:.8rem; letter-spacing:1px; text-transform:uppercase; margin-top:4px; }
+  #operator-container .op-logout-btn{ background:#ffffff; color:#6b7280; border:1px solid #d1d5db; padding:7px 12px; cursor:pointer; font-family:inherit; font-size:.78rem; text-transform:uppercase; }
   #operator-container .op-home-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-top:6px; }
   #operator-container .op-home-card.op-search-hide{ display:none !important; }
-  #operator-container .op-home-card{ background:#020a04; border:1px solid #124a24; padding:26px 16px; text-align:center; cursor:pointer; transition:all .2s ease; }
-  #operator-container .op-home-card:hover{ background:#051f0a; border-color:#00ff41; box-shadow:0 0 15px rgba(0,255,65,.25); }
-  #operator-container .op-home-icon{ font-size:2rem; margin-bottom:8px; filter:grayscale(1) brightness(1.6) sepia(1) hue-rotate(70deg) saturate(4); }
-  #operator-container .op-home-card h3{ color:#33ff66; font-size:.98rem; margin-bottom:4px; text-transform:uppercase; letter-spacing:1px; }
-  #operator-container .op-home-card p{ color:#1f7a3d; font-size:.76rem; line-height:1.4; }
+  #operator-container .op-home-card{ background:#f4faf5; border:1px solid #cfe6d5; padding:26px 16px; text-align:center; cursor:pointer; transition:all .2s ease; }
+  #operator-container .op-home-card:hover{ background:#e6f4ea; border-color:#16a34a; box-shadow:0 0 15px rgba(22,163,74,.18); }
+  #operator-container .op-home-icon{ font-size:2rem; margin-bottom:8px; filter:grayscale(1) sepia(1) hue-rotate(70deg) saturate(3); }
+  #operator-container .op-home-card h3{ color:#15803d; font-size:.98rem; margin-bottom:4px; text-transform:uppercase; letter-spacing:1px; }
+  #operator-container .op-home-card p{ color:#5f8a6c; font-size:.76rem; line-height:1.4; }
   #operator-container .op-section{ display:none; height:100vh; max-width:900px; margin:0 auto; flex-direction:column; }
   #operator-container .op-section.active{ display:flex; }
-  #operator-container .op-section-header{ background:#020a04; padding:16px 18px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #124a24; flex-shrink:0; }
-  #operator-container .op-section-header h2{ font-size:1rem; text-transform:uppercase; letter-spacing:1px; color:#33ff66; }
-  #operator-container .op-back-btn{ background:none; border:none; color:#33ff66; font-size:1.3rem; cursor:pointer; line-height:1; }
+  #operator-container .op-section-header{ background:#f4faf5; padding:16px 18px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #cfe6d5; flex-shrink:0; }
+  #operator-container .op-section-header h2{ font-size:1rem; text-transform:uppercase; letter-spacing:1px; color:#15803d; }
+  #operator-container .op-back-btn{ background:none; border:none; color:#15803d; font-size:1.3rem; cursor:pointer; line-height:1; }
   #operator-container .op-section-body{ flex:1; overflow-y:auto; padding:18px; }
-  #operator-container textarea{ width:100%; padding:10px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-size:.78rem; font-family:monospace; margin-bottom:10px; resize:vertical; }
-  #operator-container input[type="file"]{ color:#33ff66; margin-bottom:10px; font-size:.8rem; }
-  #operator-container .op-btn{ background:#000; color:#33ff66; border:1px solid #33ff66; padding:10px 14px; cursor:pointer; font-weight:600; font-family:inherit; font-size:.85rem; margin-right:8px; margin-bottom:8px; }
-  #operator-container .op-btn:hover{ background:#00ff41; color:#000; }
-  #operator-container .op-btn.op-btn-push{ border-color:#7c3aed; color:#a78bfa; }
+  #operator-container textarea{ width:100%; padding:10px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-size:.78rem; font-family:monospace; margin-bottom:10px; resize:vertical; }
+  #operator-container input[type="file"]{ color:#15803d; margin-bottom:10px; font-size:.8rem; }
+  #operator-container .op-btn{ background:#ffffff; color:#15803d; border:1px solid #15803d; padding:10px 14px; cursor:pointer; font-weight:600; font-family:inherit; font-size:.85rem; margin-right:8px; margin-bottom:8px; }
+  #operator-container .op-btn:hover{ background:#16a34a; color:#ffffff; }
+  #operator-container .op-btn.op-btn-push{ border-color:#7c3aed; color:#7c3aed; }
   #operator-container .op-btn.op-btn-push:hover{ background:#7c3aed; color:#fff; }
-  #operator-container .op-btn.op-btn-danger{ border-color:#dc2626; color:#f87171; }
+  #operator-container .op-btn.op-btn-danger{ border-color:#dc2626; color:#dc2626; }
   #operator-container .op-btn.op-btn-danger:hover{ background:#dc2626; color:#fff; }
   #operator-container p.op-note{ font-size:.74rem; color:#64748b; margin-bottom:12px; line-height:1.5; font-family:'Inter',sans-serif; }
-  #operator-container .op-partner-item{ padding:12px 14px; border:1px solid #124a24; margin-bottom:8px; cursor:pointer; }
-  #operator-container .op-partner-item:hover{ background:#051505; }
+  #operator-container .op-partner-item{ padding:12px 14px; border:1px solid #cfe6d5; margin-bottom:8px; cursor:pointer; }
+  #operator-container .op-partner-item:hover{ background:#eef7f0; }
   #operator-container .op-partner-top{ display:flex; justify-content:space-between; align-items:baseline; }
-  #operator-container .op-partner-name{ font-weight:700; font-size:.92rem; color:#33ff66; }
-  #operator-container .op-partner-name::before{ content:'$ '; color:#1f7a3d; }
-  #operator-container .op-partner-type{ font-size:.68rem; color:#1f7a3d; text-transform:uppercase; letter-spacing:.5px; }
-  #operator-container .op-partner-sub{ font-size:.76rem; color:#1f7a3d; margin-top:2px; }
+  #operator-container .op-partner-name{ font-weight:700; font-size:.92rem; color:#15803d; }
+  #operator-container .op-partner-name::before{ content:'$ '; color:#5f8a6c; }
+  #operator-container .op-partner-type{ font-size:.68rem; color:#5f8a6c; text-transform:uppercase; letter-spacing:.5px; }
+  #operator-container .op-partner-sub{ font-size:.76rem; color:#5f8a6c; margin-top:2px; }
   #operator-container .op-search-box{ padding:0 0 12px; }
-  #operator-container .op-search-box input{ width:100%; padding:9px 10px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-size:.85rem; font-family:inherit; }
-  #operator-container .op-search-box input::placeholder{ color:#1f7a3d; }
-  #operator-container .op-search-box input:focus{ outline:none; border-color:#00ff41; }
-  #operator-container .op-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.85); display:none; justify-content:center; align-items:center; z-index:7500; padding:20px; }
+  #operator-container .op-search-box input{ width:100%; padding:9px 10px; background:#f4faf5; color:#15803d; border:1px solid #cfe6d5; font-size:.85rem; font-family:inherit; }
+  #operator-container .op-search-box input::placeholder{ color:#5f8a6c; }
+  #operator-container .op-search-box input:focus{ outline:none; border-color:#16a34a; }
+  #operator-container .op-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; justify-content:center; align-items:center; z-index:7500; padding:20px; }
   #operator-container .op-modal-overlay.show{ display:flex; }
-  #operator-container .op-modal-card{ background:#000; color:#33ff66; padding:20px; width:100%; max-width:380px; border:1px solid #00ff41; box-shadow:0 0 20px rgba(0,255,65,.2); max-height:88vh; overflow-y:auto; }
-  #operator-container .op-modal-card h3{ margin-bottom:12px; color:#39ff14; text-transform:uppercase; letter-spacing:1px; font-size:.95rem; }
-  #operator-container .op-modal-card .op-mc-row{ font-size:.8rem; color:#a3b3a8; margin-bottom:8px; line-height:1.5; }
-  #operator-container .op-modal-card .op-mc-row b{ color:#33ff66; }
+  #operator-container .op-modal-card{ background:#ffffff; color:#15803d; padding:20px; width:100%; max-width:380px; border:1px solid #16a34a; box-shadow:0 0 20px rgba(22,163,74,.15); max-height:88vh; overflow-y:auto; }
+  #operator-container .op-modal-card h3{ margin-bottom:12px; color:#16a34a; text-transform:uppercase; letter-spacing:1px; font-size:.95rem; }
+  #operator-container .op-modal-card .op-mc-row{ font-size:.8rem; color:#4b5d51; margin-bottom:8px; line-height:1.5; }
+  #operator-container .op-modal-card .op-mc-row b{ color:#15803d; }
   #operator-container .op-modal-card.op-modal-card-wide{ max-width:640px; }
   #operator-container .op-zone-map-wrap{ position:relative; margin-top:10px; }
-  #operator-container .op-zone-map{ width:100%; height:340px; border:1px solid #124a24; background:#020a04; }
-  #operator-container .op-zone-map-hint{ font-size:.72rem; color:#1f7a3d; margin-top:6px; text-transform:uppercase; letter-spacing:.5px; }
-  #operator-container .op-zone-search-results{ max-height:180px; overflow-y:auto; border:1px solid #124a24; margin-top:6px; display:none; }
+  #operator-container .op-zone-map{ width:100%; height:340px; border:1px solid #cfe6d5; background:#f4faf5; }
+  #operator-container .op-zone-map-hint{ font-size:.72rem; color:#5f8a6c; margin-top:6px; text-transform:uppercase; letter-spacing:.5px; }
+  #operator-container .op-zone-search-results{ max-height:180px; overflow-y:auto; border:1px solid #cfe6d5; margin-top:6px; display:none; }
   #operator-container .op-zone-search-results.show{ display:block; }
-  #operator-container .op-zone-search-item{ padding:8px 10px; font-size:.78rem; color:#33ff66; border-bottom:1px solid #0d2c15; cursor:pointer; }
+  #operator-container .op-zone-search-item{ padding:8px 10px; font-size:.78rem; color:#15803d; border-bottom:1px solid #dcefe1; cursor:pointer; }
   #operator-container .op-zone-search-item:last-child{ border-bottom:none; }
-  #operator-container .op-zone-search-item:hover{ background:#051f0a; }
-  #operator-container .op-zone-search-item .op-zone-search-item-sub{ color:#1f7a3d; font-size:.68rem; margin-top:2px; }
-  #operator-container .op-zone-pt-label{ background:none !important; border:none !important; box-shadow:none !important; color:#39ff14 !important; font-size:11px !important; font-weight:bold; }
-  #operator-container .op-empty{ padding:24px 10px; text-align:center; color:#1f7a3d; font-size:.85rem; }
-  #operator-container .op-groceries-card{ margin-top:14px; padding:14px; border:1px solid #2d7a3a; background:#04120a; box-shadow:0 0 10px rgba(0,255,65,.08); }
-  #operator-container .op-groceries-card-title{ color:#39ff14; font-size:.85rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid #124a24; }
+  #operator-container .op-zone-search-item:hover{ background:#e6f4ea; }
+  #operator-container .op-zone-search-item .op-zone-search-item-sub{ color:#5f8a6c; font-size:.68rem; margin-top:2px; }
+  #operator-container .op-zone-pt-label{ background:none !important; border:none !important; box-shadow:none !important; color:#16a34a !important; font-size:11px !important; font-weight:bold; }
+  #operator-container .op-empty{ padding:24px 10px; text-align:center; color:#5f8a6c; font-size:.85rem; }
+  #operator-container .op-groceries-card{ margin-top:14px; padding:14px; border:1px solid #8fc79d; background:#f4faf5; box-shadow:0 0 10px rgba(22,163,74,.08); }
+  #operator-container .op-groceries-card-title{ color:#16a34a; font-size:.85rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid #cfe6d5; }
   /* Operator: Orders (all shops) */
   #operator-container .op-home-badge{ position:absolute; top:10px; right:10px; background:#dc2626; color:#fff; font-size:.66rem; font-weight:700; padding:2px 8px; border-radius:20px; }
   #operator-container .op-order-tabs{ display:flex; gap:8px; margin-bottom:12px; }
-  #operator-container .op-order-tab{ flex:1; padding:9px 6px; text-align:center; background:#020a04; border:1px solid #124a24; color:#1f7a3d; font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; cursor:pointer; font-family:inherit; }
-  #operator-container .op-order-tab.active{ background:#00ff41; color:#000; border-color:#00ff41; font-weight:700; }
-  #operator-container .op-order-item{ padding:12px 14px; border:1px solid #124a24; margin-bottom:8px; }
-  #operator-container .op-order-item.late{ border-color:#dc2626; background:#1a0505; }
+  #operator-container .op-order-tab{ flex:1; padding:9px 6px; text-align:center; background:#f4faf5; border:1px solid #cfe6d5; color:#5f8a6c; font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; cursor:pointer; font-family:inherit; }
+  #operator-container .op-order-tab.active{ background:#16a34a; color:#ffffff; border-color:#16a34a; font-weight:700; }
+  #operator-container .op-order-item{ padding:12px 14px; border:1px solid #cfe6d5; margin-bottom:8px; }
+  #operator-container .op-order-item.late{ border-color:#dc2626; background:#fef2f2; }
   #operator-container .op-order-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
-  #operator-container .op-order-shop{ font-weight:700; font-size:.9rem; color:#33ff66; }
+  #operator-container .op-order-shop{ font-weight:700; font-size:.9rem; color:#15803d; }
   #operator-container .op-order-shop::before{ content:'🏬 '; }
-  #operator-container .op-order-status-pill{ font-size:.62rem; padding:3px 9px; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; border:1px solid #124a24; color:#1f7a3d; flex-shrink:0; }
-  #operator-container .op-order-status-preparing, #operator-container .op-order-status-ready{ color:#33ff66; border-color:#1f7a3d; }
-  #operator-container .op-order-status-pending{ color:#f0a02c; border-color:#7a5a0f; }
-  #operator-container .op-order-status-delivered, #operator-container .op-order-status-completed, #operator-container .op-order-status-done{ color:#8b8b8b; border-color:#333; }
-  #operator-container .op-order-status-cancelled, #operator-container .op-order-status-rejected{ color:#f87171; border-color:#7a2a1d; }
-  #operator-container .op-order-sub{ font-size:.76rem; color:#1f7a3d; margin-top:4px; }
+  #operator-container .op-order-status-pill{ font-size:.62rem; padding:3px 9px; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; border:1px solid #cfe6d5; color:#5f8a6c; flex-shrink:0; }
+  #operator-container .op-order-status-preparing, #operator-container .op-order-status-ready{ color:#15803d; border-color:#5f8a6c; }
+  #operator-container .op-order-status-pending{ color:#b45309; border-color:#e9c27a; }
+  #operator-container .op-order-status-delivered, #operator-container .op-order-status-completed, #operator-container .op-order-status-done{ color:#6b7280; border-color:#d1d5db; }
+  #operator-container .op-order-status-cancelled, #operator-container .op-order-status-rejected{ color:#dc2626; border-color:#f2b8b0; }
+  #operator-container .op-order-sub{ font-size:.76rem; color:#5f8a6c; margin-top:4px; }
+  #operator-container .op-order-amt{ font-size:.95rem; color:#15803d; margin-top:6px; display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  #operator-container .op-order-amt b{ font-size:1.05rem; }
+  #operator-container .op-order-no{ font-size:.72rem; color:#5f8a6c; }
+  #operator-container .op-order-items{ font-size:.8rem; color:#1f2937; margin-top:4px; line-height:1.4; }
+  #operator-container .op-order-status-picked_up{ color:#15803d; border-color:#8fc79d; }
   #operator-container .op-order-late-tag{ display:inline-block; margin-top:8px; padding:3px 9px; background:#dc2626; color:#fff; font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
   /* Operator: Daily Report */
-  #operator-container input[type="date"]{ width:100%; padding:9px 10px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-size:.85rem; font-family:inherit; color-scheme:dark; }
-  #operator-container input[type="date"]:focus{ outline:none; border-color:#00ff41; }
+  #operator-container input[type="date"]{ width:100%; padding:9px 10px; background:#f4faf5; color:#15803d; border:1px solid #cfe6d5; font-size:.85rem; font-family:inherit; color-scheme:light; }
+  #operator-container input[type="date"]:focus{ outline:none; border-color:#16a34a; }
   #operator-container .op-report-summary{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
-  #operator-container .op-report-summary-item{ flex:1; min-width:76px; background:#020a04; border:1px solid #124a24; padding:10px 6px; text-align:center; }
-  #operator-container .op-report-summary-item .n{ font-size:1.15rem; font-weight:700; color:#33ff66; }
-  #operator-container .op-report-summary-item .l{ font-size:.62rem; color:#1f7a3d; text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }
+  #operator-container .op-report-summary-item{ flex:1; min-width:76px; background:#f4faf5; border:1px solid #cfe6d5; padding:10px 6px; text-align:center; }
+  #operator-container .op-report-summary-item .n{ font-size:1.15rem; font-weight:700; color:#15803d; }
+  #operator-container .op-report-summary-item .l{ font-size:.62rem; color:#5f8a6c; text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }
   /* Operator conversation list / chat panel */
   #operator-container .op-app{ display:flex; height:100vh; max-width:900px; margin:0 auto; }
-  #operator-container .op-sidebar{ width:280px; flex-shrink:0; border-right:1px solid #124a24; display:flex; flex-direction:column; background:#000; }
+  #operator-container .op-sidebar{ width:280px; flex-shrink:0; border-right:1px solid #cfe6d5; display:flex; flex-direction:column; background:#ffffff; }
   #operator-container .op-conv-list{ flex:1; overflow-y:auto; }
-  #operator-container .op-conv-item{ display:flex; flex-direction:column; padding:12px 14px; border-bottom:1px solid #124a24; cursor:pointer; }
-  #operator-container .op-conv-item:hover{ background:#051505; }
-  #operator-container .op-conv-item.active{ background:#08260f; border-left:3px solid #00ff41; }
-  #operator-container .op-conv-name{ font-weight:700; font-size:.88rem; color:#33ff66; }
-  #operator-container .op-conv-name::before{ content:'$ '; color:#1f7a3d; }
-  #operator-container .op-conv-preview{ font-size:.74rem; color:#1f7a3d; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #operator-container .op-chat-panel{ flex:1; display:none; flex-direction:column; background:#000; }
+  #operator-container .op-conv-item{ display:flex; flex-direction:column; padding:12px 14px; border-bottom:1px solid #cfe6d5; cursor:pointer; }
+  #operator-container .op-conv-item:hover{ background:#eef7f0; }
+  #operator-container .op-conv-item.active{ background:#dff1e4; border-left:3px solid #16a34a; }
+  #operator-container .op-conv-name{ font-weight:700; font-size:.88rem; color:#15803d; }
+  #operator-container .op-conv-name::before{ content:'$ '; color:#5f8a6c; }
+  #operator-container .op-conv-preview{ font-size:.74rem; color:#5f8a6c; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #operator-container .op-chat-panel{ flex:1; display:none; flex-direction:column; background:#ffffff; }
   #operator-container .op-chat-panel.active{ display:flex; }
-  #operator-container .op-chat-header{ background:#020a04; padding:14px 16px; border-bottom:1px solid #124a24; display:flex; align-items:center; gap:10px; }
-  #operator-container .op-chat-header .op-name{ font-weight:700; color:#33ff66; font-size:.95rem; }
+  #operator-container .op-chat-header{ background:#f4faf5; padding:14px 16px; border-bottom:1px solid #cfe6d5; display:flex; align-items:center; gap:10px; }
+  #operator-container .op-chat-header .op-name{ font-weight:700; color:#15803d; font-size:.95rem; }
   #operator-container .op-chat-messages{ flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; }
   #operator-container .op-chat-bubble-row{ display:flex; margin-bottom:8px; }
   #operator-container .op-chat-bubble-row.me{ justify-content:flex-end; }
   #operator-container .op-chat-bubble-row.them{ justify-content:flex-start; }
-  #operator-container .op-chat-bubble{ max-width:70%; padding:9px 12px; font-size:.85rem; line-height:1.4; border:1px solid #124a24; word-wrap:break-word; }
-  #operator-container .op-chat-bubble-row.me .op-chat-bubble{ background:#051f0a; color:#39ff14; border-color:#1f7a3d; }
-  #operator-container .op-chat-bubble-row.them .op-chat-bubble{ background:#0a0a0a; color:#33ff66; border-color:#2a2a2a; }
-  #operator-container .op-chat-bubble .op-chat-time{ display:block; text-align:right; font-size:.65rem; color:#1f7a3d; margin-top:3px; }
-  #operator-container .op-chat-input-bar{ display:flex; gap:10px; align-items:flex-end; padding:12px 14px; background:#020a04; border-top:1px solid #124a24; }
+  #operator-container .op-chat-bubble{ max-width:70%; padding:9px 12px; font-size:.85rem; line-height:1.4; border:1px solid #cfe6d5; word-wrap:break-word; }
+  #operator-container .op-chat-bubble-row.me .op-chat-bubble{ background:#e6f4ea; color:#16a34a; border-color:#5f8a6c; }
+  #operator-container .op-chat-bubble-row.them .op-chat-bubble{ background:#f4faf5; color:#15803d; border-color:#d1d5db; }
+  #operator-container .op-chat-bubble .op-chat-time{ display:block; text-align:right; font-size:.65rem; color:#5f8a6c; margin-top:3px; }
+  #operator-container .op-chat-input-bar{ display:flex; gap:10px; align-items:flex-end; padding:12px 14px; background:#f4faf5; border-top:1px solid #cfe6d5; }
   #operator-container .op-chat-input-bar textarea{ flex:1; margin:0; max-height:90px; }
-  #operator-container .op-chat-send-btn{ background:#000; color:#00ff41; border:1px solid #00ff41; width:40px; height:40px; font-size:1rem; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-family:inherit; }
-  #operator-container .op-no-chat-selected{ flex:1; display:flex; align-items:center; justify-content:center; color:#1f7a3d; font-size:.9rem; text-align:center; padding:20px; }
+  #operator-container .op-chat-send-btn{ background:#ffffff; color:#16a34a; border:1px solid #16a34a; width:40px; height:40px; font-size:1rem; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-family:inherit; }
+  #operator-container .op-no-chat-selected{ flex:1; display:flex; align-items:center; justify-content:center; color:#5f8a6c; font-size:.9rem; text-align:center; padding:20px; }
   @media (max-width:640px){
     #operator-container .op-app{ max-width:100%; position:relative; }
     #operator-container .op-sidebar{ width:100%; position:absolute; top:0; left:0; height:100%; z-index:5; transition:transform .25s ease; }
     #operator-container .op-sidebar.hide-mobile{ transform:translateX(-100%); }
     #operator-container .op-chat-panel{ width:100%; }
-    #operator-container .op-back-to-list{ display:inline-block; background:none; border:none; color:#33ff66; font-size:1.25rem; cursor:pointer; margin-right:6px; }
+    #operator-container .op-back-to-list{ display:inline-block; background:none; border:none; color:#15803d; font-size:1.25rem; cursor:pointer; margin-right:6px; }
   }
   #operator-container .op-back-to-list{ display:none; }
   .app-video-overlay{
@@ -1701,7 +1706,7 @@
       </div>
       <p class="op-note" id="op-data-usage" style="margin:0 0 10px; display:none;"></p>
       <div style="margin:0 0 14px;position:relative;">
-        <input type="search" id="op-home-search" placeholder="🔍 Search cards (e.g. coupon, orders, taxi…)" oninput="opHomeSearch(this.value)" autocomplete="off" style="width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:12px 14px;font-family:inherit;font-size:.95rem;">
+        <input type="search" id="op-home-search" placeholder="🔍 Search cards (e.g. coupon, orders, taxi…)" oninput="opHomeSearch(this.value)" autocomplete="off" style="width:100%;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:12px 14px;font-family:inherit;font-size:.95rem;">
         <p class="op-note" id="op-home-search-empty" style="display:none;margin:10px 0 0;">No card matches your search.</p>
       </div>
       <div class="op-home-grid">
@@ -2040,7 +2045,7 @@
 
       <div style="margin-bottom:22px;">
         <p class="op-note" style="margin-bottom:6px;">Add stock item to a section — only the item itself (name, photo, unit) is added, at ₹0 and marked unavailable. Each shop sets its own price and marks it available from its own Stock screen. A shop that already has the same item (same name and unit) is skipped.</p>
-        <select id="op-sec-add-select" onchange="opUpdateSectionAddHint()" style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:6px;"></select>
+        <select id="op-sec-add-select" onchange="opUpdateSectionAddHint()" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:6px;"></select>
         <p class="op-note" id="op-sec-add-hint" style="margin-bottom:8px;"></p>
         <div class="op-search-box" style="margin-bottom:0;">
           <input type="text" id="op-sec-item-name" placeholder="Item name" autocomplete="off">
@@ -2048,7 +2053,7 @@
         <div class="op-search-box" style="margin-bottom:0;">
           <input type="text" id="op-sec-item-desc" placeholder="Description (optional)" autocomplete="off">
         </div>
-        <select id="op-sec-item-unit" style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;">
+        <select id="op-sec-item-unit" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;">
           <option value="piece">Piece</option>
           <option value="gram">Gram</option>
           <option value="kg">Kg</option>
@@ -2093,7 +2098,7 @@
       <div id="op-sec-editor-shops" style="max-height:38vh; overflow-y:auto; margin-bottom:8px;"></div>
       <p class="op-note" id="op-sec-editor-count" style="margin-bottom:10px;"></p>
       <button type="button" class="op-btn op-btn-push" onclick="opSaveSectionEditor()">💾 Save section</button>
-      <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-section-editor-modal').classList.remove('show')">Cancel</button>
+      <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="document.getElementById('op-section-editor-modal').classList.remove('show')">Cancel</button>
       <p class="op-note" id="op-sec-editor-status" style="margin-top:4px; display:none;"></p>
     </div>
   </div>
@@ -2120,7 +2125,7 @@
       </div>
       <p class="op-note" style="margin-bottom:6px;">Category photo (shown in the customer app's left category list)</p>
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-        <img id="op-cat-photo-preview" alt="" style="width:64px;height:64px;object-fit:cover;border:1px solid #124a24;background:#020a04;display:none;">
+        <img id="op-cat-photo-preview" alt="" style="width:64px;height:64px;object-fit:cover;border:1px solid #cfe6d5;background:#f4faf5;display:none;">
         <input type="file" id="op-cat-photo-file" accept="image/*" style="display:none" onchange="opCatPhotoPicked(this)">
         <button type="button" class="op-btn" style="padding:6px 10px; margin-bottom:0;" onclick="document.getElementById('op-cat-photo-file').click()">📷 Choose photo</button>
         <button type="button" class="op-btn op-btn-danger" id="op-cat-photo-remove" style="padding:6px 10px; margin-bottom:0; display:none;" onclick="opCatPhotoRemove()">Remove</button>
@@ -2136,7 +2141,7 @@
       <div id="op-cat-editor-items" style="max-height:38vh; overflow-y:auto; margin-bottom:8px;"></div>
       <p class="op-note" id="op-cat-editor-count" style="margin-bottom:10px;"></p>
       <button type="button" class="op-btn op-btn-push" onclick="opSaveCategoryEditor()">💾 Save category</button>
-      <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-category-editor-modal').classList.remove('show')">Cancel</button>
+      <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="document.getElementById('op-category-editor-modal').classList.remove('show')">Cancel</button>
       <p class="op-note" id="op-cat-editor-status" style="margin-top:4px; display:none;"></p>
     </div>
   </div>
@@ -2185,7 +2190,7 @@
       <div id="op-itemcat-editor-items" style="max-height:38vh; overflow-y:auto; margin-bottom:8px;"></div>
       <p class="op-note" id="op-itemcat-editor-count" style="margin-bottom:10px;"></p>
       <button type="button" class="op-btn op-btn-push" onclick="opSaveItemCategoryEditor()">💾 Save category</button>
-      <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-itemcat-editor-modal').classList.remove('show')">Cancel</button>
+      <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="document.getElementById('op-itemcat-editor-modal').classList.remove('show')">Cancel</button>
       <p class="op-note" id="op-itemcat-editor-status" style="margin-top:4px; display:none;"></p>
     </div>
   </div>
@@ -2201,7 +2206,7 @@
       <p class="op-note" id="op-cp-unit" style="margin-bottom:10px;"></p>
       <button type="button" class="op-btn op-btn-push" onclick="opSaveCustomerPrice()">💾 Save customer price</button>
       <button type="button" class="op-btn" id="op-cp-reset-btn" style="display:none;" onclick="opClearCustomerPrice(opCpEditingEnc, true)">↩ Use automatic price</button>
-      <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-cprice-modal').classList.remove('show')">Cancel</button>
+      <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="document.getElementById('op-cprice-modal').classList.remove('show')">Cancel</button>
       <p class="op-note" id="op-cp-status" style="margin-top:4px; display:none;"></p>
     </div>
   </div>
@@ -2237,7 +2242,7 @@
         <button type="button" class="op-order-tab" data-tab="cancelled" onclick="opSwitchRidesTab('cancelled')">Cancelled</button>
       </div>
       <div class="op-search-box"><input type="text" id="op-rides-search" placeholder="Search by customer or driver..." oninput="opRenderRidesList()"></div>
-      <div class="op-search-box"><select id="op-rides-zone-filter" onchange="opRenderRidesList()" style="width:100%; padding:9px 10px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-size:.85rem; font-family:inherit;"><option value="">All zones</option></select></div>
+      <div class="op-search-box"><select id="op-rides-zone-filter" onchange="opRenderRidesList()" style="width:100%; padding:9px 10px; background:#f4faf5; color:#15803d; border:1px solid #cfe6d5; font-size:.85rem; font-family:inherit;"><option value="">All zones</option></select></div>
       <div id="op-rides-list"></div>
     </div>
   </div>
@@ -2333,56 +2338,56 @@
     </div>
     <div class="op-section-body">
       <p class="op-note">This sends a real push notification (works even if the app is closed) to every customer device that has notifications enabled. Use it for offers, announcements, or downtime notices — not for individual order updates, which already go out automatically.</p>
-      <input type="text" id="op-notify-title-input" placeholder="Title (e.g. 🎉 20% off today!)" maxlength="60" style="width:100%;padding:10px;background:#0b0f19;color:#e2e8f0;border:1px solid #334155;font-size:.85rem;margin-bottom:10px;">
+      <input type="text" id="op-notify-title-input" placeholder="Title (e.g. 🎉 20% off today!)" maxlength="60" style="width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:10px;">
       <textarea id="op-notify-body-input" placeholder="Message body..." style="height:100px;" maxlength="150"></textarea>
-      <input type="text" id="op-notify-image-input" placeholder="Image URL (optional — shown as a big picture in the notification)" style="width:100%;padding:10px;background:#0b0f19;color:#e2e8f0;border:1px solid #334155;font-size:.85rem;margin-top:10px;">
+      <input type="text" id="op-notify-image-input" placeholder="Image URL (optional — shown as a big picture in the notification)" style="width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-top:10px;">
       <div style="margin-top:8px;display:flex;align-items:center;gap:10px;">
         <input type="file" id="op-notify-image-file" accept="image/*" style="display:none;" onchange="opHandleNotifyImageUpload(event)">
         <button type="button" class="op-btn" style="width:auto;padding:8px 14px;font-size:.8rem;" onclick="document.getElementById('op-notify-image-file').click()">📷 Upload photo</button>
         <span id="op-notify-image-status" class="op-note" style="margin:0;"></span>
       </div>
-      <img id="op-notify-image-preview" style="display:none;max-width:120px;max-height:120px;border-radius:6px;margin-top:8px;border:1px solid #334155;">
+      <img id="op-notify-image-preview" style="display:none;max-width:120px;max-height:120px;border-radius:6px;margin-top:8px;border:1px solid #b7d3be;">
       <div style="margin:14px 0 4px;">
-        <p class="op-note" style="margin-bottom:6px;">Send to which customers? <span style="color:#1f7a3d;">(a customer's zone = the zone of their last known location in the app)</span></p>
-        <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:4px;"><input type="checkbox" id="op-notify-all" checked onchange="opNotifyTargetChanged('all')"> 🌍 All customers</label>
-        <div id="op-notify-zones" style="color:#33ff66;font-size:.85rem;line-height:1.9;">Loading zones...</div>
+        <p class="op-note" style="margin-bottom:6px;">Send to which customers? <span style="color:#5f8a6c;">(a customer's zone = the zone of their last known location in the app)</span></p>
+        <label style="color:#15803d;font-size:.85rem;display:block;margin-bottom:4px;"><input type="checkbox" id="op-notify-all" checked onchange="opNotifyTargetChanged('all')"> 🌍 All customers</label>
+        <div id="op-notify-zones" style="color:#15803d;font-size:.85rem;line-height:1.9;">Loading zones...</div>
       </div>
       <div>
         <button type="button" class="op-btn op-btn-push" id="op-notify-send-btn" onclick="opSendBroadcastNotification()">📢 Send to all customers</button>
       </div>
       <p class="op-note" id="op-notify-status" style="margin-top:10px;"></p>
-       <hr style="border:0;border-top:1px solid #124a24;margin:26px 0 16px;">
-       <h3 style="color:#33ff66; font-size:14px; margin:0 0 6px;">🖼️ Home screen posters</h3>
+       <hr style="border:0;border-top:1px solid #cfe6d5;margin:26px 0 16px;">
+       <h3 style="color:#15803d; font-size:14px; margin:0 0 6px;">🖼️ Home screen posters</h3>
        <p class="op-note">Offer posters shown as a swipeable banner at the top of the customer app's home screen (auto-slides every 4 seconds). Add as many as you like. Best size: 16:9, e.g. 1280×720 — photos are resized automatically. Optional link opens when a customer taps that poster. Tick Home screen, NESH Mart, Food, Trending (the Trending tab's top banner), or any combination — you can change it later on each poster.</p>
        <div style="margin:0 0 10px;">
          <p class="op-note" style="margin-bottom:6px;">Show new poster(s) on:</p>
-         <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-home" checked> 🏠 Home screen</label>
-         <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-mart" checked> 🛍️ NESH Mart</label>
-         <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-food" checked> 🍔 Food</label>
-         <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-trending"> 🔥 Trending</label>
-         <label style="color:#33ff66;font-size:.85rem;"><input type="checkbox" id="op-poster-t-popup"> 📣 NESH Mart popup</label>
+         <label style="color:#15803d;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-home" checked> 🏠 Home screen</label>
+         <label style="color:#15803d;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-mart" checked> 🛍️ NESH Mart</label>
+         <label style="color:#15803d;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-food" checked> 🍔 Food</label>
+         <label style="color:#15803d;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-poster-t-trending"> 🔥 Trending</label>
+         <label style="color:#15803d;font-size:.85rem;"><input type="checkbox" id="op-poster-t-popup"> 📣 NESH Mart popup</label>
          <p class="op-note" style="margin:6px 0 0;">📣 Popup = shows over the NESH Mart screen like Spotify's offer card, closes by itself after 4 seconds (✕ also works), and each customer sees it only once. Poster keeps its own shape - any size works. Untick the other boxes if it should be a popup only.</p>
        </div>
        <div style="margin:0 0 10px;">
-         <p class="op-note" style="margin-bottom:6px;">Open a home card or a shop when tapped? <span style="color:#1f7a3d;">(optional - pick one)</span></p>
-         <select id="op-poster-shop" style="max-width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"></select>
+         <p class="op-note" style="margin-bottom:6px;">Open a home card or a shop when tapped? <span style="color:#5f8a6c;">(optional - pick one)</span></p>
+         <select id="op-poster-shop" style="max-width:100%;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;"></select>
        </div>
        <div style="margin:0 0 10px;">
-         <p class="op-note" style="margin-bottom:6px;">Show in which zone? <span style="color:#1f7a3d;">(none ticked = 🌍 General, shows in every zone)</span></p>
-         <div id="op-poster-zones" style="color:#33ff66;font-size:.85rem;line-height:1.9;">Loading zones...</div>
+         <p class="op-note" style="margin-bottom:6px;">Show in which zone? <span style="color:#5f8a6c;">(none ticked = 🌍 General, shows in every zone)</span></p>
+         <div id="op-poster-zones" style="color:#15803d;font-size:.85rem;line-height:1.9;">Loading zones...</div>
        </div>
        <div style="margin:0 0 10px;">
-         <p class="op-note" style="margin-bottom:6px;">Poster of which shop? <span style="color:#1f7a3d;">(optional - the poster then shows ONLY in the zones where that shop is available)</span></p>
-         <select id="op-poster-zshop" style="max-width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"></select>
+         <p class="op-note" style="margin-bottom:6px;">Poster of which shop? <span style="color:#5f8a6c;">(optional - the poster then shows ONLY in the zones where that shop is available)</span></p>
+         <select id="op-poster-zshop" style="max-width:100%;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;"></select>
        </div>
        <div style="margin:0 0 10px;">
          <p class="op-note" style="margin-bottom:6px;">Show for how long:</p>
-         <select id="op-poster-dur" onchange="opDurChange(this)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+         <select id="op-poster-dur" onchange="opDurChange(this)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
            <option value="0">No time limit</option><option value="6">6 hours</option><option value="12">12 hours</option>
            <option value="24" selected>24 hours</option><option value="48">2 days</option><option value="72">3 days</option>
            <option value="168">7 days</option><option value="custom">Custom hours…</option>
          </select>
-         <input type="number" id="op-poster-dur-custom" min="1" max="8760" placeholder="hours" style="display:none;width:90px;margin-left:8px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+         <input type="number" id="op-poster-dur-custom" min="1" max="8760" placeholder="hours" style="display:none;width:90px;margin-left:8px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
        </div>
        <input type="file" id="op-poster-file" accept="image/*" multiple style="display:none" onchange="opPosterUpload(this)">
        <button type="button" class="op-btn op-btn-push" onclick="document.getElementById('op-poster-file').click()">＋ Add poster photo(s)</button>
@@ -2390,7 +2395,7 @@
        <button type="button" class="op-btn op-btn-push" onclick="document.getElementById('op-poster-video-file').click()">🎬 Add poster video(s)</button>
        <p class="op-note" style="margin-top:6px;">Video posters play (muted) in the customer app; when the video finishes, the slider moves to the next poster automatically. Keep videos short (under 30 sec, max 90 MB).</p>
        <div style="margin-top:10px;">
-         <label style="color:#33ff66;font-size:.8rem;"><input type="checkbox" id="op-poster-autodel" checked onchange="opAutoDelSet(this)"> 🗑 Auto-delete expired posters + notification photos after 24h (also from Cloudinary)</label>
+         <label style="color:#15803d;font-size:.8rem;"><input type="checkbox" id="op-poster-autodel" checked onchange="opAutoDelSet(this)"> 🗑 Auto-delete expired posters + notification photos after 24h (also from Cloudinary)</label>
          <button type="button" class="op-btn op-btn-danger" style="margin-left:8px;" onclick="opCleanupAll()">Delete expired now</button>
        </div>
        <p class="op-note" id="op-poster-status" style="margin-top:10px;"></p>
@@ -2443,37 +2448,37 @@
     <div class="op-section-body">
       <p class="op-note">Customers type the code at checkout. It works only at the shops you tick below (or all shops), and you can limit it to a card (Food / Groceries / NESH Mart) and to zones. The discount is taken off the items total and saved on the order as couponCode / couponDiscount.</p>
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px;">
-        <input type="text" id="op-cpn-code" placeholder="CODE (e.g. FIRST50)" maxlength="20" style="width:170px;text-transform:uppercase;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
-        <input type="text" id="op-cpn-desc" placeholder="Short description (optional, e.g. First order offer)" maxlength="40" style="flex:1 1 220px;min-width:200px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
-        <select id="op-cpn-type" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"><option value="flat">₹ Flat off</option><option value="percent">% Percent off</option></select>
-        <input type="number" id="op-cpn-value" min="1" placeholder="Amount / %" style="width:110px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
-        <input type="number" id="op-cpn-min" min="0" placeholder="Min order ₹" style="width:110px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
-        <input type="number" id="op-cpn-maxorder" min="0" placeholder="Max order ₹" title="Coupon will NOT apply when the items total is above this amount (blank = no limit)" style="width:110px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
-        <input type="number" id="op-cpn-max" min="0" placeholder="Max ₹ off (for %)" style="width:140px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
-        <input type="number" id="op-cpn-uses" min="1" value="1" title="Uses per customer" style="width:80px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
-        <input type="number" id="op-cpn-total" min="1" placeholder="Total uses (blank = unlimited)" title="Total times this coupon can be used by ALL customers together" style="width:210px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="text" id="op-cpn-code" placeholder="CODE (e.g. FIRST50)" maxlength="20" style="width:170px;text-transform:uppercase;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="text" id="op-cpn-desc" placeholder="Short description (optional, e.g. First order offer)" maxlength="40" style="flex:1 1 220px;min-width:200px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
+        <select id="op-cpn-type" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;"><option value="flat">₹ Flat off</option><option value="percent">% Percent off</option></select>
+        <input type="number" id="op-cpn-value" min="1" placeholder="Amount / %" style="width:110px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="number" id="op-cpn-min" min="0" placeholder="Min order ₹" style="width:110px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="number" id="op-cpn-maxorder" min="0" placeholder="Max order ₹" title="Coupon will NOT apply when the items total is above this amount (blank = no limit)" style="width:110px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="number" id="op-cpn-max" min="0" placeholder="Max ₹ off (for %)" style="width:140px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="number" id="op-cpn-uses" min="1" value="1" title="Uses per customer" style="width:80px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="number" id="op-cpn-total" min="1" placeholder="Total uses (blank = unlimited)" title="Total times this coupon can be used by ALL customers together" style="width:210px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
       </div>
       <p class="op-note" style="margin:0 0 8px;">Min order / Max order = the coupon works only when the items total is between these two amounts (Max blank = no upper limit). Max ₹ off = cap on the discount for % coupons. Box after that = how many times one customer can use it.</p>
       <div style="margin:0 0 10px;">
-        <select id="op-cpn-dur" onchange="document.getElementById('op-cpn-dur-custom').style.display=this.value==='custom'?'':'none'" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <select id="op-cpn-dur" onchange="document.getElementById('op-cpn-dur-custom').style.display=this.value==='custom'?'':'none'" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
           <option value="0">No time limit</option><option value="24">24 hours</option><option value="72">3 days</option>
           <option value="168">7 days</option><option value="720" selected>30 days</option><option value="custom">Custom hours…</option>
         </select>
-        <input type="number" id="op-cpn-dur-custom" min="1" max="8760" placeholder="hours" style="display:none;width:90px;margin-left:8px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="number" id="op-cpn-dur-custom" min="1" max="8760" placeholder="hours" style="display:none;width:90px;margin-left:8px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
       </div>
-      <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-cpn-secret"> 🔒 Secret code (don't show as an offer card - customer must type it)</label>
-      <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-cpn-auto"> ⚡ Auto-apply at checkout (applied automatically when the customer qualifies — no code needed)</label>
-      <p class="op-note" style="margin-bottom:6px;">Works in which card? <span style="color:#1f7a3d;">(none ticked = all cards)</span></p>
-      <div style="color:#33ff66;font-size:.85rem;line-height:2;margin-bottom:10px;">
+      <label style="color:#15803d;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-cpn-secret"> 🔒 Secret code (don't show as an offer card - customer must type it)</label>
+      <label style="color:#15803d;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-cpn-auto"> ⚡ Auto-apply at checkout (applied automatically when the customer qualifies — no code needed)</label>
+      <p class="op-note" style="margin-bottom:6px;">Works in which card? <span style="color:#5f8a6c;">(none ticked = all cards)</span></p>
+      <div style="color:#15803d;font-size:.85rem;line-height:2;margin-bottom:10px;">
         <label style="display:inline-block;margin-right:14px;"><input type="checkbox" class="op-cpn-card" value="food"> 🍔 Food</label>
         <label style="display:inline-block;margin-right:14px;"><input type="checkbox" class="op-cpn-card" value="groceries"> 🛒 Groceries</label>
         <label style="display:inline-block;margin-right:14px;"><input type="checkbox" class="op-cpn-card" value="mart"> 🏪 NESH Mart</label>
       </div>
-      <p class="op-note" style="margin-bottom:6px;">Works in which zone? <span style="color:#1f7a3d;">(none ticked = 🌍 all zones · zone = the customer's delivery location)</span></p>
-      <div id="op-cpn-zones" style="color:#33ff66;font-size:.85rem;line-height:1.9;margin-bottom:10px;">Loading zones...</div>
+      <p class="op-note" style="margin-bottom:6px;">Works in which zone? <span style="color:#5f8a6c;">(none ticked = 🌍 all zones · zone = the customer's delivery location)</span></p>
+      <div id="op-cpn-zones" style="color:#15803d;font-size:.85rem;line-height:1.9;margin-bottom:10px;">Loading zones...</div>
       <p class="op-note" style="margin-bottom:6px;">Works at which shops?</p>
-      <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:6px;"><input type="checkbox" id="op-cpn-all" onchange="opCpnAllToggle(this)"> 🌐 All shops</label>
-      <div id="op-cpn-shops" style="max-height:220px;overflow:auto;border:1px solid #124a24;padding:8px;margin-bottom:12px;color:#33ff66;font-size:.85rem;line-height:2;"></div>
+      <label style="color:#15803d;font-size:.85rem;display:block;margin-bottom:6px;"><input type="checkbox" id="op-cpn-all" onchange="opCpnAllToggle(this)"> 🌐 All shops</label>
+      <div id="op-cpn-shops" style="max-height:220px;overflow:auto;border:1px solid #cfe6d5;padding:8px;margin-bottom:12px;color:#15803d;font-size:.85rem;line-height:2;"></div>
       <button type="button" class="op-btn op-btn-push" id="op-cpn-save-btn" onclick="opCpnSave()">💾 Save coupon</button>
       <button type="button" class="op-btn" id="op-cpn-cancel-btn" style="display:none;margin-left:8px;" onclick="opCpnEditReset(true)">✖ Cancel edit</button>
       <p class="op-note" id="op-cpn-status" style="margin-top:10px;"></p>
@@ -2489,24 +2494,24 @@
     </div>
     <div class="op-section-body">
       <p class="op-note">Works only in NESH Store (Groceries), with its own order count. After the customer's Groceries orders are DELIVERED (the number you set), they unlock a coupon or a free Groceries item. The reward card shows at the top of NESH Store. For a free item the shop that fulfils the order is still paid its own rate (you bear the cost).</p>
-      <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-ls-on" checked> ✅ Reward is ON</label>
+      <label style="color:#15803d;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-ls-on" checked> ✅ Reward is ON</label>
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px;">
-        <input type="number" id="op-ls-n" min="1" value="5" placeholder="Orders needed" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:130px;">
-        <input type="text" id="op-ls-title" maxlength="40" placeholder="Card title (e.g. Groceries Rewards)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="flex:1 1 220px;min-width:200px;">
-        <select id="op-ls-rt" onchange="opLsTypeUi()" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"><option value="discount">🎟️ Coupon (discount)</option><option value="product">🎁 Free item</option></select>
+        <input type="number" id="op-ls-n" min="1" value="5" placeholder="Orders needed" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="width:130px;">
+        <input type="text" id="op-ls-title" maxlength="40" placeholder="Card title (e.g. Groceries Rewards)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="flex:1 1 220px;min-width:200px;">
+        <select id="op-ls-rt" onchange="opLsTypeUi()" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;"><option value="discount">🎟️ Coupon (discount)</option><option value="product">🎁 Free item</option></select>
       </div>
       <div id="op-ls-disc" style="display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px;">
-        <select id="op-ls-type" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"><option value="flat">₹ Flat off</option><option value="percent">% Percent off</option></select>
-        <input type="number" id="op-ls-value" min="1" placeholder="Amount / %" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:120px;">
-        <input type="number" id="op-ls-max" min="0" placeholder="Max ₹ off (for %)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:150px;">
+        <select id="op-ls-type" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;"><option value="flat">₹ Flat off</option><option value="percent">% Percent off</option></select>
+        <input type="number" id="op-ls-value" min="1" placeholder="Amount / %" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="width:120px;">
+        <input type="number" id="op-ls-max" min="0" placeholder="Max ₹ off (for %)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="width:150px;">
       </div>
       <div id="op-ls-prod" style="display:none;margin:0 0 10px;">
         <div class="op-search-box" style="margin-bottom:6px;"><input type="text" id="op-ls-search" placeholder="Search the free item…" oninput="opLsRenderItemSelect()"></div>
-        <div style="margin-bottom:8px;"><select id="op-ls-item" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="max-width:100%;"></select></div>
-        <input type="number" id="op-ls-qty" min="1" value="1" placeholder="Quantity" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:110px;">
+        <div style="margin-bottom:8px;"><select id="op-ls-item" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="max-width:100%;"></select></div>
+        <input type="number" id="op-ls-qty" min="1" value="1" placeholder="Quantity" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="width:110px;">
       </div>
-      <div style="margin:0 0 10px;"><input type="number" id="op-ls-min" min="0" placeholder="Min order ₹ to use reward" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:200px;"></div>
-      <div style="margin:0 0 10px;"><input type="number" id="op-ls-cmin" min="0" placeholder="Min order ₹ for an order to COUNT" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:260px;"> <span class="op-note" style="display:inline;">(items total, without delivery fee. Blank/0 = every order counts)</span></div>
+      <div style="margin:0 0 10px;"><input type="number" id="op-ls-min" min="0" placeholder="Min order ₹ to use reward" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="width:200px;"></div>
+      <div style="margin:0 0 10px;"><input type="number" id="op-ls-cmin" min="0" placeholder="Min order ₹ for an order to COUNT" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="width:260px;"> <span class="op-note" style="display:inline;">(items total, without delivery fee. Blank/0 = every order counts)</span></div>
       <button type="button" class="op-btn op-btn-push" onclick="opLsSave()">💾 Save Groceries reward</button>
       <button type="button" class="op-btn" style="margin-left:8px;" onclick="opLsDelete()">🗑 Remove</button>
       <p class="op-note" id="op-ls-status" style="margin-top:10px;"></p>
@@ -2521,55 +2526,55 @@
     </div>
     <div class="op-section-body">
       <p class="op-note">After a customer completes the number of orders you set, they unlock a coupon or a free product. A group order (many shops in one checkout) counts as ONE order. The reward card shows at the top of every shop you tick below.</p>
-      <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-loy-on" checked> ✅ Reward is ON</label>
+      <label style="color:#15803d;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-loy-on" checked> ✅ Reward is ON</label>
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px;">
-        <input type="number" id="op-loy-n" min="1" value="5" title="Orders needed" placeholder="Orders needed" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:130px;">
-        <input type="text" id="op-loy-title" maxlength="40" placeholder="Card title (e.g. NESH Rewards)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="flex:1 1 220px;min-width:200px;">
-        <select id="op-loy-rt" onchange="opLoyTypeUi()" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"><option value="discount">🎟️ Coupon (discount)</option><option value="product">🎁 Free product</option></select>
+        <input type="number" id="op-loy-n" min="1" value="5" title="Orders needed" placeholder="Orders needed" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="width:130px;">
+        <input type="text" id="op-loy-title" maxlength="40" placeholder="Card title (e.g. NESH Rewards)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="flex:1 1 220px;min-width:200px;">
+        <select id="op-loy-rt" onchange="opLoyTypeUi()" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;"><option value="discount">🎟️ Coupon (discount)</option><option value="product">🎁 Free product</option></select>
       </div>
       <div id="op-loy-disc" style="display:flex;flex-wrap:wrap;gap:10px;margin:0 0 10px;">
-        <select id="op-loy-type" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"><option value="flat">₹ Flat off</option><option value="percent">% Percent off</option></select>
-        <input type="number" id="op-loy-value" min="1" placeholder="Amount / %" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:120px;">
-        <input type="number" id="op-loy-max" min="0" placeholder="Max ₹ off (for %)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:150px;">
-        <input type="number" id="op-loy-ddays" min="0" step="any" placeholder="Coupon valid days after claim (0 = no limit)" title="How many days the customer can use the coupon after claiming it" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem; width:290px;max-width:100%;">
+        <select id="op-loy-type" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;"><option value="flat">₹ Flat off</option><option value="percent">% Percent off</option></select>
+        <input type="number" id="op-loy-value" min="1" placeholder="Amount / %" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="width:120px;">
+        <input type="number" id="op-loy-max" min="0" placeholder="Max ₹ off (for %)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="width:150px;">
+        <input type="number" id="op-loy-ddays" min="0" step="any" placeholder="Coupon valid days after claim (0 = no limit)" title="How many days the customer can use the coupon after claiming it" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem; width:290px;max-width:100%;">
       </div>
       <div id="op-loy-prod" style="display:none;margin:0 0 10px;">
-        <input type="text" id="op-loy-pname" maxlength="60" placeholder="Free product name (e.g. Cold drink 250ml)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:100%;max-width:420px;">
-        <input type="number" id="op-loy-pdays" min="0" step="any" placeholder="Free item valid days after claim (0 = no limit)" title="How many days the customer can use the free item after claiming it" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem; width:320px;max-width:100%;margin-top:8px;">
+        <input type="text" id="op-loy-pname" maxlength="60" placeholder="Free product name (e.g. Cold drink 250ml)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="width:100%;max-width:420px;">
+        <input type="number" id="op-loy-pdays" min="0" step="any" placeholder="Free item valid days after claim (0 = no limit)" title="How many days the customer can use the free item after claiming it" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem; width:320px;max-width:100%;margin-top:8px;">
       </div>
-      <div style="margin:0 0 10px;"><input type="number" id="op-loy-remind" min="0" step="any" placeholder="Auto reminder: hours left (blank = 24, 0 = off)" title="Sends a push to the customer automatically when this many hours are left on a claimed reward" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem; width:320px;max-width:100%;"> <span class="op-note" style="display:inline;">(push to the customer when their claimed reward is about to expire)</span></div>
-      <div style="margin:0 0 10px;"><input type="number" id="op-loy-min" min="0" placeholder="Min order ₹ to use reward" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:200px;"></div>
-      <div style="margin:0 0 10px;"><input type="number" id="op-loy-cmin" min="0" placeholder="Min order ₹ for an order to COUNT" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;" style="width:260px;"> <span class="op-note" style="display:inline;">(items total, without delivery fee. Blank/0 = every order counts)</span></div>
-      <div style="margin:0 0 12px;padding:10px;border:1px dashed #124a24;">
+      <div style="margin:0 0 10px;"><input type="number" id="op-loy-remind" min="0" step="any" placeholder="Auto reminder: hours left (blank = 24, 0 = off)" title="Sends a push to the customer automatically when this many hours are left on a claimed reward" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem; width:320px;max-width:100%;"> <span class="op-note" style="display:inline;">(push to the customer when their claimed reward is about to expire)</span></div>
+      <div style="margin:0 0 10px;"><input type="number" id="op-loy-min" min="0" placeholder="Min order ₹ to use reward" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="width:200px;"></div>
+      <div style="margin:0 0 10px;"><input type="number" id="op-loy-cmin" min="0" placeholder="Min order ₹ for an order to COUNT" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;" style="width:260px;"> <span class="op-note" style="display:inline;">(items total, without delivery fee. Blank/0 = every order counts)</span></div>
+      <div style="margin:0 0 12px;padding:10px;border:1px dashed #cfe6d5;">
         <p class="op-note" style="margin:0 0 8px;">⏰ Offer time (optional) — when the whole Hero Offer starts / ends. Leave blank = no limit. (How long a CLAIMED coupon / free item stays valid is set above, in days.)</p>
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
-          <label style="color:#33ff66;font-size:.8rem;">Starts<br><input type="datetime-local" id="op-loy-start" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;color-scheme:dark;"></label>
-          <label style="color:#33ff66;font-size:.8rem;">Ends (expires)<br><input type="datetime-local" id="op-loy-end" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;color-scheme:dark;"></label>
+          <label style="color:#15803d;font-size:.8rem;">Starts<br><input type="datetime-local" id="op-loy-start" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;color-scheme:light;"></label>
+          <label style="color:#15803d;font-size:.8rem;">Ends (expires)<br><input type="datetime-local" id="op-loy-end" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;color-scheme:light;"></label>
           <button type="button" class="op-btn" onclick="document.getElementById('op-loy-start').value='';document.getElementById('op-loy-end').value='';">Clear time</button>
         </div>
       </div>
       <p class="op-note" style="margin-bottom:6px;">Reward works at which shops?</p>
-      <label style="color:#33ff66;font-size:.85rem;display:block;margin-bottom:6px;"><input type="checkbox" id="op-loy-all" onchange="opLoyAllToggle(this)"> 🌐 All shops</label>
-      <div id="op-loy-shops" style="max-height:220px;overflow:auto;border:1px solid #124a24;padding:8px;margin-bottom:12px;color:#33ff66;font-size:.85rem;line-height:2;"></div>
+      <label style="color:#15803d;font-size:.85rem;display:block;margin-bottom:6px;"><input type="checkbox" id="op-loy-all" onchange="opLoyAllToggle(this)"> 🌐 All shops</label>
+      <div id="op-loy-shops" style="max-height:220px;overflow:auto;border:1px solid #cfe6d5;padding:8px;margin-bottom:12px;color:#15803d;font-size:.85rem;line-height:2;"></div>
       <button type="button" class="op-btn op-btn-push" onclick="opLoySave()">💾 Save loyalty reward</button>
       <button type="button" class="op-btn" style="margin-left:8px;" onclick="opLoyDelete()">🗑 Remove</button>
       <p class="op-note" id="op-loy-status" style="margin-top:10px;"></p>
-      <div style="margin-top:16px;padding:12px;border:1px solid #124a24;">
+      <div style="margin-top:16px;padding:12px;border:1px solid #cfe6d5;">
         <h2 style="margin:0 0 6px;">📣 Claimed rewards — expiring</h2>
         <p class="op-note">Customers who claimed the reward but have not used it yet (needs a "valid days" limit above). <b>Send</b> pushes an expiry reminder to that one customer only, with the exact expiry time. The automatic reminder goes out by itself when the hours set above are left (works while the operator panel is open on any device).</p>
         <button type="button" class="op-btn" onclick="opLoyLoadClaims()">🔄 Refresh list</button>
-        <div id="op-loy-claims" style="margin-top:8px;color:#33ff66;font-size:.85rem;line-height:1.7;"></div>
+        <div id="op-loy-claims" style="margin-top:8px;color:#15803d;font-size:.85rem;line-height:1.7;"></div>
       </div>
-      <div style="margin-top:16px;padding:12px;border:1px solid #124a24;">
+      <div style="margin-top:16px;padding:12px;border:1px solid #cfe6d5;">
         <h2 style="margin:0 0 6px;">🎯 Progress nudge — send manually</h2>
         <p class="op-note">Customers who are part-way through the Hero Offer (e.g. 1 or 2 orders done), or unlocked it but have not claimed. Pick a step, then <b>Send</b> a push to one customer or to everyone shown. Nothing is sent automatically.</p>
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
-          <select id="op-loy-nf" onchange="opLoyRenderNudge()" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;color-scheme:dark;"></select>
+          <select id="op-loy-nf" onchange="opLoyRenderNudge()" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;color-scheme:light;"></select>
           <button type="button" class="op-btn" onclick="opLoyLoadNudge()">🔄 Refresh</button>
           <button type="button" class="op-btn op-btn-push" id="op-loy-nbulk" onclick="opLoyNudgeAll()">📣 Send to all shown</button>
         </div>
         <p class="op-note" id="op-loy-nstatus" style="margin:8px 0 0;"></p>
-        <div id="op-loy-nlist" style="margin-top:8px;color:#33ff66;font-size:.85rem;line-height:1.7;"></div>
+        <div id="op-loy-nlist" style="margin-top:8px;color:#15803d;font-size:.85rem;line-height:1.7;"></div>
       </div>
     </div>
   </div>
@@ -2585,24 +2590,24 @@
       <p class="op-note">Upload a short video ad. It pops up full-screen in the customer app (muted, with a Skip button) and closes by itself the moment the video ends. Each customer sees an ad at most once per the "show again after" hours, and never more than one ad every 3 minutes. Keep it short (under 20 sec) to save data.</p>
       <div style="margin:0 0 10px;">
         <p class="op-note" style="margin-bottom:6px;">Show the ad on:</p>
-        <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-vad-t-home" checked> 🏠 Home</label>
-        <label style="color:#33ff66;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-vad-t-food"> 🍔 Food</label>
-        <label style="color:#33ff66;font-size:.85rem;"><input type="checkbox" id="op-vad-t-mart"> 🛍️ NESH Mart</label>
+        <label style="color:#15803d;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-vad-t-home" checked> 🏠 Home</label>
+        <label style="color:#15803d;font-size:.85rem;margin-right:16px;"><input type="checkbox" id="op-vad-t-food"> 🍔 Food</label>
+        <label style="color:#15803d;font-size:.85rem;"><input type="checkbox" id="op-vad-t-mart"> 🛍️ NESH Mart</label>
       </div>
       <div style="margin:0 0 10px;">
         <p class="op-note" style="margin-bottom:6px;">Show for how long:</p>
-        <select id="op-vad-dur" onchange="opVadDurChange(this)" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <select id="op-vad-dur" onchange="opVadDurChange(this)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
           <option value="0">No time limit</option><option value="6">6 hours</option><option value="12">12 hours</option>
           <option value="24">24 hours</option><option value="48">2 days</option><option value="72">3 days</option>
           <option value="168" selected>7 days</option><option value="custom">Custom hours…</option>
         </select>
-        <input type="number" id="op-vad-dur-custom" min="1" max="8760" placeholder="hours" style="display:none;width:90px;margin-left:8px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="number" id="op-vad-dur-custom" min="1" max="8760" placeholder="hours" style="display:none;width:90px;margin-left:8px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
       </div>
       <div style="margin:0 0 10px;">
-        <label style="color:#33ff66;font-size:.85rem;">Show again to the same customer after
-          <input type="number" id="op-vad-gap" min="1" max="720" value="12" style="width:70px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:6px;font-family:inherit;font-size:.85rem;"> hours</label><br>
-        <label style="color:#33ff66;font-size:.85rem;display:inline-block;margin-top:8px;">Skip button works after
-          <input type="number" id="op-vad-skip" min="0" max="30" value="0" style="width:70px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:6px;font-family:inherit;font-size:.85rem;"> seconds (0 = right away)</label>
+        <label style="color:#15803d;font-size:.85rem;">Show again to the same customer after
+          <input type="number" id="op-vad-gap" min="1" max="720" value="12" style="width:70px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:6px;font-family:inherit;font-size:.85rem;"> hours</label><br>
+        <label style="color:#15803d;font-size:.85rem;display:inline-block;margin-top:8px;">Skip button works after
+          <input type="number" id="op-vad-skip" min="0" max="30" value="0" style="width:70px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:6px;font-family:inherit;font-size:.85rem;"> seconds (0 = right away)</label>
       </div>
       <input type="file" id="op-vad-file" accept="video/*" multiple style="display:none" onchange="opVideoAdUpload(this)">
       <button type="button" class="op-btn op-btn-push" onclick="document.getElementById('op-vad-file').click()">📺 Upload video ad(s)</button>
@@ -2622,7 +2627,7 @@
     <div class="op-section-body">
       <p class="op-note">Paste a direct video link (.mp4 works best). It plays once automatically the next time that app opens — once someone closes or finishes it, it won't show again on their phone, even after closing and reopening the app. Uploading a new link here makes it play again for everyone. Use the "Enabled" checkbox to turn playback off/on without losing the saved link.</p>
 
-      <h3 style="color:#33ff66; font-size:14px; margin:18px 0 6px;">🏬 Shop / Partner App video</h3>
+      <h3 style="color:#15803d; font-size:14px; margin:18px 0 6px;">🏬 Shop / Partner App video</h3>
       <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
         <input type="checkbox" id="op-shop-video-enabled" checked style="width:16px; height:16px;">
         <span class="op-note">Enabled (uncheck to stop it playing, keeps the link saved)</span>
@@ -2633,7 +2638,7 @@
       <button type="button" class="op-btn op-btn-push" onclick="opSaveAppVideo('shopAppVideo','op-shop-video-input','op-shop-video-status','op-shop-video-enabled')">💾 Save shop app video</button>
       <p class="op-note" id="op-shop-video-status" style="margin-top:8px;"></p>
 
-      <h3 style="color:#33ff66; font-size:14px; margin:22px 0 6px;">🚖 Driver App video</h3>
+      <h3 style="color:#15803d; font-size:14px; margin:22px 0 6px;">🚖 Driver App video</h3>
       <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
         <input type="checkbox" id="op-driver-video-enabled" checked style="width:16px; height:16px;">
         <span class="op-note">Enabled (uncheck to stop it playing, keeps the link saved)</span>
@@ -2644,7 +2649,7 @@
       <button type="button" class="op-btn op-btn-push" onclick="opSaveAppVideo('driverAppVideo','op-driver-video-input','op-driver-video-status','op-driver-video-enabled')">💾 Save driver app video</button>
       <p class="op-note" id="op-driver-video-status" style="margin-top:8px;"></p>
 
-      <h3 style="color:#33ff66; font-size:14px; margin:22px 0 6px;">🚌 Customer App — Bus feature videos</h3>
+      <h3 style="color:#15803d; font-size:14px; margin:22px 0 6px;">🚌 Customer App — Bus feature videos</h3>
       <p class="op-note">Shown to customers a set number of seconds after they open the Bus section. Add one or more videos — they play back to back, in the order listed. The ✕ skip button on each video is locked for the seconds you set below, then unlocks. Saving here (even just reordering/removing) makes the whole playlist play again for everyone.</p>
       <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
         <input type="checkbox" id="op-bus-video-enabled" checked style="width:16px; height:16px;">
@@ -2677,7 +2682,7 @@
     <div class="op-section-body">
       <div style="margin-bottom:12px;"><button type="button" class="op-btn op-btn-push" onclick="opOpenAddShop()">➕ Add shop</button></div>
       <div class="op-search-box"><input type="text" id="op-partners-search" placeholder="Search restaurants..." oninput="opRenderPartnersList()"></div>
-      <div class="op-search-box"><select id="op-partners-area-filter" onchange="opRenderPartnersList()" style="width:100%; padding:9px 10px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-size:.85rem; font-family:inherit;"><option value="">All areas</option></select></div>
+      <div class="op-search-box"><select id="op-partners-area-filter" onchange="opRenderPartnersList()" style="width:100%; padding:9px 10px; background:#f4faf5; color:#15803d; border:1px solid #cfe6d5; font-size:.85rem; font-family:inherit;"><option value="">All areas</option></select></div>
       <div id="op-partners-list"></div>
     </div>
   </div>
@@ -2689,7 +2694,7 @@
       <h2>Account Deletions</h2>
     </div>
     <div class="op-section-body">
-      <p style="color:#1f7a3d; font-size:.78rem; margin:0 0 14px; line-height:1.5;">Customers submit these from the app's public "Delete Account" page. Verify the number is genuinely theirs (e.g. call to confirm) before deleting — the request itself isn't identity-verified.</p>
+      <p style="color:#5f8a6c; font-size:.78rem; margin:0 0 14px; line-height:1.5;">Customers submit these from the app's public "Delete Account" page. Verify the number is genuinely theirs (e.g. call to confirm) before deleting — the request itself isn't identity-verified.</p>
       <div id="op-deletions-list"></div>
     </div>
   </div>
@@ -2753,7 +2758,7 @@
     </div>
     <div class="op-section-body">
       <div class="op-search-box"><input type="text" id="op-drivers-search" placeholder="Search drivers..." oninput="opRenderDriversList()"></div>
-      <div class="op-search-box"><select id="op-drivers-zone-filter" onchange="opRenderDriversList()" style="width:100%; padding:9px 10px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-size:.85rem; font-family:inherit;"><option value="">All zones</option></select></div>
+      <div class="op-search-box"><select id="op-drivers-zone-filter" onchange="opRenderDriversList()" style="width:100%; padding:9px 10px; background:#f4faf5; color:#15803d; border:1px solid #cfe6d5; font-size:.85rem; font-family:inherit;"><option value="">All zones</option></select></div>
       <div id="op-drivers-list"></div>
     </div>
   </div>
@@ -2901,10 +2906,10 @@
         <button type="button" class="op-btn op-btn-danger" onclick="fzClearMart()">Remove NESH Mart rule for zone</button>
       </div>
       <p class="op-note" id="fz-status" style="margin-top:8px;"></p>
-      <hr style="border:0; border-top:1px solid #124a24; margin:20px 0;">
+      <hr style="border:0; border-top:1px solid #cfe6d5; margin:20px 0;">
       <h2>Single shop</h2>
       <p class="op-note">Pick any shop that is NOT in Go Series and set its own delivery charge and minimum order. This writes the same settings the shop sees in its own Account → Delivery Charges, so whichever was saved last wins. For Go Series and Groceries shops the delivery charge stays the Mart rule — here you only set their own price ranges (commission, Add ₹, My profit), which win over the zone rule for that shop.</p>
-      <div id="op-sdc-editor" style="display:none; margin-bottom:16px; padding:14px; border:1px solid #124a24;">
+      <div id="op-sdc-editor" style="display:none; margin-bottom:16px; padding:14px; border:1px solid #cfe6d5;">
         <h2 id="op-sdc-editor-title" style="margin-top:0;"></h2>
         <div class="op-search-box" style="margin-bottom:10px;">
           <input type="number" id="op-sdc-base" placeholder="Fixed/base charge in ₹ (e.g. 20)" min="0" step="0.5">
@@ -2954,7 +2959,7 @@
     </div>
     <div class="op-section-body">
       <p class="op-note">Pick a shop and set a flat ₹ discount. Customers see it in NESH Mart "⚡ Today's deals" with a live countdown, and get it as a scratch card at checkout. When the timer ends the deal switches off by itself. This writes the same setting the shop has in its own Account → Shop Discount, so whichever was saved last wins.</p>
-      <div id="op-deal-editor" style="display:none; margin-bottom:16px; padding:14px; border:1px solid #124a24;">
+      <div id="op-deal-editor" style="display:none; margin-bottom:16px; padding:14px; border:1px solid #cfe6d5;">
         <h2 id="op-deal-editor-title" style="margin-top:0;"></h2>
         <div class="op-search-box" style="margin-bottom:10px;">
           <input type="number" id="op-deal-amount" placeholder="Discount amount in ₹ (e.g. 50)" min="0" step="1">
@@ -2999,7 +3004,7 @@
       <p class="op-note">When a customer's NESH Store (Groceries) items total reaches the amount you set, the free item is added to the order automatically at ₹0. The shop that fulfils the order is still paid its own full rate for it (you bear the cost). Pick the free item from the Groceries catalog (piece items). If several offers are on, the highest amount the customer has reached wins. The free item only shows for customers whose area has that item available.</p>
       <h2 style="margin:14px 0 6px;">Your offers</h2>
       <div id="op-fo-list"></div>
-      <div style="margin:16px 0; padding:14px; border:1px solid #124a24;">
+      <div style="margin:16px 0; padding:14px; border:1px solid #cfe6d5;">
         <h2 style="margin-top:0;">New offer</h2>
         <div class="op-search-box" style="margin-bottom:10px;">
           <input type="number" id="op-fo-amount" placeholder="Items total needed, in ₹ (e.g. 500)" min="1" step="1">
@@ -3007,17 +3012,17 @@
         <div class="op-search-box" style="margin-bottom:6px;">
           <input type="text" id="op-fo-search" placeholder="Search the free item…" oninput="opFoRenderItemSelect()">
         </div>
-        <div style="margin-bottom:10px;"><select id="op-fo-item" style="max-width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;"></select></div>
+        <div style="margin-bottom:10px;"><select id="op-fo-item" style="max-width:100%;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;"></select></div>
         <div class="op-search-box" style="margin-bottom:10px;">
           <input type="number" id="op-fo-qty" placeholder="Free quantity" min="1" step="1" value="1">
         </div>
         <div style="margin-bottom:10px;">
-          <select id="op-fo-dur" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+          <select id="op-fo-dur" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
             <option value="0">No time limit</option><option value="24">24 hours</option><option value="48">2 days</option><option value="168">7 days</option><option value="720">30 days</option>
           </select>
         </div>
         <div style="margin-bottom:10px;">
-          <label style="color:#33ff66;font-size:.8rem;">Or pick an exact end date &amp; time (overrides the list above)<br><input type="datetime-local" id="op-fo-until" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;color-scheme:dark;"></label>
+          <label style="color:#15803d;font-size:.8rem;">Or pick an exact end date &amp; time (overrides the list above)<br><input type="datetime-local" id="op-fo-until" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;color-scheme:light;"></label>
         </div>
         <button type="button" class="op-btn op-btn-push" onclick="opFoSave()">🎁 Add offer</button>
         <p class="op-note" id="op-fo-status" style="margin-top:10px;"></p>
@@ -3034,7 +3039,7 @@
       <p class="op-note">An item with an offer price shows in the customer app's 🔥 Trending tab (Groceries and NESH Mart shops only). The tab appears for customers only while at least one offer exists. Customers pay the offer price instead of the normal price. This is the same setting each shop has in its own item form (last save wins).</p>
       <h2 style="margin:14px 0 6px;">Live offers</h2>
       <div id="op-trend-current"></div>
-      <div id="op-trend-editor" style="display:none; margin:16px 0; padding:14px; border:1px solid #124a24;">
+      <div id="op-trend-editor" style="display:none; margin:16px 0; padding:14px; border:1px solid #cfe6d5;">
         <h2 id="op-trend-editor-title" style="margin-top:0;"></h2>
         <div class="op-search-box" style="margin-bottom:10px;">
           <input type="text" id="op-trend-item-search" placeholder="Search items..." oninput="opTrendRenderItems()">
@@ -3061,7 +3066,7 @@
     </div>
     <div class="op-section-body">
       <p class="op-note">Every shop shows an estimated delivery time to customers. Shops can set their own in Account; a time you set here always wins over the shop's. Clear yours to hand control back to the shop. Shops with no time set show no delivery time to customers.</p>
-      <div id="op-eta-editor" style="display:none; margin-bottom:16px; padding:14px; border:1px solid #124a24;">
+      <div id="op-eta-editor" style="display:none; margin-bottom:16px; padding:14px; border:1px solid #cfe6d5;">
         <h2 id="op-eta-editor-title" style="margin-top:0;"></h2>
         <div class="op-search-box" style="margin-bottom:10px;">
           <input type="number" id="op-eta-input" placeholder="Delivery time in minutes (e.g. 30)" min="5" max="180" step="1">
@@ -3301,11 +3306,11 @@
       <p class="op-note">Posters shown as a swipeable slider on the driver app home screen (auto-slides every 4 seconds, next poster peeks at the side). Best size 16:9, e.g. 1280×720 — photos are resized automatically. Stored at driver_posters. Customers never see these. Deleting a poster (or an expired one, when auto-delete is ticked in the Notify section) also deletes its photo from Cloudinary.</p>
       <div style="margin:0 0 10px;">
         <p class="op-note" style="margin-bottom:6px;">Show for how long:</p>
-        <select id="op-dp-dur" onchange="document.getElementById('op-dp-dur-custom').style.display = this.value === 'custom' ? '' : 'none'" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <select id="op-dp-dur" onchange="document.getElementById('op-dp-dur-custom').style.display = this.value === 'custom' ? '' : 'none'" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
           <option value="0" selected>No time limit</option><option value="24">24 hours</option><option value="72">3 days</option>
           <option value="168">7 days</option><option value="720">30 days</option><option value="custom">Custom hours…</option>
         </select>
-        <input type="number" id="op-dp-dur-custom" min="1" max="8760" placeholder="hours" style="display:none;width:90px;margin-left:8px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:8px;font-family:inherit;font-size:.85rem;">
+        <input type="number" id="op-dp-dur-custom" min="1" max="8760" placeholder="hours" style="display:none;width:90px;margin-left:8px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;">
       </div>
       <div class="op-search-box" style="margin-bottom:10px;">
         <input type="url" id="op-dp-link" placeholder="Link opened when a driver taps the poster (optional)">
@@ -3373,7 +3378,7 @@
       <div class="op-mc-row"><b>Address:</b> <span id="op-pm-address"></span></div>
       <div class="op-mc-row"><b>UPI ID:</b> <span id="op-pm-gpay"></span></div>
       <div class="op-mc-row"><b>Status:</b> <span id="op-pm-status"></span></div>
-      <div id="op-pm-approval-block" style="display:none; margin-bottom:12px; padding:10px; border:1px solid #124a24;">
+      <div id="op-pm-approval-block" style="display:none; margin-bottom:12px; padding:10px; border:1px solid #cfe6d5;">
         <div class="op-mc-row"><b>Approval:</b> <span id="op-pm-approval-status"></span></div>
         <div class="op-mc-row" id="op-pm-approval-reason-row" style="display:none;"><b>Rejection reason sent:</b> <span id="op-pm-approval-reason"></span></div>
         <button type="button" class="op-btn op-btn-push" id="op-pm-approve-btn" onclick="opApprovePartner()">✅ Approve</button>
@@ -3381,7 +3386,7 @@
         <div id="op-pm-reject-box" style="display:none; margin-top:8px;">
           <textarea id="op-pm-reject-reason" rows="3" placeholder="Reason for rejecting — the shop will see this exact text"></textarea>
           <button type="button" class="op-btn op-btn-danger" onclick="opRejectPartner()">Send rejection</button>
-          <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-pm-reject-box').style.display='none';">Cancel</button>
+          <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="document.getElementById('op-pm-reject-box').style.display='none';">Cancel</button>
         </div>
         <p class="op-note" id="op-pm-approval-status-msg" style="margin-top:6px;"></p>
       </div>
@@ -3428,14 +3433,14 @@
       </div>
       <div style="margin-top:14px;">
         <p class="op-note" style="margin-bottom:4px;">Area — mark which area this shop is in. Use the area filter on the Restaurant Partners list to see all shops in one area.</p>
-        <select id="op-pm-area-select" style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
+        <select id="op-pm-area-select" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
         <button type="button" class="op-btn op-btn-push" onclick="opSavePartnerArea()">💾 Save area</button>
         <p class="op-note" id="op-pm-area-status" style="margin-top:4px;"></p>
       </div>
       <div style="margin-top:14px; display:none;" id="op-pm-shopzone-block">
         <p class="op-note" style="margin-bottom:4px;">Shop zone — groceries shops don't draw their own zone. Pick the zone (from Shop Zones) this shop serves. A customer inside that zone is only matched to shops in it.</p>
         <p class="op-note" id="op-pm-shopzone-requested" style="margin-bottom:6px; display:none;"></p>
-        <select id="op-pm-shopzone-select" style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
+        <select id="op-pm-shopzone-select" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
         <button type="button" class="op-btn op-btn-push" onclick="opSavePartnerShopZone()">💾 Save zone</button>
         <p class="op-note" id="op-pm-shopzone-status" style="margin-top:4px;"></p>
       </div>
@@ -3513,7 +3518,7 @@
             <input type="password" id="op-pm-clear-stock-password" placeholder="Shop password" autocomplete="off">
           </div>
           <button type="button" class="op-btn op-btn-danger" onclick="opConfirmClearStock()">Verify &amp; clear all stock</button>
-          <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="opCancelClearStockAuth()">Cancel</button>
+          <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="opCancelClearStockAuth()">Cancel</button>
         </div>
         <p class="op-note" id="op-pm-clear-stock-status" style="margin-top:4px; display:none;"></p>
       </div>
@@ -3521,7 +3526,7 @@
         <button type="button" class="op-btn" id="op-pm-toggle-btn" onclick="opTogglePartnerStatus()"></button>
         <button type="button" class="op-btn" onclick="opOpenChatWith(opCurrentPartnerId); document.getElementById('op-partner-modal').classList.remove('show'); opOpenSection('support');">💬 Chat</button>
         <button type="button" class="op-btn op-btn-danger" onclick="opDeletePartner()">🗑 Delete Account</button>
-        <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-partner-modal').classList.remove('show')">Close</button>
+        <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="document.getElementById('op-partner-modal').classList.remove('show')">Close</button>
       </div>
     </div>
   </div>
@@ -3532,7 +3537,7 @@
       <h3>Add shop</h3>
       <p class="op-note" style="margin-bottom:10px;">Creates the shop account right away — no approval step. Give the username and password to the shop owner so they can log in.</p>
       <div class="op-search-box" style="padding-bottom:8px;">
-        <select id="op-as-type" onchange="opAddShopTypeChange()" style="width:100%; padding:9px 10px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-size:.85rem; font-family:inherit;">
+        <select id="op-as-type" onchange="opAddShopTypeChange()" style="width:100%; padding:9px 10px; background:#f4faf5; color:#15803d; border:1px solid #cfe6d5; font-size:.85rem; font-family:inherit;">
           <option value="hotel">Hotel / Restaurant</option>
           <option value="groceries">Groceries</option>
           <option value="online_shop">Other Shop (NESH Mart)</option>
@@ -3553,7 +3558,7 @@
       <p class="op-note" id="op-as-status" style="min-height:1em;"></p>
       <div style="margin-top:6px;">
         <button type="button" class="op-btn op-btn-push" id="op-as-create-btn" onclick="opCreateShop()">✅ Create shop</button>
-        <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-addshop-modal').classList.remove('show')">Cancel</button>
+        <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="document.getElementById('op-addshop-modal').classList.remove('show')">Cancel</button>
       </div>
     </div>
   </div>
@@ -3566,7 +3571,7 @@
       <div class="op-mc-row"><b>Phone:</b> <span id="op-dm-phone"></span></div>
       <div class="op-mc-row"><b>Vehicle:</b> <span id="op-dm-vehicle"></span></div>
       <div class="op-mc-row"><b>Status:</b> <span id="op-dm-status"></span></div>
-      <div id="op-dm-approval-block" style="display:none; margin-bottom:12px; padding:10px; border:1px solid #124a24;">
+      <div id="op-dm-approval-block" style="display:none; margin-bottom:12px; padding:10px; border:1px solid #cfe6d5;">
         <div class="op-mc-row"><b>Approval:</b> <span id="op-dm-approval-status"></span></div>
         <div class="op-mc-row" id="op-dm-approval-reason-row" style="display:none;"><b>Rejection reason sent:</b> <span id="op-dm-approval-reason"></span></div>
         <button type="button" class="op-btn op-btn-push" id="op-dm-approve-btn" onclick="opApproveDriver()">✅ Approve</button>
@@ -3574,17 +3579,17 @@
         <div id="op-dm-reject-box" style="display:none; margin-top:8px;">
           <textarea id="op-dm-reject-reason" rows="3" placeholder="Reason for rejecting — the driver will see this exact text"></textarea>
           <button type="button" class="op-btn op-btn-danger" onclick="opRejectDriver()">Send rejection</button>
-          <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-dm-reject-box').style.display='none';">Cancel</button>
+          <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="document.getElementById('op-dm-reject-box').style.display='none';">Cancel</button>
         </div>
         <p class="op-note" id="op-dm-approval-status-msg" style="margin-top:6px;"></p>
       </div>
       <div class="op-mc-row"><b>Zone:</b> <span id="op-dm-zone">—</span></div>
       <div style="margin-top:10px;">
-        <select id="op-dm-zone-select" style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
+        <select id="op-dm-zone-select" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
         <button type="button" class="op-btn op-btn-push" onclick="opSaveDriverZone()">💾 Save zone</button>
         <p class="op-note" id="op-dm-zone-status" style="margin-top:6px;"></p>
       </div>
-      <div style="margin-top:14px; border-top:1px solid #124a24; padding-top:12px;">
+      <div style="margin-top:14px; border-top:1px solid #cfe6d5; padding-top:12px;">
         <div class="op-mc-row"><b>Platform due:</b> <span id="op-dm-due">—</span></div>
         <p class="op-note" style="margin-bottom:6px;">From the per-ride platform fee (Taxi Fare screen) on this driver's completed rides.</p>
         <div class="op-search-box" style="margin-bottom:6px;">
@@ -3593,14 +3598,14 @@
         <button type="button" class="op-btn op-btn-push" onclick="opSettleDriverDue()">✅ Mark Settled</button>
         <p class="op-note" id="op-dm-settle-status" style="margin-top:4px;"></p>
       </div>
-      <div style="margin-top:14px; border-top:1px solid #124a24; padding-top:12px;">
+      <div style="margin-top:14px; border-top:1px solid #cfe6d5; padding-top:12px;">
         <p class="op-note" style="margin-bottom:6px;">Assign a pending order/ride directly to this driver — it'll be offered to them once they're online.</p>
-        <select id="op-dm-order-select" style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
+        <select id="op-dm-order-select" style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; margin-bottom:8px;"></select>
         <button type="button" class="op-btn op-btn-push" onclick="opAssignOrderToDriver()">📦 Assign to this driver</button>
         <p class="op-note" id="op-dm-assign-status" style="margin-top:6px;"></p>
       </div>
       <div style="margin-top:14px;">
-        <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-driver-modal').classList.remove('show')">Close</button>
+        <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="document.getElementById('op-driver-modal').classList.remove('show')">Close</button>
       </div>
     </div>
   </div>
@@ -3614,18 +3619,18 @@
       <div class="op-mc-row"><b>Device ID:</b> <span id="op-oc-device" style="word-break:break-all;"></span></div>
       <div style="margin-top:10px;">
         <p class="op-note" style="margin-bottom:6px;"><b>Items:</b></p>
-        <div id="op-oc-items" style="border:1px solid #334155; border-radius:6px; padding:8px 10px; max-height:160px; overflow-y:auto;"></div>
+        <div id="op-oc-items" style="border:1px solid #b7d3be; border-radius:6px; padding:8px 10px; max-height:160px; overflow-y:auto;"></div>
         <div class="op-mc-row" id="op-oc-items-total" style="margin-top:6px;"></div>
       </div>
       <div class="op-mc-row" id="op-oc-block-status" style="margin-top:10px;"></div>
       <div style="margin-top:10px;">
         <p class="op-note" style="margin-bottom:6px;">Message shown to the customer if blocked (also used as the reason):</p>
-        <textarea id="op-oc-message" rows="3" placeholder="e.g. Blocked for repeated fake/abusive orders. Contact support to appeal." style="width:100%; padding:8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.8rem; resize:vertical;"></textarea>
+        <textarea id="op-oc-message" rows="3" placeholder="e.g. Blocked for repeated fake/abusive orders. Contact support to appeal." style="width:100%; padding:8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.8rem; resize:vertical;"></textarea>
       </div>
       <div style="margin-top:14px;">
         <button type="button" class="op-btn op-btn-danger" id="op-oc-block-btn" onclick="opBlockOrderCustomer()">⛔ Block user &amp; device</button>
         <button type="button" class="op-btn op-btn-push" id="op-oc-unblock-btn" style="display:none;" onclick="opUnblockOrderCustomer()">✅ Unblock</button>
-        <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="opCloseOrderCustomerModal()">Close</button>
+        <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="opCloseOrderCustomerModal()">Close</button>
         <p class="op-note" id="op-oc-status" style="margin-top:6px;"></p>
       </div>
     </div>
@@ -3652,7 +3657,7 @@
         <p class="op-zone-map-hint" id="op-zb-map-hint">Pan/zoom to the right spot, then press "Draw the zone"</p>
       </div>
       <p class="op-note" id="op-zb-point-count" style="margin-top:8px;">0 points added</p>
-      <p class="op-note" id="op-zb-error" style="display:none; color:#ff4444;"></p>
+      <p class="op-note" id="op-zb-error" style="display:none; color:#dc2626;"></p>
       <div style="display:flex; gap:8px; margin-top:10px;">
         <button type="button" class="op-btn op-btn-danger" style="flex:1; margin:0;" onclick="opZbUndo()">↩ Undo</button>
         <button type="button" class="op-btn" style="flex:1; margin:0;" onclick="opZbSimplifyNow()">✨ Simplify</button>
@@ -3662,7 +3667,7 @@
         <button type="button" class="op-btn op-btn-push" style="width:100%; margin:0;" onclick="opSaveZoneBoundary()">💾 Save boundary</button>
       </div>
       <div style="margin-top:14px;">
-        <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-zone-boundary-modal').classList.remove('show')">Close</button>
+        <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="document.getElementById('op-zone-boundary-modal').classList.remove('show')">Close</button>
       </div>
     </div>
   </div>
@@ -3682,7 +3687,7 @@
       <button type="button" class="op-btn op-btn-push" onclick="opSaveBusBasics()">💾 Save name/photo</button>
       <p class="op-note" id="op-bus-basics-status" style="margin-top:6px;"></p>
 
-      <div style="margin-top:16px; border-top:1px solid #124a24; padding-top:12px;">
+      <div style="margin-top:16px; border-top:1px solid #cfe6d5; padding-top:12px;">
         <p class="op-note" style="margin-bottom:6px;">Tap the map, then use one of the buttons below to save that point as Route Start, Route End, or a new Stop.</p>
         <div class="op-search-box" style="margin-bottom:0;">
           <input type="text" id="op-bus-search" placeholder="Search area, street, landmark…" autocomplete="off">
@@ -3703,14 +3708,14 @@
         <p class="op-note" id="op-bus-map-status" style="margin-top:6px;"></p>
       </div>
 
-      <div style="margin-top:16px; border-top:1px solid #124a24; padding-top:12px;">
+      <div style="margin-top:16px; border-top:1px solid #cfe6d5; padding-top:12px;">
         <div class="op-mc-row"><b>Route Start:</b> <span id="op-bus-route-start-label">—</span></div>
         <div class="op-mc-row"><b>Route End:</b> <span id="op-bus-route-end-label">—</span></div>
         <p class="op-note" style="margin:8px 0 4px;">Stops (in order):</p>
         <div id="op-bus-stops-list"></div>
       </div>
 
-      <div style="margin-top:16px; border-top:1px solid #124a24; padding-top:12px;">
+      <div style="margin-top:16px; border-top:1px solid #cfe6d5; padding-top:12px;">
         <p class="op-note" style="margin-bottom:6px;">Trips — daily departure times shown to customers:</p>
         <div class="op-search-box" style="margin-bottom:6px;">
           <input type="text" id="op-bus-trip-time-input" placeholder="Time e.g. 08:30">
@@ -3719,14 +3724,14 @@
         <div id="op-bus-trips-list" style="margin-top:8px;"></div>
       </div>
 
-      <div style="margin-top:16px; border-top:1px solid #124a24; padding-top:12px;">
+      <div style="margin-top:16px; border-top:1px solid #cfe6d5; padding-top:12px;">
         <p class="op-note" style="margin-bottom:6px;">Stop requests from customers — accept to add as a real stop, or dismiss.</p>
         <div id="op-bus-requests-list"></div>
       </div>
 
       <div style="margin-top:16px;">
         <button type="button" class="op-btn op-btn-danger" onclick="opDeleteBus()">🗑 Delete Bus</button>
-        <button type="button" class="op-btn" style="border-color:#8b8b8b;color:#8b8b8b;" onclick="document.getElementById('op-bus-modal').classList.remove('show')">Close</button>
+        <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="document.getElementById('op-bus-modal').classList.remove('show')">Close</button>
       </div>
     </div>
   </div>
@@ -8483,7 +8488,7 @@ async function opRegisterOperatorPush() {
       try {
         const { db, ref, set } = window.fb;
         opDeviceKey = String(token.value).replace(/[.$#\[\]\/]/g, '_');
-        await set(ref(db, 'operator_devices/' + opDeviceKey), { token: token.value, updatedAt: Date.now() });
+        await set(ref(db, 'operator_devices/' + opDeviceKey), { token: token.value, updatedAt: Date.now(), fs: 2 });
       } catch (e) {}
     });
     await PN.register();
@@ -8643,7 +8648,7 @@ function opLoadVisits() {
         + '<span class="op-partner-name">' + k + (k === todayKey ? ' (today)' : '') + '</span>'
         + '<span class="op-partner-type">' + c + ' visit' + (c === 1 ? '' : 's') + '</span></div></div>';
     }
-    sumEl.innerHTML = '<div class="op-mc-row" style="font-size:.95rem;color:#33ff66;">Today: <b>' + (Number(data[todayKey]) || 0)
+    sumEl.innerHTML = '<div class="op-mc-row" style="font-size:.95rem;color:#15803d;">Today: <b>' + (Number(data[todayKey]) || 0)
       + '</b> &nbsp;|&nbsp; Last 30 days: <b>' + total + '</b></div>';
     listEl.innerHTML = rows;
     opLoadVisitors(todayKey);
@@ -8700,7 +8705,7 @@ function opLoadVisitors(dayKey) {
     const list = Object.values(data).sort((a, b) => (b.t || 0) - (a.t || 0));
     const loggedIn = list.filter(v => v.phone).length;
     const zoneCount = {}, outPending = [];
-    let html = '<div class="op-mc-row" style="font-size:.9rem;color:#33ff66;"><b>' + escapeHtml(dayKey) + '</b> — '
+    let html = '<div class="op-mc-row" style="font-size:.9rem;color:#15803d;"><b>' + escapeHtml(dayKey) + '</b> — '
       + list.length + ' device' + (list.length === 1 ? '' : 's') + ' &nbsp;|&nbsp; logged in: <b>' + loggedIn
       + '</b> &nbsp;|&nbsp; guests: <b>' + (list.length - loggedIn) + '</b></div>';
     const rows = list.map((v, i) => {
@@ -8718,7 +8723,7 @@ function opLoadVisitors(dayKey) {
         + '<div class="op-partner-sub">' + loc + '</div></div>';
     }).join('');
     const zs = Object.keys(zoneCount).sort((a, b) => zoneCount[b] - zoneCount[a]).map(k => escapeHtml(k) + ': <b>' + zoneCount[k] + '</b>').join(' &nbsp;|&nbsp; ');
-    if (zs) html += '<div class="op-mc-row" style="font-size:.85rem;color:#33ff66;">' + zs + '</div>';
+    if (zs) html += '<div class="op-mc-row" style="font-size:.85rem;color:#15803d;">' + zs + '</div>';
     box.innerHTML = html + rows;
     if (outPending.length) opLoadVisitLandmarks().then(lm => {
       outPending.forEach(o => {
@@ -9415,7 +9420,7 @@ function opRenderShiftsList() {
       </div>
       ${s.note ? '<div class="op-partner-sub">' + escapeHtml(s.note) + '</div>' : ''}
       ${b.length ? '<div class="op-partner-sub">' + b.map(x => escapeHtml(x.name || x._id) + (x.phone ? ' (' + escapeHtml(x.phone) + ')' : '')
-        + ' <a href="#" style="color:#f87171;" onclick="opRemoveShiftBooking(\'' + s._id + '\',\'' + x._id + '\'); return false;">remove</a>').join('<br>') + '</div>' : '<div class="op-partner-sub">No bookings yet.</div>'}
+        + ' <a href="#" style="color:#dc2626;" onclick="opRemoveShiftBooking(\'' + s._id + '\',\'' + x._id + '\'); return false;">remove</a>').join('<br>') + '</div>' : '<div class="op-partner-sub">No bookings yet.</div>'}
       <div style="margin-top:10px;"><button class="op-btn op-btn-danger" onclick="opDeleteShift('${s._id}')">🗑 Delete shift</button></div>
     </div>`;
   }).join('');
@@ -9932,7 +9937,7 @@ function fzRenderShops(martSaved) {
   food.forEach(p => { fzSel[p._id] = true; });
   martIds.forEach(id => { fzSel[id] = martSaved ? !!martSaved[id] : true; });
   const row = (id, name, sub) => '<label class="fz-chk" style="justify-content:space-between;"><span>' + escapeHtml(name) + '<br><span style="font-size:.7rem;color:#64748b;">' + escapeHtml(sub) + '</span></span><input type="checkbox" data-fz="' + escapeHtml(id) + '" ' + (fzSel[id] ? 'checked' : '') + ' onchange="fzSel[this.dataset.fz]=this.checked; fzCount();"></label>';
-  const group = (title, list, idsOfGroup) => '<p class="op-note" style="margin:10px 0 2px;"><b>' + title + '</b> · <a href="#" style="color:#33ff66;" data-ids="' + escapeHtml(idsOfGroup.join(',')) + '" onclick="fzTick(this.dataset.ids,true); return false;">all</a> / <a href="#" style="color:#33ff66;" data-ids="' + escapeHtml(idsOfGroup.join(',')) + '" onclick="fzTick(this.dataset.ids,false); return false;">none</a></p><div style="max-height:200px; overflow-y:auto; border:1px solid #124a24; padding:4px 10px;">' + list + '</div>';
+  const group = (title, list, idsOfGroup) => '<p class="op-note" style="margin:10px 0 2px;"><b>' + title + '</b> · <a href="#" style="color:#15803d;" data-ids="' + escapeHtml(idsOfGroup.join(',')) + '" onclick="fzTick(this.dataset.ids,true); return false;">all</a> / <a href="#" style="color:#15803d;" data-ids="' + escapeHtml(idsOfGroup.join(',')) + '" onclick="fzTick(this.dataset.ids,false); return false;">none</a></p><div style="max-height:200px; overflow-y:auto; border:1px solid #cfe6d5; padding:4px 10px;">' + list + '</div>';
   box.innerHTML =
     group('🏪 Food &amp; other shops (' + food.length + ')', food.length ? food.map(p => row(p._id, p.restaurantName || p._id, opTypeLabel(p.businessType))).join('') : '<p class="op-note">None in this zone.</p>', food.map(p => p._id)) +
     group('🛒 NESH Mart — Go Series &amp; groceries (' + mart.length + ')', mart.map(p => row(p._id, p.restaurantName || p._id, opTypeLabel(p.businessType) + (p.goSeries ? ' · Go Series' : ''))).join('') + row('NESH_STORE', 'NESH Store', 'groceries cart from the nearest shop'), martIds) +
@@ -10434,7 +10439,7 @@ function opFoRenderList() {
     const off = o.on === false;
     const row = document.createElement('div');
     row.className = 'op-partner-row';
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #124a24;';
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #cfe6d5;';
     const status = expired ? '⛔ Expired' : off ? '⏸ Switched off' : '✅ Live' + (o.expiresAt ? ' until ' + new Date(Number(o.expiresAt)).toLocaleString() : ' (no time limit)');
     row.innerHTML = '<div style="flex:1;min-width:180px;"><div class="op-partner-name">Items total ₹' + escapeHtml(String(o.minAmount)) + ' → ' + escapeHtml(String(o.qty || 1)) + ' × ' + escapeHtml(o.itemName || o.itemKey) + ' FREE</div><div class="op-partner-sub">' + status + '</div></div>';
     const tg = document.createElement('button'); tg.type = 'button'; tg.className = 'op-btn'; tg.style.margin = '0'; tg.textContent = off ? 'Switch on' : 'Switch off';
@@ -10653,7 +10658,7 @@ function opRenderDeletionsList() {
   if (!wrap) return;
   if (!opAllDeletionRequests.length) { wrap.innerHTML = '<div class="op-empty">No account deletion requests.</div>'; return; }
   wrap.innerHTML = opAllDeletionRequests.map(r => `
-    <div class="op-partner-item" style="cursor:default; ${r.status === 'pending' ? 'border-color:#f0a02c;' : ''}">
+    <div class="op-partner-item" style="cursor:default; ${r.status === 'pending' ? 'border-color:#b45309;' : ''}">
       <div class="op-partner-top">
         <span class="op-partner-name">+91 ${escapeHtml(r._id)}</span>
         <span class="op-partner-type">${r.status === 'pending' ? '⏳ Pending' : r.status === 'completed' ? '✅ Deleted' : '🚫 Dismissed'}</span>
@@ -10738,15 +10743,15 @@ function opRenderGroceriesCatalog() {
       const isWinner = maxPrice != null && !s.unavailable && !s.shopSuspended && !s.shopOff && s.price === maxPrice;
       const updatedText = s.priceUpdatedAt ? timeAgo(s.priceUpdatedAt) : 'never updated';
       const tags = [
-        s.shopSuspended ? '<span style="color:#f87171;">(shop suspended)</span>' : '',
-        (!s.shopSuspended && s.shopOff) ? '<span style="color:#f87171;">(shop unavailable)</span>' : '',
-        s.unavailable ? '<span style="color:#f87171;">(item unavailable)</span>' : ''
+        s.shopSuspended ? '<span style="color:#dc2626;">(shop suspended)</span>' : '',
+        (!s.shopSuspended && s.shopOff) ? '<span style="color:#dc2626;">(shop unavailable)</span>' : '',
+        s.unavailable ? '<span style="color:#dc2626;">(item unavailable)</span>' : ''
       ].filter(Boolean).join(' ');
       const dim = s.shopSuspended || s.shopOff;
       return `
-        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:5px 0; border-top:1px solid #124a24; opacity:${dim ? '0.55' : '1'};">
-          <span style="font-size:.82rem; color:${isWinner ? '#39ff14' : '#a3b3a8'};">${isWinner ? '⭐ ' : ''}${escapeHtml(s.shopName)}${tags ? ' ' + tags : ''}</span>
-          <span style="font-size:.78rem; color:#1f7a3d; text-align:right; white-space:nowrap;">₹${s.price} · ${escapeHtml(updatedText)}</span>
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:5px 0; border-top:1px solid #cfe6d5; opacity:${dim ? '0.55' : '1'};">
+          <span style="font-size:.82rem; color:${isWinner ? '#16a34a' : '#4b5d51'};">${isWinner ? '⭐ ' : ''}${escapeHtml(s.shopName)}${tags ? ' ' + tags : ''}</span>
+          <span style="font-size:.78rem; color:#5f8a6c; text-align:right; white-space:nowrap;">₹${s.price} · ${escapeHtml(updatedText)}</span>
         </div>`;
     }).join('');
     return `
@@ -11007,9 +11012,9 @@ function opRenderSectionEditorShops() {
     wrap.innerHTML = shops.map(p => {
       const others = opNeshSections.filter(s => s.id !== opSectionEditingId && s.shopIds.includes(p._id)).map(s => s.name);
       return `
-        <label style="display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #124a24; cursor:pointer;">
-          <input type="checkbox" style="width:20px; height:20px; margin:0; accent-color:#33ff66;" ${opSectionPickSet.has(p._id) ? 'checked' : ''} onchange="opToggleSectionShop('${p._id}', this.checked)">
-          <span style="font-size:.85rem; color:#33ff66;">${escapeHtml(opShopLabel(p))}${others.length ? ` <span style="color:#1f7a3d; font-size:.72rem;">(also in ${escapeHtml(others.join(', '))})</span>` : ''}</span>
+        <label style="display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #cfe6d5; cursor:pointer;">
+          <input type="checkbox" style="width:20px; height:20px; margin:0; accent-color:#15803d;" ${opSectionPickSet.has(p._id) ? 'checked' : ''} onchange="opToggleSectionShop('${p._id}', this.checked)">
+          <span style="font-size:.85rem; color:#15803d;">${escapeHtml(opShopLabel(p))}${others.length ? ` <span style="color:#5f8a6c; font-size:.72rem;">(also in ${escapeHtml(others.join(', '))})</span>` : ''}</span>
         </label>`;
     }).join('');
   }
@@ -11122,7 +11127,7 @@ async function opAddStockToSection() {
     msg = `Added to ${okCount}, but failed for: ${failed.map(opShopLabel).join(', ')}. Tap Add again to retry just those.`;
     say(msg);
   } else {
-    say(msg, '#33ff66');
+    say(msg, '#15803d');
     document.getElementById('op-sec-item-name').value = '';
     document.getElementById('op-sec-item-desc').value = '';
     document.getElementById('op-sec-item-unit').value = 'piece';
@@ -11203,7 +11208,7 @@ async function opSecBulkImportFile(e) {
     let msg = `Done — ${totalAdded} item${totalAdded === 1 ? '' : 's'} added across ${shops.length} shop${shops.length === 1 ? '' : 's'} in "${sec.name}"`;
     if (totalSkipped) msg += ` (${totalSkipped} skipped — shop already had that item)`;
     if (badRows) msg += `, ${badRows} row${badRows === 1 ? '' : 's'} ignored (no name)`;
-    say(msg + '.', totalAdded > 0 ? '#33ff66' : 'var(--chili)');
+    say(msg + '.', totalAdded > 0 ? '#15803d' : 'var(--chili)');
     if (totalAdded > 0) showToast(`${totalAdded} items imported to "${sec.name}"`);
   } catch (err) {
     say('Import failed: ' + (err && err.message ? err.message : 'check your connection and try again.'));
@@ -11298,7 +11303,7 @@ async function opSecBulkPhotoUpload(e) {
     if (attached > 0) msg += `, matched and attached to ${attached} item${attached === 1 ? '' : 's'} across this section's shops`;
     if (unmatched.length) msg += `, ${unmatched.length} had no name match — downloaded photo-links.csv for those`;
     if (failed > 0) msg += `, ${failed} failed`;
-    say(msg + '.', failed > 0 ? 'var(--chili)' : '#33ff66');
+    say(msg + '.', failed > 0 ? 'var(--chili)' : '#15803d');
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -11381,7 +11386,7 @@ function opRenderNeshCategories() {
     return `
       <div class="op-partner-item" style="cursor:default;">
         <div class="op-partner-top">
-          <span class="op-partner-name">${c.image ? `<img src="${c.image}" alt="" style="width:34px;height:34px;object-fit:cover;vertical-align:middle;margin-right:8px;border:1px solid #124a24;">` : ''}${escapeHtml(c.name)}</span>
+          <span class="op-partner-name">${c.image ? `<img src="${c.image}" alt="" style="width:34px;height:34px;object-fit:cover;vertical-align:middle;margin-right:8px;border:1px solid #cfe6d5;">` : ''}${escapeHtml(c.name)}</span>
           <span class="op-partner-sub">${items.length} item${items.length === 1 ? '' : 's'}</span>
         </div>
         <div class="op-partner-sub" style="margin:6px 0 10px;">${items.length ? escapeHtml(names.join(', ')) + more : 'No items found — edit to pick items'}</div>
@@ -11429,9 +11434,9 @@ function opRenderCategoryEditorItems() {
     wrap.innerHTML = shown.map(({ i, g }) => {
       const others = opNeshCategories.filter(c => c.id !== opCatEditingId && c.itemKeys.includes(g.key)).map(c => c.name);
       return `
-        <label style="display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #124a24; cursor:pointer;">
-          <input type="checkbox" style="width:20px; height:20px; margin:0; accent-color:#33ff66;" ${opCatPickSet.has(g.key) ? 'checked' : ''} onchange="opToggleCategoryItem(${i}, this.checked)">
-          <span style="font-size:.85rem; color:#33ff66;">${escapeHtml(g.name)} <span style="color:#1f7a3d; font-size:.72rem;">per ${escapeHtml(g.unit)}${suffix[g.unit] || ''}${others.length ? ' · also in ' + escapeHtml(others.join(', ')) : ''}</span></span>
+        <label style="display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #cfe6d5; cursor:pointer;">
+          <input type="checkbox" style="width:20px; height:20px; margin:0; accent-color:#15803d;" ${opCatPickSet.has(g.key) ? 'checked' : ''} onchange="opToggleCategoryItem(${i}, this.checked)">
+          <span style="font-size:.85rem; color:#15803d;">${escapeHtml(g.name)} <span style="color:#5f8a6c; font-size:.72rem;">per ${escapeHtml(g.unit)}${suffix[g.unit] || ''}${others.length ? ' · also in ' + escapeHtml(others.join(', ')) : ''}</span></span>
         </label>`;
     }).join('');
   }
@@ -11646,9 +11651,9 @@ function opRenderItemCategoryEditorItems() {
     wrap.innerHTML = shown.map(({ i, it }) => {
       const others = opItemCategories.filter(c => c.id !== opItemCatEditingId && c.itemIds.includes(it.id)).map(c => c.name);
       return `
-        <label style="display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #124a24; cursor:pointer;">
-          <input type="checkbox" style="width:20px; height:20px; margin:0; accent-color:#33ff66;" ${opItemCatPickSet.has(it.id) ? 'checked' : ''} onchange="opToggleItemCategoryItem(${i}, this.checked)">
-          <span style="font-size:.85rem; color:#33ff66;">${escapeHtml(it.name)}${others.length ? ` <span style="color:#1f7a3d; font-size:.72rem;">also in ${escapeHtml(others.join(', '))}</span>` : ''}</span>
+        <label style="display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #cfe6d5; cursor:pointer;">
+          <input type="checkbox" style="width:20px; height:20px; margin:0; accent-color:#15803d;" ${opItemCatPickSet.has(it.id) ? 'checked' : ''} onchange="opToggleItemCategoryItem(${i}, this.checked)">
+          <span style="font-size:.85rem; color:#15803d;">${escapeHtml(it.name)}${others.length ? ` <span style="color:#5f8a6c; font-size:.72rem;">also in ${escapeHtml(others.join(', '))}</span>` : ''}</span>
         </label>`;
     }).join('');
   }
@@ -11785,17 +11790,17 @@ function opCustomerPriceLineHtml(g, maxPrice) {
   const ov = Number(opNeshPrices[enc]) || 0;
   let line;
   if (ov > 0) {
-    line = `Customer price: ₹${ov} <span style="color:#a78bfa;">✍️ set by you</span>` +
+    line = `Customer price: ₹${ov} <span style="color:#7c3aed;">✍️ set by you</span>` +
       (auto != null
-        ? ` <span style="color:#1f7a3d; font-weight:400;">· auto would be ₹${auto}</span>`
-        : ` <span style="color:#f87171; font-weight:400;">· hidden — no shop has it available</span>`);
+        ? ` <span style="color:#5f8a6c; font-weight:400;">· auto would be ₹${auto}</span>`
+        : ` <span style="color:#dc2626; font-weight:400;">· hidden — no shop has it available</span>`);
   } else {
     line = `Customer price: ${auto != null ? '₹' + auto : '— no shop has it available'}`;
   }
   const btnStyle = 'padding:5px 9px; margin:0 6px 4px 0; font-size:.74rem;';
   const btns = `<button type="button" class="op-btn op-btn-push" style="${btnStyle}" data-cp="${enc}">✏️ ${ov > 0 ? 'Change' : 'Set'} customer price</button>` +
     (ov > 0 ? `<button type="button" class="op-btn" style="${btnStyle}" data-cp-reset="${enc}">↩ Use auto price</button>` : '');
-  return `<div style="margin:6px 0 6px; font-size:.85rem; font-weight:700; color:#39ff14;">${line}</div><div>${btns}</div>`;
+  return `<div style="margin:6px 0 6px; font-size:.85rem; font-weight:700; color:#16a34a;">${line}</div><div>${btns}</div>`;
 }
 
 function opOpenCustomerPriceModal(enc) {
@@ -11886,7 +11891,7 @@ function opListenGroceryQueue() {
     console.error('groceryOrderQueue listener failed:', err);
     opGroceriesQueueError = (err && err.message) ? err.message : String(err);
     const w = document.getElementById('op-groceries-queue-list');
-    if (w) w.innerHTML = '<div class="op-empty" style="color:#f87171;">Could not load NESH Store orders: ' + escapeHtml(opGroceriesQueueError) + '<br><br>Firebase Rules must allow reading <b>groceryOrderQueue</b>.</div>';
+    if (w) w.innerHTML = '<div class="op-empty" style="color:#dc2626;">Could not load NESH Store orders: ' + escapeHtml(opGroceriesQueueError) + '<br><br>Firebase Rules must allow reading <b>groceryOrderQueue</b>.</div>';
     showToast('⚠️ Cannot read NESH Store orders (Firebase rules)');
   });
 }
@@ -11903,7 +11908,7 @@ function opSetGroceriesQueueFilter(f) { opGroceriesQueueFilter = f; opRenderGroc
 function opRenderGroceriesQueueList() {
   const wrap = document.getElementById('op-groceries-queue-list');
   if (!wrap) return;
-  if (opGroceriesQueueError) { wrap.innerHTML = '<div class="op-empty" style="color:#f87171;">Could not load NESH Store orders: ' + escapeHtml(opGroceriesQueueError) + '<br><br>Firebase Rules must allow reading <b>groceryOrderQueue</b>.</div>'; return; }
+  if (opGroceriesQueueError) { wrap.innerHTML = '<div class="op-empty" style="color:#dc2626;">Could not load NESH Store orders: ' + escapeHtml(opGroceriesQueueError) + '<br><br>Firebase Rules must allow reading <b>groceryOrderQueue</b>.</div>'; return; }
   // Every order placed from NESH Store is listed here (newest first) — not just
   // the unassigned ones. Only unassigned ones can be opened to pick a shop.
   const all = opGroceriesQueue.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -11915,7 +11920,7 @@ function opRenderGroceriesQueueList() {
   const list = all.filter(match[opGroceriesQueueFilter] || match.all);
   const conn = opGroceriesQueueLoadedAt
     ? `<div style="font-size:.68rem; color:#6b7280; margin-bottom:8px;">🟢 Connected to Firebase · ${all.length} order${all.length === 1 ? '' : 's'} in groceryOrderQueue · synced ${timeAgo(opGroceriesQueueLoadedAt)}</div>`
-    : `<div style="font-size:.68rem; color:#f0a02c; margin-bottom:8px;">🟠 Not connected yet — waiting for Firebase (if this stays, close and reopen the operator panel, or check the network)</div>`;
+    : `<div style="font-size:.68rem; color:#b45309; margin-bottom:8px;">🟠 Not connected yet — waiting for Firebase (if this stays, close and reopen the operator panel, or check the network)</div>`;
   const header = conn + `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">${chips}</div>`;
   if (!list.length) { wrap.innerHTML = header + '<div class="op-empty">No NESH Store orders here.</div>'; return; }
   wrap.innerHTML = header + list.map(o => {
@@ -12396,7 +12401,7 @@ function opRenderZonesList() {
         <div class="op-partner-sub">${hasBounds ? '📍 Boundary set' : '⚠️ No boundary — using distance fallback'}</div>
       </div>
       <div style="display:flex; gap:6px; flex-shrink:0; align-items:center;">
-        <select onchange="opSetZoneGroup('${z._id}', this.value)" style="padding:6px 8px; background:#0b0f19; color:#e2e8f0; border:1px solid #334155; font-family:'Courier New',monospace; font-size:.72rem;">
+        <select onchange="opSetZoneGroup('${z._id}', this.value)" style="padding:6px 8px; background:#ffffff; color:#1f2937; border:1px solid #b7d3be; font-family:'Courier New',monospace; font-size:.72rem;">
           <option value="">No group</option>
           ${groupOptions}
         </select>
@@ -12645,7 +12650,7 @@ function opZbRedraw() {
   if (opZbPolygon) { opZbMap.removeLayer(opZbPolygon); opZbPolygon = null; }
 
   const toLatLngs = () => opZbPoints.map(p => [p.lat, p.lng]);
-  const style = { color: '#39ff14', weight: 2, fillColor: '#39ff14', fillOpacity: 0.2, interactive: false };
+  const style = { color: '#16a34a', weight: 2, fillColor: '#16a34a', fillOpacity: 0.2, interactive: false };
   if (opZbPoints.length >= 3) opZbPolygon = L.polygon(toLatLngs(), style).addTo(opZbMap);
   else if (opZbPoints.length === 2) opZbPolygon = L.polyline(toLatLngs(), style).addTo(opZbMap);
 
@@ -12653,7 +12658,7 @@ function opZbRedraw() {
   if (editable) {
     const cornerIcon = L.divIcon({
       className: '', iconSize: [22, 22], iconAnchor: [11, 11],
-      html: '<div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;"><div style="width:14px;height:14px;border-radius:50%;background:#39ff14;border:2px solid #000;box-shadow:0 0 0 2px #39ff14;"></div></div>'
+      html: '<div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;"><div style="width:14px;height:14px;border-radius:50%;background:#16a34a;border:2px solid #000;box-shadow:0 0 0 2px #16a34a;"></div></div>'
     });
     const midIcon = L.divIcon({
       className: '', iconSize: [22, 22], iconAnchor: [11, 11],
@@ -13341,14 +13346,14 @@ function opRenderDriversList() {
   });
   if (!filtered.length) { wrap.innerHTML = '<div class="op-empty">No drivers found.</div>'; return; }
   wrap.innerHTML = filtered.map(d => `
-    <div class="op-partner-item" onclick="opShowDriverDetail('${d._id}')" ${d.approvalStatus === 'pending' ? 'style="border-color:#f0a02c;"' : d.approvalStatus === 'rejected' ? 'style="border-color:#dc2626;"' : ''}>
+    <div class="op-partner-item" onclick="opShowDriverDetail('${d._id}')" ${d.approvalStatus === 'pending' ? 'style="border-color:#b45309;"' : d.approvalStatus === 'rejected' ? 'style="border-color:#dc2626;"' : ''}>
       <div class="op-partner-top">
         <span class="op-partner-name">${escapeHtml(d.name || d._id)}</span>
         <span class="op-partner-type">${d.isOnline ? '🟢 Online' : '⚪ Offline'}</span>
       </div>
       <div class="op-partner-sub">${escapeHtml(OP_VEHICLE_LABEL[d.vehicleType] || d.vehicleType || '')} · ${d.zoneName ? escapeHtml(d.zoneName) : '⚠️ No zone set'}</div>
-      ${d.approvalStatus === 'pending' ? '<div class="op-partner-sub" style="color:#f0a02c;">⏳ Waiting for approval</div>' : ''}
-      ${d.approvalStatus === 'rejected' ? '<div class="op-partner-sub" style="color:#f87171;">❌ Rejected — waiting for driver to resend</div>' : ''}
+      ${d.approvalStatus === 'pending' ? '<div class="op-partner-sub" style="color:#b45309;">⏳ Waiting for approval</div>' : ''}
+      ${d.approvalStatus === 'rejected' ? '<div class="op-partner-sub" style="color:#dc2626;">❌ Rejected — waiting for driver to resend</div>' : ''}
     </div>
   `).join('');
 }
@@ -13748,17 +13753,30 @@ function opRenderOrdersList() {
 
   if (!list.length) { wrap.innerHTML = '<div class="op-empty">No orders here.</div>'; return; }
 
+  const STATUS_LABEL = {
+    pending: 'Waiting for shop', preparing: 'Preparing', ready: 'Ready for pickup',
+    picked_up: 'Out for delivery', delivered: 'Delivered', completed: 'Delivered', done: 'Delivered',
+    cancelled: 'Cancelled', rejected: 'Rejected by shop'
+  };
   wrap.innerHTML = list.map(o => {
     const status = (o.status || 'pending').toLowerCase();
+    const statusText = STATUS_LABEL[status] || status.replace(/_/g, ' ');
     const isLate = opOrderIsLate(o, now);
-    const itemCount = (o.items || []).reduce((s, it) => s + (it.qty || 0), 0);
+    const items = o.items || [];
+    const itemCount = items.reduce((s, it) => s + (it.qty || 0), 0);
+    const preview = items.slice(0, 2).map(it => (it.qty || 1) + ' × ' + (it.name || 'Item')).join(', ') + (items.length > 2 ? ' +' + (items.length - 2) + ' more' : '');
+    const phone = o.customerPhone || o.customerNumber || '';
+    const placed = o.createdAt ? new Date(o.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
     return `
       <div class="op-order-item${isLate ? ' late' : ''}" onclick="opOpenOrderCustomer('${o._shopId}','${o._id}')">
         <div class="op-order-top">
           <span class="op-order-shop">${escapeHtml(o._shopName)}</span>
-          <span class="op-order-status-pill op-order-status-${status}">${escapeHtml(status)}</span>
+          <span class="op-order-status-pill op-order-status-${status}">${escapeHtml(statusText)}</span>
         </div>
-        <div class="op-order-sub">#${escapeHtml(String(o.orderNumber || o._id))} · ${escapeHtml(o.customerName || 'Guest')} · ₹${o.total || 0} · ${itemCount} item${itemCount === 1 ? '' : 's'} · ${timeAgo(o.createdAt || now)}</div>
+        <div class="op-order-amt"><b>₹${o.total || 0}</b> · ${itemCount} item${itemCount === 1 ? '' : 's'}<span class="op-order-no">Order #${escapeHtml(String(o.orderNumber || o._id))}</span></div>
+        ${preview ? `<div class="op-order-items">${escapeHtml(preview)}</div>` : ''}
+        <div class="op-order-sub">👤 ${escapeHtml(o.customerName || 'Guest')}${phone ? ' · 📞 ' + escapeHtml(String(phone)) : ''}</div>
+        <div class="op-order-sub">🕒 ${escapeHtml(placed)} (${timeAgo(o.createdAt || now)})</div>
         ${isLate ? '<span class="op-order-late-tag">⚠ Not accepted/rejected in 5+ min</span>' : ''}
       </div>
     `;
@@ -13791,8 +13809,8 @@ function opOpenOrderCustomer(shopId, orderId) {
   const items = o.items || [];
   itemsEl.innerHTML = items.length
     ? items.map(it => `
-        <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #334155; font-size:.82rem;">
-          <span>${it.qty || 1} × ${escapeHtml(it.name || 'Item')}${it.desc ? `<br><span style="color:#94a3b8; font-size:.75rem;">${escapeHtml(it.desc)}</span>` : ''}</span>
+        <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #b7d3be; font-size:.82rem;">
+          <span>${it.qty || 1} × ${escapeHtml(it.name || 'Item')}${it.desc ? `<br><span style="color:#6b7280; font-size:.75rem;">${escapeHtml(it.desc)}</span>` : ''}</span>
           <span style="white-space:nowrap; margin-left:10px;">₹${(it.price || 0) * (it.qty || 1)}</span>
         </div>
       `).join('')
@@ -14068,14 +14086,14 @@ function opRenderPartnersList() {
   });
   if (!filtered.length) { wrap.innerHTML = '<div class="op-empty">No restaurant partners found.</div>'; return; }
   wrap.innerHTML = filtered.map(p => `
-    <div class="op-partner-item" onclick="opShowPartnerDetail('${p._id}')" ${p.approvalStatus === 'pending' ? 'style="border-color:#f0a02c;"' : p.approvalStatus === 'rejected' ? 'style="border-color:#dc2626;"' : ''}>
+    <div class="op-partner-item" onclick="opShowPartnerDetail('${p._id}')" ${p.approvalStatus === 'pending' ? 'style="border-color:#b45309;"' : p.approvalStatus === 'rejected' ? 'style="border-color:#dc2626;"' : ''}>
       <div class="op-partner-top">
         <span class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</span>
         <span class="op-partner-type">${opTypeLabel(p.businessType)}</span>
       </div>
       <div class="op-partner-sub">${escapeHtml(p.address || '')}${p.areaName ? ' · 📍 ' + escapeHtml(p.areaName) : ''} ${p.status === 'suspended' ? ' · ⛔ SUSPENDED' : ''} · Due ₹${opComputeDue(p)}</div>
-      ${p.approvalStatus === 'pending' ? '<div class="op-partner-sub" style="color:#f0a02c;">⏳ Waiting for approval</div>' : ''}
-      ${p.approvalStatus === 'rejected' ? '<div class="op-partner-sub" style="color:#f87171;">❌ Rejected — waiting for shop to resend</div>' : ''}
+      ${p.approvalStatus === 'pending' ? '<div class="op-partner-sub" style="color:#b45309;">⏳ Waiting for approval</div>' : ''}
+      ${p.approvalStatus === 'rejected' ? '<div class="op-partner-sub" style="color:#dc2626;">❌ Rejected — waiting for shop to resend</div>' : ''}
     </div>
   `).join('');
 }
@@ -14104,7 +14122,7 @@ function opAddShopGps() {
 async function opCreateShop() {
   const status = document.getElementById('op-as-status');
   const btn = document.getElementById('op-as-create-btn');
-  const fail = t => { status.style.color = '#f87171'; status.textContent = t; };
+  const fail = t => { status.style.color = '#dc2626'; status.textContent = t; };
   status.style.color = ''; status.textContent = '';
   const businessType = document.getElementById('op-as-type').value;
   const name = document.getElementById('op-as-name').value.trim();
@@ -14145,7 +14163,7 @@ async function opCreateShop() {
         zoneMsg = ' Added to zone ' + (z.name || z._id) + '.';
       }
     }
-    status.style.color = '#33ff66';
+    status.style.color = '#15803d';
     status.textContent = 'Shop created.' + zoneMsg;
     setTimeout(() => { document.getElementById('op-addshop-modal').classList.remove('show'); }, 900);
   } catch (e) {
@@ -14326,10 +14344,10 @@ function opRenderAvailabilityList() {
   }
   wrap.innerHTML = items.map(it => `
     <div style="padding:8px 0; border-bottom:1px solid #1f2937;">
-      <div style="font-size:.8rem; color:#e2e8f0; margin-bottom:6px;">${escapeHtml(it.name || '(unnamed)')}${it.unit && it.unit !== 'piece' ? ' <span style="color:#94a3b8;">(per ' + escapeHtml(it.unit) + ')</span>' : ''}${it.unavailable ? ' <span style="color:#f87171;">(unavailable)</span>' : ''}</div>
+      <div style="font-size:.8rem; color:#1f2937; margin-bottom:6px;">${escapeHtml(it.name || '(unnamed)')}${it.unit && it.unit !== 'piece' ? ' <span style="color:#6b7280;">(per ' + escapeHtml(it.unit) + ')</span>' : ''}${it.unavailable ? ' <span style="color:#dc2626;">(unavailable)</span>' : ''}</div>
       <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-        <span style="font-size:.8rem; color:#94a3b8;">₹</span>
-        <input type="number" min="0" step="any" inputmode="decimal" id="op-pm-price-${it.id}" value="${Number(it.price) || 0}" style="width:80px; padding:5px 8px; border-radius:6px; border:1px solid #374151; background:#0f172a; color:#e2e8f0; font-size:.8rem;" onkeydown="if(event.key==='Enter'){opSaveItemPrice('${it.id}');}" />
+        <span style="font-size:.8rem; color:#6b7280;">₹</span>
+        <input type="number" min="0" step="any" inputmode="decimal" id="op-pm-price-${it.id}" value="${Number(it.price) || 0}" style="width:80px; padding:5px 8px; border-radius:6px; border:1px solid #b7d3be; background:#ffffff; color:#1f2937; font-size:.8rem;" onkeydown="if(event.key==='Enter'){opSaveItemPrice('${it.id}');}" />
         <button type="button" class="op-btn op-btn-push" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opSaveItemPrice('${it.id}')">💾 Save price</button>
         <button type="button" class="op-btn ${it.unavailable ? 'op-btn-push' : 'op-btn-danger'}" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opToggleItemAvailability('${it.id}')">${it.unavailable ? 'Mark available' : 'Mark unavailable'}</button>
       </div>
@@ -14350,12 +14368,12 @@ function opCustomerPriceRowHtml(it) {
   if (pNames.length > 1) {
     const csp = (it.customerSizePrices && typeof it.customerSizePrices === 'object') ? it.customerSizePrices : {};
     const boxes = pNames.map(n => `
-        <label style="display:flex; flex-direction:column; gap:2px; font-size:.7rem; color:#94a3b8;">${escapeHtml(n)} <span style="color:#64748b;">(shop ₹${Number(spx[n]) || 0})</span>
-          <input type="number" min="0" step="any" inputmode="decimal" id="op-pm-csp-${it.id}-${escapeHtml(n)}" value="${Number(csp[n]) > 0 ? Number(csp[n]) : ''}" placeholder="same as shop" style="width:84px; padding:5px 8px; border-radius:6px; border:1px solid #374151; background:#0f172a; color:#e2e8f0; font-size:.8rem;">
+        <label style="display:flex; flex-direction:column; gap:2px; font-size:.7rem; color:#6b7280;">${escapeHtml(n)} <span style="color:#64748b;">(shop ₹${Number(spx[n]) || 0})</span>
+          <input type="number" min="0" step="any" inputmode="decimal" id="op-pm-csp-${it.id}-${escapeHtml(n)}" value="${Number(csp[n]) > 0 ? Number(csp[n]) : ''}" placeholder="same as shop" style="width:84px; padding:5px 8px; border-radius:6px; border:1px solid #b7d3be; background:#ffffff; color:#1f2937; font-size:.8rem;">
         </label>`).join('');
     return `
       <div style="margin-top:6px;">
-        <span style="font-size:.75rem; color:#a78bfa;">Customer price per portion</span>
+        <span style="font-size:.75rem; color:#7c3aed;">Customer price per portion</span>
         <div style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; margin-top:4px;">${boxes}
           <button type="button" class="op-btn op-btn-push" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opSaveItemPortionCustomerPrices('${it.id}')">💾 Save portion prices</button>
         </div>
@@ -14364,8 +14382,8 @@ function opCustomerPriceRowHtml(it) {
   const cp = Number(it.customerPrice) || 0;
   return `
       <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px;">
-        <span style="font-size:.75rem; color:#a78bfa;">Customer ₹</span>
-        <input type="number" min="0" step="any" inputmode="decimal" id="op-pm-cprice-${it.id}" value="${cp || ''}" placeholder="same as shop" style="width:90px; padding:5px 8px; border-radius:6px; border:1px solid #374151; background:#0f172a; color:#e2e8f0; font-size:.8rem;">
+        <span style="font-size:.75rem; color:#7c3aed;">Customer ₹</span>
+        <input type="number" min="0" step="any" inputmode="decimal" id="op-pm-cprice-${it.id}" value="${cp || ''}" placeholder="same as shop" style="width:90px; padding:5px 8px; border-radius:6px; border:1px solid #b7d3be; background:#ffffff; color:#1f2937; font-size:.8rem;">
         <button type="button" class="op-btn op-btn-push" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opSaveItemCustomerPrice('${it.id}')">💾 Save customer price</button>
       </div>`;
 }
@@ -14444,7 +14462,7 @@ function opToggleItemAvailability(itemId) {
 }
 function opCommissionRowHtml(t) {
   const v = (x) => (x === 0 || x === undefined || x === null || x === '') ? '' : x;
-  const inp = 'style="width:30%; padding:7px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-family:inherit; font-size:.8rem; margin-right:4px;"';
+  const inp = 'style="width:30%; padding:7px; background:#f4faf5; color:#15803d; border:1px solid #cfe6d5; font-family:inherit; font-size:.8rem; margin-right:4px;"';
   return '<div class="op-comm-row" style="display:flex; align-items:center; gap:4px; margin-bottom:6px;">' +
     '<input type="number" class="op-comm-min" min="0" step="any" inputmode="decimal" placeholder="From ₹" value="' + v(t.min) + '" ' + inp + '>' +
     '<input type="number" class="op-comm-max" min="0" step="any" inputmode="decimal" placeholder="To ₹" value="' + v(t.max) + '" ' + inp + '>' +
@@ -14461,8 +14479,8 @@ function opToggleDueHistory() {
   const sets = p.settlements ? Object.values(p.settlements).sort((a, b) => (b.settledAt || 0) - (a.settledAt || 0)) : [];
   const rows = hist.map(h => `
     <div class="op-order-item" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-      <div style="font-size:.78rem; line-height:1.5;"><b>Order #${escapeHtml(String(h.no))}</b><br><span style="color:#1f7a3d;">${h.at ? new Date(h.at).toLocaleString() : ''}<br>Order amount ₹${Math.round(h.amount * 100) / 100}</span></div>
-      <div style="font-size:1.3rem; font-weight:800; color:#39ff14; white-space:nowrap;">₹${h.commission}</div>
+      <div style="font-size:.78rem; line-height:1.5;"><b>Order #${escapeHtml(String(h.no))}</b><br><span style="color:#5f8a6c;">${h.at ? new Date(h.at).toLocaleString() : ''}<br>Order amount ₹${Math.round(h.amount * 100) / 100}</span></div>
+      <div style="font-size:1.3rem; font-weight:800; color:#16a34a; white-space:nowrap;">₹${h.commission}</div>
     </div>`).join('');
   const setRows = sets.map(x => `
     <div class="op-order-item" style="display:flex; justify-content:space-between; gap:10px; font-size:.78rem;">
@@ -14523,7 +14541,7 @@ function opSaveCommissionTiers() {
 // (index.html markupFor) adds it to each item whose shop price is in [min, max] (both included). Shop is paid its own price.
 function opMarkupRowHtml(t) {
   const v = (x) => (x === 0 || x === undefined || x === null || x === '') ? '' : x;
-  const inp = 'style="width:24%; padding:7px; background:#020a04; color:#33ff66; border:1px solid #124a24; font-family:inherit; font-size:.8rem; margin-right:4px;"';
+  const inp = 'style="width:24%; padding:7px; background:#f4faf5; color:#15803d; border:1px solid #cfe6d5; font-family:inherit; font-size:.8rem; margin-right:4px;"';
   const isPct = t && t.type === 'pct';
   return '<div class="op-mk-row" style="display:flex; align-items:center; gap:4px; margin-bottom:6px;">' +
     '<input type="number" class="op-mk-min" min="0" step="any" inputmode="decimal" placeholder="From ₹" value="' + v(t.min) + '" ' + inp + '>' +
@@ -15055,7 +15073,7 @@ function opRenderChatMessages(msgs) {
   const el = document.getElementById('op-chat-messages');
   if (!el) return;
   if (!msgs.length) {
-    el.innerHTML = '<p style="color:#1f7a3d;text-align:center;margin-top:20px;">No messages yet.</p>';
+    el.innerHTML = '<p style="color:#5f8a6c;text-align:center;margin-top:20px;">No messages yet.</p>';
     return;
   }
   el.innerHTML = msgs.map(m => {
@@ -15467,21 +15485,21 @@ function opRenderPosters() {
   var l = document.getElementById('op-poster-list'); l.innerHTML = '';
   opPostersCache.forEach(function (b, i) {
     var d = document.createElement('div'); d.className = 'op-partner-item'; d.style.cursor = 'default';
-    d.innerHTML = '<img style="width:100%;max-width:360px;aspect-ratio:16/9;object-fit:cover;border:1px solid #124a24;display:block;margin-bottom:8px;" alt="">' +
+    d.innerHTML = '<img style="width:100%;max-width:360px;aspect-ratio:16/9;object-fit:cover;border:1px solid #cfe6d5;display:block;margin-bottom:8px;" alt="">' +
       '<div class="op-search-box" style="padding-bottom:8px;"><input type="url" placeholder="Tap link (optional)"></div>' +
-      '<div style="margin-bottom:8px;"><label style="color:#33ff66;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="home"> 🏠 Home</label>' +
-      '<label style="color:#33ff66;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="mart"> 🛍️ NESH Mart</label>' +
-      '<label style="color:#33ff66;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="food"> 🍔 Food</label>' +
-      '<label style="color:#33ff66;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="trending"> 🔥 Trending</label>' +
-      '<label style="color:#33ff66;font-size:.8rem;"><input type="checkbox" data-t="popup"> 📣 Popup</label></div>' +
-      '<div style="margin-bottom:8px;"><p class="op-note" style="margin:0 0 4px;">Poster of which shop? (shows only in that shop\'s zones)</p><select data-r="zshop" style="max-width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:7px;font-family:inherit;font-size:.8rem;"></select></div>' +
-      '<div style="margin-bottom:8px;"><select data-r="shop" style="max-width:100%;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:7px;font-family:inherit;font-size:.8rem;"></select></div>' +
-      '<div data-r="zones" style="color:#33ff66;font-size:.8rem;line-height:1.9;margin-bottom:8px;"></div>' +
+      '<div style="margin-bottom:8px;"><label style="color:#15803d;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="home"> 🏠 Home</label>' +
+      '<label style="color:#15803d;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="mart"> 🛍️ NESH Mart</label>' +
+      '<label style="color:#15803d;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="food"> 🍔 Food</label>' +
+      '<label style="color:#15803d;font-size:.8rem;margin-right:14px;"><input type="checkbox" data-t="trending"> 🔥 Trending</label>' +
+      '<label style="color:#15803d;font-size:.8rem;"><input type="checkbox" data-t="popup"> 📣 Popup</label></div>' +
+      '<div style="margin-bottom:8px;"><p class="op-note" style="margin:0 0 4px;">Poster of which shop? (shows only in that shop\'s zones)</p><select data-r="zshop" style="max-width:100%;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:7px;font-family:inherit;font-size:.8rem;"></select></div>' +
+      '<div style="margin-bottom:8px;"><select data-r="shop" style="max-width:100%;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:7px;font-family:inherit;font-size:.8rem;"></select></div>' +
+      '<div data-r="zones" style="color:#15803d;font-size:.8rem;line-height:1.9;margin-bottom:8px;"></div>' +
       '<p class="op-note" data-r="status" style="margin-bottom:6px;"></p>' +
-      '<div style="margin-bottom:8px;"><select data-r="dur" style="background:#020a04;color:#33ff66;border:1px solid #124a24;padding:7px;font-family:inherit;font-size:.8rem;">' +
+      '<div style="margin-bottom:8px;"><select data-r="dur" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:7px;font-family:inherit;font-size:.8rem;">' +
       '<option value="keep">Keep time as is</option><option value="0">No time limit</option><option value="6">Show 6 hours from now</option><option value="12">Show 12 hours from now</option>' +
       '<option value="24">Show 24 hours from now</option><option value="48">Show 2 days from now</option><option value="72">Show 3 days from now</option><option value="168">Show 7 days from now</option><option value="custom">Custom hours from now…</option></select> ' +
-      '<input type="number" data-r="custom" min="1" max="8760" placeholder="hours" style="display:none;width:80px;background:#020a04;color:#33ff66;border:1px solid #124a24;padding:7px;font-family:inherit;font-size:.8rem;"></div>' +
+      '<input type="number" data-r="custom" min="1" max="8760" placeholder="hours" style="display:none;width:80px;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:7px;font-family:inherit;font-size:.8rem;"></div>' +
       '<button type="button" class="op-btn" data-a="save">Save</button> ' +
       '<button type="button" class="op-btn" data-a="up">↑</button> <button type="button" class="op-btn" data-a="down">↓</button> ' +
       '<button type="button" class="op-btn op-btn-danger" data-a="del">Delete</button>';
@@ -15489,7 +15507,7 @@ function opRenderPosters() {
     if (b.video) {
       var pv = document.createElement('video');
       pv.src = b.video; pv.poster = b.img; pv.controls = true; pv.muted = true; pv.playsInline = true; pv.preload = 'metadata';
-      pv.style.cssText = 'width:100%;max-width:360px;aspect-ratio:16/9;object-fit:cover;border:1px solid #124a24;display:block;margin-bottom:8px;background:#000;';
+      pv.style.cssText = 'width:100%;max-width:360px;aspect-ratio:16/9;object-fit:cover;border:1px solid #cfe6d5;display:block;margin-bottom:8px;background:#000;';
       d.replaceChild(pv, d.querySelector('img'));
     }
     var inp = d.querySelector('input[type=url]'); inp.value = b.link;
@@ -15675,12 +15693,12 @@ function opLoadVideoAds() {
     if (!keys.length) { box.innerHTML = '<p class="op-note" style="margin-top:12px;">No video ads yet.</p>'; return; }
     keys.forEach(function (k) {
       var o = v[k], t = o.targets || {}, row = document.createElement('div');
-      row.style.cssText = 'display:flex;gap:10px;align-items:center;margin-top:12px;padding:10px;border:1px solid #124a24;border-radius:10px;';
-      var im = document.createElement('img'); im.src = o.thumb || ''; im.style.cssText = 'width:84px;height:84px;object-fit:cover;border-radius:8px;background:#020a04;flex:none;';
-      var info = document.createElement('div'); info.style.cssText = 'flex:1;min-width:0;color:#33ff66;font-size:.8rem;line-height:1.5;';
+      row.style.cssText = 'display:flex;gap:10px;align-items:center;margin-top:12px;padding:10px;border:1px solid #cfe6d5;border-radius:10px;';
+      var im = document.createElement('img'); im.src = o.thumb || ''; im.style.cssText = 'width:84px;height:84px;object-fit:cover;border-radius:8px;background:#f4faf5;flex:none;';
+      var info = document.createElement('div'); info.style.cssText = 'flex:1;min-width:0;color:#15803d;font-size:.8rem;line-height:1.5;';
       var places = [t.home ? '🏠 Home' : '', t.food ? '🍔 Food' : '', t.mart ? '🛍️ NESH Mart' : ''].filter(Boolean).join(' · ');
       info.innerHTML = '<div>' + places + '</div><div>' + (o.off ? '⏸ Paused' : opPosterStatus(+o.expiresAt || 0)) + '</div><div>Again after ' + (o.gapHours || 12) + ' h · Skip after ' + (o.skipAfter || 0) + ' s</div>';
-      var a = document.createElement('a'); a.href = o.video; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '▶ Preview'; a.style.cssText = 'color:#33ff66;';
+      var a = document.createElement('a'); a.href = o.video; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '▶ Preview'; a.style.cssText = 'color:#15803d;';
       info.appendChild(a);
       var col = document.createElement('div'); col.style.cssText = 'display:flex;flex-direction:column;gap:6px;flex:none;';
       var b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'op-btn'; b1.style.cssText = 'padding:6px 10px;margin:0;'; b1.textContent = o.off ? 'Resume' : 'Pause';
@@ -15910,7 +15928,7 @@ function opLoyLoadClaims() {
     box.innerHTML = '';
     if (!rows.length) { box.textContent = 'No customer has a claimed, unused reward right now.'; return; }
     rows.forEach(function (x) {
-      var d = document.createElement('div'); d.style.cssText = 'border-bottom:1px solid #124a24;padding:6px 0;';
+      var d = document.createElement('div'); d.style.cssText = 'border-bottom:1px solid #cfe6d5;padding:6px 0;';
       var expired = x.exp && x.exp <= now;
       var t = document.createElement('div');
       t.textContent = '📱 ' + x.ph + ' · claimed ' + opLoyFmtDate(x.at) + ' · ' + (x.exp ? (expired ? '⛔ expired ' + opLoyFmtDate(x.exp) : '⏳ expires ' + opLoyFmtDate(x.exp) + ' (' + opLoyLeft(x.exp - now) + ' left)') : 'no expiry set')
@@ -16010,7 +16028,7 @@ function opLoyRenderNudge() {
   document.getElementById('op-loy-nbulk').disabled = !rows.length;
   if (!rows.length) { list.textContent = 'No customers at this step right now.'; return; }
   rows.forEach(function (x) {
-    var row = document.createElement('div'); row.style.cssText = 'border-bottom:1px solid #124a24;padding:6px 0;';
+    var row = document.createElement('div'); row.style.cssText = 'border-bottom:1px solid #cfe6d5;padding:6px 0;';
     var bar = ''; for (var i = 1; i <= x.st.n; i++) bar += i <= x.st.done ? '●' : '○';
     var t = document.createElement('div');
     t.textContent = '📱 ' + x.ph + ' · ' + bar + ' ' + (x.st.unlocked ? 'unlocked — not claimed yet' : x.st.done + ' of ' + x.st.n + ' done · ' + x.st.left + ' more') + (x.last ? ' · last nudged ' + opLoyFmtDate(x.last) : '');
@@ -16192,7 +16210,7 @@ function opLoadCoupons() {
     if (!keys.length) { box.innerHTML = '<p class="op-note" style="margin-top:12px;">No coupons yet.</p>'; return; }
     keys.forEach(function (k) {
       var o = v[k], row = document.createElement('div');
-      row.style.cssText = 'margin-top:12px;padding:10px;border:1px solid #124a24;border-radius:10px;color:#33ff66;font-size:.82rem;line-height:1.6;';
+      row.style.cssText = 'margin-top:12px;padding:10px;border:1px solid #cfe6d5;border-radius:10px;color:#15803d;font-size:.82rem;line-height:1.6;';
       var off = o.type === 'percent' ? o.value + '% off' + (o.maxDiscount ? ' (max ₹' + o.maxDiscount + ')' : '') : '₹' + o.value + ' off';
       var where = o.allShops ? '🌐 All shops' : Object.keys(o.shops || {}).map(function (id) { return names[id] || id; }).join(', ') || '—';
       var h = document.createElement('div'); h.style.cssText = 'font-weight:700;font-size:.95rem;'; h.textContent = '🎟️ ' + o.code + ' — ' + off + (o.auto ? '  ⚡ AUTO-APPLY' : '');
@@ -16288,11 +16306,11 @@ function opLoadDriverPosters(keepMsg) {
     if (keepMsg !== true && keepMsg !== 'noclean') opDpMsg(ids.length ? '' : 'No driver posters yet.');
     ids.forEach(function (k, i) {
       var o = v[k], row = document.createElement('div');
-      row.style.cssText = 'display:flex;gap:10px;align-items:center;margin-top:12px;padding:10px;border:1px solid #124a24;border-radius:10px;';
-      var im = document.createElement('img'); im.src = o.img; im.style.cssText = 'width:120px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:#020a04;flex:none;';
-      var info = document.createElement('div'); info.style.cssText = 'flex:1;min-width:0;color:#33ff66;font-size:.8rem;line-height:1.5;';
+      row.style.cssText = 'display:flex;gap:10px;align-items:center;margin-top:12px;padding:10px;border:1px solid #cfe6d5;border-radius:10px;';
+      var im = document.createElement('img'); im.src = o.img; im.style.cssText = 'width:120px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:#f4faf5;flex:none;';
+      var info = document.createElement('div'); info.style.cssText = 'flex:1;min-width:0;color:#15803d;font-size:.8rem;line-height:1.5;';
       var st = o.off ? '⏸ Paused' : opPosterStatus(+o.expiresAt || 0);
-      info.innerHTML = '<div>#' + (i + 1) + ' · ' + st + '</div>' + (o.link ? '<div style="word-break:break-all;color:#1f7a3d;">🔗 ' + escapeHtml(o.link) + '</div>' : '');
+      info.innerHTML = '<div>#' + (i + 1) + ' · ' + st + '</div>' + (o.link ? '<div style="word-break:break-all;color:#5f8a6c;">🔗 ' + escapeHtml(o.link) + '</div>' : '');
       var col = document.createElement('div'); col.style.cssText = 'display:flex;flex-direction:column;gap:6px;flex:none;';
       function btn(label, fn) { var b = document.createElement('button'); b.type = 'button'; b.className = 'op-btn'; b.style.cssText = 'padding:6px 10px;margin:0;'; b.textContent = label; b.onclick = fn; col.appendChild(b); return b; }
       function swap(j) {
