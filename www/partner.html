@@ -886,6 +886,7 @@
         <input id="reg-shop-category" type="text" list="shop-category-suggestions" placeholder="What kind of shop? e.g. Mobile Shop, Sports" maxlength="24" />
       </div>
       <datalist id="shop-category-suggestions">
+        <option value="Pravasi Hampers">
         <option value="Mobile Shop">
         <option value="Sports">
       </datalist>
@@ -1981,6 +1982,16 @@
           <div class="op-home-icon">🎉</div>
           <h3>Home Popup Banner</h3>
           <p>Offer popup on the customer app home screen (like "FREE DELIVERY") — set the text, image and which card "Order Now" opens</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('pravasi-banner')">
+          <div class="op-home-icon">🎁</div>
+          <h3>Pravasi Banner</h3>
+          <p>Put a banner on the Pravasi Hampers screen — picture, heading, button and what it opens</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('pravasi-design')">
+          <div class="op-home-icon">🎨</div>
+          <h3>Pravasi Design</h3>
+          <p>Upload a CSS or JSON design file — it replaces the old Pravasi design in the customer app (with Undo)</p>
         </div>
         <div class="op-home-card" onclick="opOpenSection('test-location')">
           <div class="op-home-icon">🧪</div>
@@ -3322,6 +3333,7 @@
         <option value="online_shop">🛍️ Other Shop card</option>
         <option value="taxi">🚖 Taxi card</option>
         <option value="bus">🚌 Bus card</option>
+        <option value="pravasi">🎁 Pravasi Hampers card</option>
         <option value="orders">📦 Your Orders</option>
         <option value="none">Just close the popup</option>
       </select>
@@ -3347,6 +3359,96 @@
         <button type="button" class="op-btn op-btn-danger" onclick="opSaveHomePopup(false)">⏹ Switch OFF</button>
       </div>
       <p class="op-note" id="op-hp-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- PRAVASI BANNER — stored at pravasi/banner = { on, image, title, line, btn, action, value, bg, color, version, updatedAt } -->
+  <div class="op-section" id="op-section-pravasi-banner">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Pravasi Banner</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">A banner shown at the top of the <b>Pravasi Hampers</b> screen in the customer app (just under the search box). Fill it in, check the preview, then <b>Save &amp; switch ON</b>. No app update needed.</p>
+      <style>#op-section-pravasi-banner .hp-f{width:100%;padding:10px;background:transparent;color:inherit;border:1px solid currentColor;border-radius:6px;font:inherit;box-sizing:border-box;margin-bottom:10px}#op-section-pravasi-banner .hp-l{display:block;font-size:12px;opacity:.8;margin:6px 0 4px}</style>
+
+      <label class="hp-l">Preview</label>
+      <div id="op-pb-preview" style="margin-bottom:12px;"></div>
+
+      <label class="hp-l">Picture (optional)</label>
+      <input type="file" id="op-pb-file" accept="image/*" onchange="opPbPickImage(event)" style="margin-bottom:8px;">
+      <input type="text" id="op-pb-image" class="hp-f" placeholder="…or paste an image link (https://…)" oninput="opPbPreview()">
+      <button type="button" class="op-btn op-btn-danger" style="padding:6px 10px;" onclick="document.getElementById('op-pb-image').value='';document.getElementById('op-pb-file').value='';opPbPreview()">Remove picture</button>
+
+      <label class="hp-l" style="margin-top:10px;">Heading (use Enter for a 2nd line)</label>
+      <textarea id="op-pb-title" class="hp-f" rows="2" maxlength="60" placeholder="Send love home 🎁" oninput="opPbPreview()"></textarea>
+      <label class="hp-l">Small line under it (optional)</label>
+      <input type="text" id="op-pb-line" class="hp-f" maxlength="80" placeholder="Hampers delivered to your family" oninput="opPbPreview()">
+      <label class="hp-l">Button text (leave empty for no button)</label>
+      <input type="text" id="op-pb-btn" class="hp-f" maxlength="24" placeholder="SHOP NOW" oninput="opPbPreview()">
+
+      <label class="hp-l">When the banner is tapped…</label>
+      <select id="op-pb-action" class="hp-f" onchange="opPbActionChanged()">
+        <option value="none">Do nothing</option>
+        <option value="search">Search for a word (e.g. hamper)</option>
+        <option value="shop">Open one shop</option>
+        <option value="link">Open a web link</option>
+        <option value="call">Call a phone number</option>
+      </select>
+      <div id="op-pb-row-search" style="display:none;"><input type="text" id="op-pb-v-search" class="hp-f" maxlength="30" placeholder="Word to search, e.g. hamper"></div>
+      <div id="op-pb-row-shop" style="display:none;"><select id="op-pb-v-shop" class="hp-f"></select></div>
+      <div id="op-pb-row-link" style="display:none;"><input type="text" id="op-pb-v-link" class="hp-f" placeholder="https://…"></div>
+      <div id="op-pb-row-call" style="display:none;"><input type="text" id="op-pb-v-call" class="hp-f" maxlength="16" placeholder="+91XXXXXXXXXX"></div>
+
+      <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:10px;">
+        <label class="hp-l" style="display:flex;align-items:center;gap:8px;">Background <input type="color" id="op-pb-bg" value="#F2B705" oninput="opPbPreview()"></label>
+        <label class="hp-l" style="display:flex;align-items:center;gap:8px;">Text <input type="color" id="op-pb-color" value="#2B2410" oninput="opPbPreview()"></label>
+      </div>
+      <p class="op-note">Tip: when you use a picture, pick a <b>white</b> text colour so the words are easy to read.</p>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
+        <button type="button" class="op-btn op-btn-push" onclick="opSavePravasiBanner(true)">💾 Save &amp; switch ON</button>
+        <button type="button" class="op-btn op-btn-danger" onclick="opSavePravasiBanner(false)">⏹ Switch OFF</button>
+      </div>
+      <p class="op-note" id="op-pb-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- PRAVASI DESIGN — upload pravasi.css / pravasi-data.json; writes design fields of pravasi/* (backup at pravasi/designBackup) -->
+  <div class="op-section" id="op-section-pravasi-design">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Pravasi Design</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Upload a design file for the <b>Pravasi Hampers</b> screens. The new design <b>replaces the old one</b> in the customer app right away — no app update needed.</p>
+      <p class="op-note"><b>.css file</b> (with the <code>@card</code> / <code>@list</code> / <code>@shop</code> sections): replaces only the CSS.<br><b>.html file</b> (pravasi-layout.html, parts marked <code>&lt;!-- @shop --&gt;</code>, <code>@card</code>, <code>@hero</code>, <code>@top</code>, <code>@bottom</code>, <code>@empty</code>): replaces only the layout — the shop card template and the blocks around the list.<br><b>.json file</b> (pravasi-data.json): replaces all CSS + layout (shop card template, banners areas, hide list). Texts (title, tagline, icon, greeting…) change only if they are in the file.<br>Shops list, order and the Operator banner are <b>never</b> touched by an upload.</p>
+
+      <div class="op-note" style="margin:0 0 14px;padding:12px;border:1px solid currentColor;border-radius:10px;">
+        <b>Screen settings</b> (Pravasi Hampers screen)<br>
+        <label style="display:block;margin:8px 0 0;"><input type="checkbox" id="op-pl-food"> Food look (shop cards like the Food screen)</label>
+        <label style="display:block;margin:6px 0 0;"><input type="checkbox" id="op-pl-items"> Show items (hampers) list</label>
+        <label style="display:block;margin:6px 0 0;"><input type="checkbox" id="op-pl-shops"> Show shops list</label>
+        <label style="display:block;margin:6px 0 0;"><input type="checkbox" id="op-pl-mart"> Hide NESH Mart banners &amp; sections</label>
+        <label style="display:block;margin:6px 0 10px;"><input type="checkbox" id="op-pl-abroad"> Customers outside India open Pravasi Hampers directly (home cards hidden for them)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;">
+          <button type="button" class="op-btn" onclick="opPravasiPreset('food')">🍔 Like Food</button>
+          <button type="button" class="op-btn" onclick="opPravasiPreset('mart')">🏪 Like NESH Mart</button>
+          <button type="button" class="op-btn" onclick="opPravasiPreset('items')">🎁 Items only</button>
+        </div>
+        <button type="button" class="op-btn op-btn-push" onclick="opSavePravasiLayout()">💾 Save screen settings</button>
+        <span id="op-pl-status" style="margin-left:8px;"></span>
+      </div>
+
+      <input type="file" id="op-pd-file" accept=".css,.json,.html,text/css,application/json,text/html" onchange="opPdPickFile(event)" style="margin-bottom:10px;">
+      <div id="op-pd-summary" class="op-note" style="margin:0 0 10px;"></div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="op-btn op-btn-push" id="op-pd-apply" onclick="opApplyPravasiDesign()" disabled>✅ Replace design in the app</button>
+        <button type="button" class="op-btn" id="op-pd-undo" onclick="opUndoPravasiDesign()" disabled>↩ Undo last upload</button>
+        <button type="button" class="op-btn" onclick="opPdDownloadCurrent()">⬇ Download current design</button>
+      </div>
+      <p class="op-note" id="op-pd-status" style="margin-top:10px;"></p>
     </div>
   </div>
 
@@ -8731,6 +8833,8 @@ function opOpenSection(name) {
   if (name === 'support-phone') opLoadSupportPhone();
   if (name === 'test-location') opLoadTestLocation();
   if (name === 'home-popup') opLoadHomePopup();
+  if (name === 'pravasi-banner') opLoadPravasiBanner();
+  if (name === 'pravasi-design') opLoadPravasiDesign();
   if (name === 'driver-config') opLoadDriverConfig();
   if (name === 'driver-posters') opLoadDriverPosters();
   if (name === 'driver-sos') opRenderSosList();
@@ -9413,6 +9517,311 @@ function opSaveHomePopup(on) {
   set(ref(db, 'app_config/homePopup'), data)
     .then(() => { status.textContent = on ? 'Saved — popup is ON. Customers see it the next time they open the home screen.' : 'Saved — popup is OFF.'; })
     .catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+
+/* ---- Pravasi banner: /pravasi/banner { on, image, title, line, btn, action, value, bg, color, version, updatedAt } ---- */
+var opPbUploading = false;
+function opPbColor(c, d) { return /^#[0-9a-f]{3,8}$/i.test(String(c || '')) ? c : d; }
+function opPbBannerHtml(b) {
+  const bg = opPbColor(b.bg, '#F2B705'), fg = opPbColor(b.color, '#2B2410');
+  const img = /^https:\/\//i.test(b.image || '') ? String(b.image).replace(/'/g, '%27').replace(/"/g, '%22').replace(/\(/g, '%28').replace(/\)/g, '%29').replace(/\s/g, '%20') : '';
+  const hasText = !!(b.title || b.line || b.btn);
+  const bgCss = 'background-color:' + bg + (img ? ";background-image:url('" + img + "');background-size:cover;background-position:center;" : ';');
+  return '<div style="position:relative;margin:6px 0;border-radius:20px;overflow:hidden;min-height:132px;display:flex;align-items:center;padding:18px;box-sizing:border-box;' + bgCss + 'color:' + fg + ';">'
+    + (img && hasText ? '<div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.55),rgba(0,0,0,0));"></div>' : '')
+    + (hasText ? '<div style="position:relative;z-index:1;max-width:80%;">'
+      + (b.title ? '<p style="margin:0;font-weight:800;font-size:20px;line-height:1.15;white-space:pre-line;">' + escapeHtml(b.title) + '</p>' : '')
+      + (b.line ? '<p style="margin:4px 0 0;font-size:13px;opacity:.92;">' + escapeHtml(b.line) + '</p>' : '')
+      + (b.btn ? '<span style="display:inline-block;margin-top:10px;border-radius:999px;padding:9px 16px;font-weight:700;font-size:13px;background:' + fg + ';color:' + bg + ';">' + escapeHtml(b.btn) + '</span>' : '')
+      + '</div>' : '')
+    + '</div>';
+}
+function opPbRead() {
+  const action = document.getElementById('op-pb-action').value;
+  const value = action === 'search' ? document.getElementById('op-pb-v-search').value.trim()
+    : action === 'shop' ? document.getElementById('op-pb-v-shop').value
+    : action === 'link' ? document.getElementById('op-pb-v-link').value.trim()
+    : action === 'call' ? document.getElementById('op-pb-v-call').value.replace(/[^\d+]/g, '') : '';
+  return {
+    image: document.getElementById('op-pb-image').value.trim(),
+    title: document.getElementById('op-pb-title').value.trim(),
+    line: document.getElementById('op-pb-line').value.trim(),
+    btn: document.getElementById('op-pb-btn').value.trim(),
+    action, value,
+    bg: document.getElementById('op-pb-bg').value,
+    color: document.getElementById('op-pb-color').value
+  };
+}
+function opPbPreview() {
+  const box = document.getElementById('op-pb-preview'); if (!box) return;
+  const b = opPbRead();
+  box.innerHTML = (b.image || b.title || b.line || b.btn) ? opPbBannerHtml(b) : '<p class="op-note">Nothing to preview yet — add a heading or a picture.</p>';
+}
+function opPbActionChanged() {
+  const a = document.getElementById('op-pb-action').value;
+  ['search', 'shop', 'link', 'call'].forEach(k => { document.getElementById('op-pb-row-' + k).style.display = (a === k) ? '' : 'none'; });
+}
+function opPbBuildShops(selectedId) {
+  const sel = document.getElementById('op-pb-v-shop');
+  const shops = opAllPartners.filter(p => p.businessType === 'online_shop').sort((x, y) => {
+    const px = String(x.opCategory || '').toLowerCase() === 'pravasi hampers' ? 0 : 1, py = String(y.opCategory || '').toLowerCase() === 'pravasi hampers' ? 0 : 1;
+    return px - py || String(x.restaurantName || '').localeCompare(String(y.restaurantName || ''));
+  });
+  sel.innerHTML = '<option value="">— pick a shop —</option>' + shops.map(p => '<option value="' + escapeHtml(p._id) + '">' + escapeHtml(p.restaurantName || p._id) + (p.opCategory ? ' (' + escapeHtml(p.opCategory) + ')' : '') + '</option>').join('');
+  if (selectedId) sel.value = selectedId;
+}
+function opPbPickImage(e) {
+  const file = e.target.files && e.target.files[0];
+  const status = document.getElementById('op-pb-status');
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = async () => {
+      opPbUploading = true;
+      status.textContent = 'Uploading picture...';
+      try {
+        const blob = await resizeImageToBlob(img, 1000, 0.8);
+        const url = await uploadPhotoToCloudinary(blob);
+        document.getElementById('op-pb-image').value = url;
+        opPbPreview();
+        status.textContent = 'Picture uploaded. Now press Save.';
+      } catch (err) {
+        status.textContent = 'Could not upload the picture — check your connection and try again.';
+      } finally { opPbUploading = false; }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function opLoadPravasiBanner() {
+  const status = document.getElementById('op-pb-status');
+  status.textContent = 'Loading current banner...';
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'pravasi/banner')).then(snap => {
+    const c = snap.val() || {};
+    document.getElementById('op-pb-image').value = c.image || '';
+    document.getElementById('op-pb-title').value = c.title || '';
+    document.getElementById('op-pb-line').value = c.line || '';
+    document.getElementById('op-pb-btn').value = c.btn || '';
+    document.getElementById('op-pb-action').value = c.action || 'none';
+    document.getElementById('op-pb-v-search').value = c.action === 'search' ? (c.value || '') : '';
+    document.getElementById('op-pb-v-link').value = c.action === 'link' ? (c.value || '') : '';
+    document.getElementById('op-pb-v-call').value = c.action === 'call' ? (c.value || '') : '';
+    opPbBuildShops(c.action === 'shop' ? c.value : '');
+    document.getElementById('op-pb-bg').value = opPbColor(c.bg, '#F2B705');
+    document.getElementById('op-pb-color').value = opPbColor(c.color, '#2B2410');
+    opPbActionChanged();
+    opPbPreview();
+    status.textContent = c.updatedAt ? ('Banner is ' + (c.on ? 'ON' : 'OFF') + ' — last saved ' + c.updatedAt + '.') : 'Not set yet — customers see no banner on Pravasi Hampers.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opSavePravasiBanner(on) {
+  const status = document.getElementById('op-pb-status');
+  if (opPbUploading) { status.textContent = 'Wait — the picture is still uploading.'; return; }
+  const b = opPbRead();
+  if (on && !b.title && !b.image && !b.line) { status.textContent = 'Add a heading or a picture first.'; return; }
+  if (b.image && !/^https:\/\//i.test(b.image)) { status.textContent = 'The picture link must start with https://'; return; }
+  if (b.action === 'shop' && !b.value) { status.textContent = 'Pick which shop the banner should open.'; return; }
+  if (b.action === 'search' && !b.value) { status.textContent = 'Type the word to search for.'; return; }
+  if (b.action === 'link' && !/^https:\/\//i.test(b.value)) { status.textContent = 'The web link must start with https://'; return; }
+  if (b.action === 'call' && b.value.replace(/\D/g, '').length < 6) { status.textContent = 'Enter a valid phone number.'; return; }
+  const data = Object.assign(b, { on: !!on, version: Date.now(), updatedAt: new Date().toLocaleString() });
+  status.textContent = 'Saving...';
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'pravasi/banner'), data)
+    .then(() => { status.textContent = on ? 'Saved — banner is ON. It shows on the Pravasi Hampers screen right away.' : 'Saved — banner is OFF.'; })
+    .catch(err => { status.textContent = 'Error: ' + err.message + (/permission/i.test(err.message) ? ' (Firebase rules must allow writing to "pravasi".)' : ''); });
+}
+
+/* ---- Pravasi design upload: replaces design fields of /pravasi (never shops / banner) ---- */
+var OP_PD_STYLE_KEYS = ['cardCss', 'listCss', 'shopCss', 'css', 'cardHtml', 'shopHtml', 'heroHtml', 'listTopHtml', 'listBottomHtml', 'emptyHtml', 'hide', 'showProducts'];
+var OP_PD_TEXT_KEYS = ['title', 'tagline', 'icon', 'cardImage', 'listGreeting', 'listEyebrow', 'listPlaceholder'];
+var OP_PD_CSS_KEYS = ['cardCss', 'listCss', 'shopCss', 'css'];
+var opPdPending = null;
+function opPdMinify(c) {
+  return String(c).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s*\n\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
+}
+function opPdCheckCss(name, css) {
+  if (css.length > 60000) throw new Error(name + ' is too big (max 60,000 characters).');
+  if (/<\s*\/?\s*style/i.test(css)) throw new Error(name + ' must be plain CSS — remove the <style> tags.');
+  if ((css.match(/\{/g) || []).length !== (css.match(/\}/g) || []).length) throw new Error(name + ' has unbalanced { } — check the file.');
+}
+function opPdParse(fileName, text) {
+  const set = {}, clear = [], ignored = [];
+  if (/\.json$/i.test(fileName)) {
+    let obj; try { obj = JSON.parse(text); } catch (e) { throw new Error('This is not a valid JSON file.'); }
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error('The JSON file must be an object { … }.');
+    Object.keys(obj).forEach(k => {
+      if (OP_PD_STYLE_KEYS.indexOf(k) < 0 && OP_PD_TEXT_KEYS.indexOf(k) < 0) ignored.push(k);
+    });
+    OP_PD_STYLE_KEYS.concat(OP_PD_TEXT_KEYS).forEach(k => {
+      const v = obj[k];
+      const isStyle = OP_PD_STYLE_KEYS.indexOf(k) >= 0;
+      if (v === undefined || v === null || v === '') { if (isStyle) clear.push(k); return; }
+      if (k === 'hide') { if (!Array.isArray(v) || v.some(x => typeof x !== 'string')) throw new Error('"hide" must be a list of words, e.g. ["search"].'); if (v.length) set[k] = v; else clear.push(k); return; }
+      if (k === 'showProducts') { set[k] = (v === true || v === 'true'); return; }
+      if (typeof v !== 'string') throw new Error('"' + k + '" must be text.');
+      if (v.length > 60000) throw new Error('"' + k + '" is too big (max 60,000 characters).');
+      if (OP_PD_CSS_KEYS.indexOf(k) >= 0) opPdCheckCss(k, v);
+      set[k] = v;
+    });
+  } else if (/\.html?$/i.test(fileName)) {
+    const map = { card: 'cardHtml', shop: 'shopHtml', hero: 'heroHtml', top: 'listTopHtml', bottom: 'listBottomHtml', empty: 'emptyHtml' };
+    const parts = text.split(/<!--\s*@(card|shop|hero|top|bottom|empty)\s*-->/);
+    if (parts.length === 1) throw new Error('No sections found — start each part with a marker like <!-- @shop -->.');
+    const found = {};
+    for (let i = 1; i < parts.length; i += 2) {
+      const h = parts[i + 1].replace(/<!--[\s\S]*?-->/g, '').replace(/\s*\n\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
+      if (h) found[map[parts[i]]] = h;
+    }
+    Object.keys(map).forEach(m => {
+      const k = map[m];
+      if (found[k]) {
+        if (found[k].length > 60000) throw new Error(k + ' is too big (max 60,000 characters).');
+        set[k] = found[k];
+      } else clear.push(k);
+    });
+    if (!Object.keys(set).length) throw new Error('The sections in this file are empty.');
+  } else {
+    const parts = text.split(/\/\*\s*@(card|list|shop)\b/);
+    const found = {};
+    if (parts.length === 1) found.css = opPdMinify(text);
+    else {
+      const head = opPdMinify(parts[0]); if (head) found.css = head;
+      for (let i = 1; i < parts.length; i += 2) {
+        const body = parts[i + 1], j = body.indexOf('*/');
+        found[parts[i] + 'Css'] = opPdMinify(j >= 0 ? body.slice(j + 2) : body);
+      }
+    }
+    OP_PD_CSS_KEYS.forEach(k => {
+      if (found[k]) { opPdCheckCss(k, found[k]); set[k] = found[k]; } else clear.push(k);
+    });
+    if (!Object.keys(set).length) throw new Error('No CSS found in this file.');
+  }
+  if (!Object.keys(set).length && !clear.length) throw new Error('Nothing to upload in this file.');
+  return { name: fileName, set, clear, ignored };
+}
+function opPdPickFile(e) {
+  const f = e.target.files && e.target.files[0];
+  const status = document.getElementById('op-pd-status'), box = document.getElementById('op-pd-summary'), btn = document.getElementById('op-pd-apply');
+  opPdPending = null; btn.disabled = true; box.innerHTML = ''; status.textContent = '';
+  if (!f) return;
+  if (f.size > 300000) { status.textContent = 'File is too big (max 300 KB).'; return; }
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      opPdPending = opPdParse(f.name, String(r.result));
+      const s = opPdPending, ks = Object.keys(s.set);
+      box.innerHTML = '<b>' + escapeHtml(s.name) + '</b><br>'
+        + '✅ Will replace: ' + (ks.length ? ks.map(k => escapeHtml(k) + (typeof s.set[k] === 'string' ? ' (' + s.set[k].length + ' chars)' : '')).join(', ') : '—') + '<br>'
+        + '🧹 Will clear (old value removed): ' + (s.clear.length ? s.clear.map(escapeHtml).join(', ') : '—') + '<br>'
+        + (s.ignored.length ? '⏭ Ignored (not design): ' + s.ignored.map(escapeHtml).join(', ') : '');
+      btn.disabled = false;
+      status.textContent = 'Check the list, then press Replace.';
+    } catch (err) { status.textContent = err.message; }
+  };
+  r.onerror = () => { status.textContent = 'Could not read the file.'; };
+  r.readAsText(f);
+}
+function opLoadPravasiDesign() {
+  const status = document.getElementById('op-pd-status');
+  opPdPending = null;
+  document.getElementById('op-pd-file').value = '';
+  document.getElementById('op-pd-summary').innerHTML = '';
+  document.getElementById('op-pd-apply').disabled = true;
+  status.textContent = 'Loading...';
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'pravasi')).then(snap => {
+    const c = snap.val() || {};
+    document.getElementById('op-pd-undo').disabled = !c.designBackup;
+    { const l = c.layout || {}, on = (v, d) => v === undefined || v === null ? d : (v === true || v === 'true');
+      document.getElementById('op-pl-food').checked = l.look === 'food';
+      document.getElementById('op-pl-items').checked = on(l.showItems, true);
+      document.getElementById('op-pl-shops').checked = on(l.showShops, false);
+      document.getElementById('op-pl-mart').checked = on(l.hideMartBanners, true);
+      document.getElementById('op-pl-abroad').checked = on(l.abroadDirect, true); }
+    status.textContent = c.designMeta && c.designMeta.updatedAt
+      ? 'Current design: ' + c.designMeta.name + ' — uploaded ' + c.designMeta.updatedAt + '.'
+      : 'No design file uploaded from here yet.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opApplyPravasiDesign() {
+  const status = document.getElementById('op-pd-status');
+  const s = opPdPending; if (!s) { status.textContent = 'Choose a file first.'; return; }
+  const { db, ref, get, update } = window.fb;
+  status.textContent = 'Replacing...';
+  get(ref(db, 'pravasi')).then(snap => {
+    const cur = snap.val() || {};
+    const keys = Object.keys(s.set).concat(s.clear);
+    const old = {};
+    keys.forEach(k => { if (cur[k] !== undefined) old[k] = cur[k]; });
+    const upd = {};
+    Object.keys(s.set).forEach(k => { upd[k] = s.set[k]; });
+    s.clear.forEach(k => { upd[k] = null; });
+    upd.designBackup = { at: new Date().toLocaleString(), keys, data: old };
+    upd.designMeta = { name: s.name, updatedAt: new Date().toLocaleString() };
+    return update(ref(db, 'pravasi'), upd);
+  }).then(() => {
+    opPdPending = null;
+    document.getElementById('op-pd-file').value = '';
+    document.getElementById('op-pd-apply').disabled = true;
+    document.getElementById('op-pd-undo').disabled = false;
+    document.getElementById('op-pd-summary').innerHTML = '';
+    status.textContent = 'Done — the old design is replaced. Customers see the new Pravasi design now. (Undo is available.)';
+  }).catch(err => { status.textContent = 'Error: ' + err.message + (/permission/i.test(err.message) ? ' (Firebase rules must allow writing to "pravasi".)' : ''); });
+}
+function opPravasiPreset(kind) {
+  const set = (id, v) => { document.getElementById(id).checked = v; };
+  if (kind === 'food') { set('op-pl-food', true); set('op-pl-items', false); set('op-pl-shops', true); set('op-pl-mart', true); }
+  else if (kind === 'mart') { set('op-pl-food', false); set('op-pl-items', false); set('op-pl-shops', true); set('op-pl-mart', false); }
+  else { set('op-pl-food', false); set('op-pl-items', true); set('op-pl-shops', false); set('op-pl-mart', true); }
+  document.getElementById('op-pl-status').textContent = 'Now press Save screen settings.';
+}
+function opSavePravasiLayout() {
+  const st = document.getElementById('op-pl-status');
+  const { db, ref, set } = window.fb;
+  st.textContent = 'Saving...';
+  set(ref(db, 'pravasi/layout'), {
+    look: document.getElementById('op-pl-food').checked ? 'food' : 'mart',
+    showItems: document.getElementById('op-pl-items').checked,
+    showShops: document.getElementById('op-pl-shops').checked,
+    hideMartBanners: document.getElementById('op-pl-mart').checked,
+    abroadDirect: document.getElementById('op-pl-abroad').checked,
+    updatedAt: new Date().toLocaleString()
+  }).then(() => { st.textContent = 'Saved — customers see it now.'; })
+    .catch(err => { st.textContent = 'Error: ' + err.message + (/permission/i.test(err.message) ? ' (Firebase rules must allow writing to "pravasi".)' : ''); });
+}
+function opUndoPravasiDesign() {
+  const status = document.getElementById('op-pd-status');
+  const { db, ref, get, update } = window.fb;
+  status.textContent = 'Restoring...';
+  get(ref(db, 'pravasi')).then(snap => {
+    const b = (snap.val() || {}).designBackup;
+    if (!b) { status.textContent = 'Nothing to undo.'; return; }
+    const upd = {};
+    (b.keys || []).forEach(k => { upd[k] = (b.data && b.data[k] !== undefined) ? b.data[k] : null; });
+    upd.designBackup = null;
+    upd.designMeta = { name: 'restored previous design', updatedAt: new Date().toLocaleString() };
+    return update(ref(db, 'pravasi'), upd).then(() => {
+      document.getElementById('op-pd-undo').disabled = true;
+      status.textContent = 'Restored — the design before the last upload is back.';
+    });
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opPdDownloadCurrent() {
+  const status = document.getElementById('op-pd-status');
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'pravasi')).then(snap => {
+    const c = snap.val() || {}, out = {};
+    OP_PD_TEXT_KEYS.concat(OP_PD_STYLE_KEYS).forEach(k => { if (c[k] !== undefined) out[k] = c[k]; });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }));
+    a.download = 'pravasi-design.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    status.textContent = 'Downloaded the current design.';
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
 /* ---- Driver app settings: /driver_config { supportPhone, incentiveAmount, incentiveText, updatedAt } ---- */
@@ -12363,7 +12772,7 @@ function opSaveCategoryOrder() {
    needed. Kept live via onValue so a fresh category shows up in
    both places immediately, even in an already-open tab.
    ================================================================== */
-const SHOP_CATEGORY_DEFAULT = ['Mobile Shop', 'Sports'];
+const SHOP_CATEGORY_DEFAULT = ['Pravasi Hampers', 'Mobile Shop', 'Sports'];
 let shopCategoryList = SHOP_CATEGORY_DEFAULT.slice();
 
 function listenShopCategories() {
@@ -15524,7 +15933,7 @@ function neshDoubleBackExit() {
 var opPostersCache = [];
 // Shop picker for "tap poster -> open this shop". Uses the shop list the panel already loads (opAllPartners) - no extra database read.
 // ONE picker for "tap poster -> open ...": either a home card or a shop. Card values are stored as 'card:<id>'.
-var OP_POSTER_CARDS = [['food','🍔 Food'],['groceries','🛒 Groceries'],['online-shop','🛍️ NESH Mart'],['taxi','🚕 Taxi'],['bus','🚌 Bus']];
+var OP_POSTER_CARDS = [['food','🍔 Food'],['groceries','🛒 Groceries'],['online-shop','🛍️ NESH Mart'],['taxi','🚕 Taxi'],['bus','🚌 Bus'],['pravasi','🎁 Pravasi Hampers']];
 function opFillShopSelect(sel, selectedId) {
   if (!sel) return;
   var shops = (typeof opAllPartners !== 'undefined' && opAllPartners ? opAllPartners : [])
