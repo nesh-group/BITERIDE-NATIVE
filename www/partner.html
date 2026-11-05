@@ -719,6 +719,22 @@
   /* Cancelled tab turns red when selected */
   #operator-container .op-order-tab[data-tab="cancelled"].active{ background:#dc2626; border-color:#dc2626; color:#fff; }
 </style>
+<style id="pvchat-css">
+#pvchat-fab .pvc-n{ position:absolute; top:-4px; right:-4px; min-width:20px; height:20px; padding:0 5px; border-radius:99px; background:var(--chili); color:#fff; font:700 11px/20px Inter,sans-serif; text-align:center; display:none; }
+#pvchat-fab .pvc-n.show{ display:block; }
+#pvchat-container{ display:none; position:fixed; inset:0; z-index:6000; background:#0B1622; flex-direction:column; }
+#pvchat-container.show{ display:flex; }
+#pvchat-thread{ display:none; flex:1; flex-direction:column; min-height:0; }
+#pvchat-container.in-thread #pvchat-thread{ display:flex; }
+#pvchat-container.in-thread #pvchat-list{ display:none; }
+.pvc-conv{ display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--field-border); border-radius:12px; background:var(--field-bg); color:var(--cloud); cursor:pointer; margin-bottom:8px; font-family:'Inter',sans-serif; }
+.pvc-conv .nm{ font-weight:700; font-size:.92rem; } .pvc-conv .lt{ font-size:.78rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:230px; }
+.pvc-conv .bd{ margin-left:auto; min-width:22px; height:22px; border-radius:99px; background:var(--chili); color:#fff; font:700 12px/22px Inter,sans-serif; text-align:center; padding:0 6px; }
+.pvc-vplay{ border:0; border-radius:999px; padding:8px 14px; background:var(--marigold); color:#fff; font:700 .8rem 'Inter',sans-serif; cursor:pointer; }
+.pvc-ordercard{ align-self:flex-start; max-width:88%; background:#10263d; border:1.5px solid var(--marigold); border-radius:12px; padding:10px 12px; color:var(--cloud); font:500 .82rem/1.4 'Inter',sans-serif; margin-bottom:6px; }
+.pvc-ordercard b{ display:block; font-size:.9rem; margin-bottom:3px; }
+.pvc-ordercard button{ margin-top:8px; width:100%; border:0; border-radius:8px; padding:9px; background:var(--marigold); color:#fff; font:700 .8rem 'Inter',sans-serif; cursor:pointer; }
+</style>
 </head>
 <body>
 
@@ -1760,6 +1776,35 @@
   </div>
 </div>
 
+<!-- PRAVASI SHOP: customer chats (only visible for Pravasi Hampers shops) -->
+<button class="support-fab" id="pvchat-fab" style="right:calc(50% - 210px + 84px); background:#2B2410;" title="Customer chats">
+  <span class="pvc-n" id="pvchat-fab-n">0</span>
+  <span style="font-size:22px;line-height:1;">💬</span>
+</button>
+<div id="pvchat-container">
+  <div class="sup-chat-header">
+    <button class="sup-back-btn" id="pvchat-back" aria-label="Back">←</button>
+    <div>
+      <div class="sup-name" id="pvchat-title">Customer Chats</div>
+      <div class="sup-sub" id="pvchat-sub">Pravasi Hampers</div>
+    </div>
+  </div>
+  <div id="pvchat-list" class="chat-messages"></div>
+  <div id="pvchat-thread">
+    <div id="pvchat-msgs" class="chat-messages"></div>
+    <div class="chat-input-bar" id="pvchat-bar">
+      <textarea id="pvchat-text" rows="1" placeholder="Reply to customer..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();pvcpSend();}"></textarea>
+      <button class="chat-send-btn" id="pvchat-mic-btn" type="button" aria-label="Record voice message" style="background:#fff;color:#000;">🎤</button>
+      <button class="chat-send-btn" onclick="pvcpSend()" aria-label="Send">&#10148;</button>
+    </div>
+    <div class="chat-input-bar" id="pvchat-rec" style="display:none;">
+      <span style="flex:1;font:700 .9rem 'Inter',sans-serif;color:var(--cloud);">🔴 Recording <span id="pvchat-rec-t">0:00</span></span>
+      <button class="chat-send-btn" id="pvchat-rec-cancel" type="button" aria-label="Cancel" style="background:#475569;">✕</button>
+      <button class="chat-send-btn" id="pvchat-rec-send" type="button" aria-label="Send voice message">&#10148;</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== OPERATOR PANEL ===================== -->
 <div id="operator-container">
   <!-- OPERATOR HOME -->
@@ -1997,6 +2042,11 @@
           <div class="op-home-icon">✈️</div>
           <h3>Pravasi Airports</h3>
           <p>Add airports and choose which shops deliver to each airport — customers abroad pick an airport instead of a location</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('pravasi-chats')">
+          <div class="op-home-icon">💬</div>
+          <h3>Pravasi Chats</h3>
+          <p>See which customers chat with each Pravasi shop — delete voice messages or a whole chat</p>
         </div>
         <div class="op-home-card" onclick="opOpenSection('pravasi-design')">
           <div class="op-home-icon">🎨</div>
@@ -3480,6 +3530,25 @@
       <div id="op-pa-editor" style="display:none; margin-top:12px; padding:12px; border:1px solid currentColor; border-radius:10px;"></div>
       <div id="op-pa-list" style="margin-top:12px;"></div>
       <p class="op-note" id="op-pa-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- PRAVASI CHATS — pvchatMeta/{shop}/{customer}, pvchat/{shop}/{customer}/messages, pvchatVoice/{shop}/{customer}/{msgId} -->
+  <div class="op-section" id="op-section-pravasi-chats">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Pravasi Chats</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Customer ↔ shop chats of the Pravasi Hampers shops. Voice messages delete themselves after 7 days — here you can delete them (or a whole chat) sooner.</p>
+      <select id="op-pc-shop" class="hp-f" style="width:100%;padding:10px;margin-bottom:8px;" onchange="opPcLoad()"></select>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <button type="button" class="op-btn" onclick="opPcLoad()">🔄 Reload</button>
+        <button type="button" class="op-btn op-btn-danger" onclick="opPcDeleteShopVoice()">🗑 Delete ALL voice of this shop</button>
+        <button type="button" class="op-btn op-btn-danger" onclick="opPcSweepExpired()">🧹 Delete expired voice (all shops)</button>
+      </div>
+      <div id="op-pc-list" style="margin-top:12px;"></div>
+      <p class="op-note" id="op-pc-status" style="margin-top:10px;"></p>
     </div>
   </div>
 
@@ -5029,6 +5098,7 @@ function logInRestaurant(id, data) {
       listenDailyEarnings();
     });
     listenPartnerSupportMessages();
+    try { pvcpInit(); } catch (e) {}
     registerForOrderPushNotifications();
     checkAndShowAppVideo('shopAppVideo', 'nesh_shop_video_seen');
     // Claim this device as the active session for the shop BEFORE watching
@@ -8720,6 +8790,280 @@ function sendPartnerSupportMessage() {
 }
 
 /* =========================================================
+   PRAVASI SHOP — customer chats
+   pvchatMeta/{shopId}/{customerNumber} = { customerName, customerNumber, lastText, lastTime, lastFrom, unreadShop, unreadCustomer }
+   pvchat/{shopId}/{customerNumber}/messages/{id} = { from:'customer'|'shop', text, time, type?:'order', orderKey, orderNumber, items, total }
+   ========================================================= */
+let pvcpConvs = [], pvcpActive = null, pvcpThreadUnsub = null, pvcpPrevUnread = null;
+async function pvcpInit() {
+  if (!state.restId || state.pvcpFor === state.restId) return;
+  const r = state.restaurant || {};
+  if (r.businessType !== 'online_shop') return;
+  state.pvcpFor = state.restId;
+  const { db, ref, get, onValue } = window.fb;
+  let on = String(r.opCategory || '').trim().toLowerCase() === 'pravasi hampers';
+  try { const e = (await get(ref(db, 'pravasi/shops/' + state.restId))).val(); if (e) on = e.active !== false && e.active !== 'false'; } catch (e) {}
+  if (!on) return;
+  document.getElementById('pvchat-fab').classList.add('show');
+  onValue(ref(db, 'pvchatMeta/' + state.restId), snap => {
+    const list = []; snap.forEach(c => { list.push(Object.assign({ _id: c.key }, c.val())); });
+    list.sort((a, b) => (b.lastTime || 0) - (a.lastTime || 0));
+    pvcpConvs = list;
+    if (!state.pvcpSwept) { state.pvcpSwept = true; setTimeout(() => { try { pvcpSweep(list); } catch (e) {} }, 3000); }
+    const unread = list.reduce((n, c) => n + (Number(c.unreadShop) || 0), 0);
+    const n = document.getElementById('pvchat-fab-n');
+    n.textContent = unread > 99 ? '99+' : unread; n.classList.toggle('show', unread > 0);
+    if (pvcpPrevUnread !== null && unread > pvcpPrevUnread) { const c = list.find(x => (Number(x.unreadShop) || 0) > 0); showToast('💬 New message' + (c ? ' from ' + (c.customerName || 'customer') : '')); }
+    pvcpPrevUnread = unread;
+    if (document.getElementById('pvchat-container').classList.contains('show') && !pvcpActive) pvcpRenderList();
+  });
+}
+function pvcpRenderList() {
+  const box = document.getElementById('pvchat-list');
+  if (!pvcpConvs.length) { box.innerHTML = '<p style="color:#6E8CAE;text-align:center;font-family:\'Inter\',sans-serif;font-size:.85rem;margin-top:20px;">No customer messages yet.</p>'; return; }
+  box.innerHTML = pvcpConvs.map(c => {
+    const u = Number(c.unreadShop) || 0;
+    return '<div class="pvc-conv" data-cn="' + escapeHtml(c._id) + '"><div><div class="nm">' + escapeHtml(c.customerName || c._id) + '</div><div class="lt">' +
+      (c.lastFrom === 'shop' ? 'You: ' : '') + escapeHtml(c.lastText || '') + '</div></div>' + (u ? '<span class="bd">' + u + '</span>' : '') + '</div>';
+  }).join('');
+}
+function pvcpOpen() {
+  const c = document.getElementById('pvchat-container');
+  c.classList.add('show'); c.classList.remove('in-thread'); pvcpActive = null;
+  document.getElementById('pvchat-title').textContent = 'Customer Chats'; document.getElementById('pvchat-sub').textContent = 'Pravasi Hampers';
+  pvcpRenderList();
+}
+function pvcpClose() {
+  if (pvcpThreadUnsub) { pvcpThreadUnsub(); pvcpThreadUnsub = null; }
+  pvcpActive = null;
+  document.getElementById('pvchat-container').classList.remove('show', 'in-thread');
+}
+function pvcpBack() {
+  try { if (PVRP.rec && PVRP.rec.state !== 'inactive') pvrpStop(true); } catch (e) {}
+  if (pvcpActive) { if (pvcpThreadUnsub) { pvcpThreadUnsub(); pvcpThreadUnsub = null; } pvcpOpen(); } else pvcpClose();
+}
+function pvcpOpenThread(cn) {
+  const conv = pvcpConvs.find(c => c._id === cn) || { _id: cn };
+  pvcpActive = cn;
+  document.getElementById('pvchat-container').classList.add('in-thread');
+  document.getElementById('pvchat-title').textContent = conv.customerName || cn;
+  document.getElementById('pvchat-sub').textContent = '+' + String(cn).replace(/^\+/, '');
+  document.getElementById('pvchat-msgs').innerHTML = '';
+  if (pvcpThreadUnsub) pvcpThreadUnsub();
+  const { db, ref, onValue, update } = window.fb;
+  pvcpThreadUnsub = onValue(ref(db, 'pvchat/' + state.restId + '/' + cn + '/messages'), snap => {
+    const list = []; snap.forEach(c => { list.push(Object.assign({ _id: c.key }, c.val())); });
+    list.sort((a, b) => (a.time || 0) - (b.time || 0));
+    pvcpRenderThread(list);
+    update(ref(db, 'pvchatMeta/' + state.restId + '/' + cn), { unreadShop: 0 }).catch(() => {});
+  });
+}
+function pvcpRenderThread(list) {
+  const box = document.getElementById('pvchat-msgs');
+  if (!list.length) { box.innerHTML = '<p style="color:#6E8CAE;text-align:center;font-size:.85rem;margin-top:20px;">No messages yet.</p>'; return; }
+  box.innerHTML = list.map(m => {
+    const t = m.time ? new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    if (m.type === 'order') {
+      const its = (m.items || []).map(i => escapeHtml(i.qty + '× ' + i.name)).join(', ');
+      return '<div class="pvc-ordercard"><b>🧾 New order #' + escapeHtml(String(m.orderNumber || '')) + '</b>' + (its ? its + '<br>' : '') +
+        (m.total ? 'Total ₹' + escapeHtml(String(m.total)) : '') + '<button type="button" data-ord="' + escapeHtml(String(m.orderKey || '')) + '">Open order</button></div>';
+    }
+    if (m.type === 'voice') {
+      const mine2 = m.from === 'shop', gone = m.expired || (m.expiresAt && Date.now() > m.expiresAt), c = pvcpVoiceCache[m._id];
+      return '<div class="chat-bubble-row ' + (mine2 ? 'me' : 'them') + '"><div class="chat-bubble">' + (gone ? '<i style="opacity:.7">🎤 Voice message expired</i>'
+        : c ? '<audio controls src="' + escapeHtml(c) + '" style="width:210px;max-width:100%;height:36px"></audio>'
+        : '<button type="button" class="pvc-vplay" data-vid="' + escapeHtml(m._id) + '">▶ Play voice message</button>') +
+        '<span class="chat-time">' + (m.dur ? Math.floor(m.dur / 60) + ':' + String(m.dur % 60).padStart(2, '0') + ' · ' : '') + t + '</span></div></div>';
+    }
+    const mine = m.from === 'shop';
+    return '<div class="chat-bubble-row ' + (mine ? 'me' : 'them') + '"><div class="chat-bubble">' + escapeHtml(m.text || '') + '<span class="chat-time">' + t + '</span></div></div>';
+  }).join('');
+  box.scrollTop = box.scrollHeight;
+  try { pvcpCleanup(list, pvcpActive); } catch (e) {}
+}
+function pvcpSend() {
+  const ta = document.getElementById('pvchat-text'), text = ta.value.trim();
+  if (!text || !pvcpActive || !state.restId) return;
+  const { db, ref, push, set, update, runTransaction } = window.fb;
+  const time = Date.now(), cn = pvcpActive;
+  set(push(ref(db, 'pvchat/' + state.restId + '/' + cn + '/messages')), { from: 'shop', text, time }).catch(() => showToast("Couldn't send — check connection"));
+  update(ref(db, 'pvchatMeta/' + state.restId + '/' + cn), { lastText: text, lastTime: time, lastFrom: 'shop' }).catch(() => {});
+  runTransaction(ref(db, 'pvchatMeta/' + state.restId + '/' + cn + '/unreadCustomer'), v => (Number(v) || 0) + 1).catch(() => {});
+  ta.value = '';
+}
+// ---- Voice messages (shop side, max 60 s): tap 🎤 to record, ➤ to send. Saved in the database, deleted after 7 days. ----
+const pvVoiceIdb = {   // device cache: a voice is downloaded only ONCE, after that it plays from the phone
+  open() { return this._p || (this._p = new Promise((res, rej) => { try { const r = indexedDB.open('nesh_pv_voice', 1); r.onupgradeneeded = () => r.result.createObjectStore('v'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); } })); },
+  async get(k) { try { const db = await this.open(); return await new Promise(res => { const q = db.transaction('v').objectStore('v').get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); } catch (e) { return null; } },
+  async put(k, v) { try { const db = await this.open(); db.transaction('v', 'readwrite').objectStore('v').put(v, k); } catch (e) {} },
+  async del(k) { try { const db = await this.open(); db.transaction('v', 'readwrite').objectStore('v').delete(k); } catch (e) {} }
+};
+const PVC_MAX_SEC = 60, PVC_VOICE_DAYS = 7;
+const PVRP = { rec: null, chunks: [], stream: null, t0: 0, timer: null, cancel: false, busy: false };
+const pvcpVoiceCache = {}, pvcpCleaned = {};
+function pvrpMime() { const c = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus']; for (const m of c) { try { if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; } catch (e) {} } return ''; }
+function pvrpUi(on) {
+  document.getElementById('pvchat-bar').style.display = on ? 'none' : '';
+  document.getElementById('pvchat-rec').style.display = on ? 'flex' : 'none';
+  clearInterval(PVRP.timer);
+  if (on) {
+    const t = document.getElementById('pvchat-rec-t'); t.textContent = '0:00 / 1:00';
+    PVRP.timer = setInterval(() => {
+      const s = Math.floor((Date.now() - PVRP.t0) / 1000);
+      t.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' / 1:00';
+      if (s >= PVC_MAX_SEC) pvrpStop(false);
+    }, 300);
+  }
+}
+async function pvrpStart() {
+  if (!pvcpActive || PVRP.busy) return;
+  if (!navigator.mediaDevices || !window.MediaRecorder) { showToast('Voice recording is not supported on this device'); return; }
+  try { PVRP.stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { showToast('Please allow microphone access'); return; }
+  const mime = pvrpMime(); PVRP.chunks = []; PVRP.cancel = false;
+  PVRP.rec = new MediaRecorder(PVRP.stream, Object.assign(mime ? { mimeType: mime } : {}, { audioBitsPerSecond: 24000 }));
+  PVRP.rec.ondataavailable = e => { if (e.data && e.data.size) PVRP.chunks.push(e.data); };
+  PVRP.rec.onstop = pvrpDone;
+  PVRP.rec.start(); PVRP.t0 = Date.now(); pvrpUi(true);
+}
+function pvrpStop(cancel) { PVRP.cancel = !!cancel; if (PVRP.rec && PVRP.rec.state !== 'inactive') PVRP.rec.stop(); }
+async function pvrpDone() {
+  const dur = Math.min(PVC_MAX_SEC, Math.round((Date.now() - PVRP.t0) / 1000)), type = (PVRP.rec && PVRP.rec.mimeType) || 'audio/webm', cn = pvcpActive;
+  try { PVRP.stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+  pvrpUi(false);
+  if (PVRP.cancel || !PVRP.chunks.length || dur < 1 || !cn) return;
+  PVRP.busy = true;
+  try {
+    const data = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(new Blob(PVRP.chunks, { type })); });
+    if (data.length > 600000) throw new Error('too big');
+    const { db, ref, push, set, update, runTransaction } = window.fb, time = Date.now();
+    const mref = push(ref(db, 'pvchat/' + state.restId + '/' + cn + '/messages'));
+    await set(ref(db, 'pvchatVoice/' + state.restId + '/' + cn + '/' + mref.key), { data });
+    await set(mref, { from: 'shop', type: 'voice', text: '🎤 Voice message', dur, time, expiresAt: time + PVC_VOICE_DAYS * 864e5 });
+    pvcpVoiceCache[mref.key] = data; pvVoiceIdb.put(mref.key, data);   // sender never downloads their own voice
+    update(ref(db, 'pvchatMeta/' + state.restId + '/' + cn), { lastText: '🎤 Voice message', lastTime: time, lastFrom: 'shop' }).catch(() => {});
+    runTransaction(ref(db, 'pvchatMeta/' + state.restId + '/' + cn + '/unreadCustomer'), v => (Number(v) || 0) + 1).catch(() => {});
+  } catch (e) { showToast("Couldn't send voice — check connection"); }
+  PVRP.busy = false;
+}
+async function pvcpPlayVoice(btn) {
+  const vid = btn.dataset.vid; btn.disabled = true; btn.textContent = 'Loading…';
+  try {
+    let d = pvcpVoiceCache[vid] || await pvVoiceIdb.get(vid);   // memory -> phone cache -> (only then) download
+    if (!d) { const { db, ref, get } = window.fb; const v = (await get(ref(db, 'pvchatVoice/' + state.restId + '/' + pvcpActive + '/' + vid))).val(); d = v && v.data; if (!d) throw new Error('gone'); pvVoiceIdb.put(vid, d); }
+    pvcpVoiceCache[vid] = d;
+    const a = document.createElement('audio'); a.controls = true; a.src = d; a.style.cssText = 'width:210px;max-width:100%;height:36px';
+    btn.replaceWith(a); a.play().catch(() => {});
+  } catch (e) { btn.disabled = false; btn.textContent = '▶ Play voice message'; showToast("Couldn't load voice — it may have been deleted"); }
+}
+function pvcpCleanup(list, cn) {   // expired (7 days) or deleted by the operator: drop the phone copy; expired ones are also removed from the database
+  const { db, ref, update, remove } = window.fb;
+  list.forEach(m => {
+    if (m.type !== 'voice') return;
+    const past = m.expiresAt && Date.now() >= m.expiresAt;
+    if ((!m.expired && !past) || pvcpCleaned[m._id]) return;
+    pvcpCleaned[m._id] = 1;
+    delete pvcpVoiceCache[m._id]; pvVoiceIdb.del(m._id);
+    if (!m.expired) {
+      remove(ref(db, 'pvchatVoice/' + state.restId + '/' + cn + '/' + m._id)).catch(() => {});
+      update(ref(db, 'pvchat/' + state.restId + '/' + cn + '/messages/' + m._id), { expired: true }).catch(() => {});
+    }
+  });
+}
+async function pvcpSweep(convs) {   // once per session: clear expired voice in the shop's 50 latest chats (messages only hold small notes, no audio)
+  const { db, ref, get } = window.fb;
+  for (const c of convs.slice(0, 50)) {
+    try { const list = []; (await get(ref(db, 'pvchat/' + state.restId + '/' + c._id + '/messages'))).forEach(x => { list.push(Object.assign({ _id: x.key }, x.val())); }); pvcpCleanup(list, c._id); } catch (e) {}
+  }
+}
+document.getElementById('pvchat-mic-btn').addEventListener('click', pvrpStart);
+document.getElementById('pvchat-rec-cancel').addEventListener('click', () => pvrpStop(true));
+document.getElementById('pvchat-rec-send').addEventListener('click', () => pvrpStop(false));
+document.getElementById('pvchat-msgs').addEventListener('click', e => { const b = e.target.closest && e.target.closest('.pvc-vplay'); if (b) pvcpPlayVoice(b); });
+
+document.getElementById('pvchat-fab').addEventListener('click', pvcpOpen);
+document.getElementById('pvchat-back').addEventListener('click', pvcpBack);
+document.getElementById('pvchat-list').addEventListener('click', e => { const el = e.target.closest && e.target.closest('[data-cn]'); if (el) pvcpOpenThread(el.getAttribute('data-cn')); });
+document.getElementById('pvchat-msgs').addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-ord]'); if (!b) return;
+  const id = b.getAttribute('data-ord'); pvcpClose();
+  if ((state.homeOrdersCache || []).some(x => x._id === id)) openOrderDetail(id);
+  else { showToast('Opening your orders…'); showScreen('home'); }
+});
+
+/* ---- Pravasi Chats (operator): delete voice / whole chats ---- */
+function opPcStatus(t) { const e = document.getElementById('op-pc-status'); if (e) e.textContent = t || ''; }
+function opPcShops() { return (opAllPartners || []).filter(p => p.businessType === 'online_shop' && String(p.opCategory || '').trim().toLowerCase() === 'pravasi hampers').sort((a, b) => (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id)); }
+function opPcInit() {
+  const sel = document.getElementById('op-pc-shop'), shops = opPcShops(), keep = sel.value;
+  sel.innerHTML = shops.length ? shops.map(p => '<option value="' + escapeHtml(p._id) + '">' + escapeHtml(p.restaurantName || p._id) + '</option>').join('') : '<option value="">No Pravasi Hampers shops found</option>';
+  if (keep && shops.some(p => p._id === keep)) sel.value = keep;
+  opPcLoad();
+}
+async function opPcLoad() {
+  const rid = document.getElementById('op-pc-shop').value, box = document.getElementById('op-pc-list');
+  if (!rid) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="op-empty">Loading…</div>';
+  try {
+    const { db, ref, get } = window.fb;
+    const list = []; (await get(ref(db, 'pvchatMeta/' + rid))).forEach(c => { list.push(Object.assign({ _id: c.key }, c.val())); });
+    list.sort((a, b) => (b.lastTime || 0) - (a.lastTime || 0));
+    if (!list.length) { box.innerHTML = '<div class="op-empty">No chats for this shop yet.</div>'; return; }
+    box.innerHTML = list.map(c => '<div style="border:1px solid currentColor;border-radius:10px;padding:10px;margin-bottom:8px;">' +
+      '<b>' + escapeHtml(c.customerName || c._id) + '</b> <span style="opacity:.7">+' + escapeHtml(String(c._id).replace(/^\+/, '')) + '</span><br>' +
+      '<span style="opacity:.8;font-size:.85em;">' + escapeHtml(c.lastText || '') + (c.lastTime ? ' · ' + new Date(c.lastTime).toLocaleString() : '') + '</span>' +
+      '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">' +
+      '<button type="button" class="op-btn op-btn-danger" style="padding:6px 10px;margin:0;" onclick="opPcDeleteVoice(\'' + escapeHtml(rid) + '\',\'' + escapeHtml(c._id) + '\')">🗑 Voice messages</button>' +
+      '<button type="button" class="op-btn op-btn-danger" style="padding:6px 10px;margin:0;" onclick="opPcDeleteChat(\'' + escapeHtml(rid) + '\',\'' + escapeHtml(c._id) + '\')">🗑 Whole chat</button></div></div>').join('');
+  } catch (e) { box.innerHTML = '<div class="op-empty">Error: ' + escapeHtml(e.message) + (/permission/i.test(e.message) ? ' (Firebase rules must allow pvchatMeta.)' : '') + '</div>'; }
+}
+// marks every voice message of one chat as expired + removes its audio; returns how many
+async function opPcCollectVoice(rid, cn, onlyExpired, up) {
+  const { db, ref, get } = window.fb; let n = 0;
+  (await get(ref(db, 'pvchat/' + rid + '/' + cn + '/messages'))).forEach(c => {
+    const m = c.val(); if (!m || m.type !== 'voice') return;
+    if (onlyExpired && (m.expired || !m.expiresAt || Date.now() < m.expiresAt)) return;
+    up['pvchat/' + rid + '/' + cn + '/messages/' + c.key + '/expired'] = true;
+    up['pvchatVoice/' + rid + '/' + cn + '/' + c.key] = null; n++;
+  });
+  return n;
+}
+async function opPcApply(up) {
+  const { db, ref, update } = window.fb, keys = Object.keys(up);
+  for (let i = 0; i < keys.length; i += 400) { const part = {}; keys.slice(i, i + 400).forEach(k => { part[k] = up[k]; }); await update(ref(db), part); }
+}
+async function opPcDeleteVoice(rid, cn) {
+  if (!confirm('Delete all voice messages of this chat? Customers will see "Voice message expired". This cannot be undone.')) return;
+  try { const up = {}, n = await opPcCollectVoice(rid, cn, false, up); await opPcApply(up); await window.fb.remove(window.fb.ref(window.fb.db, 'pvchatVoice/' + rid + '/' + cn)); opPcStatus('Deleted ' + n + ' voice message(s).'); }
+  catch (e) { opPcStatus('Error: ' + e.message); }
+}
+async function opPcDeleteChat(rid, cn) {
+  if (!confirm('Delete this WHOLE chat (all messages and voice)? This cannot be undone.')) return;
+  try { const { db, ref, remove } = window.fb; await remove(ref(db, 'pvchat/' + rid + '/' + cn)); await remove(ref(db, 'pvchatVoice/' + rid + '/' + cn)); await remove(ref(db, 'pvchatMeta/' + rid + '/' + cn)); opPcStatus('Chat deleted.'); opPcLoad(); }
+  catch (e) { opPcStatus('Error: ' + e.message); }
+}
+async function opPcDeleteShopVoice() {
+  const rid = document.getElementById('op-pc-shop').value; if (!rid) return;
+  if (!confirm('Delete ALL voice messages of this shop (every customer)? This cannot be undone.')) return;
+  try {
+    const { db, ref, get, remove } = window.fb, up = {}; let n = 0;
+    const cns = []; (await get(ref(db, 'pvchatMeta/' + rid))).forEach(c => { cns.push(c.key); });
+    for (const cn of cns) n += await opPcCollectVoice(rid, cn, false, up);
+    await opPcApply(up); await remove(ref(db, 'pvchatVoice/' + rid)); opPcStatus('Deleted ' + n + ' voice message(s).');
+  } catch (e) { opPcStatus('Error: ' + e.message); }
+}
+async function opPcSweepExpired() {
+  if (!confirm('Delete every voice message older than 7 days, for all Pravasi shops?')) return;
+  opPcStatus('Working…');
+  try {
+    const { db, ref, get } = window.fb, up = {}; let n = 0;
+    const metas = (await get(ref(db, 'pvchatMeta'))).val() || {};
+    for (const rid of Object.keys(metas)) for (const cn of Object.keys(metas[rid] || {})) n += await opPcCollectVoice(rid, cn, true, up);
+    await opPcApply(up); opPcStatus('Deleted ' + n + ' expired voice message(s).');
+  } catch (e) { opPcStatus('Error: ' + e.message); }
+}
+
+/* =========================================================
    OPERATOR PANEL
    ========================================================= */
 let opCurrentPartnerId = null;
@@ -8894,6 +9238,7 @@ function opOpenSection(name) {
   if (name === 'shop-order') opBuildShopOrderWorking();
   if (name === 'delete-all') opOpenDeleteAllSection();
   if (name === 'support') opRenderChatConvList();
+  if (name === 'pravasi-chats') opPcInit();
   if (name === 'pricing') opLoadExtraAmount();
   if (name === 'online-upi') opLoadOnlineUpi();
   if (name === 'nesh-suggest') { const si = document.getElementById('op-nesh-suggest-search'); if (si) si.value = ''; document.getElementById('op-nesh-suggest-status').textContent = ''; opBuildNeshSuggest(); }
@@ -16106,6 +16451,7 @@ function neshHandleBack() {
     return 'stay';
   }
   if (neshIsShown('reason-modal-overlay')) { closeReasonModal(); return 'stay'; }
+  if (neshIsShown('pvchat-container')) { pvcpBack(); return 'stay'; }
   if (neshIsShown('support-chat-container')) {
     const b = document.getElementById('support-chat-back');
     if (b) b.click(); else document.getElementById('support-chat-container').classList.remove('show');
