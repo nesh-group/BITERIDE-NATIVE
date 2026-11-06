@@ -3518,7 +3518,7 @@
     </div>
   </div>
 
-  <!-- PRAVASI AIRPORTS — stored at pravasi/airports/{id} = { name, code, lat, lng, active, shopIds:{shopId:true}, updatedAt } -->
+  <!-- PRAVASI AIRPORTS — stored at pravasi/airports/{id} = { name, code, lat, lng, active, shopIds:{shopId:true}, points:{pointId:{name,lat,lng}}, updatedAt } -->
   <div class="op-section" id="op-section-pravasi-airports">
     <div class="op-section-header">
       <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
@@ -7350,6 +7350,7 @@ function buildOrderShareText(o) {
   lines.push(`👤 ${o.customerName || 'Guest'}${o.customerPhone ? ' — ' + o.customerPhone : ''}`);
   if (o.customerPhoneAbroad) lines.push(`🌍 Abroad number: ${o.customerPhoneAbroad}`);
   if (o.airportName) lines.push(`✈️ Airport: ${o.airportName}${o.airportCode ? ' (' + o.airportCode + ')' : ''}`);
+  if (o.deliveryPointName) lines.push(`📌 Meeting point: ${o.deliveryPointName}`);
   const addr = [o.customerAddress, o.customerLocation].filter(Boolean).join(', ');
   if (addr) lines.push(`📍 ${addr}`);
   if (o.customerLandmark) lines.push(`🏷️ Landmark: ${o.customerLandmark}`);
@@ -7405,7 +7406,7 @@ function renderOrderDetail(o) {
 
   const phoneLink = document.getElementById('od-cust-phone');
   if (o.customerPhone) {
-    phoneLink.textContent = o.customerPhone + (o.customerPhoneAbroad ? '  ·  🌍 ' + o.customerPhoneAbroad : '') + (o.airportName ? '  ·  ✈️ ' + o.airportName : '');
+    phoneLink.textContent = o.customerPhone + (o.customerPhoneAbroad ? '  ·  🌍 ' + o.customerPhoneAbroad : '') + (o.airportName ? '  ·  ✈️ ' + o.airportName : '') + (o.deliveryPointName ? '  ·  📌 ' + o.deliveryPointName : '');
     phoneLink.href = "tel:" + o.customerPhone;
   } else {
     phoneLink.textContent = '—';
@@ -10272,7 +10273,28 @@ function opApSave(on) {
     .catch(err => { status.textContent = 'Error: ' + err.message + (/permission/i.test(err.message) ? ' (Firebase rules must allow writing to "pravasi".)' : ''); });
 }
 /* ---- Pravasi airports: /pravasi/airports/{id} { name, code, lat, lng, active, shopIds:{shopId:true}, updatedAt } ---- */
-let opPaData = {}, opPaEditId = null, opPaSel = {}, opPaSearch = '';
+let opPaData = {}, opPaEditId = null, opPaSel = {}, opPaSearch = '', opPaPts = [];
+/* Delivery points = the exact spots in the airport where the delivery boy meets the customer. Customer picks one in "Your travel details". */
+function opPaPtsInit(a) {
+  const pts = (a && a.points) || {};
+  opPaPts = Object.keys(pts).map(id => ({ id, name: pts[id].name || '', ll: (typeof pts[id].lat === 'number' && typeof pts[id].lng === 'number') ? pts[id].lat + ', ' + pts[id].lng : '' }))
+    .sort((x, y) => String(x.name).localeCompare(String(y.name)));
+}
+function opPaRenderPts() {
+  const box = document.getElementById('op-pa-pts'); if (!box) return;
+  box.innerHTML = opPaPts.length ? opPaPts.map((pt, i) =>
+    '<div style="display:flex; gap:6px; align-items:flex-start; margin-top:8px; padding:8px; border:1px dashed currentColor; border-radius:8px;"><div style="flex:1; min-width:0;">' +
+    '<input class="hp-f" style="width:100%;padding:10px;box-sizing:border-box;" maxlength="60" placeholder="Point name (e.g. Arrival Gate 2)" value="' + escapeHtml(pt.name) + '" oninput="opPaPts[' + i + '].name=this.value">' +
+    '<input class="hp-f" style="width:100%;padding:10px;margin-top:6px;box-sizing:border-box;" placeholder="latitude, longitude (e.g. 10.1520, 76.4019)" value="' + escapeHtml(pt.ll) + '" oninput="opPaPts[' + i + '].ll=this.value"></div>' +
+    '<button type="button" class="op-btn op-btn-danger" onclick="opPaPtDel(' + i + ')" aria-label="Remove point">✕</button></div>').join('')
+    : '<p class="op-note" style="margin:6px 0 0;">No delivery points yet. Customers will be met at the airport spot above.</p>';
+}
+function opPaPtAdd() {
+  if (opPaPts.length >= 20) { opPaSetStatus('Maximum 20 delivery points per airport.'); return; }
+  opPaPts.push({ id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: '', ll: '' });
+  opPaRenderPts();
+}
+function opPaPtDel(i) { opPaPts.splice(i, 1); opPaRenderPts(); }
 function opPaSetStatus(t) { const e = document.getElementById('op-pa-status'); if (e) e.textContent = t || ''; }
 function opPaLoad() {
   opPaSetStatus('Loading airports...');
@@ -10292,7 +10314,7 @@ function opPaRenderList() {
     const on = a.active !== false && a.active !== 'false';
     return '<div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">' +
       '<div><div class="op-partner-name">✈️ ' + escapeHtml(a.name || id) + (a.code ? ' (' + escapeHtml(a.code) + ')' : '') + '</div>' +
-      '<div class="op-partner-sub">' + n + ' shop' + (n === 1 ? '' : 's') + ' · ' + (on ? 'Shown to customers' : 'Hidden') + '</div></div>' +
+      '<div class="op-partner-sub">' + n + ' shop' + (n === 1 ? '' : 's') + ' · ' + Object.keys(a.points || {}).length + ' delivery point' + (Object.keys(a.points || {}).length === 1 ? '' : 's') + ' · ' + (on ? 'Shown to customers' : 'Hidden') + '</div></div>' +
       '<div style="display:flex; gap:6px;"><button type="button" class="op-btn" onclick="opPaEdit(\'' + id + '\')">Edit</button>' +
       '<button type="button" class="op-btn op-btn-danger" onclick="opPaDelete(\'' + id + '\')">Delete</button></div></div>';
   }).join('');
@@ -10301,6 +10323,7 @@ function opPaEdit(id) {
   opPaEditId = id || '';
   const a = (id && opPaData[id]) || {};
   opPaSel = Object.assign({}, a.shopIds || {});
+  opPaPtsInit(a);
   opPaSearch = '';
   const ed = document.getElementById('op-pa-editor');
   ed.style.display = 'block';
@@ -10310,12 +10333,17 @@ function opPaEdit(id) {
     '<input id="op-pa-code" class="hp-f" style="width:100%;padding:10px;margin:8px 0 0;box-sizing:border-box;text-transform:uppercase;" maxlength="4" placeholder="Code (e.g. COK)" value="' + escapeHtml(a.code || '') + '">' +
     '<input id="op-pa-latlng" class="hp-f" style="width:100%;padding:10px;margin:8px 0 0;box-sizing:border-box;" placeholder="Delivery point (required): latitude, longitude (e.g. 10.1520, 76.4019)" value="' + (typeof a.lat === 'number' ? a.lat + ', ' + a.lng : '') + '">' +
     '<p class="op-note" style="margin:4px 0 0;">Tip: long-press the airport pickup spot in Google Maps and copy the two numbers. Used for the delivery charge and the rider.</p>' +
+    '<b style="display:block;margin-top:14px;">Delivery points (where the delivery boy meets the customer)</b>' +
+    '<p class="op-note" style="margin:4px 0 0;">Add as many as you need (max 20). The customer picks one in “Your travel details”, and the order is delivered there. Leave empty to use only the airport spot above.</p>' +
+    '<div id="op-pa-pts"></div>' +
+    '<button type="button" class="op-btn" style="margin-top:8px;" onclick="opPaPtAdd()">➕ Add delivery point</button>' +
     '<label style="display:block;margin:10px 0;"><input type="checkbox" id="op-pa-active" ' + (a.active === false || a.active === 'false' ? '' : 'checked') + '> Show this airport to customers</label>' +
     '<b>Shops that deliver to this airport</b>' +
     '<input id="op-pa-search" class="hp-f" style="width:100%;padding:10px;margin:8px 0;box-sizing:border-box;" placeholder="Search shops" oninput="opPaSearch=this.value;opPaRenderShops()">' +
     '<div id="op-pa-shops" style="max-height:320px;overflow:auto;"></div>' +
     '<div style="display:flex; gap:8px; margin-top:10px;"><button type="button" class="op-btn op-btn-push" onclick="opPaSave()">💾 Save airport</button>' +
     '<button type="button" class="op-btn" onclick="opPaCancel()">Cancel</button></div>';
+  opPaRenderPts();
   opPaRenderShops();
   ed.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -10347,6 +10375,16 @@ function opPaSave() {
     if (!m) { opPaSetStatus('Delivery point must look like: 10.1520, 76.4019'); return; }
     data.lat = Number(m[1]); data.lng = Number(m[2]);
   }
+  const points = {};
+  for (let i = 0; i < opPaPts.length; i++) {
+    const pt = opPaPts[i], pn = String(pt.name || '').trim(), pl = String(pt.ll || '').trim();
+    if (!pn && !pl) continue;   // ignore empty rows
+    if (!pn) { opPaSetStatus('Delivery point ' + (i + 1) + ': please enter a name.'); return; }
+    const pm = pl.match(/(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)/);
+    if (!pm) { opPaSetStatus('Delivery point “' + pn + '”: location must look like 10.1520, 76.4019'); return; }
+    points[pt.id] = { name: pn, lat: Number(pm[1]), lng: Number(pm[2]) };
+  }
+  if (Object.keys(points).length) data.points = points;
   const { db, ref, set } = window.fb;
   const id = opPaEditId || ('ap_' + (code || 'x').toLowerCase() + '_' + Date.now().toString(36));
   opPaSetStatus('Saving...');
