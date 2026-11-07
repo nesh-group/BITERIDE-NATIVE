@@ -1896,6 +1896,11 @@
           <h3>Online Payment UPI</h3>
           <p>One UPI ID for every shop's online payment (shops' own UPI is switched off)</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('item-share')">
+          <div class="op-home-icon">📤</div>
+          <h3>Item Share Button</h3>
+          <p>Show or hide the Share button on the product page in the customer app</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('pricing')">
           <div class="op-home-icon">💰</div>
           <h3>Extra Amount</h3>
@@ -2587,6 +2592,19 @@
     </div>
   </div>
 
+  <!-- ITEM SHARE BUTTON ON/OFF -->
+  <div class="op-section" id="op-section-item-share">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Item Share Button</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Turn this OFF to hide the Share button on the product page in the customer app. Turn it ON to show it again. It is ON by default.</p>
+      <div class="op-mc-row" style="margin-bottom:10px;"><b>Share button in customer app:</b> <span id="op-item-share-status">—</span></div>
+      <button type="button" class="op-btn" id="op-item-share-toggle-btn" onclick="opToggleItemShare()" style="margin-bottom:14px;"></button>
+    </div>
+  </div>
+
   <!-- EXTRA AMOUNT (PAISA) -->
   <div class="op-section" id="op-section-pricing">
     <div class="op-section-header">
@@ -2847,6 +2865,10 @@
     </div>
     <div class="op-section-body">
       <div style="margin-bottom:12px;"><button type="button" class="op-btn op-btn-push" onclick="opOpenAddShop()">➕ Add shop</button></div>
+      <div style="margin-bottom:12px;">
+        <button type="button" class="op-btn op-btn-danger" onclick="opShopPhotoCleanup()">🗑 Delete old shop/item photos <span id="op-shopphoto-count"></span></button>
+        <p class="op-note" id="op-shopphoto-status" style="margin-top:4px;"></p>
+      </div>
       <div class="op-search-box"><input type="text" id="op-partners-search" placeholder="Search restaurants..." oninput="opRenderPartnersList()"></div>
       <div class="op-search-box"><select id="op-partners-area-filter" onchange="opRenderPartnersList()" style="width:100%; padding:9px 10px; background:#f4faf5; color:#15803d; border:1px solid #cfe6d5; font-size:.85rem; font-family:inherit;"><option value="">All areas</option></select></div>
       <div id="op-partners-list"></div>
@@ -5706,6 +5728,40 @@ async function uploadPhotoToCloudinary(blob) {
   return data.secure_url;
 }
 
+// ---------- PHOTO CACHE HELPERS (see NESH photo cache guide) ----------
+// Is this exact Cloudinary URL still used by any shop/item? (checked AFTER the new URL is saved)
+async function nshPhotoStillUsed(url) {
+  try {
+    const fb = window.fb;
+    const snap = await fb.get(fb.ref(fb.db, 'restaurants'));
+    const txt = JSON.stringify(snap.val() || {});
+    return txt.indexOf(url) > -1;
+  } catch (e) { return true; } // if unsure, never delete
+}
+// Old Cloudinary photo -> deleted through the poster-delete worker (only when nobody else uses it).
+async function nshPhotoChanged(oldUrl, newUrl) {
+  try {
+    if (!oldUrl || oldUrl === newUrl) return;
+    if (typeof oldUrl !== 'string' || oldUrl.indexOf('res.cloudinary.com') < 0) return;
+    if (!window.POSTER_DELETE_ENDPOINT || !window.fb) return;
+    if (await nshPhotoStillUsed(oldUrl)) return; // share check
+    const fb = window.fb;
+    const nref = fb.push(fb.ref(fb.db, 'notif_images'));
+    await fb.set(nref, { img: oldUrl, ts: Date.now(), expiresAt: Date.now() - 1000, src: 'shop' });
+    const r = await fetch(window.POSTER_DELETE_ENDPOINT, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'notif', id: nref.key }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.ok) await fb.remove(nref); // failed -> stays, opCleanupNotifImages retries
+  } catch (e) {}
+}
+// Non-Cloudinary (e.g. Google) link: add ?v=<time> so phones/app load the new photo.
+function nshBustUrl(u) {
+  if (!/^https?:/i.test(u) || u.indexOf('res.cloudinary.com') > -1) return u;
+  u = u.replace(/([?&])v=\d+&?/, '$1').replace(/[?&]$/, '');
+  return u + (u.indexOf('?') > -1 ? '&' : '?') + 'v=' + Date.now();
+}
+
 // ---------- RESTAURANT PHOTO ----------
 function renderRestPhoto(photoUrl) {
   const preview = document.getElementById('rest-photo-preview');
@@ -5736,8 +5792,10 @@ function handleRestPhotoSelect(e) {
         const blob = await resizeImageToBlob(img, 800, 0.7);
         const url = await uploadPhotoToCloudinary(blob);
         const { db, ref, update } = window.fb;
+        const oldPhoto = state.restaurant.photo;
         await update(ref(db, 'restaurants/' + state.restId), { photo: url });
         state.restaurant.photo = url;
+        nshPhotoChanged(oldPhoto, url);
         renderRestPhoto(url);
         showToast("Restaurant photo updated");
       } catch (err) {
@@ -6673,6 +6731,7 @@ function openItemForm(item) {
   if (!item && isGroceriesShop()) return;
   state.editingItemId = item ? item.id : null;
   state.photoDataUrl = item ? (item.photo || "") : "";
+  state.oldItemPhoto = item ? (item.photo || "") : "";
   document.getElementById('item-form-eyebrow').textContent = item ? "EDIT ITEM" : "NEW ITEM";
   document.getElementById('item-form-title').textContent = item ? "Edit menu item" : "Add menu item";
   document.getElementById('item-name').value = item ? item.name : "";
@@ -6882,6 +6941,7 @@ async function saveItem() {
     } else {
       await set(push(ref(db, 'restaurants/' + state.restId + '/menu')), data);
     }
+    if (state.editingItemId && state.oldItemPhoto) nshPhotoChanged(state.oldItemPhoto, state.photoDataUrl || '');
     showToast(state.editingItemId ? "Item updated" : "Item added to your menu");
     showScreen('home');
   } catch (e) {
@@ -9194,6 +9254,7 @@ function opEnterPanel() {
   opListenRides();
   opListenBuses();
   opListenBusFeatureToggle();
+  opListenItemShareToggle();
   opListenCategoryOrder();
   opListenShopOrder();
   opListenNeshItemOrder();
@@ -14174,6 +14235,24 @@ function opListenBusFeatureToggle() {
     }
   });
 }
+let opItemShareEnabled = true;
+function opListenItemShareToggle() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'app_config/itemShareEnabled'), snap => {
+    opItemShareEnabled = snap.val() !== false;
+    const statusEl = document.getElementById('op-item-share-status');
+    const btn = document.getElementById('op-item-share-toggle-btn');
+    if (statusEl) statusEl.textContent = opItemShareEnabled ? '🟢 ON — customers can see it' : '⚪ OFF — hidden from customer app';
+    if (btn) {
+      btn.textContent = opItemShareEnabled ? '⛔ Turn OFF for customers' : '✅ Turn ON for customers';
+      btn.className = 'op-btn ' + (opItemShareEnabled ? 'op-btn-danger' : 'op-btn-push');
+    }
+  });
+}
+function opToggleItemShare() {
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'app_config/itemShareEnabled'), !opItemShareEnabled).catch(err => alert('Error: ' + err.message));
+}
 function opToggleBusFeature() {
   const { db, ref, set } = window.fb;
   set(ref(db, 'app_config/busFeatureEnabled'), !opBusFeatureEnabled).catch(err => alert('Error: ' + err.message));
@@ -15323,7 +15402,42 @@ function opComputeDue(p) {
   }
   return Math.max(0, gross - settled);
 }
+// ---- Old shop/item photos waiting to be deleted from Cloudinary (entries in notif_images with src:'shop') ----
+var opShopPhotoLastCount = 0;
+async function opShopPhotoCount() {
+  var el = document.getElementById('op-shopphoto-count'); if (!el || !window.fb) return;
+  try {
+    var snap = await window.fb.get(window.fb.ref(window.fb.db, 'notif_images')), v = snap.val() || {};
+    var n = Object.keys(v).filter(function (k) { return v[k] && v[k].src === 'shop'; }).length;
+    el.textContent = n ? '(' + n + ' pending)' : '';
+  } catch (e) {}
+}
+var opShopPhotoBusy = false;
+async function opShopPhotoCleanup() {
+  var fb = window.fb, msg = document.getElementById('op-shopphoto-status');
+  if (opShopPhotoBusy) return;
+  if (!fb || !window.POSTER_DELETE_ENDPOINT) { if (msg) msg.textContent = 'Set POSTER_DELETE_ENDPOINT first (Cloudinary delete worker).'; return; }
+  opShopPhotoBusy = true;
+  try {
+    var snap = await fb.get(fb.ref(fb.db, 'notif_images')), v = snap.val() || {};
+    var ids = Object.keys(v).filter(function (k) { return v[k] && v[k].src === 'shop'; });
+    if (!ids.length) { if (msg) msg.textContent = 'No old shop/item photos waiting.'; return; }
+    var n = 0, bad = 0, kept = 0;
+    for (var i = 0; i < ids.length; i++) {
+      if (msg) msg.textContent = 'Deleting ' + (i + 1) + '/' + ids.length + '...';
+      try {
+        if (await nshPhotoStillUsed(v[ids[i]].img)) { await fb.remove(fb.ref(fb.db, 'notif_images/' + ids[i])); kept++; continue; } // another shop/item uses it: keep photo
+        var r = await fetch(window.POSTER_DELETE_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'notif', id: ids[i] }) });
+        var j = await r.json().catch(function () { return {}; });
+        if (r.ok && j.ok) { await fb.remove(fb.ref(fb.db, 'notif_images/' + ids[i])); n++; } else bad++;
+      } catch (e) { bad++; }
+    }
+    if (msg) msg.textContent = n + ' photo(s) deleted from Cloudinary' + (kept ? ', ' + kept + ' still used by another shop/item (kept)' : '') + (bad ? ', ' + bad + ' failed (try again later)' : '') + '.';
+  } catch (e) { if (msg) msg.textContent = 'Could not check old photos.'; }
+  finally { opShopPhotoBusy = false; opShopPhotoCount(); }
+}
 function opRenderPartnersList() {
+  if (Date.now() - opShopPhotoLastCount > 60000) { opShopPhotoLastCount = Date.now(); opShopPhotoCount(); }
   const wrap = document.getElementById('op-partners-list');
   if (!wrap) return;
   const q = (document.getElementById('op-partners-search').value || '').toLowerCase();
@@ -16237,9 +16351,12 @@ function handleOpShopPhotoSelect(e) {
         const blob = await resizeImageToBlob(img, 800, 0.7);
         const url = await uploadPhotoToCloudinary(blob);
         const { db, ref, update } = window.fb;
+        const pOld = opAllPartners.find(x => x._id === partnerId);
+        const oldPhoto = pOld ? pOld.photo : '';
         await update(ref(db, 'restaurants/' + partnerId), { photo: url });
         const p = opAllPartners.find(x => x._id === partnerId);
         if (p) p.photo = url;
+        nshPhotoChanged(oldPhoto, url);
         if (opCurrentPartnerId === partnerId) opRenderShopPhoto(url, true);
         status.textContent = 'Shop photo updated.';
       } catch (err) {
@@ -16259,9 +16376,11 @@ function opRemoveShopPhoto() {
   opRenderShopPhoto("");
   status.textContent = 'Removing...';
   const { db, ref, update } = window.fb;
+  const oldPhotoRm = (opAllPartners.find(x => x._id === partnerId) || {}).photo;
   update(ref(db, 'restaurants/' + partnerId), { photo: null }).then(() => {
     const p = opAllPartners.find(x => x._id === partnerId);
     if (p) p.photo = null;
+    nshPhotoChanged(oldPhotoRm, '');
     status.textContent = 'Shop photo removed.';
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
