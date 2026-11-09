@@ -3256,6 +3256,7 @@
     </div>
     <div class="op-section-body">
       <p class="op-note">Groceries / NESH Mart: an item with an offer price shows in the customer app's 🔥 Trending tab (the tab appears only while at least one offer exists). Food shops: an item (or each portion — Quarter / Half / Full — of an item sold in portions) with an offer price shows in the 🔥 Offers strip on the customer's Food screen; a discounted portion shows there as its own item. Customers pay the offer price instead of the normal price and the shop is paid the offer price. Remove the offer and it disappears right away.</p>
+      <p class="op-note"><b>The offer price you type is what the CUSTOMER pays.</b> Each item shows its customer price (with the shop price in brackets); the strike-through price customers see is that customer price.</p>
       <h2 style="margin:14px 0 6px;">Live offers</h2>
       <div id="op-trend-current"></div>
       <div id="op-trend-editor" style="display:none; margin:16px 0; padding:14px; border:1px solid #cfe6d5;">
@@ -7080,6 +7081,7 @@ async function saveItem() {
       : []);
     const data = { name, desc, price, unit: isGroceriesShop() ? (state.selectedUnit || "piece") : "piece", photo: state.photoDataUrl || "", unavailable: document.getElementById('item-unavailable').checked, sizes, sizePrices: portionsOn ? portionPrices : null };
     if (offerSecOn) data.offerPrice = offerPrice > 0 ? offerPrice : null;
+    if (offerSecOn && offerPrice > 0) data.offerCustomerPrice = null;   // the shop just set its own offer price -> it replaces an earlier operator (customer-price) offer
     // Operator's per-portion offers: drop any that no longer fit (portion removed, or its price is now at/below the offer). Untouched otherwise, so an offer set meanwhile isn't overwritten.
     if (state.editingItemId && state.editingOfferSizes) {
       const keep = {};
@@ -9490,7 +9492,7 @@ function opOpenSection(name) {
   if (name === 'shop-delivery') { opCloseShopDeliveryEditor(); opRenderShopDeliveryList(); try { fzInit(); } catch (e) {} }
   if (name === 'delivery-time') { opCloseEtaEditor(); opRenderEtaList(); }
   if (name === 'shop-deals') { opCloseShopDealEditor(); opRenderShopDealsList(); }
-  if (name === 'trending') { opTrendCloseShop(); opRenderTrending(); }
+  if (name === 'trending') { opTrendCloseShop(); opTrendLoadCfg(); opRenderTrending(); }
   if (name === 'free-offers') opFoLoad();
   if (name === 'shop-zones') opRenderShopZones();
   if (name === 'orders') { const od = document.getElementById('op-orders-date'); if (od && !od.value) od.value = opOrdersDayValue(); }
@@ -11716,10 +11718,67 @@ function opClearShopDeal() {
 }
 
 /* ---- Trending offers ----
-   Groceries / NESH Mart: menu/{item}/offerPrice -> customer Trending tab.
-   Food shops: menu/{item}/offerPrice (item sold as one price) or menu/{item}/offerSizePrices/{portion} (Quarter / Half / Full) -> customer Food "Offers" strip.
-   Both live on the item node the customer app already downloads, so offers cost no extra reads. */
+   The operator types the offer as the price the CUSTOMER pays (the panel shows each item's customer price next to the shop price).
+   Stored on the item node the customer app already downloads (no extra reads):
+     menu/{item}/offerCustomerPrice                      one-price item (Groceries / NESH Mart / Food)
+     menu/{item}/offerCustomerSizePrices/{portion}       Food item sold in portions (Quarter / Half / Full)
+   The customer app applies it on top of its own final customer price. Older shop-price offers (offerPrice / offerSizePrices)
+   still work and are shown here converted to customer terms; saving or removing here replaces them (last save wins). */
 let opTrendShopId = null;
+let opTrendCfg = { goMarkup: 0, zones: {}, loaded: false, loading: false };
+// Same inputs the customer app uses to build a customer price: Go Series item markup + zone price ranges (Mart shops).
+function opTrendLoadCfg() {
+  if (opTrendCfg.loaded || opTrendCfg.loading) return;
+  opTrendCfg.loading = true;
+  const { db, ref, get } = window.fb;
+  Promise.all([get(ref(db, 'app_config/goSeriesDelivery')), get(ref(db, 'app_config/zoneDelivery'))]).then(([g, z]) => {
+    const gv = g.val();
+    opTrendCfg.goMarkup = (gv && Number(gv.itemMarkup)) || 0;
+    const zv = z.val() || {}, out = {};
+    Object.keys(zv).forEach(id => { const c = zv[id] || {}; out[id] = { shopIds: c.shopIds || null, freeTiers: Array.isArray(c.freeTiers) ? c.freeTiers : Object.values(c.freeTiers || {}) }; });
+    opTrendCfg.zones = out; opTrendCfg.loaded = true; opTrendCfg.loading = false;
+    try { opRenderTrending(); } catch (e) {}
+  }).catch(() => { opTrendCfg.loading = false; });
+}
+// The price a customer pays for `raw` (shop price) of this item — mirrors index.html (neshWithOffer / priceBump / markupFor). null until the config is loaded.
+function opTrendCust(p, it, raw, isPortion, sz) {
+  if (!opTrendCfg.loaded || !p || !it) return null;
+  raw = Number(raw) || 0;
+  if (raw <= 0) return null;
+  const grocery = p.businessType === 'groceries';
+  if (isPortion) {
+    const opSz = (it.customerSizePrices && typeof it.customerSizePrices === 'object') ? Number(it.customerSizePrices[sz]) : 0;
+    if (opSz > 0) return opSz;
+  } else if (Number(it.customerPrice) > 0 && !grocery) return Number(it.customerPrice);
+  const isMart = grocery || !!p.goSeries;
+  let tiers = [];
+  if (!isMart) {
+    const f = p.deliveryCharges && p.deliveryCharges.freeTiers;
+    tiers = f ? (Array.isArray(f) ? f : Object.values(f)) : [];
+  } else {
+    const own = p.martRanges ? (Array.isArray(p.martRanges) ? p.martRanges : Object.values(p.martRanges)) : [];
+    if (own.length) tiers = own;
+    else {
+      const zc = opTrendCfg.zones;
+      const zid = Object.keys(zc).find(id => zc[id] && zc[id].shopIds && zc[id].shopIds[p._id] && zc[id].freeTiers.length);
+      if (zid) tiers = zc[zid].freeTiers;
+    }
+  }
+  const hasCp = !isPortion && Number(it.customerPrice) > 0;
+  const piece = !it.unit || it.unit === 'piece';
+  let bump = 0, mk = 0;
+  if (!hasCp && piece) {
+    const t = tiers.find(t => t && raw >= (Number(t.min) || 0) && (t.max == null || raw < Number(t.max)));
+    const amt = Number(t && t.add);
+    if (t && amt > 0) bump = Math.round(amt);
+    const mt = p.priceMarkup ? (Array.isArray(p.priceMarkup) ? p.priceMarkup : Object.values(p.priceMarkup)).filter(Boolean) : [];
+    const mtier = mt.find(t => raw >= (Number(t.min) || 0) && (t.max == null || t.max === '' || raw <= Number(t.max)));
+    const val = Number(mtier && mtier.add) || 0;
+    if (mtier && val > 0) mk = mtier.type === 'pct' ? Math.round(raw * val / 100) : Math.round(val);
+  }
+  const go = (isPortion ? !!p.goSeries : (!!p.goSeries || grocery)) ? (Number(opTrendCfg.goMarkup) || 0) : 0;
+  return raw + go + bump + mk;
+}
 function opTrendShops() { return opAllPartners.filter(p => p && p._id); }
 function opTrendIsFood(p) { return !!p && p.businessType !== 'groceries' && p.businessType !== 'online_shop'; }
 function opTrendWhere(p) { return opTrendIsFood(p) ? 'the Food Offers strip' : 'Trending'; }
@@ -11734,19 +11793,36 @@ function opTrendPortions(p, it) {
   const ok = nm.filter(sz => Number(it.sizePrices[sz]) > 0);
   return ok.length > 1 ? ok : [];
 }
-function opTrendPortionOffer(it, sz) {
+// Current offer of a portion, in CUSTOMER terms (0 = none).
+function opTrendPortionOffer(p, it, sz) {
+  const raw = Number(it.sizePrices[sz]);
+  const cust = opTrendCust(p, it, raw, true, sz);
+  const oc = (it.offerCustomerSizePrices && typeof it.offerCustomerSizePrices === 'object') ? Number(it.offerCustomerSizePrices[sz]) : 0;
+  if (oc > 0 && (cust === null || oc < cust)) return oc;
   const o = (it.offerSizePrices && typeof it.offerSizePrices === 'object') ? Number(it.offerSizePrices[sz]) : 0;
-  return (o > 0 && o < Number(it.sizePrices[sz])) ? o : 0;
+  if (o > 0 && o < raw && cust !== null) return Math.max(1, cust - (raw - o));
+  return 0;
+}
+// Current offer of a one-price item, in CUSTOMER terms (0 = none).
+function opTrendItemOffer(p, it) {
+  const raw = Number(it.price) || 0;
+  const cust = opTrendCust(p, it, raw, false);
+  const oc = Number(it.offerCustomerPrice) || 0;
+  if (oc > 0 && (cust === null || oc < cust)) return oc;
+  const o = Number(it.offerPrice) || 0;
+  if (o > 0 && o < raw && cust !== null) return Math.max(1, cust - (raw - o));
+  return 0;
 }
 function opTrendLive() {
   const out = [];
   opTrendShops().forEach(p => opTrendMenuList(p).forEach(it => {
     const pt = opTrendPortions(p, it);
     if (pt.length) {
-      pt.forEach((sz, idx) => { const o = opTrendPortionOffer(it, sz); if (o) out.push({ p, it, z: idx, label: sz, price: Number(it.sizePrices[sz]), offer: o }); });
+      pt.forEach((sz, idx) => { const o = opTrendPortionOffer(p, it, sz); if (o) out.push({ p, it, z: idx, label: sz, cust: opTrendCust(p, it, it.sizePrices[sz], true, sz), offer: o }); });
       return;
     }
-    if (Number(it.offerPrice) > 0 && Number(it.offerPrice) < Number(it.price)) out.push({ p, it, z: '', label: '', price: Number(it.price), offer: Number(it.offerPrice) });
+    const o = opTrendItemOffer(p, it);
+    if (o) out.push({ p, it, z: '', label: '', cust: opTrendCust(p, it, it.price, false), offer: o });
   }));
   return out;
 }
@@ -11754,14 +11830,14 @@ function opRenderTrending() {
   const cur = document.getElementById('op-trend-current');
   if (!cur) return;
   const live = opTrendLive();
-  cur.innerHTML = live.length ? live.map(({ p, it, z, label, price, offer }) => `
+  cur.innerHTML = live.length ? live.map(({ p, it, z, label, cust, offer }) => `
     <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
       <div>
         <div class="op-partner-name">${escapeHtml(it.name || 'Item')}${label ? ' · ' + escapeHtml(label) : ''}</div>
-        <div class="op-partner-sub">${escapeHtml(p.restaurantName || p._id)} · ₹${escapeHtml(String(price))} → ₹${escapeHtml(String(offer))}</div>
+        <div class="op-partner-sub">${escapeHtml(p.restaurantName || p._id)} · customer ${cust !== null ? '₹' + escapeHtml(String(cust)) + ' → ' : 'pays '}₹${escapeHtml(String(offer))}</div>
       </div>
       <button type="button" class="op-btn op-btn-danger" style="margin:0;" data-s="${escapeHtml(p._id)}" data-i="${escapeHtml(it._k)}" data-z="${escapeHtml(String(z))}" onclick="opTrendClear(this.dataset.s, this.dataset.i, this.dataset.z)">Remove</button>
-    </div>`).join('') : '<p class="op-note">No offer products yet — the Trending tab and the Food Offers strip are hidden for customers.</p>';
+    </div>`).join('') : '<p class="op-note">' + (opTrendCfg.loaded ? 'No offer products yet — the Trending tab and the Food Offers strip are hidden for customers.' : 'Loading…') + '</p>';
   const liveBy = {};
   live.forEach(x => { liveBy[x.p._id] = (liveBy[x.p._id] || 0) + 1; });
   const wrap = document.getElementById('op-trend-shops');
@@ -11805,6 +11881,7 @@ function opTrendRenderItems() {
   const items = opTrendMenuList(p)
     .filter(it => !q || String(it.name || '').toLowerCase().includes(q))
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+  const money = n => String(Math.round(n * 100) / 100);
   wrap.innerHTML = items.length ? items.map(it => {
     const pt = opTrendPortions(p, it);
     if (pt.length) {
@@ -11812,57 +11889,66 @@ function opTrendRenderItems() {
       return `
     <div class="op-partner-item" style="padding-bottom:6px;">
       <div class="op-partner-name">${escapeHtml(it.name || 'Item')}</div>
-      ${pt.map((sz, idx) => { const o = opTrendPortionOffer(it, sz); return `
+      ${pt.map((sz, idx) => {
+        const o = opTrendPortionOffer(p, it, sz);
+        const cust = opTrendCust(p, it, it.sizePrices[sz], true, sz);
+        return `
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px;">
-        <div class="op-partner-sub" style="flex:1 1 120px; min-width:0;">${escapeHtml(sz)} · ₹${escapeHtml(String(it.sizePrices[sz]))}${o ? ' · offer ₹' + escapeHtml(String(o)) : ''}</div>
+        <div class="op-partner-sub" style="flex:1 1 120px; min-width:0;">${escapeHtml(sz)} · customer ${cust !== null ? '₹' + escapeHtml(money(cust)) : '…'} <span style="opacity:.7;">(shop ₹${escapeHtml(String(it.sizePrices[sz]))})</span>${o ? ' · offer ₹' + escapeHtml(money(o)) : ''}</div>
         <input type="number" inputmode="decimal" min="0" step="any" placeholder="Offer ₹" value="${o ? escapeHtml(String(o)) : ''}" style="width:90px;padding:8px;" id="op-trend-pin-${escapeHtml(it._k)}-${idx}">
         <button type="button" class="op-btn op-btn-push" style="margin:0;" data-i="${escapeHtml(it._k)}" data-z="${idx}" onclick="opTrendSave(opTrendShopId, this.dataset.i, this.dataset.z)">Save</button>
         ${o ? `<button type="button" class="op-btn op-btn-danger" style="margin:0;" data-i="${escapeHtml(it._k)}" data-z="${idx}" onclick="opTrendClear(opTrendShopId, this.dataset.i, this.dataset.z)">Remove</button>` : ''}
       </div>`; }).join('')}
     </div>`;
     }
+    const o = opTrendItemOffer(p, it);
+    const cust = opTrendCust(p, it, it.price, false);
     return `
     <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
       <div style="min-width:0; flex:1 1 140px;">
         <div class="op-partner-name">${escapeHtml(it.name || 'Item')}</div>
-        <div class="op-partner-sub">Price ₹${escapeHtml(String(it.price))}${Number(it.offerPrice) > 0 ? ' · offer ₹' + escapeHtml(String(it.offerPrice)) : ''}</div>
+        <div class="op-partner-sub">Customer ${cust !== null ? '₹' + escapeHtml(money(cust)) : '…'} <span style="opacity:.7;">(shop ₹${escapeHtml(String(it.price))})</span>${o ? ' · offer ₹' + escapeHtml(money(o)) : ''}</div>
       </div>
-      <input type="number" inputmode="decimal" min="0" step="any" placeholder="Offer ₹" value="${Number(it.offerPrice) > 0 ? escapeHtml(String(it.offerPrice)) : ''}" style="width:90px;padding:8px;" id="op-trend-in-${escapeHtml(it._k)}">
+      <input type="number" inputmode="decimal" min="0" step="any" placeholder="Offer ₹" value="${o ? escapeHtml(String(o)) : ''}" style="width:90px;padding:8px;" id="op-trend-in-${escapeHtml(it._k)}">
       <button type="button" class="op-btn op-btn-push" style="margin:0;" data-i="${escapeHtml(it._k)}" onclick="opTrendSave(opTrendShopId, this.dataset.i)">Save</button>
-      ${Number(it.offerPrice) > 0 ? `<button type="button" class="op-btn op-btn-danger" style="margin:0;" data-i="${escapeHtml(it._k)}" onclick="opTrendClear(opTrendShopId, this.dataset.i)">Remove</button>` : ''}
+      ${o ? `<button type="button" class="op-btn op-btn-danger" style="margin:0;" data-i="${escapeHtml(it._k)}" onclick="opTrendClear(opTrendShopId, this.dataset.i)">Remove</button>` : ''}
     </div>`; }).join('') : '<p class="op-note">No items.</p>';
 }
-// z = portion index for a Food item sold in portions, empty for a normal one-price item.
+// The offer is the price the CUSTOMER pays. z = portion index for a Food item sold in portions, empty for a normal one-price item.
 function opTrendSave(shopId, itemKey, z) {
   const p = opAllPartners.find(x => x._id === shopId);
   const it = p && p.menu && p.menu[itemKey];
   const status = document.getElementById('op-trend-status');
   if (!it) return;
+  if (!opTrendCfg.loaded) { status.textContent = 'Customer prices are still loading — try again in a moment.'; opTrendLoadCfg(); return; }
   const isPortion = z !== undefined && z !== null && z !== '';
   const { db, ref, update } = window.fb;
   if (isPortion) {
     const sz = opTrendPortions(p, it)[Number(z)];
     const inp = document.getElementById('op-trend-pin-' + itemKey + '-' + Number(z));
     if (!sz || !inp) return;
-    const normal = Number(it.sizePrices[sz]);
+    const normal = opTrendCust(p, it, it.sizePrices[sz], true, sz);
     const v = Number(inp.value);
-    if (inp.value.trim() === '' || !isFinite(v) || v <= 0 || v >= normal) { status.textContent = 'Offer price must be above ₹0 and lower than the normal price of the ' + sz + ' portion (₹' + normal + ').'; return; }
+    if (inp.value.trim() === '' || !isFinite(v) || v <= 0 || v >= normal) { status.textContent = 'Offer price must be above ₹0 and lower than the customer price of the ' + sz + ' portion (₹' + normal + ').'; return; }
     const map = {};
-    opTrendPortions(p, it).forEach(k => { const o = opTrendPortionOffer(it, k); if (o) map[k] = o; });
+    opTrendPortions(p, it).forEach(k => { const o = opTrendPortionOffer(p, it, k); if (o) map[k] = o; });
     map[sz] = v;
     status.textContent = 'Saving...';
-    update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerSizePrices: map }).then(() => {
-      it.offerSizePrices = map; status.textContent = 'Saved — "' + (it.name || 'Item') + ' (' + sz + ')" is now in ' + opTrendWhere(p) + '.'; opRenderTrending();
+    update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerCustomerSizePrices: map, offerSizePrices: null }).then(() => {
+      it.offerCustomerSizePrices = map; it.offerSizePrices = null;
+      status.textContent = 'Saved — customers pay ₹' + v + ' for "' + (it.name || 'Item') + ' (' + sz + ')" (customer price ₹' + normal + '). It is now in ' + opTrendWhere(p) + '.'; opRenderTrending();
     }).catch(err => { status.textContent = 'Error: ' + err.message; });
     return;
   }
   const inp = document.getElementById('op-trend-in-' + itemKey);
   if (!inp) return;
+  const normal = opTrendCust(p, it, it.price, false);
   const v = Number(inp.value);
-  if (inp.value.trim() === '' || !isFinite(v) || v <= 0 || v >= Number(it.price)) { status.textContent = 'Offer price must be above ₹0 and lower than the normal price (₹' + it.price + ').'; return; }
+  if (inp.value.trim() === '' || !isFinite(v) || v <= 0 || normal === null || v >= normal) { status.textContent = 'Offer price must be above ₹0 and lower than the customer price (₹' + normal + ').'; return; }
   status.textContent = 'Saving...';
-  update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerPrice: v }).then(() => {
-    it.offerPrice = v; status.textContent = 'Saved — "' + (it.name || 'Item') + '" is now in ' + opTrendWhere(p) + '.'; opRenderTrending();
+  update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerCustomerPrice: v, offerPrice: null }).then(() => {
+    it.offerCustomerPrice = v; it.offerPrice = null;
+    status.textContent = 'Saved — customers pay ₹' + v + ' for "' + (it.name || 'Item') + '" (customer price ₹' + normal + '). It is now in ' + opTrendWhere(p) + '.'; opRenderTrending();
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 function opTrendClear(shopId, itemKey, z) {
@@ -11872,21 +11958,22 @@ function opTrendClear(shopId, itemKey, z) {
   const isPortion = z !== undefined && z !== null && z !== '';
   const { db, ref, update } = window.fb;
   if (isPortion) {
+    if (!opTrendCfg.loaded) { opTrendLoadCfg(); return; }
     const sz = opTrendPortions(p, it)[Number(z)];
     if (!sz) return;
     if (!confirm('Remove the offer on "' + (it.name || 'this item') + '" (' + sz + ')? It leaves the Food Offers strip right away.')) return;
     const map = {};
-    opTrendPortions(p, it).forEach(k => { const o = opTrendPortionOffer(it, k); if (o && k !== sz) map[k] = o; });
+    opTrendPortions(p, it).forEach(k => { const o = opTrendPortionOffer(p, it, k); if (o && k !== sz) map[k] = o; });
     const val = Object.keys(map).length ? map : null;
-    update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerSizePrices: val }).then(() => {
-      if (val) it.offerSizePrices = val; else delete it.offerSizePrices;
+    update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerCustomerSizePrices: val, offerSizePrices: null }).then(() => {
+      it.offerCustomerSizePrices = val; it.offerSizePrices = null;
       const st = document.getElementById('op-trend-status'); if (st) st.textContent = 'Offer removed.'; opRenderTrending();
     }).catch(err => { alert('Error: ' + err.message); });
     return;
   }
   if (!confirm('Remove the offer on "' + (it.name || 'this item') + '"? It leaves ' + opTrendWhere(p) + ' right away.')) return;
-  update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerPrice: null }).then(() => {
-    delete it.offerPrice; const st = document.getElementById('op-trend-status'); if (st) st.textContent = 'Offer removed.'; opRenderTrending();
+  update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerCustomerPrice: null, offerPrice: null }).then(() => {
+    it.offerCustomerPrice = null; it.offerPrice = null; const st = document.getElementById('op-trend-status'); if (st) st.textContent = 'Offer removed.'; opRenderTrending();
   }).catch(err => { alert('Error: ' + err.message); });
 }
 
