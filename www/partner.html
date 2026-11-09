@@ -927,7 +927,7 @@
       </div>
       <div class="field">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
-        <input id="reg-username" type="text" placeholder="Choose a username" autocomplete="off" />
+        <input id="reg-username" type="text" placeholder="Choose a username (small letters, numbers)" autocomplete="off" autocapitalize="none" />
       </div>
       <div class="field">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -1818,6 +1818,10 @@
         <button class="op-logout-btn" onclick="opLogout()">Logout</button>
       </div>
       <p class="op-note" id="op-data-usage" style="margin:0 0 10px; display:none;"></p>
+      <div style="margin:0 0 12px;">
+        <label class="op-note" for="op-load-zone" style="display:block;margin:0 0 4px;">Load shops of zone (saves data)</label>
+        <select id="op-load-zone" onchange="opSetLoadZone(this.value)" style="width:100%;padding:10px;font-family:inherit;font-size:.95rem;"></select>
+      </div>
       <div style="margin:0 0 14px;position:relative;">
         <input type="search" id="op-home-search" placeholder="Search: coupon, orders, taxi…" oninput="opHomeSearch(this.value)" autocomplete="off" style="width:100%;background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:12px 14px;font-family:inherit;font-size:.95rem;">
         <p class="op-note" id="op-home-search-empty" style="display:none;margin:10px 0 0;">No card matches your search.</p>
@@ -1986,7 +1990,7 @@
         <div class="op-home-card" onclick="opOpenSection('trending')">
           <div class="op-home-icon">🔥</div>
           <h3>Trending Offers</h3>
-          <p>Set an offer price on any Groceries / NESH Mart product — offer products show in the customer app's Trending tab</p>
+          <p>Set an offer price on any product (or Food portion) — shows in the customer app's Trending tab / Food Offers strip</p>
         </div>
         <div class="op-home-card" onclick="opOpenSection('free-offers')">
           <div class="op-home-icon">🎁</div>
@@ -2121,6 +2125,8 @@
       <label class="op-switch-row"><span class="op-switch-text">🔔 Sound on new order<small>This phone only · off by default</small></span><input type="checkbox" class="op-switch" id="op-alert-sound" onchange="opSetAlertSound(this.checked)"></label>
       <label class="op-switch-row"><span class="op-switch-text">📳 Vibration on new order<small>This phone only · off by default</small></span><input type="checkbox" class="op-switch" id="op-alert-vibrate" onchange="opSetAlertVibrate(this.checked)"></label>
       </div>
+      <div class="op-search-box" style="margin-bottom:6px;"><input type="date" id="op-orders-date" onchange="opOrdersDayChanged()"></div>
+      <p class="op-note" style="margin:0 0 10px;">Only the last 2 days up to the picked date are downloaded (data saver). Delivered / Cancelled show the picked date; In Progress shows all open orders in that window.</p>
       <div class="op-order-tabs">
         <button type="button" class="op-order-tab active" data-tab="inprogress" onclick="opSwitchOrdersTab('inprogress')">In Progress</button>
         <button type="button" class="op-order-tab" data-tab="delivered" onclick="opSwitchOrdersTab('delivered')">Delivered</button>
@@ -2440,9 +2446,9 @@
       <p class="op-note">Profit per order = your item amount + GST + shop commission (if you set one for that shop) + delivery charge the customer paid − the real delivery charge given to the delivery boy (even when delivery was free for the customer) − coupon. Only delivered orders are counted.</p>
       <p class="op-note" id="op-profit-start" style="font-weight:600;color:#14532d;">Loading…</p>
       <div class="op-search-box" style="margin-bottom:10px;">
-        <input type="date" id="op-profit-date" onchange="opRenderProfit()">
+        <input type="date" id="op-profit-date" onchange="opProfitDateChanged()">
       </div>
-      <label class="op-switch-row" style="margin-bottom:12px;"><span class="op-switch-text">Show all dates<small>Ignore the date above</small></span><input type="checkbox" class="op-switch" id="op-profit-all" onchange="opRenderProfit()" checked></label>
+      <p class="op-note" style="margin-bottom:12px;">Only the picked date's orders are downloaded (data saver). <b>All-time profit</b> comes from the saved daily profit archive.</p>
       <div class="op-report-summary" id="op-profit-summary"></div>
       <div id="op-profit-list"></div>
     </div>
@@ -3224,7 +3230,7 @@
       <h2>Trending Offers</h2>
     </div>
     <div class="op-section-body">
-      <p class="op-note">An item with an offer price shows in the customer app's 🔥 Trending tab (Groceries and NESH Mart shops only). The tab appears for customers only while at least one offer exists. Customers pay the offer price instead of the normal price. This is the same setting each shop has in its own item form (last save wins).</p>
+      <p class="op-note">Groceries / NESH Mart: an item with an offer price shows in the customer app's 🔥 Trending tab (the tab appears only while at least one offer exists). Food shops: an item (or each portion — Quarter / Half / Full — of an item sold in portions) with an offer price shows in the 🔥 Offers strip on the customer's Food screen; a discounted portion shows there as its own item. Customers pay the offer price instead of the normal price and the shop is paid the offer price. Remove the offer and it disappears right away.</p>
       <h2 style="margin:14px 0 6px;">Live offers</h2>
       <div id="op-trend-current"></div>
       <div id="op-trend-editor" style="display:none; margin:16px 0; padding:14px; border:1px solid #cfe6d5;">
@@ -4096,7 +4102,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, onValue, push, set, get, update, remove, goOffline, goOnline, query, orderByKey, startAt, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getDatabase, ref, onValue, push, set, get, update, remove, goOffline, goOnline, query, orderByKey, startAt, endAt, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCrM5wKwsnGtIc7HSTk_5R1d3dXEcYyd7o",
@@ -4110,7 +4116,44 @@
 
   const fbApp = initializeApp(firebaseConfig);
   const db = getDatabase(fbApp);
-  window.fb = { db, ref, onValue, push, set, get, update, remove, query, orderByKey, startAt, runTransaction };
+  window.fb = { db, ref, onValue, push, set, get, update, remove, query, orderByKey, startAt, endAt, runTransaction };
+  // Catalog version stamp: any write to a shop's PUBLIC fields (menu, stock, price, status, photo, hours...)
+  // bumps `catalogVer`, so customer apps that cache the catalog know to download it again.
+  (function () {
+    const f = window.fb, orig = { set, update, remove, push };
+    const PUB = /^restaurants\/[^/]+(\/(menu|itemCategories|popularItems|suggestItems|photo|status|restaurantName|address|location|businessType|openTime|closeTime|hoursEnabled|deliveryCharges|deliveryZone|discount\w*|goSeries|gpayNumber|minOrderAmount|opCategory|shopUnavailable\w*|deliveryTimeMins|opDeliveryTimeMins|martRanges|priceMarkup|ratingCount|ratingSum)(\/|$))?$|^restaurants\/[^/]+\/(menu|itemCategories|popularItems|suggestItems|photo|status|restaurantName|address|location|businessType|openTime|closeTime|hoursEnabled|deliveryCharges|deliveryZone|discount\w*|goSeries|gpayNumber|minOrderAmount|opCategory|shopUnavailable\w*|deliveryTimeMins|opDeliveryTimeMins|martRanges|priceMarkup|ratingCount|ratingSum)(\/|$)/;
+    const pathOf = r => { try { return String(r).replace(/^https?:\/\/[^/]+\/?/, '').replace(/\/$/, ''); } catch (e) { return ''; } };
+    let bumpT = null; const dirty = new Set();
+    // Stamps what changed: catalogVerShop/{shopId} = now (customer apps re-download ONLY that shop) and the old global
+    // catalogVer (kept for customer app versions that don't know catalogVerShop yet).
+    const bump = (ids) => {
+      (ids || []).forEach(i => dirty.add(i));
+      clearTimeout(bumpT);
+      bumpT = setTimeout(() => {
+        const list = Array.from(dirty); dirty.clear();
+        const now = Date.now();
+        if (list.length) { const u = {}; list.forEach(i => { u[i] = now; }); orig.update(ref(db, 'catalogVerShop'), u).catch(e => { try { console.warn('catalogVerShop write blocked:', e && e.message); } catch (e2) {} }); }
+        orig.set(ref(db, 'catalogVer'), now).catch(e => { try { console.warn('catalogVer write blocked:', e && e.message); } catch (e2) {} });
+      }, 400);
+    };
+    // Which shops' PUBLIC fields does this write touch?
+    const shopsTouched = (r, vals) => {
+      const base = pathOf(r), out = new Set();
+      const add = p => { const m = PUB.test(p) && /^restaurants\/([^/]+)/.exec(p); if (m) out.add(m[1]); };
+      if (vals && typeof vals === 'object' && !Array.isArray(vals) && Object.keys(vals).some(k => k.indexOf('/') >= 0 || base === '' || /^restaurants\/[^/]+$/.test(base))) {
+        Object.keys(vals).forEach(k => add((base ? base + '/' : '') + k));
+      } else add(base);
+      return Array.from(out);
+    };
+    const wrap = (name, hasVal) => {
+      f[name] = function (r, v) {
+        const p = orig[name].apply(null, arguments);
+        try { const ids = shopsTouched(r, hasVal ? v : null); if (ids.length) Promise.resolve(p).then(() => bump(ids), () => {}); } catch (e) {}
+        return p;
+      };
+    };
+    wrap('set', true); wrap('update', true); wrap('remove', false); wrap('push', false);
+  })();
 
   // ---------- Reliable reconnect after the app is minimized ----------
   // Mobile browsers/PWAs freeze the RTDB websocket while the app is in the
@@ -4137,13 +4180,37 @@
     isConnected = snap.val() === true;
   });
 
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) goOnline(db);
-  });
-
+  // ---- Reconnect after the app was in the background ----
+  // goOnline() alone does nothing while the SDK still believes it is connected, but a socket that slept in the background
+  // is often dead (no new data until the page is refreshed). So after a longer absence we open a FRESH socket, and keep
+  // checking until `.info/connected` is true again. Cycles run only while the app is visible, so it can never stay offline.
+  let awayAt = 0, recheckT = null, wentOffline = false;
+  const nshMarkAway = () => { if (!awayAt) awayAt = Date.now(); };
+  const nshReconnect = () => {
+    const away = awayAt ? Date.now() - awayAt : 0; awayAt = 0;
+    const hard = away > 20000 && !wentOffline; wentOffline = false;   // wentOffline: goOffline() already ran on pause, so goOnline() below is already a fresh socket
+    try { goOnline(db); } catch (e) {}
+    if (hard) {
+      try { goOffline(db); } catch (e) {}
+      setTimeout(() => { try { goOnline(db); } catch (e) {} }, 250);
+    }
+    clearInterval(recheckT);
+    let tries = 0;
+    recheckT = setInterval(() => {
+      if (document.hidden || isConnected || ++tries > 15) { clearInterval(recheckT); return; }
+      try { goOffline(db); goOnline(db); } catch (e) {}
+    }, 4000);
+  };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) nshMarkAway(); else nshReconnect(); });
+  window.addEventListener('online', () => { try { goOnline(db); } catch (e) {} });
+  window.addEventListener('pageshow', e => { if (e.persisted) nshReconnect(); });
+  try {
+    const CapApp0 = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+    if (CapApp0 && CapApp0.addListener) CapApp0.addListener('appStateChange', st => { if (st && st.isActive) nshReconnect(); else nshMarkAway(); });
+  } catch (e) {}
   setInterval(() => {
     if (!document.hidden && !isConnected) goOnline(db);
-  }, 15000);
+  }, 5000);
 
   // ---- Cloudinary photo upload (free, no card, no backend needed) ----
   window.CLOUDINARY_CLOUD_NAME = "gsbs6xkx";
@@ -4649,7 +4716,7 @@ function init() {
       if (!cached) showScreen('login');
     }, 7000);
 
-    get(ref(db, 'restaurants/' + savedId)).then(snap => {
+    fetchShopRecord(savedId).then(snap => {
       clearTimeout(timeoutId);
       if (snap.exists()) {
         logInRestaurant(savedId, snap.val()); // fresh data (updates cache too)
@@ -4830,6 +4897,31 @@ function useGpsFor(inputId, btnId) {
 const OPERATOR_USERNAME = "AFSALKN";
 const OPERATOR_PASSWORD = "AFsa12@*";
 
+/* Shop login / app-open data saver: the shop app only needs the shop's PROFILE fields here (name, address,
+   status, hours, discount, zone...). menu / orders / categories / settlements have their own listeners, so
+   they are no longer downloaded a second time inside the profile read. Child keys come from Firebase's
+   REST shallow=true (keys only), then each small child is read. Any failure falls back to the old full read.
+   Returns a snapshot-like { exists(), val() }. */
+const SHOP_HEAVY_CHILDREN = ['menu', 'orders', 'itemCategories', 'popularItems', 'suggestItems', 'settlements', 'orderRollup', 'commissionHistory', 'activeSession'];
+async function fetchShopRecord(id) {
+  const { db, ref, get } = window.fb;
+  try {
+    const res = await fetch('https://texi-and-food-default-rtdb.firebaseio.com/restaurants/' + encodeURIComponent(id) + '.json?shallow=true');
+    if (!res.ok) throw new Error('shallow ' + res.status);
+    const keys = await res.json();
+    if (keys === null) return { exists: () => false, val: () => null };
+    if (typeof keys !== 'object') throw new Error('unexpected shallow answer');
+    const light = {};
+    await Promise.all(Object.keys(keys).filter(k => SHOP_HEAVY_CHILDREN.indexOf(k) < 0).map(async k => {
+      const sn = await get(ref(db, 'restaurants/' + id + '/' + k));
+      if (sn.exists()) light[k] = sn.val();
+    }));
+    if (!Object.keys(light).length) throw new Error('empty profile');
+    return { exists: () => true, val: () => light };
+  } catch (e) {
+    return await get(ref(db, 'restaurants/' + id));   // old behaviour
+  }
+}
 async function doLogin() {
   const username = document.getElementById('login-username').value.trim();
   const password = document.getElementById('login-password').value;
@@ -4851,8 +4943,17 @@ async function doLogin() {
   btn.disabled = true;
   try {
     const { db, ref, get } = window.fb;
-    const snap = await get(ref(db, 'restaurants/' + username));
-    if (!snap.exists()) {
+    // Existing accounts keep the exact username they registered with; new ones are lowercase.
+    const okChars = /^[^.#$\[\]\/]+$/;
+    let loginId = username, snap = null;
+    if (okChars.test(username)) {
+      snap = await fetchShopRecord(username);
+      if (!snap.exists() && username !== username.toLowerCase()) {
+        const snap2 = await fetchShopRecord(username.toLowerCase());
+        if (snap2.exists()) { snap = snap2; loginId = username.toLowerCase(); }
+      }
+    }
+    if (!snap || !snap.exists()) {
       errEl.textContent = "No restaurant account found for this username";
       errEl.style.display = "block";
       return;
@@ -4863,7 +4964,7 @@ async function doLogin() {
       errEl.style.display = "block";
       return;
     }
-    logInRestaurant(username, rec);
+    logInRestaurant(loginId, rec);
   } catch (e) {
     errEl.textContent = "Couldn't log in — check your connection and try again.";
     errEl.style.display = "block";
@@ -5892,13 +5993,18 @@ async function doRegister() {
   const location = document.getElementById('reg-location').value.trim();
   const gst = document.getElementById('reg-gst').value.trim();
   const shopCategory = document.getElementById('reg-shop-category').value.trim();
-  const username = document.getElementById('reg-username').value.trim();
+  const username = document.getElementById('reg-username').value.trim().toLowerCase();
   const password = document.getElementById('reg-password').value;
   const errEl = document.getElementById('reg-error');
   errEl.style.display = "none";
 
   if (!name || !address || !username || !password) {
     errEl.textContent = "Please fill restaurant name, address, username and password";
+    errEl.style.display = "block";
+    return;
+  }
+  if (!regEditMode && !/^[a-z0-9_-]{3,30}$/.test(username)) {
+    errEl.textContent = "Username: 3-30 letters, numbers, _ or - only (no spaces or symbols). It is saved in small letters.";
     errEl.style.display = "block";
     return;
   }
@@ -5937,7 +6043,12 @@ async function doRegister() {
     }
 
     const snap = await get(ref(db, 'restaurants/' + username));
-    if (snap.exists()) {
+    let taken = snap.exists();
+    if (!taken) {
+      // an older shop may be saved with capital letters (e.g. "Nesh") - treat it as the same name
+      try { const ix = await get(ref(db, 'shopIds')); if (ix.exists()) taken = Object.keys(ix.val() || {}).some(k => k.toLowerCase() === username); } catch (e) {}
+    }
+    if (taken) {
       errEl.textContent = "This username is already taken";
       errEl.style.display = "block";
       return;
@@ -5955,7 +6066,14 @@ async function doRegister() {
       record.opCategory = shopCategory;
     }
     if (businessType === 'groceries') record.goSeries = true;
-    await set(ref(db, 'restaurants/' + username), record);
+    // Create only if nobody else got this username in the meantime (transaction); fall back to a plain write if transactions are not allowed.
+    let created = false;
+    try {
+      const tr = await window.fb.runTransaction(ref(db, 'restaurants/' + username), cur => (cur === null ? record : undefined));
+      if (!tr.committed) { errEl.textContent = "This username is already taken"; errEl.style.display = "block"; return; }
+      created = true;
+    } catch (e) { created = false; }
+    if (!created) await set(ref(db, 'restaurants/' + username), record);
     try { const f = window.fb; f.get(f.ref(f.db, 'shopIds')).then(sn => { if (sn.exists()) return f.update(f.ref(f.db, 'shopIds'), { [username]: true }); }).catch(() => {}); } catch (e) {} // only once the index has been created by the Operator Panel
     logInRestaurant(username, record);
   } catch (e) {
@@ -6730,6 +6848,7 @@ function openItemForm(item) {
   // else ever calls this in "new item" mode for a groceries shop.
   if (!item && isGroceriesShop()) return;
   state.editingItemId = item ? item.id : null;
+  state.editingOfferSizes = (item && item.offerSizePrices && typeof item.offerSizePrices === 'object') ? item.offerSizePrices : null;   // operator's per-portion offers (Food)
   state.photoDataUrl = item ? (item.photo || "") : "";
   state.oldItemPhoto = item ? (item.photo || "") : "";
   document.getElementById('item-form-eyebrow').textContent = item ? "EDIT ITEM" : "NEW ITEM";
@@ -6936,6 +7055,13 @@ async function saveItem() {
       : []);
     const data = { name, desc, price, unit: isGroceriesShop() ? (state.selectedUnit || "piece") : "piece", photo: state.photoDataUrl || "", unavailable: document.getElementById('item-unavailable').checked, sizes, sizePrices: portionsOn ? portionPrices : null };
     if (offerSecOn) data.offerPrice = offerPrice > 0 ? offerPrice : null;
+    // Operator's per-portion offers: drop any that no longer fit (portion removed, or its price is now at/below the offer). Untouched otherwise, so an offer set meanwhile isn't overwritten.
+    if (state.editingItemId && state.editingOfferSizes) {
+      const keep = {};
+      if (portionsOn) portionNames.forEach(sz => { const o = Number(state.editingOfferSizes[sz]); if (o > 0 && o < portionPrices[sz]) keep[sz] = o; });
+      const before = Object.keys(state.editingOfferSizes).length;
+      if (Object.keys(keep).length !== before) data.offerSizePrices = Object.keys(keep).length ? keep : null;
+    }
     if (state.editingItemId) {
       await update(ref(db, 'restaurants/' + state.restId + '/menu/' + state.editingItemId), data);
     } else {
@@ -9250,8 +9376,6 @@ function opEnterPanel() {
   opListenPartners();
   opListenZones();
   opListenZoneGroups();
-  opListenDrivers();
-  opListenRides();
   opListenBuses();
   opListenBusFeatureToggle();
   opListenItemShareToggle();
@@ -9275,17 +9399,34 @@ function opLogout() {
     opDeviceKey = null;
   }
   localStorage.removeItem('asfood_is_operator');
+  try { opZoneSel = ''; opSyncPartnerLoad(); opAllPartners = []; } catch (e) {}
   document.documentElement.classList.remove('op-boot');
   document.getElementById('operator-container').classList.remove('show');
   showScreen('login');
 }
+/* Orders / Reports / Order Profit need every shop's orders: loading all shops happens only while
+   these screens are open, then the previously picked zone is restored (data saver). */
+let opZoneBeforeAll = null;
+function opLoadAllForSection() {
+  if (opZoneSel === '__all__') return;
+  opZoneBeforeAll = opZoneSel;
+  opZoneSel = '__all__';
+  try { opFillLoadZoneSelect(); opSyncPartnerLoad(); } catch (e) {}
+}
+function opRestoreZoneLoad() {
+  if (opZoneBeforeAll === null) return;
+  opZoneSel = opZoneBeforeAll; opZoneBeforeAll = null;
+  try { opFillLoadZoneSelect(); opSyncPartnerLoad(); } catch (e) {}
+}
 function opOpenSection(name) {
+  if (['orders'].indexOf(name) >= 0) opLoadAllForSection(); else opRestoreZoneLoad();
   document.querySelectorAll('#operator-container .op-section').forEach(s => s.classList.remove('active'));
   document.getElementById('op-section-' + name).classList.add('active');
   if (name === 'push') opUpdateAppCodeSizeLabel();
   if (name === 'partners') { opPopulatePartnersAreaFilter(); opRenderPartnersList(); }
   if (name === 'deletions') opRenderDeletionsList();
   if (name === 'visits') opLoadVisits();
+  if (name === 'drivers' || name === 'taxi-orders') { opEnsureDrivers(); opEnsureRides(); }
   if (name === 'drivers') { opPopulateDriversZoneFilter(); opRenderDriversList(); }
   if (name === 'taxi-orders') { opPopulateRidesZoneFilter(); opRenderRidesList(); }
   if (name === 'app-videos') { opLoadAppVideos(); opLoadBusVideos(); }
@@ -9326,8 +9467,10 @@ function opOpenSection(name) {
   if (name === 'trending') { opTrendCloseShop(); opRenderTrending(); }
   if (name === 'free-offers') opFoLoad();
   if (name === 'shop-zones') opRenderShopZones();
-  if (name === 'report') opRenderReportShopList();
-  if (name === 'profit') { const d = document.getElementById('op-profit-date'); if (d && !d.value) d.value = new Date().toLocaleDateString('en-CA'); opRenderProfit(); }
+  if (name === 'orders') { const od = document.getElementById('op-orders-date'); if (od && !od.value) od.value = opOrdersDayValue(); }
+  if (name === 'report') { opRenderReportShopList(); try { opLoadLiteShops(); } catch (e) {} }
+  if (name === 'profit') { try { opProfitLoadedDays.delete(new Date().toLocaleDateString('en-CA')); opProfitLoadedDays.delete(new Date(Date.now() - 864e5).toLocaleDateString('en-CA')); opLoadProfitDaily(); } catch (e) {}
+    const d = document.getElementById('op-profit-date'); if (d && !d.value) d.value = new Date().toLocaleDateString('en-CA'); opRenderProfit(); }
   if (name === 'groceries-queue') opRenderGroceriesQueueList();
   if (name === 'groceries-catalog') opRenderGroceriesCatalog();
   if (name === 'nesh-item-order') opBuildNeshItemOrderWorking();
@@ -10684,6 +10827,7 @@ function opListenShopZones() {
     const sec = document.getElementById('op-section-shop-zones');
     if (sec && sec.classList.contains('active')) opRenderShopZones();
     try { opRenderNotifyZones(); } catch (e) {}
+    try { opFillLoadZoneSelect(); if (opZoneSel && opZoneSel !== '__all__') opSyncPartnerLoad(); } catch (e) {}
   });
 }
 function opSzBoundsOk(z) {
@@ -11545,17 +11689,38 @@ function opClearShopDeal() {
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
 
-/* ---- Trending offers (item offerPrice for Groceries + NESH Mart shops) ---- */
+/* ---- Trending offers ----
+   Groceries / NESH Mart: menu/{item}/offerPrice -> customer Trending tab.
+   Food shops: menu/{item}/offerPrice (item sold as one price) or menu/{item}/offerSizePrices/{portion} (Quarter / Half / Full) -> customer Food "Offers" strip.
+   Both live on the item node the customer app already downloads, so offers cost no extra reads. */
 let opTrendShopId = null;
-function opTrendShops() { return opAllPartners.filter(p => p.businessType === 'groceries' || p.businessType === 'online_shop'); }
+function opTrendShops() { return opAllPartners.filter(p => p && p._id); }
+function opTrendIsFood(p) { return !!p && p.businessType !== 'groceries' && p.businessType !== 'online_shop'; }
+function opTrendWhere(p) { return opTrendIsFood(p) ? 'the Food Offers strip' : 'Trending'; }
 function opTrendMenuList(p) {
   const m = p && p.menu ? p.menu : {};
   return Object.keys(m).map(k => Object.assign({ _k: k }, m[k]));
 }
+// Portion names of a food item sold in portions (same rule as the customer app: 2+ portions, each with a price). [] otherwise.
+function opTrendPortions(p, it) {
+  if (!opTrendIsFood(p) || !it || !it.sizePrices || typeof it.sizePrices !== 'object') return [];
+  const nm = Array.isArray(it.sizes) ? it.sizes.filter(Boolean) : [];
+  const ok = nm.filter(sz => Number(it.sizePrices[sz]) > 0);
+  return ok.length > 1 ? ok : [];
+}
+function opTrendPortionOffer(it, sz) {
+  const o = (it.offerSizePrices && typeof it.offerSizePrices === 'object') ? Number(it.offerSizePrices[sz]) : 0;
+  return (o > 0 && o < Number(it.sizePrices[sz])) ? o : 0;
+}
 function opTrendLive() {
   const out = [];
   opTrendShops().forEach(p => opTrendMenuList(p).forEach(it => {
-    if (Number(it.offerPrice) > 0 && Number(it.offerPrice) < Number(it.price)) out.push({ p, it });
+    const pt = opTrendPortions(p, it);
+    if (pt.length) {
+      pt.forEach((sz, idx) => { const o = opTrendPortionOffer(it, sz); if (o) out.push({ p, it, z: idx, label: sz, price: Number(it.sizePrices[sz]), offer: o }); });
+      return;
+    }
+    if (Number(it.offerPrice) > 0 && Number(it.offerPrice) < Number(it.price)) out.push({ p, it, z: '', label: '', price: Number(it.price), offer: Number(it.offerPrice) });
   }));
   return out;
 }
@@ -11563,29 +11728,31 @@ function opRenderTrending() {
   const cur = document.getElementById('op-trend-current');
   if (!cur) return;
   const live = opTrendLive();
-  cur.innerHTML = live.length ? live.map(({ p, it }) => `
+  cur.innerHTML = live.length ? live.map(({ p, it, z, label, price, offer }) => `
     <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
       <div>
-        <div class="op-partner-name">${escapeHtml(it.name || 'Item')}</div>
-        <div class="op-partner-sub">${escapeHtml(p.restaurantName || p._id)} · ₹${escapeHtml(String(it.price))} → ₹${escapeHtml(String(it.offerPrice))}</div>
+        <div class="op-partner-name">${escapeHtml(it.name || 'Item')}${label ? ' · ' + escapeHtml(label) : ''}</div>
+        <div class="op-partner-sub">${escapeHtml(p.restaurantName || p._id)} · ₹${escapeHtml(String(price))} → ₹${escapeHtml(String(offer))}</div>
       </div>
-      <button type="button" class="op-btn op-btn-danger" style="margin:0;" data-s="${escapeHtml(p._id)}" data-i="${escapeHtml(it._k)}" onclick="opTrendClear(this.dataset.s, this.dataset.i)">Remove</button>
-    </div>`).join('') : '<p class="op-note">No offer products yet — the Trending tab is hidden for customers.</p>';
+      <button type="button" class="op-btn op-btn-danger" style="margin:0;" data-s="${escapeHtml(p._id)}" data-i="${escapeHtml(it._k)}" data-z="${escapeHtml(String(z))}" onclick="opTrendClear(this.dataset.s, this.dataset.i, this.dataset.z)">Remove</button>
+    </div>`).join('') : '<p class="op-note">No offer products yet — the Trending tab and the Food Offers strip are hidden for customers.</p>';
+  const liveBy = {};
+  live.forEach(x => { liveBy[x.p._id] = (liveBy[x.p._id] || 0) + 1; });
   const wrap = document.getElementById('op-trend-shops');
   const q = (document.getElementById('op-trend-search').value || '').trim().toLowerCase();
   const shops = opTrendShops()
     .filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q))
     .sort((a, b) => (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id));
   wrap.innerHTML = shops.length ? shops.map(p => {
-    const n = opTrendMenuList(p).filter(it => Number(it.offerPrice) > 0).length;
+    const n = liveBy[p._id] || 0;
     return `
     <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
       <div>
         <div class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</div>
-        <div class="op-partner-sub">${escapeHtml(opTypeLabel(p.businessType))} · ${n ? n + ' offer item' + (n > 1 ? 's' : '') : 'no offers'}</div>
+        <div class="op-partner-sub">${escapeHtml(opTypeLabel(p.businessType))} · ${n ? n + ' offer' + (n > 1 ? 's' : '') : 'no offers'}</div>
       </div>
       <button type="button" class="op-btn op-btn-push" style="margin:0;" data-id="${escapeHtml(p._id)}" onclick="opTrendOpenShop(this.dataset.id)">✏️ Items</button>
-    </div>`; }).join('') : '<p class="op-note">' + (q ? 'No matching shops.' : 'No Groceries / NESH Mart shops yet.') + '</p>';
+    </div>`; }).join('') : '<p class="op-note">' + (q ? 'No matching shops.' : 'No shops yet.') + '</p>';
   if (opTrendShopId) opTrendRenderItems();
 }
 function opTrendOpenShop(id) {
@@ -11612,7 +11779,23 @@ function opTrendRenderItems() {
   const items = opTrendMenuList(p)
     .filter(it => !q || String(it.name || '').toLowerCase().includes(q))
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-  wrap.innerHTML = items.length ? items.map(it => `
+  wrap.innerHTML = items.length ? items.map(it => {
+    const pt = opTrendPortions(p, it);
+    if (pt.length) {
+      // Food item sold in portions: one offer price per portion (a discounted portion shows as its own item for customers)
+      return `
+    <div class="op-partner-item" style="padding-bottom:6px;">
+      <div class="op-partner-name">${escapeHtml(it.name || 'Item')}</div>
+      ${pt.map((sz, idx) => { const o = opTrendPortionOffer(it, sz); return `
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px;">
+        <div class="op-partner-sub" style="flex:1 1 120px; min-width:0;">${escapeHtml(sz)} · ₹${escapeHtml(String(it.sizePrices[sz]))}${o ? ' · offer ₹' + escapeHtml(String(o)) : ''}</div>
+        <input type="number" inputmode="decimal" min="0" step="any" placeholder="Offer ₹" value="${o ? escapeHtml(String(o)) : ''}" style="width:90px;padding:8px;" id="op-trend-pin-${escapeHtml(it._k)}-${idx}">
+        <button type="button" class="op-btn op-btn-push" style="margin:0;" data-i="${escapeHtml(it._k)}" data-z="${idx}" onclick="opTrendSave(opTrendShopId, this.dataset.i, this.dataset.z)">Save</button>
+        ${o ? `<button type="button" class="op-btn op-btn-danger" style="margin:0;" data-i="${escapeHtml(it._k)}" data-z="${idx}" onclick="opTrendClear(opTrendShopId, this.dataset.i, this.dataset.z)">Remove</button>` : ''}
+      </div>`; }).join('')}
+    </div>`;
+    }
+    return `
     <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
       <div style="min-width:0; flex:1 1 140px;">
         <div class="op-partner-name">${escapeHtml(it.name || 'Item')}</div>
@@ -11621,28 +11804,61 @@ function opTrendRenderItems() {
       <input type="number" inputmode="decimal" min="0" step="any" placeholder="Offer ₹" value="${Number(it.offerPrice) > 0 ? escapeHtml(String(it.offerPrice)) : ''}" style="width:90px;padding:8px;" id="op-trend-in-${escapeHtml(it._k)}">
       <button type="button" class="op-btn op-btn-push" style="margin:0;" data-i="${escapeHtml(it._k)}" onclick="opTrendSave(opTrendShopId, this.dataset.i)">Save</button>
       ${Number(it.offerPrice) > 0 ? `<button type="button" class="op-btn op-btn-danger" style="margin:0;" data-i="${escapeHtml(it._k)}" onclick="opTrendClear(opTrendShopId, this.dataset.i)">Remove</button>` : ''}
-    </div>`).join('') : '<p class="op-note">No items.</p>';
+    </div>`; }).join('') : '<p class="op-note">No items.</p>';
 }
-function opTrendSave(shopId, itemKey) {
+// z = portion index for a Food item sold in portions, empty for a normal one-price item.
+function opTrendSave(shopId, itemKey, z) {
   const p = opAllPartners.find(x => x._id === shopId);
   const it = p && p.menu && p.menu[itemKey];
   const status = document.getElementById('op-trend-status');
-  const inp = document.getElementById('op-trend-in-' + itemKey);
-  if (!it || !inp) return;
-  const v = Number(inp.value);
-  if (!isFinite(v) || v <= 0 || v >= Number(it.price)) { status.textContent = 'Offer price must be above ₹0 and lower than the normal price (₹' + it.price + ').'; return; }
+  if (!it) return;
+  const isPortion = z !== undefined && z !== null && z !== '';
   const { db, ref, update } = window.fb;
+  if (isPortion) {
+    const sz = opTrendPortions(p, it)[Number(z)];
+    const inp = document.getElementById('op-trend-pin-' + itemKey + '-' + Number(z));
+    if (!sz || !inp) return;
+    const normal = Number(it.sizePrices[sz]);
+    const v = Number(inp.value);
+    if (inp.value.trim() === '' || !isFinite(v) || v <= 0 || v >= normal) { status.textContent = 'Offer price must be above ₹0 and lower than the normal price of the ' + sz + ' portion (₹' + normal + ').'; return; }
+    const map = {};
+    opTrendPortions(p, it).forEach(k => { const o = opTrendPortionOffer(it, k); if (o) map[k] = o; });
+    map[sz] = v;
+    status.textContent = 'Saving...';
+    update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerSizePrices: map }).then(() => {
+      it.offerSizePrices = map; status.textContent = 'Saved — "' + (it.name || 'Item') + ' (' + sz + ')" is now in ' + opTrendWhere(p) + '.'; opRenderTrending();
+    }).catch(err => { status.textContent = 'Error: ' + err.message; });
+    return;
+  }
+  const inp = document.getElementById('op-trend-in-' + itemKey);
+  if (!inp) return;
+  const v = Number(inp.value);
+  if (inp.value.trim() === '' || !isFinite(v) || v <= 0 || v >= Number(it.price)) { status.textContent = 'Offer price must be above ₹0 and lower than the normal price (₹' + it.price + ').'; return; }
   status.textContent = 'Saving...';
   update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerPrice: v }).then(() => {
-    it.offerPrice = v; status.textContent = 'Saved — "' + (it.name || 'Item') + '" is now in Trending.'; opRenderTrending();
+    it.offerPrice = v; status.textContent = 'Saved — "' + (it.name || 'Item') + '" is now in ' + opTrendWhere(p) + '.'; opRenderTrending();
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
 }
-function opTrendClear(shopId, itemKey) {
+function opTrendClear(shopId, itemKey, z) {
   const p = opAllPartners.find(x => x._id === shopId);
   const it = p && p.menu && p.menu[itemKey];
   if (!it) return;
-  if (!confirm('Remove the offer on "' + (it.name || 'this item') + '"? It leaves Trending right away.')) return;
+  const isPortion = z !== undefined && z !== null && z !== '';
   const { db, ref, update } = window.fb;
+  if (isPortion) {
+    const sz = opTrendPortions(p, it)[Number(z)];
+    if (!sz) return;
+    if (!confirm('Remove the offer on "' + (it.name || 'this item') + '" (' + sz + ')? It leaves the Food Offers strip right away.')) return;
+    const map = {};
+    opTrendPortions(p, it).forEach(k => { const o = opTrendPortionOffer(it, k); if (o && k !== sz) map[k] = o; });
+    const val = Object.keys(map).length ? map : null;
+    update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerSizePrices: val }).then(() => {
+      if (val) it.offerSizePrices = val; else delete it.offerSizePrices;
+      const st = document.getElementById('op-trend-status'); if (st) st.textContent = 'Offer removed.'; opRenderTrending();
+    }).catch(err => { alert('Error: ' + err.message); });
+    return;
+  }
+  if (!confirm('Remove the offer on "' + (it.name || 'this item') + '"? It leaves ' + opTrendWhere(p) + ' right away.')) return;
   update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerPrice: null }).then(() => {
     delete it.offerPrice; const st = document.getElementById('op-trend-status'); if (st) st.textContent = 'Offer removed.'; opRenderTrending();
   }).catch(err => { alert('Error: ' + err.message); });
@@ -11786,6 +12002,7 @@ function opDeletePushedAppUpdate() {
    Kept in sync here: missing shops are added, deleted shops are removed. */
 let opShopIndex = null, opShopIndexBusy = false, opShopIndexFailed = false;
 function opHealShopIndex(list) {
+  if (opZoneSel !== '__all__') return;   // partial list (zone load) must never delete ids from the customer index
   if (opShopIndex === null || opShopIndexBusy || opShopIndexFailed || !Array.isArray(list) || !list.length) return;
   const ids = new Set(list.map(p => p._id));
   const diff = {}; let n = 0;
@@ -11796,20 +12013,159 @@ function opHealShopIndex(list) {
   const { db, ref, update } = window.fb;
   update(ref(db, 'shopIds'), diff).catch(() => { opShopIndexFailed = true; }).finally(() => { opShopIndexBusy = false; });
 }
+/* Keeps shopIds in step with the real shops WITHOUT downloading them: Firebase's REST `shallow=true`
+   returns only the shop ids (a few KB). Adds shops missing from the index (customer app lists shops from it)
+   and removes ids of deleted shops. Runs once per panel session; any failure just skips it. */
+let opShallowHealDone = false;
+async function opHealIndexShallow() {
+  if (opShallowHealDone || opShopIndex === null || opShopIndexBusy || opShopIndexFailed) return;
+  opShallowHealDone = true;
+  try {
+    const url = 'https://texi-and-food-default-rtdb.firebaseio.com/restaurants.json?shallow=true';
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const real = await res.json();
+    if (!real || typeof real !== 'object') return;
+    const ids = Object.keys(real);
+    if (!ids.length) return;                       // never wipe the index on an odd answer
+    const diff = {}; let n = 0;
+    ids.forEach(id => { if (!(id in opShopIndex)) { diff[id] = true; n++; } });
+    Object.keys(opShopIndex).forEach(id => { if (!(id in real)) { diff[id] = null; n++; } });
+    if (!n) return;
+    opShopIndexBusy = true;
+    const { db, ref, update } = window.fb;
+    await update(ref(db, 'shopIds'), diff).catch(() => { opShopIndexFailed = true; });
+    opShopIndexBusy = false;
+  } catch (e) { opShopIndexBusy = false; }
+}
 /* ---- Restaurant Partners list ---- */
 function opListenPartners() {
-  const { db, ref, onValue, update } = window.fb;
+  const { db, ref, onValue, update, get, set } = window.fb;
   opListenShopZones();
   onValue(ref(db, 'shopIds'), snap => {
     opShopIndex = snap.val() || {};
     try { opHealShopIndex(opAllPartners); } catch (e) {}
+    try { opHealIndexShallow(); } catch (e) {}
+    try { if (opZoneSel === '__none__') opSyncPartnerLoad(); } catch (e) {}
+    try { if (opZoneSel === '__all__' && !opFullUnsub) opSyncPartnerLoad(); } catch (e) {}
   }, () => { opShopIndexFailed = true; });
-  onValue(ref(db, 'restaurants'), snap => {
-    try { opMeasure('restaurants', snap); } catch (e) {}
-    const list = [];
-    snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
+  opFillLoadZoneSelect();
+  opSyncPartnerLoad();
+  try { get(ref(db, 'catalogVer')).then(sn => { if (!sn.exists()) return set(ref(db, 'catalogVer'), Date.now()); }).catch(() => {}); } catch (e) {}
+}
+/* ---- Zone-based shop loading (bandwidth saver) ----
+   Used to download the WHOLE /restaurants node (every shop + every order) on each operator open.
+   Now nothing loads until a zone is picked; then only restaurants/{id} of that zone's shops are
+   listened to (live, so stock/menu/order changes still arrive instantly).
+   '__all__' = old full load, '__none__' = shops that are in no zone (new/pending shops). */
+let opZoneSel = '', opFullUnsub = null, opApplyTimer = null, opLightMode = false;
+const opLightData = {};
+const opShopSubs = {}, opShopData = {};
+function opFillLoadZoneSelect() {
+  const sel = document.getElementById('op-load-zone');
+  if (!sel) return;
+  const cur = opZoneSel;
+  sel.innerHTML = '<option value="">— Select a zone to load shops —</option>' +
+    (opShopZones || []).map(z => `<option value="${z._id}">${escapeHtml(z.name || z._id)}</option>`).join('') +
+    '<option value="__none__">Shops in no zone (new / pending)</option>' +
+    '<option value="__all__">ALL shops (full load - heavy)</option>';
+  sel.value = cur;
+  if (sel.value !== cur) sel.value = '';
+}
+function opSetLoadZone(v) { opZoneSel = v || ''; opSyncPartnerLoad(); }
+function opWantedShopIds() {
+  const want = new Set();
+  const zones = opShopZones || [];
+  const inZone = z => Object.keys(z.shopIds || {}).filter(k => z.shopIds[k]);
+  if (opZoneSel === '__none__') {
+    const used = new Set(); zones.forEach(z => inZone(z).forEach(id => used.add(id)));
+    Object.keys(opShopIndex || {}).forEach(id => { if (!used.has(id)) want.add(id); });
+  } else if (opZoneSel) {
+    const z = zones.find(x => x._id === opZoneSel);
+    if (z) inZone(z).forEach(id => want.add(id));
+  }
+  return want;
+}
+function opScheduleApply() {
+  clearTimeout(opApplyTimer);
+  opApplyTimer = setTimeout(() => {
+    if (opLightMode) {
+      const llist = Object.keys(opLightData).filter(id => opLightData[id]).map(id => Object.assign({ _id: id }, opLightData[id]));
+      try { opMeasure('restaurants', { val: () => opLightData }); } catch (e) {}
+      opApplyPartners(llist, false);
+      return;
+    }
+    const list = Object.keys(opShopData).map(id => opShopData[id]);
+    try { opMeasure('zone shops', { val: () => opShopData }); } catch (e) {}
+    opApplyPartners(list, false);
+  }, 40);
+}
+function opSyncPartnerLoad() {
+  const { db, ref, onValue } = window.fb;
+  if (opZoneSel === '__all__') {
+    Object.keys(opShopSubs).forEach(id => { try { opShopSubs[id](); } catch (e) {} delete opShopSubs[id]; delete opShopData[id]; });
+    // LIGHT load (bandwidth saver): Orders / Profit / Report need only each shop's orders,
+    // settlements, commission and name - NOT the menu, photos, categories. So read just those
+    // children per shop instead of the whole `restaurants` node. If the shop index is not
+    // available, fall back to the old full download.
+    if (opFullUnsub) return;
+    if (opShopIndex && !opShopIndexFailed) {
+      opLightMode = true;
+      const LIGHT = ['orders', 'settlements', 'commissionHistory', 'commissionTiers', 'restaurantName', 'approvalStatus', 'businessType', 'goSeries'];
+      const { query, orderByKey, startAt, endAt } = window.fb;
+      const dStr = opOrdersDayValue(), todayStr = opDateKey(Date.now());
+      const winFrom = opPushPrefix(opDayStartMs(dStr) - 864e5 - 600000);
+      const winTo = opPushPrefix(opDayStartMs(dStr) + 864e5 + 600000) + '~';
+      const unsubs = [];
+      Object.keys(opLightData).forEach(k => delete opLightData[k]);
+      Object.keys(opShopIndex).forEach(id => {
+        LIGHT.forEach(ch => {
+          let target = ref(db, 'restaurants/' + id + '/' + ch);
+          if (ch === 'orders') target = dStr < todayStr ? query(target, orderByKey(), startAt(winFrom), endAt(winTo)) : query(target, orderByKey(), startAt(winFrom));
+          unsubs.push(onValue(target, snap => {
+            const d = opLightData[id] || (opLightData[id] = {});
+            const v = snap.val();
+            if (v == null) delete d[ch]; else d[ch] = v;
+            opScheduleApply();
+          }, () => {}));
+        });
+      });
+      opFullUnsub = () => { unsubs.forEach(u => { try { u(); } catch (e) {} }); opLightMode = false; Object.keys(opLightData).forEach(k => delete opLightData[k]); };
+      opScheduleApply();
+      return;
+    }
+    opLightMode = false;
+    opFullUnsub = onValue(ref(db, 'restaurants'), snap => {
+      try { opMeasure('restaurants', snap); } catch (e) {}
+      const list = [];
+      snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
+      opApplyPartners(list, true);
+    });
+    return;
+  }
+  const hadFull = !!opFullUnsub;
+  if (opFullUnsub) { try { opFullUnsub(); } catch (e) {} opFullUnsub = null; }
+  if (opShopIndex === null && opZoneSel === '__none__') return;   // shop index not here yet - called again when it arrives
+  const want = opWantedShopIds();
+  let changed = hadFull;
+  Object.keys(opShopSubs).forEach(id => {
+    if (!want.has(id)) { try { opShopSubs[id](); } catch (e) {} delete opShopSubs[id]; delete opShopData[id]; changed = true; }
+  });
+  want.forEach(id => {
+    if (opShopSubs[id]) return;
+    changed = true;
+    opShopSubs[id] = onValue(ref(db, 'restaurants/' + id), snap => {
+      if (snap.exists()) opShopData[id] = Object.assign({ _id: id }, snap.val()); else delete opShopData[id];
+      opScheduleApply();
+    }, () => {});
+  });
+  if (changed) opScheduleApply();
+}
+function opApplyPartners(list, full) {
+  const { db, ref, update } = window.fb;
+  {
     opAllPartners = list;
-    try { opHealShopIndex(list); } catch (e) {}
+    if (full) { try { opHealShopIndex(list); } catch (e) {} }
     // Keep an open "assign groceries order" screen in sync when a shop marks
     // an item unavailable/available (skipped while an assignment is running).
     try {
@@ -11853,7 +12209,7 @@ function opListenPartners() {
     if (neshCatSec && neshCatSec.classList.contains('active')) opRenderNeshCategories();
     const catEditorModal = document.getElementById('op-category-editor-modal');
     if (catEditorModal && catEditorModal.classList.contains('show')) opRenderCategoryEditorItems();
-  });
+  }
 }
 function opTypeLabel(t) { return t === 'groceries' ? 'Groceries' : t === 'online_shop' ? 'Other Shop' : 'Hotel'; }
 
@@ -14568,6 +14924,10 @@ document.getElementById('op-bus-search').addEventListener('input', () => {
    ================================================================== */
 let opAllDrivers = [];
 let opCurrentDriverId = null;
+/* Data saver: taxi_drivers / rides are downloaded only when a screen that needs them is first opened. */
+let opDriversStarted = false, opRidesStarted = false;
+function opEnsureDrivers() { if (opDriversStarted) return; opDriversStarted = true; try { opListenDrivers(); } catch (e) { opDriversStarted = false; } }
+function opEnsureRides() { if (opRidesStarted) return; opRidesStarted = true; try { opListenRides(); } catch (e) { opRidesStarted = false; } }
 function opListenDrivers() {
   const { db, ref, onValue } = window.fb;
   onValue(ref(db, 'taxi_drivers'), snap => {
@@ -14861,6 +15221,7 @@ function opListenRides() {
     const list = [];
     snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
     opAllRides = list;
+    try { const da = document.getElementById('op-section-delete-all'); if (da && da.classList.contains('active')) opRenderDeleteAllPreview(); } catch (e) {}
     if (opCurrentDriverId && document.getElementById('op-driver-modal').classList.contains('show')) {
       opPopulateDriverOrderSelect();
     }
@@ -15018,31 +15379,170 @@ function opLoadProfitStart() {
   } catch (e) {}
 }
 function opFmtMoney(n) { n = Math.round(n * 100) / 100; return (n < 0 ? '-' : '') + '₹' + Math.abs(n); }
+/* ---- Profit archive: per-day totals saved in profitDaily/{YYYY-MM-DD} = {count, net} ----
+   Written from the orders while they still exist and never lowered, so deleting orders later
+   does not delete their profit. Order Profit shows max(live orders, archive) for every day. */
+let opProfitDaily = {}, opProfitDailyLoaded = false, opProfitArchiveMsg = '', opProfitArchiveBusy = false;
+function opProfitLiveDays(liveAll, histByShop) {
+  const days = {};
+  liveAll.forEach(o => {
+    if (!o.createdAt) return;
+    const d = new Date(o.createdAt).toLocaleDateString('en-CA');
+    const r = opOrderProfit(o, histByShop[o._shopId]);
+    const x = days[d] || (days[d] = { count: 0, net: 0 });
+    x.count++; x.net += r.net;
+  });
+  Object.keys(days).forEach(d => { days[d].net = Math.round(days[d].net * 100) / 100; });
+  return days;
+}
+async function opLoadProfitDaily() {
+  try {
+    const { db, ref, get } = window.fb;
+    const v = (await get(ref(db, 'profitDaily'))).val() || {};
+    opProfitDaily = v; opProfitDailyLoaded = true;
+    opProfitArchiveMsg = '';
+    opRenderProfit();
+    try { opProfitBoot(); } catch (e3) {}
+  } catch (e) { opProfitArchiveMsg = '⚠ Profit archive could not be read (check database rules for profitDaily)'; try { opRenderProfit(); } catch (e2) {} }
+}
+async function opProfitArchiveSync(liveDays) {
+  // Only with ALL shops loaded (a zone-only list would undercount a day), and after the archive was read.
+  if (!opProfitDailyLoaded || opProfitArchiveBusy) return;
+  const { db, ref, update } = window.fb;
+  const up = {};
+  Object.keys(liveDays).forEach(d => {
+    const a = opProfitDaily[d], l = liveDays[d];
+    if (!a || l.count > a.count) up[d] = { count: l.count, net: l.net, at: Date.now() };
+  });
+  const keys = Object.keys(up);
+  if (!keys.length) return;
+  opProfitArchiveBusy = true;
+  try {
+    await update(ref(db, 'profitDaily'), up);
+    keys.forEach(d => { opProfitDaily[d] = up[d]; });
+    opProfitArchiveMsg = '';
+  } catch (e) {
+    opProfitArchiveMsg = '⚠ Profit archive NOT saved (database rules block profitDaily) - do not delete orders yet';
+  }
+  opProfitArchiveBusy = false;
+}
+/* ---- Order Profit data (date-wise, one-shot reads) ----
+   Order keys are push() ids = time ordered, so one day's orders per shop are read with a key range
+   (restaurants/{id}/orders orderByKey startAt..endAt). Nothing else of the shop is downloaded.
+   All-time profit = sum of the profitDaily archive (+ any loaded day that is newer than its archive). */
+const OP_PUSH_CHARS = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
+function opPushPrefix(t) { let s2 = ''; t = Math.max(0, Math.floor(t)); for (let i = 0; i < 8; i++) { s2 = OP_PUSH_CHARS.charAt(t % 64) + s2; t = Math.floor(t / 64); } return s2; }
+function opDayStartMs(d) { const a = d.split('-').map(Number); return new Date(a[0], a[1] - 1, a[2]).getTime(); }
+function opDayKeyOf(ms) { return new Date(ms).toLocaleDateString('en-CA'); }
+let opProfitOrderMap = {}, opProfitOrders = [], opProfitShops = {}, opProfitLoadedDays = new Set(), opProfitChain = Promise.resolve(), opProfitBusy = 0, opProfitErr = '';
+function opProfitRebuild() {
+  opProfitOrders = Object.keys(opProfitOrderMap).map(k => opProfitOrderMap[k]);
+}
+async function opProfitLoadDays(days) {
+  const need = days.filter(d => d && !opProfitLoadedDays.has(d)).sort();
+  if (!need.length) return;
+  opProfitBusy++;
+  try { opRenderProfit(); } catch (e) {}
+  const { db, ref, get, query, orderByKey, startAt, endAt } = window.fb;
+  try {
+    const ids = Object.keys(opShopIndex || {});
+    if (!opShopIndex) throw new Error('shop list not ready');
+    const from = opDayStartMs(need[0]) - 600000, to = opDayStartMs(need[need.length - 1]) + 864e5 + 600000;
+    const k1 = opPushPrefix(from), k2 = opPushPrefix(to) + '~';
+    const fresh = {};
+    let idx = 0;
+    const worker = async () => {
+      while (idx < ids.length) {
+        const id = ids[idx++];
+        try {
+          if (!opProfitShops[id]) {
+            const [nm, ch] = await Promise.all([get(ref(db, 'restaurants/' + id + '/restaurantName')), get(ref(db, 'restaurants/' + id + '/commissionHistory'))]);
+            opProfitShops[id] = { name: nm.val() || id, commissionHistory: ch.val() || null };
+          }
+          const snap = await get(query(ref(db, 'restaurants/' + id + '/orders'), orderByKey(), startAt(k1), endAt(k2)));
+          snap.forEach(c => { fresh[id + '/' + c.key] = Object.assign({ _shopId: id, _shopName: opProfitShops[id].name, _id: c.key }, c.val() || {}); });
+        } catch (e) { throw e; }
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker(), worker(), worker()]);
+    // replace everything inside the loaded window, keep the rest
+    Object.keys(opProfitOrderMap).forEach(k => { const c = Number(opProfitOrderMap[k].createdAt) || 0; if (c >= from && c <= to) delete opProfitOrderMap[k]; });
+    Object.assign(opProfitOrderMap, fresh);
+    opProfitRebuild();
+    for (let t = opDayStartMs(need[0]); t <= opDayStartMs(need[need.length - 1]); t += 864e5) opProfitLoadedDays.add(opDayKeyOf(t + 3600000));
+    opProfitErr = '';
+  } catch (e) { opProfitErr = '⚠ Could not load orders (' + (e && e.message || e) + ') — pick the date again to retry'; }
+  opProfitBusy--;
+  try { opRenderProfit(); } catch (e) {}
+}
+function opProfitQueue(days) { opProfitChain = opProfitChain.then(() => opProfitLoadDays(days)).catch(() => {}); return opProfitChain; }
+// Called once the archive is read: loads the picked date + any days not yet in the archive (normally just today).
+function opProfitBoot() {
+  if (!opProfitStartAt) { setTimeout(opProfitBoot, 800); return; }
+  const dEl = document.getElementById('op-profit-date');
+  const sel = (dEl && dEl.value) || opDayKeyOf(Date.now());
+  const arch = Object.keys(opProfitDaily).sort();
+  const first = arch.length ? arch[arch.length - 1] : opDayKeyOf(opProfitStartAt);
+  const days = [];
+  for (let t = opDayStartMs(first); t <= Date.now() && days.length < 62; t += 864e5) days.push(opDayKeyOf(t + 3600000));
+  days.push(sel);
+  opProfitQueue(Array.from(new Set(days)));
+}
+function opProfitDateChanged() {
+  const dEl = document.getElementById('op-profit-date');
+  if (dEl && dEl.value) opProfitQueue([dEl.value]);
+  opRenderProfit();
+}
 function opRenderProfit() {
   const listEl = document.getElementById('op-profit-list');
   const sumEl = document.getElementById('op-profit-summary');
   if (!listEl || !sumEl) return;
   const dateEl = document.getElementById('op-profit-date');
-  const allEl = document.getElementById('op-profit-all');
-  const day = (dateEl && dateEl.value) || '';
-  const allDates = !!(allEl && allEl.checked);
+  const day = (dateEl && dateEl.value) || opDayKeyOf(Date.now());
   const startNote = document.getElementById('op-profit-start');
   if (startNote) startNote.textContent = opProfitStartAt ? 'Recording orders placed from ' + new Date(opProfitStartAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' onwards.' : 'Loading…';
   if (!opProfitStartAt) { sumEl.innerHTML = ''; listEl.innerHTML = '<div class="op-empty">Loading…</div>'; return; }
-  let list = opFlattenAllOrders().filter(o => ['delivered', 'completed', 'done'].includes((o.status || '').toLowerCase()) && (Number(o.createdAt) || 0) >= opProfitStartAt);
-  if (!allDates && day) list = list.filter(o => o.createdAt && new Date(o.createdAt).toLocaleDateString('en-CA') === day);
+  // only orders of fully loaded days (a day at the edge of a query window is partial)
+  const liveAll = opProfitOrders.filter(o => ['delivered', 'completed', 'done'].includes((o.status || '').toLowerCase()) && (Number(o.createdAt) || 0) >= opProfitStartAt && opProfitLoadedDays.has(opDayKeyOf(Number(o.createdAt) || 0)));
+  const dayLoaded = opProfitLoadedDays.has(day);
+  let list = liveAll.filter(o => o.createdAt && opDayKeyOf(o.createdAt) === day);
   list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   let total = 0;
   const histByShop = {};
-  opAllPartners.forEach(pt => { histByShop[pt._id] = pt.commissionHistory; });
+  Object.keys(opProfitShops).forEach(id => { histByShop[id] = opProfitShops[id].commissionHistory; });
   const rows = list.map(o => { const r = opOrderProfit(o, histByShop[o._shopId]); total += r.net; return { o, r }; });
   total = Math.round(total * 100) / 100;
+  let shownCount = list.length, archNote = '';
+  let allCount = 0, allNet = 0;
+  try {
+    const liveDays = opProfitLiveDays(liveAll, histByShop);
+    opProfitArchiveSync(liveDays);
+    const a0 = opProfitDaily[day], l0 = liveDays[day] || { count: 0, net: 0 };
+    if (a0 && a0.count > l0.count) {
+      const xc = a0.count - l0.count, xn = (Number(a0.net) || 0) - l0.net;
+      shownCount += xc; total = Math.round((total + xn) * 100) / 100;
+      archNote = xc + ' deleted order' + (xc > 1 ? 's' : '') + ' counted from the saved profit archive';
+    }
+    const keys = new Set(Object.keys(opProfitDaily).concat(Object.keys(liveDays)));
+    keys.forEach(d => {
+      const a = opProfitDaily[d], l = liveDays[d];
+      const use = (l && (!a || l.count >= a.count)) ? l : a;
+      if (use) { allCount += Number(use.count) || 0; allNet += Number(use.net) || 0; }
+    });
+    allNet = Math.round(allNet * 100) / 100;
+    if (opProfitArchiveMsg) archNote += (archNote ? ' · ' : '') + opProfitArchiveMsg;
+  } catch (e) {}
+  if (opProfitErr) archNote += (archNote ? ' · ' : '') + opProfitErr;
+  const col = v => (v < 0 ? '#dc2626' : '#14532d');
   sumEl.innerHTML =
-    '<div class="op-report-summary-item"><div class="n">' + list.length + '</div><div class="l">Delivered orders</div></div>' +
-    '<div class="op-report-summary-item"><div class="n" style="color:' + (total < 0 ? '#dc2626' : '#14532d') + '">' + opFmtMoney(total) + '</div><div class="l">Total profit</div></div>';
-  if (!rows.length) { listEl.innerHTML = '<div class="op-empty">No delivered orders for this date.</div>'; return; }
+    '<div class="op-report-summary-item"><div class="n">' + shownCount + '</div><div class="l">Delivered orders (this date)</div></div>' +
+    '<div class="op-report-summary-item"><div class="n" style="color:' + col(total) + '">' + opFmtMoney(total) + '</div><div class="l">Profit (this date)</div></div>' +
+    '<div class="op-report-summary-item"><div class="n" style="color:' + col(allNet) + '">' + opFmtMoney(allNet) + '</div><div class="l">All-time profit · ' + allCount + ' orders</div></div>';
+  const noteHtml = archNote ? '<div class="op-note" style="margin:0 0 8px;">🗄 ' + escapeHtml(archNote) + '</div>' : '';
+  if (!dayLoaded && opProfitBusy > 0) { listEl.innerHTML = noteHtml + '<div class="op-empty">Loading this date…</div>'; return; }
+  if (!rows.length) { listEl.innerHTML = noteHtml + '<div class="op-empty">' + (shownCount > 0 ? 'Order details were deleted — only the saved profit total is shown.' : 'No delivered orders for this date.') + '</div>'; return; }
   const line = (label, val, sign) => '<div style="display:flex;justify-content:space-between;gap:10px;font-size:.9rem;padding:2px 0;color:#374151;"><span>' + label + '</span><span style="white-space:nowrap;">' + sign + ' ₹' + Math.abs(Math.round(val * 100) / 100) + '</span></div>';
-  listEl.innerHTML = rows.map(({ o, r }) =>
+  listEl.innerHTML = noteHtml + rows.map(({ o, r }) =>
     '<div class="op-order-item">' +
       '<div class="op-order-top"><span class="op-order-shop">' + escapeHtml(o._shopName || '') + '</span>' +
       '<span class="op-order-no">#' + escapeHtml(String(o.orderNumber || o._id || '')) + '</span></div>' +
@@ -15058,6 +15558,15 @@ function opRenderProfit() {
       '<div class="op-order-amt" style="border-top:1px solid #cfe6d5;margin-top:6px;padding-top:6px;"><span>You earn</span><b style="color:' + (r.net < 0 ? '#dc2626' : '#14532d') + '">' + opFmtMoney(r.net) + '</b></div>' +
     '</div>'
   ).join('');
+}
+let opOrdersDay = '';
+function opOrdersDayValue() { return opOrdersDay || opDateKey(Date.now()); }
+function opOrdersDayChanged() {
+  const el = document.getElementById('op-orders-date');
+  opOrdersDay = (el && el.value) || '';
+  if (opFullUnsub) { try { opFullUnsub(); } catch (e) {} opFullUnsub = null; }
+  if (opZoneSel === '__all__') { try { opSyncPartnerLoad(); } catch (e) {} }
+  opRenderOrdersList();
 }
 function opSwitchOrdersTab(tab) {
   opOrdersTab = tab;
@@ -15079,6 +15588,7 @@ function opRenderOrdersList() {
     if (opOrdersTab === 'cancelled') return ['cancelled', 'rejected'].includes(status);
     return !['delivered', 'completed', 'done', 'cancelled', 'rejected'].includes(status); // in progress
   });
+  if (opOrdersTab !== 'inprogress') { const dd = opOrdersDayValue(); list = list.filter(o => opDateKey(o.createdAt) === dd); }
   if (q) {
     list = list.filter(o =>
       (o._shopName || '').toLowerCase().includes(q) ||
@@ -15229,8 +15739,9 @@ function opRenderReportShopList() {
   const wrap = document.getElementById('op-report-shop-list');
   if (!wrap) return;
   const q = (document.getElementById('op-report-shop-search').value || '').toLowerCase();
-  const filtered = opAllPartners.filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q));
-  if (!filtered.length) { wrap.innerHTML = '<div class="op-empty">No restaurant partners found.</div>'; return; }
+  const src = Object.keys(opLiteShops).length ? Object.keys(opLiteShops).map(id => opLiteShops[id]) : opAllPartners;
+  const filtered = src.filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q)).sort((a, b) => String(a.restaurantName || a._id).localeCompare(String(b.restaurantName || b._id)));
+  if (!filtered.length) { wrap.innerHTML = '<div class="op-empty">' + (opLiteShopsBusy ? 'Loading shops…' : 'No restaurant partners found.') + '</div>'; return; }
   wrap.innerHTML = filtered.map(p => `
     <div class="op-partner-item" onclick="opOpenReportShop('${p._id}')">
       <div class="op-partner-top">
@@ -15240,8 +15751,51 @@ function opRenderReportShopList() {
     </div>
   `).join('');
 }
+/* Daily Report data saver: shop names come from 2 tiny fields per shop; the orders of ONE shop for
+   ONE date are read with a key range (order keys are push() ids = time ordered). */
+let opLiteShops = {}, opLiteShopsBusy = false, opReportLoadedKey = '', opReportOrdersRaw = [], opReportLoading = false, opReportErr = '';
+async function opLoadLiteShops() {
+  if (opLiteShopsBusy) return;
+  if (!opShopIndex) { setTimeout(opLoadLiteShops, 800); return; }
+  const ids = Object.keys(opShopIndex).filter(id => !opLiteShops[id]);
+  if (!ids.length) return;
+  opLiteShopsBusy = true;
+  const { db, ref, get } = window.fb;
+  let i = 0;
+  const worker = async () => {
+    while (i < ids.length) {
+      const id = ids[i++];
+      try {
+        const [nm, bt] = await Promise.all([get(ref(db, 'restaurants/' + id + '/restaurantName')), get(ref(db, 'restaurants/' + id + '/businessType'))]);
+        opLiteShops[id] = { _id: id, restaurantName: nm.val() || id, businessType: bt.val() || '' };
+      } catch (e) {}
+    }
+  };
+  await Promise.all([worker(), worker(), worker(), worker(), worker(), worker()]);
+  opLiteShopsBusy = false;
+  try { opRenderReportShopList(); } catch (e) {}
+}
+async function opReportLoad() {
+  const dateVal = (document.getElementById('op-report-date-input') || {}).value;
+  if (!opReportShopId || !dateVal) return;
+  const key = opReportShopId + '|' + dateVal;
+  if (opReportLoadedKey === key) return;
+  opReportLoadedKey = key; opReportLoading = true; opReportOrdersRaw = []; opReportErr = '';
+  try { opRenderReportOrders(); } catch (e) {}
+  try {
+    const { db, ref, get, query, orderByKey, startAt, endAt } = window.fb;
+    const t0 = opDayStartMs(dateVal);
+    const snap = await get(query(ref(db, 'restaurants/' + opReportShopId + '/orders'), orderByKey(), startAt(opPushPrefix(t0 - 600000)), endAt(opPushPrefix(t0 + 864e5 + 600000) + '~')));
+    if (opReportLoadedKey !== key) return;
+    const arr = [];
+    snap.forEach(c => { arr.push(Object.assign({ _id: c.key }, c.val() || {})); });
+    opReportOrdersRaw = arr;
+  } catch (e) { opReportLoadedKey = ''; opReportErr = 'Could not load orders (' + (e && e.message || e) + ') - pick the date again to retry.'; }
+  opReportLoading = false;
+  try { opRenderReportOrders(); } catch (e) {}
+}
 function opOpenReportShop(id) {
-  const p = opAllPartners.find(x => x._id === id);
+  const p = opLiteShops[id] || opAllPartners.find(x => x._id === id);
   opReportShopId = id;
   opReportShopName = (p && p.restaurantName) || id;
   document.getElementById('op-report-shop-name').textContent = opReportShopName;
@@ -15257,12 +15811,12 @@ function opRenderReportOrders() {
   const summaryEl = document.getElementById('op-report-summary');
   const delBtn = document.getElementById('op-report-delete-btn');
   if (!listEl || !opReportShopId) return;
-  const p = opAllPartners.find(x => x._id === opReportShopId);
   const dateVal = document.getElementById('op-report-date-input').value;
+  if (dateVal && opReportLoadedKey !== opReportShopId + '|' + dateVal) { opReportLoad(); return; }
+  if (opReportLoading) { listEl.innerHTML = '<div class="op-empty">Loading this date…</div>'; document.getElementById('op-report-summary').innerHTML = ''; delBtn.style.display = 'none'; return; }
+  if (opReportErr) { listEl.innerHTML = '<div class="op-empty">' + escapeHtml(opReportErr) + '</div>'; document.getElementById('op-report-summary').innerHTML = ''; delBtn.style.display = 'none'; return; }
 
-  const matched = (p && p.orders && dateVal)
-    ? Object.keys(p.orders).map(oid => Object.assign({ _id: oid }, p.orders[oid])).filter(o => opDateKey(o.createdAt) === dateVal)
-    : [];
+  const matched = dateVal ? opReportOrdersRaw.filter(o => opDateKey(o.createdAt) === dateVal) : [];
   opReportOrdersCache = matched;
 
   if (!matched.length) {
@@ -15317,7 +15871,7 @@ function opDeleteReportDate() {
   opReportOrdersCache.forEach(o => { updates[o._id] = null; });
   update(ref(db, 'restaurants/' + opReportShopId + '/orders'), updates).then(() => {
     delStatus.textContent = 'Deleted ' + opReportOrdersCache.length + ' order(s) for ' + dateVal + '.';
-    opReportOrdersCache = [];
+    opReportOrdersCache = []; opReportOrdersRaw = [];
     document.getElementById('op-report-orders-list').innerHTML = '<div class="op-empty">No orders on this date.</div>';
     document.getElementById('op-report-summary').innerHTML = '';
     document.getElementById('op-report-delete-btn').style.display = 'none';
@@ -15328,6 +15882,7 @@ function opDeleteReportDate() {
 let opDelAllOrdersCache = []; // flattened shop orders (each has _shopId, _id) matched to the picked date
 let opDelAllRidesCache = [];  // rides (each has _id) matched to the picked date
 function opOpenDeleteAllSection() {
+  opEnsureRides();
   document.getElementById('op-delall-status').textContent = '';
   const dateInput = document.getElementById('op-delall-date-input');
   if (!dateInput.value) dateInput.value = opDateKey(Date.now());
@@ -15502,7 +16057,7 @@ async function opCreateShop() {
   const location = document.getElementById('op-as-location').value.trim();
   const gst = document.getElementById('op-as-gst').value.trim();
   const category = document.getElementById('op-as-category').value.trim();
-  const username = document.getElementById('op-as-username').value.trim();
+  const username = document.getElementById('op-as-username').value.trim().toLowerCase();
   const password = document.getElementById('op-as-password').value;
   if (!name || !address || !username || !password) { fail('Fill shop name, address, username and password.'); return; }
   if (/[.#$\[\]\/\s]/.test(username)) { fail('Username cannot have spaces or . # $ [ ] /'); return; }
@@ -15513,7 +16068,9 @@ async function opCreateShop() {
   try {
     const { db, ref, get, set, update } = window.fb;
     const snap = await get(ref(db, 'restaurants/' + username));
-    if (snap.exists()) { fail('This username is already taken.'); btn.disabled = false; return; }
+    let taken = snap.exists();
+    if (!taken) { try { const ix = await get(ref(db, 'shopIds')); if (ix.exists()) taken = Object.keys(ix.val() || {}).some(k => k.toLowerCase() === username); } catch (e) {} }
+    if (taken) { fail('This username is already taken.'); btn.disabled = false; return; }
     const record = {
       restaurantName: name, address, location, gst,
       username, password, businessType,
@@ -15524,7 +16081,14 @@ async function opCreateShop() {
     };
     if (businessType === 'online_shop' && category) record.opCategory = category;
     if (businessType === 'groceries') record.goSeries = true;
-    await set(ref(db, 'restaurants/' + username), record);
+    // Create only if nobody else got this username in the meantime (transaction); fall back to a plain write if transactions are not allowed.
+    let created = false;
+    try {
+      const tr = await window.fb.runTransaction(ref(db, 'restaurants/' + username), cur => (cur === null ? record : undefined));
+      if (!tr.committed) { fail('This username is already taken.'); btn.disabled = false; return; }
+      created = true;
+    } catch (e) { created = false; }
+    if (!created) await set(ref(db, 'restaurants/' + username), record);
     try { const f = window.fb; f.get(f.ref(f.db, 'shopIds')).then(sn => { if (sn.exists()) return f.update(f.ref(f.db, 'shopIds'), { [username]: true }); }).catch(() => {}); } catch (e) {} // only once the index has been created by the Operator Panel
     // Groceries shops go into the zone their location falls inside (same as approving one).
     let zoneMsg = '';
