@@ -1930,6 +1930,11 @@
           <h3>Groceries Reward</h3>
           <p>After N Groceries orders: coupon or free item (Groceries only)</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('referral')">
+          <div class="op-home-icon">🎁</div>
+          <h3>Refer &amp; Earn</h3>
+          <p>Friend's first order delivered: both get ₹ off (wallet, Food orders)</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('video-ads')">
           <div class="op-home-icon">📺</div>
           <h3>Video Ads</h3>
@@ -2705,6 +2710,26 @@
       <button type="button" class="op-btn op-btn-push" onclick="opLsSave()">💾 Save Groceries reward</button>
       <button type="button" class="op-btn" style="margin-left:8px;" onclick="opLsDelete()">🗑 Remove</button>
       <p class="op-note" id="op-ls-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- REFER &amp; EARN — stored at app_config/referral = { on, value, minOrder, minFirst, maxRewards, link }. Customer side: referral/{phone}, referralCodes/{CODE}, referralFriends/{referrer}/{friend} -->
+  <div class="op-section" id="op-section-referral">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Refer &amp; Earn</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Every customer gets a code to share. When the friend's FIRST order is DELIVERED, both the friend and the customer who referred them get the reward amount in their wallet. The wallet is applied automatically on Food orders (one reward per order). Changing the amount later only affects rewards earned after the change; amounts already earned stay as they were.</p>
+      <label style="color:#15803d;font-size:.85rem;display:block;margin-bottom:10px;"><input type="checkbox" id="op-ref-on" checked> ✅ Refer &amp; Earn is ON</label>
+      <div style="margin:0 0 10px;"><input type="number" id="op-ref-value" min="1" placeholder="Reward amount ₹ (for each reward)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;width:250px;max-width:100%;"></div>
+      <div style="margin:0 0 10px;"><input type="number" id="op-ref-min" min="0" placeholder="Min order ₹ to use the reward (0 = none)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;width:300px;max-width:100%;"></div>
+      <div style="margin:0 0 10px;"><input type="number" id="op-ref-minfirst" min="0" placeholder="Min items ₹ for the friend's first order to count (0 = any)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;width:360px;max-width:100%;"></div>
+      <div style="margin:0 0 10px;"><input type="number" id="op-ref-max" min="1" max="500" placeholder="Max rewards one customer can earn (default 20)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;width:320px;max-width:100%;"></div>
+      <div style="margin:0 0 10px;"><input type="text" id="op-ref-link" maxlength="300" placeholder="Share link (empty = Play Store link of the app)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;width:100%;max-width:420px;"></div>
+      <button type="button" class="op-btn op-btn-push" onclick="opRefSave()">💾 Save Refer &amp; Earn</button>
+      <button type="button" class="op-btn" style="margin-left:8px;" onclick="opRefDelete()">🗑 Remove</button>
+      <p class="op-note" id="op-ref-status" style="margin-top:10px;"></p>
     </div>
   </div>
 
@@ -9434,6 +9459,7 @@ function opOpenSection(name) {
   if (name === 'coupons') { opCpnBuildShops(); try { opCpnEditReset(false); } catch (e) {} opLoadZoneNames().then(function () { opCpnBuildZones(); opLoadCoupons(); }); }
   if (name === 'loyalty') { opLoyBuildShops(); opLoyLoad(); opLoyLoadClaims(); opLoyLoadNudge(); }
   if (name === 'loyalty-store') { opLsRenderItemSelect(); opLsLoad(); }
+  if (name === 'referral') opRefLoad();
   if (name === 'notify') { opLoadPosters(); opRenderNotifyZones(); }
   if (name === 'zones') opRenderZonesList();
   if (name === 'category-order') opRenderCategoryOrder();
@@ -17728,6 +17754,42 @@ function opLsDelete() {
   var fb = window.fb; if (!fb) return;
   if (!confirm('Remove the Groceries reward? Customers will no longer see it.')) return;
   fb.remove(fb.ref(fb.db, 'app_config/loyaltyStore')).then(function () { opLsMsg('Removed.'); }).catch(function (e) { opLsMsg('Error: ' + ((e && e.message) || '')); });
+}
+/* ---- REFER & EARN (operator) ---- app_config/referral = { on, value, minOrder, minFirst, maxRewards, link, ts } */
+function opRefMsg(t) { var e = document.getElementById('op-ref-status'); if (e) e.textContent = t || ''; }
+function opRefLoad() {
+  var fb = window.fb; if (!fb) return;
+  fb.get(fb.ref(fb.db, 'app_config/referral')).then(function (snap) {
+    var v = snap.val(); if (!v) { opRefMsg('Not set up yet. Enter the reward amount and save.'); return; }
+    document.getElementById('op-ref-on').checked = v.on !== false;
+    document.getElementById('op-ref-value').value = v.value || '';
+    document.getElementById('op-ref-min').value = v.minOrder || '';
+    document.getElementById('op-ref-minfirst').value = v.minFirst || '';
+    document.getElementById('op-ref-max').value = v.maxRewards || '';
+    document.getElementById('op-ref-link').value = v.link || '';
+    opRefMsg(v.on === false ? 'Saved, but currently OFF.' : (Number(v.value) > 0 ? 'Live ✅ — reward ₹' + v.value : 'Reward amount is 0, so it is OFF.'));
+  }).catch(function () { opRefMsg('Could not load.'); });
+}
+function opRefSave() {
+  var fb = window.fb; if (!fb) { opRefMsg('Not connected yet, try again.'); return; }
+  var value = Math.round((parseFloat(document.getElementById('op-ref-value').value) || 0) * 100) / 100;
+  if (!(value > 0)) { opRefMsg('Enter the reward amount in ₹ (more than 0). To stop it, untick ON.'); return; }
+  var link = document.getElementById('op-ref-link').value.trim();
+  if (link && !/^https?:\/\//i.test(link)) { opRefMsg('The share link must start with http:// or https://'); return; }
+  var max = Math.floor(parseFloat(document.getElementById('op-ref-max').value) || 20);
+  if (max < 1) max = 1; if (max > 500) max = 500;
+  opRefMsg('Saving...');
+  fb.set(fb.ref(fb.db, 'app_config/referral'), {
+    on: document.getElementById('op-ref-on').checked, value: value,
+    minOrder: Math.max(0, parseFloat(document.getElementById('op-ref-min').value) || 0),
+    minFirst: Math.max(0, parseFloat(document.getElementById('op-ref-minfirst').value) || 0),
+    maxRewards: max, link: link, ts: Date.now()
+  }).then(function () { opRefMsg('Saved ✅ — customers see it now (Food home).'); }).catch(function (e) { opRefMsg('Error: ' + ((e && e.message) || 'could not save')); });
+}
+function opRefDelete() {
+  var fb = window.fb; if (!fb) return;
+  if (!confirm('Remove Refer & Earn? Customers will no longer see it. Rewards they already earned are kept but cannot be used until you set it up again.')) return;
+  fb.remove(fb.ref(fb.db, 'app_config/referral')).then(function () { opRefMsg('Removed.'); }).catch(function (e) { opRefMsg('Error: ' + ((e && e.message) || '')); });
 }
 
 /* ---- LOYALTY REWARD (operator) ----
