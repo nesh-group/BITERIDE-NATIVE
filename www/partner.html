@@ -1900,6 +1900,11 @@
           <h3>Online Payment UPI</h3>
           <p>One UPI ID for every shop's online payment (shops' own UPI is switched off)</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('login-otp')">
+          <div class="op-home-icon">🔐</div>
+          <h3>Login OTP</h3>
+          <p>Turn the OTP at customer login ON or OFF (OFF = mobile number alone logs in)</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('item-share')">
           <div class="op-home-icon">📤</div>
           <h3>Item Share Button</h3>
@@ -2108,6 +2113,11 @@
           <div class="op-home-icon">👥</div>
           <h3>Visits</h3>
           <p>Daily customer app visits (one per device per day)</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('pay-requests')">
+          <div class="op-home-icon">🧹</div>
+          <h3>Pay Requests</h3>
+          <p>See and delete old "pay for me" links and their saved card images (frees database space)</p>
         </div>
         <div class="op-home-card" onclick="opOpenSection('notify')">
           <div class="op-home-icon">📢</div>
@@ -2603,6 +2613,19 @@
     </div>
   </div>
 
+  <!-- LOGIN OTP ON/OFF (app_config/otpOff: true = no OTP) -->
+  <div class="op-section" id="op-section-login-otp">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Login OTP</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">OTP ON: customers get an SMS code when they log in. OTP OFF: the mobile number alone logs in (no SMS). Takes effect right away for the next login, no app update needed. It is ON by default. Customers abroad never get an OTP.</p>
+      <div class="op-mc-row" style="margin-bottom:10px;"><b>Customer login OTP:</b> <span id="op-login-otp-status">—</span></div>
+      <button type="button" class="op-btn" id="op-login-otp-toggle-btn" onclick="opToggleLoginOtp()" style="margin-bottom:14px;"></button>
+    </div>
+  </div>
+
   <!-- ITEM SHARE BUTTON ON/OFF -->
   <div class="op-section" id="op-section-item-share">
     <div class="op-section-header">
@@ -2918,6 +2941,27 @@
     </div>
   </div>
 
+
+  <div class="op-section" id="op-section-pay-requests">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Pay Requests</h2>
+    </div>
+    <div class="op-section-body">
+      <p style="color:#475569; font-size:.78rem; margin:0 0 14px; line-height:1.5;">Each "pay for me" link saves a request, a preview and a card image in the database. Deleting removes all three. A deleted link stops working, so keep recent ones.</p>
+      <select id="op-pr-age" onchange="opPrRender()" style="width:100%;padding:10px;font-family:inherit;font-size:.95rem;margin-bottom:10px;">
+        <option value="0">All pay requests</option>
+        <option value="1" selected>Older than 1 day</option>
+        <option value="3">Older than 3 days</option>
+        <option value="7">Older than 7 days</option>
+        <option value="30">Older than 30 days</option>
+      </select>
+      <button type="button" class="op-btn" id="op-pr-del-btn" onclick="opPrDeleteShown()" style="margin-bottom:10px;">Delete these</button>
+      <button type="button" class="op-btn" onclick="opPrLoad()" style="margin-bottom:10px;">Reload</button>
+      <p class="op-note" id="op-pr-status" style="margin:0 0 10px;"></p>
+      <div id="op-pr-list"></div>
+    </div>
+  </div>
 
   <!-- HOME CATEGORY ORDER -->
   <div class="op-section" id="op-section-category-order">
@@ -4171,10 +4215,30 @@
       } else add(base);
       return Array.from(out);
     };
+    // app_config stamps: every write under app_config/{node} also sets appConfigVer/{node} = now, so customer apps that cache
+    // that node (see appConfigVer in the customer app) download it again - live, and only that node.
+    let cfgT = null; const cfgDirty = new Set();
+    const cfgBump = (nodes) => {
+      (nodes || []).forEach(n => cfgDirty.add(n));
+      clearTimeout(cfgT);
+      cfgT = setTimeout(() => {
+        const list = Array.from(cfgDirty); cfgDirty.clear();
+        const now = Date.now(), u = {}; list.forEach(n => { u[n] = now; });
+        if (list.length) orig.update(ref(db, 'appConfigVer'), u).catch(e => { try { console.warn('appConfigVer write blocked (add it to the database rules):', e && e.message); } catch (e2) {} });
+      }, 150);
+    };
+    const cfgTouched = (r, vals) => {
+      const base = pathOf(r), out = new Set();
+      const add = p => { const m = /^app_config\/([^/]+)/.exec(p); if (m) out.add(m[1]); };
+      if ((base === 'app_config' || base === '') && vals && typeof vals === 'object') Object.keys(vals).forEach(k => add((base ? base + '/' : '') + k));
+      else add(base);
+      return Array.from(out);
+    };
     const wrap = (name, hasVal) => {
       f[name] = function (r, v) {
         const p = orig[name].apply(null, arguments);
         try { const ids = shopsTouched(r, hasVal ? v : null); if (ids.length) Promise.resolve(p).then(() => bump(ids), () => {}); } catch (e) {}
+        try { const ns = cfgTouched(r, hasVal ? v : null); if (ns.length) Promise.resolve(p).then(() => cfgBump(ns), () => {}); } catch (e) {}
         return p;
       };
     };
@@ -4241,6 +4305,9 @@
   // ---- Cloudinary photo upload (free, no card, no backend needed) ----
   window.CLOUDINARY_CLOUD_NAME = "gsbs6xkx";
   window.CLOUDINARY_UPLOAD_PRESET = "llwpguwm";
+  // R2 upload Worker (see nesh-upload-worker.js). While NESH_UPLOAD_ENDPOINT is empty, photos still go to Cloudinary.
+  window.NESH_UPLOAD_ENDPOINT = "https://photo-uplod.neshgroup1.workers.dev";   // e.g. "https://nesh-upload.YOURNAME.workers.dev"
+  window.NESH_UPLOAD_KEY = "nesh-up-7Kq92xLm4Rt8Vb3Zc6";        // same text as the Worker's UPLOAD_KEY secret
   window.dispatchEvent(new Event('fb-ready'));
 </script>
 
@@ -5845,6 +5912,17 @@ async function opHandleNotifyImageUpload(e) {
 }
 
 async function uploadPhotoToCloudinary(blob) {
+  // New: Cloudflare R2 via the upload Worker (when configured). Name kept so every caller works unchanged.
+  if (window.NESH_UPLOAD_ENDPOINT) {
+    const fd = new FormData();
+    fd.append('file', blob, 'photo.jpg');
+    const headers = window.NESH_UPLOAD_KEY ? { 'X-Nesh-Key': window.NESH_UPLOAD_KEY } : {};
+    const r = await fetch(window.NESH_UPLOAD_ENDPOINT, { method: 'POST', body: fd, headers });
+    if (!r.ok) throw new Error('Upload failed: ' + r.status);
+    const j = await r.json();
+    if (!j.url) throw new Error('Upload failed: no url');
+    return j.url;
+  }
   const formData = new FormData();
   formData.append('file', blob);
   formData.append('upload_preset', window.CLOUDINARY_UPLOAD_PRESET);
@@ -9406,6 +9484,7 @@ function opEnterPanel() {
   opListenBuses();
   opListenBusFeatureToggle();
   opListenItemShareToggle();
+  opListenLoginOtpToggle();
   opListenCategoryOrder();
   opListenShopOrder();
   opListenNeshItemOrder();
@@ -9445,6 +9524,92 @@ function opRestoreZoneLoad() {
   opZoneSel = opZoneBeforeAll; opZoneBeforeAll = null;
   try { opFillLoadZoneSelect(); opSyncPartnerLoad(); } catch (e) {}
 }
+/* ===== Pay Requests cleanup ===== */
+var _opPr = { rows: [], shown: [] };
+function opPrAge(ms) {
+  if (!ms) return 'unknown age';
+  const d = (Date.now() - ms) / 86400000;
+  if (d < 1) return Math.max(1, Math.round(d * 24)) + ' h old';
+  return Math.floor(d) + ' d old';
+}
+async function opPrLoad() {
+  const st = document.getElementById('op-pr-status'), box = document.getElementById('op-pr-list');
+  if (!st || !box) return;
+  st.textContent = 'Loading…'; box.innerHTML = '';
+  try {
+    const { db, ref, get } = window.fb;
+    const res = await Promise.all([get(ref(db, 'payRequests')), get(ref(db, 'payPreview'))]);
+    const reqs = res[0].val() || {}, prevs = res[1].val() || {};
+    let cardKeys = [];
+    try { // keys only, so the big card images are not downloaded
+      const r = await fetch('https://texi-and-food-default-rtdb.firebaseio.com/payCards.json?shallow=true');
+      if (r.ok) { const j = await r.json(); cardKeys = j ? Object.keys(j) : []; }
+    } catch (e) {}
+    const cardSet = new Set(cardKeys);
+    const keys = new Set(Object.keys(reqs).concat(Object.keys(prevs), cardKeys));
+    _opPr.rows = Array.from(keys).map(function (k) {
+      const q = reqs[k] || null, p = prevs[k] || null;
+      return {
+        key: k, hasReq: !!q, hasPrev: !!p, hasCard: cardSet.has(k),
+        status: q ? (q.status || '') : '',
+        restName: (q && q.restName) || (p && p.restName) || '',
+        fromName: (q && q.fromName) || (p && p.fromName) || '',
+        at: (q && q.createdAt) || (p && p.at) || 0
+      };
+    }).sort(function (a, b) { return b.at - a.at; });
+    opPrRender();
+  } catch (e) { st.textContent = 'Could not load: ' + ((e && e.message) || e); }
+}
+function opPrRender() {
+  const st = document.getElementById('op-pr-status'), box = document.getElementById('op-pr-list');
+  const sel = document.getElementById('op-pr-age'), btn = document.getElementById('op-pr-del-btn');
+  if (!st || !box || !sel) return;
+  const days = parseInt(sel.value, 10) || 0, cutoff = Date.now() - days * 86400000;
+  const rows = _opPr.rows.filter(function (r) { return days === 0 || !r.at || r.at <= cutoff; });
+  _opPr.shown = rows.map(function (r) { return r.key; });
+  st.textContent = _opPr.rows.length + ' total · ' + rows.length + ' match this filter';
+  if (btn) { btn.textContent = 'Delete these ' + rows.length; btn.disabled = !rows.length; }
+  box.innerHTML = rows.slice(0, 100).map(function (r) {
+    const parts = [];
+    if (r.hasReq) parts.push('request'); if (r.hasPrev) parts.push('preview'); if (r.hasCard) parts.push('card image');
+    return '<div style="border:1px solid #cfe6d5;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">'
+      + '<div style="min-width:0;font-size:.82rem;line-height:1.5;">'
+      + '<b>' + escapeHtml(r.restName || '(no shop)') + '</b> · ' + escapeHtml(r.fromName || '—') + '<br>'
+      + '<span style="color:#64748b;">' + escapeHtml(r.status || 'no request') + ' · ' + opPrAge(r.at) + ' · ' + parts.join(' + ') + '</span></div>'
+      + '<button type="button" class="op-btn" data-key="' + escapeHtml(r.key) + '" onclick="opPrDeleteOne(this.dataset.key)" style="width:auto;padding:6px 12px;">Delete</button></div>';
+  }).join('') + (rows.length > 100 ? '<p class="op-note">Showing the first 100. Use "Delete these" to remove all ' + rows.length + '.</p>' : '');
+}
+async function opPrDeleteKeys(keys) {
+  const { db, ref, remove } = window.fb;
+  let done = 0, fail = 0;
+  for (const k of keys) {
+    try {
+      await Promise.all([remove(ref(db, 'payRequests/' + k)), remove(ref(db, 'payPreview/' + k)), remove(ref(db, 'payCards/' + k))]);
+      done++;
+    } catch (e) { fail++; }
+  }
+  return { done: done, fail: fail };
+}
+async function opPrDeleteOne(key) {
+  if (!key || !confirm('Delete this pay request and its card image? The link will stop working.')) return;
+  const r = await opPrDeleteKeys([key]);
+  _opPr.rows = _opPr.rows.filter(function (x) { return x.key !== key; });
+  opPrRender();
+  if (r.fail) document.getElementById('op-pr-status').textContent = 'Delete failed (check database rules).';
+}
+async function opPrDeleteShown() {
+  const keys = _opPr.shown.slice();
+  if (!keys.length) return;
+  if (!confirm('Delete ' + keys.length + ' pay request(s) with their previews and card images?\nThis cannot be undone and those links will stop working.')) return;
+  const st = document.getElementById('op-pr-status');
+  st.textContent = 'Deleting…';
+  const r = await opPrDeleteKeys(keys);
+  const gone = new Set(keys);
+  _opPr.rows = _opPr.rows.filter(function (x) { return !gone.has(x.key); });
+  opPrRender();
+  st.textContent = 'Deleted ' + r.done + (r.fail ? ' · failed ' + r.fail + ' (check database rules)' : '') + ' · ' + _opPr.rows.length + ' left';
+}
+
 function opOpenSection(name) {
   if (['orders'].indexOf(name) >= 0) opLoadAllForSection(); else opRestoreZoneLoad();
   document.querySelectorAll('#operator-container .op-section').forEach(s => s.classList.remove('active'));
@@ -9452,6 +9617,7 @@ function opOpenSection(name) {
   if (name === 'push') opUpdateAppCodeSizeLabel();
   if (name === 'partners') { opPopulatePartnersAreaFilter(); opRenderPartnersList(); }
   if (name === 'deletions') opRenderDeletionsList();
+  if (name === 'pay-requests') opPrLoad();
   if (name === 'visits') opLoadVisits();
   if (name === 'drivers' || name === 'taxi-orders') { opEnsureDrivers(); opEnsureRides(); }
   if (name === 'drivers') { opPopulateDriversZoneFilter(); opRenderDriversList(); }
@@ -10873,6 +11039,10 @@ function opRenderShopZones() {
     <div class="op-partner-item" style="display:block; margin-bottom:12px;">
       <div class="op-partner-name">${escapeHtml(z.name || z._id)}</div>
       <div class="op-partner-sub">${opSzBoundsOk(z) ? '📍 Boundary set' : '⚠️ No boundary drawn yet (customers can\'t be matched to this zone)'} · ${count} shop${count === 1 ? '' : 's'}</div>
+      <label style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:10px; padding:10px 12px; border-radius:12px; background:rgba(242,183,5,.14); cursor:pointer;">
+        <span style="font-weight:700;">🚕 Taxi in this zone <span style="font-weight:500; opacity:.7;">(${z.taxiOn === true ? 'ON' : z.taxiOn === false ? 'OFF' : 'not set'})</span></span>
+        <input type="checkbox" ${z.taxiOn === true ? 'checked' : ''} style="width:22px; height:22px;" onchange="opSzSetTaxi('${z._id}', this.checked)">
+      </label>
       <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
         <button type="button" class="op-btn op-btn-push" style="margin:0;" onclick="opOpenShopZoneAreaModal('${z._id}')">🗺️ Draw boundary</button>
         <button type="button" class="op-btn" style="margin:0;" onclick="opSzToggleManage('${z._id}')">${open ? '▲ Hide shops' : '🏪 Manage shops'}</button>
@@ -10888,6 +11058,13 @@ function opRenderShopZones() {
     </div>`;
   }).join('');
   if (opSzOpenZoneId) opRenderSzShopList(opSzOpenZoneId);
+}
+// Taxi per zone: once Taxi has been switched ON/OFF on any zone, the customer app shows the Taxi tile only to customers
+// whose location is inside a zone that has Taxi ON. If no zone has it set, Taxi shows for everyone as before.
+function opSzSetTaxi(zoneId, on) {
+  const { db, ref, update } = window.fb;
+  update(ref(db, 'app_config/shopZones/' + zoneId), { taxiOn: !!on })
+    .catch(err => { alert('Error: ' + err.message); opRenderShopZones(); });
 }
 function opSzToggleManage(zoneId) {
   opSzOpenZoneId = (opSzOpenZoneId === zoneId) ? null : zoneId;
@@ -10918,6 +11095,7 @@ function opRenderSzShopList(zoneId) {
 function opSzToggleShop(zoneId, shopId, checked) {
   const { db, ref, update } = window.fb;
   update(ref(db, 'app_config/shopZones/' + zoneId + '/shopIds'), { [shopId]: checked ? true : null })
+    .then(() => { if (checked) opStampShopCache(shopId); })
     .catch(err => alert('Error: ' + err.message));
 }
 function opAddShopZone() {
@@ -14718,6 +14896,26 @@ function opListenItemShareToggle() {
     }
   });
 }
+let opLoginOtpOff = false;   // app_config/otpOff === true means the customer app skips the login OTP
+function opListenLoginOtpToggle() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'app_config/otpOff'), snap => {
+    opLoginOtpOff = snap.val() === true;
+    const statusEl = document.getElementById('op-login-otp-status');
+    const btn = document.getElementById('op-login-otp-toggle-btn');
+    if (statusEl) statusEl.textContent = opLoginOtpOff ? '⚪ OFF — number alone logs in' : '🟢 ON — SMS code at login';
+    if (btn) {
+      btn.textContent = opLoginOtpOff ? '✅ Turn OTP ON' : '⛔ Turn OTP OFF';
+      btn.className = 'op-btn ' + (opLoginOtpOff ? 'op-btn-push' : 'op-btn-danger');
+    }
+  });
+}
+function opToggleLoginOtp() {
+  const { db, ref, set } = window.fb;
+  const turnOff = !opLoginOtpOff;
+  if (turnOff && !confirm('Turn the login OTP OFF? Anyone who knows a mobile number will be able to log in as that customer.')) return;
+  set(ref(db, 'app_config/otpOff'), turnOff).catch(err => alert('Error: ' + err.message));
+}
 function opToggleItemShare() {
   const { db, ref, set } = window.fb;
   set(ref(db, 'app_config/itemShareEnabled'), !opItemShareEnabled).catch(err => alert('Error: ' + err.message));
@@ -16159,6 +16357,13 @@ function opAddShopGps() {
     .then(pos => { input.value = pos.coords.latitude.toFixed(5) + ', ' + pos.coords.longitude.toFixed(5); btn.textContent = '📍 GPS'; })
     .catch(() => { document.getElementById('op-as-status').textContent = 'Location permission denied.'; btn.textContent = '📍 GPS'; });
 }
+function opStampShopCache(shopId) {
+  try {
+    const { db, ref, update, set } = window.fb, now = Date.now();
+    update(ref(db, 'catalogVerShop'), { [shopId]: now }).catch(() => {});
+    set(ref(db, 'catalogVer'), now).catch(() => {});
+  } catch (e) {}
+}
 async function opCreateShop() {
   const status = document.getElementById('op-as-status');
   const btn = document.getElementById('op-as-create-btn');
@@ -16202,6 +16407,7 @@ async function opCreateShop() {
       created = true;
     } catch (e) { created = false; }
     if (!created) await set(ref(db, 'restaurants/' + username), record);
+    opStampShopCache(username);   // runTransaction is not auto-stamped: tell customer apps this shop is new
     try { const f = window.fb; f.get(f.ref(f.db, 'shopIds')).then(sn => { if (sn.exists()) return f.update(f.ref(f.db, 'shopIds'), { [username]: true }); }).catch(() => {}); } catch (e) {} // only once the index has been created by the Operator Panel
     // Groceries shops go into the zone their location falls inside (same as approving one).
     let zoneMsg = '';
