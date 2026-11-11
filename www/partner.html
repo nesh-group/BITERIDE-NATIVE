@@ -1199,6 +1199,23 @@
       <input type="file" accept="image/*" id="rest-photo-input" style="display:none;" />
     </label>
 
+    <div class="px" style="margin-top:14px; padding-bottom:0;">
+      <p style="font-size:13px; font-weight:700; margin:0 0 3px;">Header background picture <span style="font-weight:500; opacity:.7;">(optional)</span></p>
+      <p style="font-size:11.5px; opacity:.75; margin:0;">Wide picture shown behind your shop name at the top of your menu in the customer app. If you don't add one, your shop photo is used, same as now.</p>
+    </div>
+    <label class="rest-photo-upload" id="banner-photo-upload-wrap" style="margin-top:8px;">
+      <span class="rest-photo-placeholder" id="banner-photo-placeholder">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A9C4E0" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Tap to add a header picture
+      </span>
+      <img id="banner-photo-preview" style="display:none;" />
+      <span class="rest-photo-edit-badge" id="banner-photo-edit-badge" style="display:none;">📷 Change picture</span>
+      <input type="file" accept="image/*" id="banner-photo-input" style="display:none;" />
+    </label>
+    <div class="px" style="margin-top:6px; padding-bottom:0;">
+      <button type="button" id="banner-photo-remove-btn" style="display:none; background:none; border:none; color:#C0392B; font-size:12.5px; font-weight:700; padding:4px 0; cursor:pointer;" onclick="removeBannerPhoto()">Remove header picture</button>
+    </div>
+
     <div class="px" style="margin-top:16px;">
       <p class="rest-title" id="account-rest-name" style="font-size:19px;">Restaurant</p>
       <p class="rest-sub" id="account-rest-address" style="margin-bottom:6px;"></p>
@@ -3857,6 +3874,15 @@
         <p class="op-note" id="op-pm-shop-photo-status" style="margin-top:4px;"></p>
       </div>
       <div style="margin-top:14px;">
+        <p class="op-note" style="margin-bottom:6px;">Header background picture — optional wide picture behind this shop's name at the top of its menu in the customer app. Not set = the shop photo is used.</p>
+        <button type="button" class="op-btn" id="op-pm-banner-show-btn" style="display:none;" onclick="opShowBanner()">👁️ Show header picture</button>
+        <img id="op-pm-banner-preview" style="display:none; width:100%; max-height:160px; object-fit:cover; border-radius:10px; margin-bottom:8px;" />
+        <input type="file" id="op-pm-banner-input" accept="image/*" style="display:none;" onchange="handleOpBannerSelect(event)" />
+        <button type="button" class="op-btn op-btn-push" onclick="document.getElementById('op-pm-banner-input').click()">📷 Upload header picture</button>
+        <button type="button" class="op-btn op-btn-danger" id="op-pm-banner-remove-btn" style="display:none;" onclick="opRemoveBanner()">Remove header picture</button>
+        <p class="op-note" id="op-pm-banner-status" style="margin-top:4px;"></p>
+      </div>
+      <div style="margin-top:14px;">
         <p class="op-note" style="margin-bottom:4px;">Shop category badge — shown on top of this shop's photo in the customer app list. Leave blank to hide.</p>
         <div class="op-search-box" style="margin-bottom:6px;">
           <input type="text" id="op-pm-category-input" list="shop-category-suggestions" placeholder="e.g. Bakery, Pure Veg, Bestseller" maxlength="24">
@@ -4191,7 +4217,7 @@
   // bumps `catalogVer`, so customer apps that cache the catalog know to download it again.
   (function () {
     const f = window.fb, orig = { set, update, remove, push };
-    const PUB = /^restaurants\/[^/]+(\/(menu|itemCategories|popularItems|suggestItems|photo|status|restaurantName|address|location|businessType|openTime|closeTime|hoursEnabled|deliveryCharges|deliveryZone|discount\w*|goSeries|gpayNumber|minOrderAmount|opCategory|shopUnavailable\w*|deliveryTimeMins|opDeliveryTimeMins|martRanges|priceMarkup|ratingCount|ratingSum)(\/|$))?$|^restaurants\/[^/]+\/(menu|itemCategories|popularItems|suggestItems|photo|status|restaurantName|address|location|businessType|openTime|closeTime|hoursEnabled|deliveryCharges|deliveryZone|discount\w*|goSeries|gpayNumber|minOrderAmount|opCategory|shopUnavailable\w*|deliveryTimeMins|opDeliveryTimeMins|martRanges|priceMarkup|ratingCount|ratingSum)(\/|$)/;
+    const PUB = /^restaurants\/[^/]+(\/(menu|itemCategories|popularItems|suggestItems|photo|bannerPhoto|status|restaurantName|address|location|businessType|openTime|closeTime|hoursEnabled|deliveryCharges|deliveryZone|discount\w*|goSeries|gpayNumber|minOrderAmount|opCategory|shopUnavailable\w*|deliveryTimeMins|opDeliveryTimeMins|martRanges|priceMarkup|ratingCount|ratingSum)(\/|$))?$|^restaurants\/[^/]+\/(menu|itemCategories|popularItems|suggestItems|photo|bannerPhoto|status|restaurantName|address|location|businessType|openTime|closeTime|hoursEnabled|deliveryCharges|deliveryZone|discount\w*|goSeries|gpayNumber|minOrderAmount|opCategory|shopUnavailable\w*|deliveryTimeMins|opDeliveryTimeMins|martRanges|priceMarkup|ratingCount|ratingSum)(\/|$)/;
     const pathOf = r => { try { return String(r).replace(/^https?:\/\/[^/]+\/?/, '').replace(/\/$/, ''); } catch (e) { return ''; } };
     let bumpT = null; const dirty = new Set();
     // Stamps what changed: catalogVerShop/{shopId} = now (customer apps re-download ONLY that shop) and the old global
@@ -4915,6 +4941,10 @@ function init() {
   document.getElementById('rest-photo-upload-wrap').addEventListener('click', () => document.getElementById('rest-photo-input').click());
   document.getElementById('rest-photo-input').addEventListener('change', handleRestPhotoSelect);
 
+  // Header background picture (optional)
+  document.getElementById('banner-photo-upload-wrap').addEventListener('click', () => document.getElementById('banner-photo-input').click());
+  document.getElementById('banner-photo-input').addEventListener('change', handleBannerPhotoSelect);
+
   // Shop discount scratch card photo
   document.getElementById('shop-discount-photo-wrap').addEventListener('click', () => document.getElementById('shop-discount-photo-input').click());
   document.getElementById('shop-discount-photo-input').addEventListener('change', handleShopDiscountPhotoSelect);
@@ -5226,6 +5256,7 @@ function logInRestaurant(id, data) {
   if (typeof updatePopularSub === 'function') updatePopularSub();
   document.getElementById('rest-id-label-text').textContent = bizNoun(data.businessType) + ' ID (for auto-payment setup)';
   renderRestPhoto(data.photo || "");
+  try { renderBannerPhoto(data.bannerPhoto || ""); } catch (e) {}
   document.getElementById('gpay-number').value = data.gpayNumber || "";
   updateGpayBadge(data.gpayNumber || "");
   try {
@@ -6011,6 +6042,65 @@ function handleRestPhotoSelect(e) {
     img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+// ---------- HEADER BACKGROUND PICTURE (optional, shop's own) ----------
+// Stored in restaurants/{shop}/bannerPhoto. Empty = the customer app keeps using the normal shop photo.
+function renderBannerPhoto(url) {
+  const preview = document.getElementById('banner-photo-preview');
+  const placeholder = document.getElementById('banner-photo-placeholder');
+  const badge = document.getElementById('banner-photo-edit-badge');
+  const rm = document.getElementById('banner-photo-remove-btn');
+  if (!preview) return;
+  if (url) {
+    preview.src = url; preview.style.display = "block";
+    placeholder.style.display = "none"; badge.style.display = "flex"; rm.style.display = "inline-block";
+  } else {
+    preview.style.display = "none"; preview.removeAttribute('src');
+    placeholder.style.display = "flex"; badge.style.display = "none"; rm.style.display = "none";
+  }
+}
+function handleBannerPhotoSelect(e) {
+  const file = e.target.files[0];
+  e.target.value = "";   // allow picking the same file again later
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = async () => {
+      renderBannerPhoto(ev.target.result);   // instant local preview
+      showToast("Uploading picture...");
+      try {
+        const blob = await resizeImageToBlob(img, 1200, 0.75);
+        const url = await uploadPhotoToCloudinary(blob);
+        const { db, ref, update } = window.fb;
+        const oldPic = state.restaurant.bannerPhoto;
+        await update(ref(db, 'restaurants/' + state.restId), { bannerPhoto: url });
+        state.restaurant.bannerPhoto = url;
+        nshPhotoChanged(oldPic, url);
+        renderBannerPhoto(url);
+        showToast("Header picture updated");
+      } catch (err) {
+        showToast("Couldn't upload picture — check your connection and try again.");
+        renderBannerPhoto(state.restaurant.bannerPhoto || "");
+      }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+async function removeBannerPhoto() {
+  try {
+    const { db, ref, update } = window.fb;
+    const oldPic = state.restaurant.bannerPhoto;
+    await update(ref(db, 'restaurants/' + state.restId), { bannerPhoto: null });
+    state.restaurant.bannerPhoto = null;
+    nshPhotoChanged(oldPic, '');
+    renderBannerPhoto("");
+    showToast("Header picture removed - your shop photo is used again");
+  } catch (err) {
+    showToast("Couldn't remove it — check your connection and try again.");
+  }
 }
 
 // ---------- REGISTER ----------
@@ -16444,6 +16534,7 @@ function opShowPartnerDetail(id) {
   document.getElementById('op-pm-category-status').textContent = '';
   opRenderShopPhoto(p.photo || '');
   document.getElementById('op-pm-shop-photo-status').textContent = '';
+  try { opLoadBanner(id); } catch (e) {}
   opRenderShopZoneStatus(p);
   opRenderPartnerShopZoneBlock(p);
   document.getElementById('op-pm-bulk-import-status').textContent = '';
@@ -17266,6 +17357,77 @@ function opRemoveShopPhoto() {
     nshPhotoChanged(oldPhotoRm, '');
     status.textContent = 'Shop photo removed.';
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+// ---- Operator panel: header background picture (restaurants/{id}/bannerPhoto). Read on demand (one tiny field),
+// the image itself only loads when "Show header picture" is tapped. ----
+let opBannerUrl = '';
+function opRenderBanner(url, show) {
+  const preview = document.getElementById('op-pm-banner-preview');
+  const showBtn = document.getElementById('op-pm-banner-show-btn');
+  const rmBtn = document.getElementById('op-pm-banner-remove-btn');
+  if (!preview) return;
+  opBannerUrl = url || '';
+  if (!url) { preview.removeAttribute('src'); preview.style.display = 'none'; showBtn.style.display = 'none'; rmBtn.style.display = 'none'; return; }
+  rmBtn.style.display = 'inline-block';
+  if (show || String(url).startsWith('data:')) { preview.src = url; preview.style.display = 'block'; showBtn.style.display = 'none'; }
+  else { preview.removeAttribute('src'); preview.style.display = 'none'; showBtn.style.display = 'inline-block'; }
+}
+function opShowBanner() { if (opBannerUrl) opRenderBanner(opBannerUrl, true); }
+async function opLoadBanner(id) {
+  opRenderBanner('');
+  const st = document.getElementById('op-pm-banner-status'); if (st) st.textContent = '';
+  try {
+    const { db, ref, get } = window.fb;
+    const sn = await get(ref(db, 'restaurants/' + id + '/bannerPhoto'));
+    if (opCurrentPartnerId === id) opRenderBanner(sn.exists() ? String(sn.val() || '') : '');
+  } catch (e) {}
+}
+function handleOpBannerSelect(e) {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file || !opCurrentPartnerId) return;
+  const partnerId = opCurrentPartnerId;
+  const status = document.getElementById('op-pm-banner-status');
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = async () => {
+      opRenderBanner(ev.target.result);
+      status.textContent = 'Uploading picture...';
+      try {
+        const blob = await resizeImageToBlob(img, 1200, 0.75);
+        const url = await uploadPhotoToCloudinary(blob);
+        const { db, ref, update, get } = window.fb;
+        let oldPic = '';
+        try { const sn = await get(ref(db, 'restaurants/' + partnerId + '/bannerPhoto')); oldPic = sn.exists() ? String(sn.val() || '') : ''; } catch (e2) {}
+        await update(ref(db, 'restaurants/' + partnerId), { bannerPhoto: url });
+        const p = opAllPartners.find(x => x._id === partnerId); if (p) p.bannerPhoto = url;
+        nshPhotoChanged(oldPic, url);
+        if (opCurrentPartnerId === partnerId) opRenderBanner(url, true);
+        status.textContent = 'Header picture updated.';
+      } catch (err) {
+        status.textContent = "Couldn't upload picture — check your connection and try again.";
+        if (opCurrentPartnerId === partnerId) opLoadBanner(partnerId);
+      }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+async function opRemoveBanner() {
+  if (!opCurrentPartnerId) return;
+  const partnerId = opCurrentPartnerId;
+  const status = document.getElementById('op-pm-banner-status');
+  const oldPic = opBannerUrl;
+  opRenderBanner('');
+  status.textContent = 'Removing...';
+  try {
+    const { db, ref, update } = window.fb;
+    await update(ref(db, 'restaurants/' + partnerId), { bannerPhoto: null });
+    const p = opAllPartners.find(x => x._id === partnerId); if (p) p.bannerPhoto = null;
+    nshPhotoChanged(oldPic, '');
+    status.textContent = 'Header picture removed - the shop photo is used again.';
+  } catch (err) { status.textContent = 'Error: ' + err.message; }
 }
 function opTogglePartnerStatus() {
   const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
