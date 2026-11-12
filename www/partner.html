@@ -2640,6 +2640,25 @@
       <p class="op-note">OTP ON: customers get an SMS code when they log in. OTP OFF: the mobile number alone logs in (no SMS). Takes effect right away for the next login, no app update needed. It is ON by default. Customers abroad never get an OTP.</p>
       <div class="op-mc-row" style="margin-bottom:10px;"><b>Customer login OTP:</b> <span id="op-login-otp-status">—</span></div>
       <button type="button" class="op-btn" id="op-login-otp-toggle-btn" onclick="opToggleLoginOtp()" style="margin-bottom:14px;"></button>
+
+      <hr style="border:0;border-top:1px solid #ddd;margin:6px 0 14px;">
+      <p class="op-note"><b>How the OTP is sent.</b> SMS is the default. After your WhatsApp OTP server (Worker) is ready and the WhatsApp template is approved, paste its https address below and Save. Then choose SMS only, WhatsApp only, or Both. With Both, the first code goes by the channel you choose below; when the customer taps Resend, the code goes by the other channel (the screen tells them where it was sent, and any code they received still works). If WhatsApp ever fails, SMS is sent instead. No app update needed.</p>
+      <div class="op-mc-row" style="margin-bottom:10px;"><b>OTP is sent via:</b> <span id="op-otp-method-status">—</span></div>
+      <input type="url" id="op-wa-url" placeholder="https://nesh-wa-otp.xxxx.workers.dev" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccc;border-radius:8px;margin-bottom:8px;">
+      <button type="button" class="op-btn" onclick="opSaveWaUrl()" style="margin-bottom:14px;">💾 Save WhatsApp server address</button>
+      <div style="font-weight:700;margin-bottom:6px;">Send OTP by</div>
+      <div style="display:flex;gap:6px;margin-bottom:14px;">
+        <button type="button" class="op-btn" id="op-m-sms" onclick="opSetOtpMethod('sms')" style="flex:1;">📩 SMS only</button>
+        <button type="button" class="op-btn" id="op-m-whatsapp" onclick="opSetOtpMethod('whatsapp')" style="flex:1;">💬 WhatsApp only</button>
+        <button type="button" class="op-btn" id="op-m-both" onclick="opSetOtpMethod('both')" style="flex:1;">📩💬 Both</button>
+      </div>
+      <div id="op-otp-first-wrap" style="display:none;">
+        <div style="font-weight:700;margin-bottom:6px;">When Both: which one is sent first? (Resend uses the other)</div>
+        <div style="display:flex;gap:6px;margin-bottom:14px;">
+          <button type="button" class="op-btn" id="op-f-wa" onclick="opSetOtpFirst('wa')" style="flex:1;">💬 WhatsApp first</button>
+          <button type="button" class="op-btn" id="op-f-sms" onclick="opSetOtpFirst('sms')" style="flex:1;">📩 SMS first</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -9574,7 +9593,7 @@ function opEnterPanel() {
   opListenBuses();
   opListenBusFeatureToggle();
   opListenItemShareToggle();
-  opListenLoginOtpToggle();
+  opListenLoginOtpToggle(); opListenOtpMethod();
   opListenCategoryOrder();
   opListenShopOrder();
   opListenNeshItemOrder();
@@ -14999,6 +15018,37 @@ function opListenLoginOtpToggle() {
       btn.className = 'op-btn ' + (opLoginOtpOff ? 'op-btn-push' : 'op-btn-danger');
     }
   });
+}
+let opOtpMethod = 'sms', opOtpFirst = 'wa', opWaUrl = '';   // app_config/otpMethod ('sms'|'whatsapp'|'both'), otpFirst ('wa'|'sms'), waOtpUrl
+function opListenOtpMethod() {
+  const { db, ref, onValue } = window.fb;
+  const paint = () => {
+    const g = id => document.getElementById(id);
+    const names = { sms: '📩 SMS only', whatsapp: '💬 WhatsApp only (SMS if WhatsApp fails)', both: '📩💬 Both — ' + (opOtpFirst === 'sms' ? 'SMS' : 'WhatsApp') + ' first, Resend by the other' };
+    if (g('op-otp-method-status')) g('op-otp-method-status').textContent = names[opOtpMethod];
+    ['sms', 'whatsapp', 'both'].forEach(m => { const b = g('op-m-' + m); if (b) b.className = 'op-btn' + (opOtpMethod === m ? ' op-btn-push' : ''); });
+    [['wa', 'op-f-wa'], ['sms', 'op-f-sms']].forEach(a => { const b = g(a[1]); if (b) b.className = 'op-btn' + (opOtpFirst === a[0] ? ' op-btn-push' : ''); });
+    if (g('op-otp-first-wrap')) g('op-otp-first-wrap').style.display = opOtpMethod === 'both' ? 'block' : 'none';
+    const inp = g('op-wa-url'); if (inp && document.activeElement !== inp) inp.value = opWaUrl;
+  };
+  onValue(ref(db, 'app_config/otpMethod'), snap => { const v = snap.val(); opOtpMethod = (v === 'whatsapp' || v === 'both') ? v : 'sms'; paint(); });
+  onValue(ref(db, 'app_config/otpFirst'), snap => { opOtpFirst = snap.val() === 'sms' ? 'sms' : 'wa'; paint(); });
+  onValue(ref(db, 'app_config/waOtpUrl'), snap => { opWaUrl = String(snap.val() || ''); paint(); });
+}
+function opSaveWaUrl() {
+  const { db, ref, set } = window.fb;
+  const v = (document.getElementById('op-wa-url').value || '').trim().replace(/\/+$/, '');
+  if (v && !/^https:\/\//.test(v)) { alert('The address must start with https://'); return; }
+  set(ref(db, 'app_config/waOtpUrl'), v).then(() => alert('Saved.')).catch(err => alert('Error: ' + err.message));
+}
+function opSetOtpMethod(m) {
+  const { db, ref, set } = window.fb;
+  if (m !== 'sms' && !/^https:\/\//.test(opWaUrl)) { alert('First save the WhatsApp server address.'); return; }
+  set(ref(db, 'app_config/otpMethod'), m).catch(err => alert('Error: ' + err.message));
+}
+function opSetOtpFirst(f) {
+  const { db, ref, set } = window.fb;
+  set(ref(db, 'app_config/otpFirst'), f).catch(err => alert('Error: ' + err.message));
 }
 function opToggleLoginOtp() {
   const { db, ref, set } = window.fb;
