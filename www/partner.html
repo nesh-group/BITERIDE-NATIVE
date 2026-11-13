@@ -3928,7 +3928,7 @@
         <button type="button" class="op-btn op-btn-push" id="op-pm-zone-btn" onclick="opOpenShopZoneModal(opCurrentPartnerId)">🗺️ Draw delivery zone</button>
       </div>
       <div class="op-groceries-card" id="op-pm-groceries-card">
-        <h4 class="op-groceries-card-title">🛒 NESH Store — Groceries Stock</h4>
+        <h4 class="op-groceries-card-title" id="op-pm-groceries-card-title">🛒 NESH Store — Groceries Stock</h4>
         <div style="margin-top:0;" id="op-pm-stockadd-wrap">
         <p class="op-note" style="margin-bottom:4px;">Let this shop add its own stock — when ON, this shop can add, bulk-import, and re-photo its own items from its own Stock screen (same as Hotel/Other Shop partners), on top of items you add below. When OFF (default for groceries), only you can add new stock items for this shop.</p>
         <button type="button" class="op-btn op-btn-push" id="op-pm-stockadd-toggle-btn" onclick="opToggleStockAddPermission()"></button>
@@ -12025,6 +12025,7 @@ function opTrendLoadCfg() {
     Object.keys(zv).forEach(id => { const c = zv[id] || {}; out[id] = { shopIds: c.shopIds || null, freeTiers: Array.isArray(c.freeTiers) ? c.freeTiers : Object.values(c.freeTiers || {}) }; });
     opTrendCfg.zones = out; opTrendCfg.loaded = true; opTrendCfg.loading = false;
     try { opRenderTrending(); } catch (e) {}
+    try { if (opAvailItems && opAvailItems.length) opRenderAvailabilityList(); } catch (e) {}
   }).catch(() => { opTrendCfg.loading = false; });
 }
 // The price a customer pays for `raw` (shop price) of this item — mirrors index.html (neshWithOffer / priceBump / markupFor). null until the config is loaded.
@@ -16594,7 +16595,16 @@ function opShowPartnerDetail(id) {
   // "NESH Store — Groceries Stock" card. Other business types can already
   // add/manage their own items and availability from their own app.
   const groceriesCard = document.getElementById('op-pm-groceries-card');
-  if (groceriesCard) groceriesCard.style.display = (p.businessType === 'groceries') ? 'block' : 'none';
+  // Non-groceries shops (Food / Other Shop) still need the item list here: it is where the operator
+  // sets each item's "Customer ₹" (customer price markup). Only the groceries-only tools stay hidden for them.
+  const isGroceryPartner = (p.businessType === 'groceries');
+  if (groceriesCard) groceriesCard.style.display = 'block';
+  const gcTitle = document.getElementById('op-pm-groceries-card-title');
+  if (gcTitle) gcTitle.textContent = isGroceryPartner ? '🛒 NESH Store — Groceries Stock' : '🏷️ Item prices & customer price (markup)';
+  ['op-pm-stockadd-wrap', 'op-pm-add-item-wrap'].forEach(wid => {
+    const w = document.getElementById(wid);
+    if (w) w.style.display = isGroceryPartner ? '' : 'none';
+  });
   const stockAddBtn = document.getElementById('op-pm-stockadd-toggle-btn');
   if (stockAddBtn) stockAddBtn.textContent = p.allowStockAdd ? '✅ Shop CAN add own stock (tap to turn OFF)' : '🔒 Shop cannot add own stock (tap to turn ON)';
   document.getElementById('op-pm-stockadd-status').textContent = '';
@@ -16755,6 +16765,38 @@ function opRenderAvailabilityList() {
 // The shop keeps its own price (menu/{id}/price, what the shop is paid); the
 // customer app shows this price instead, and the shop only ever sees its own
 // amount. Empty / 0 = no override (customer sees the shop's price).
+// What this shop's "Price Markup" ranges add to a shop price `raw` (info only, so the operator can compare it with a fixed customer price).
+// Same rule as the customer app: both ends of a range included, flat ₹ or %, per-piece items only. Returns null when no range applies.
+function opRangeMarkupHint(part, raw) {
+  raw = Number(raw) || 0;
+  if (!part || raw <= 0) return null;
+  const mt = part.priceMarkup ? (Array.isArray(part.priceMarkup) ? part.priceMarkup : Object.values(part.priceMarkup)).filter(Boolean) : [];
+  const t = mt.find(t => raw >= (Number(t.min) || 0) && (t.max == null || t.max === '' || raw <= Number(t.max)));
+  const val = Number(t && t.add) || 0;
+  if (!t || val <= 0) return null;
+  const add = t.type === 'pct' ? Math.round(raw * val / 100) : Math.round(val);
+  return add > 0 ? { add, total: raw + add } : null;
+}
+// Info line under the Customer ₹ box: the final price the customer would pay from the ranges alone (Shop Delivery Charges "Add ₹" + Price Markup),
+// i.e. what they pay when NO fixed customer price is set. Same maths as the Trending screen (opTrendCust). Display only.
+function opRangeMarkupHintHtml(part, raw, fixed, it, isPortion, sz) {
+  raw = Number(raw) || 0;
+  if (!part || raw <= 0) return '';
+  let total = null;
+  if (it) {
+    if (!opTrendCfg.loaded) opTrendLoadCfg();
+    const probe = Object.assign({}, it, { customerPrice: 0, customerSizePrices: null });
+    total = opTrendCust(part, probe, raw, !!isPortion, sz);
+  }
+  if (total == null) {   // config still loading → show the Price Markup part only
+    const h = opRangeMarkupHint(part, raw);
+    if (!h) return '';
+    return '<div style="font-size:.7rem; color:#b45309; margin-top:3px;">Range markup: +₹' + h.add + ' → ₹' + h.total + (fixed ? ' (not used — fixed customer price is set)' : '') + '</div>';
+  }
+  const add = total - raw;
+  if (add <= 0) return '<div style="font-size:.7rem; color:#b45309; margin-top:3px;">Ranges add ₹0 — final ₹' + total + (fixed ? ' (fixed price is set)' : '') + '</div>';
+  return '<div style="font-size:.7rem; color:#b45309; margin-top:3px;">Final price from ranges: ₹' + total + ' (shop ₹' + raw + ' + ₹' + add + ')' + (fixed ? ' — not used, fixed customer price is set' : '') + '</div>';
+}
 function opCustomerPriceRowHtml(it) {
   const part = opAllPartners.find(x => x._id === opCurrentPartnerId);
   if (!part || part.businessType === 'groceries') return '';
@@ -16765,6 +16807,7 @@ function opCustomerPriceRowHtml(it) {
     const csp = (it.customerSizePrices && typeof it.customerSizePrices === 'object') ? it.customerSizePrices : {};
     const boxes = pNames.map(n => `
         <label style="display:flex; flex-direction:column; gap:2px; font-size:.7rem; color:#6b7280;">${escapeHtml(n)} <span style="color:#64748b;">(shop ₹${Number(spx[n]) || 0})</span>
+          ${opRangeMarkupHintHtml(part, spx[n], Number(csp[n]) > 0, it, true, n)}
           <input type="number" min="0" step="any" inputmode="decimal" id="op-pm-csp-${it.id}-${escapeHtml(n)}" value="${Number(csp[n]) > 0 ? Number(csp[n]) : ''}" placeholder="same as shop" style="width:84px; padding:5px 8px; border-radius:6px; border:1px solid #b7d3be; background:#ffffff; color:#1f2937; font-size:.8rem;">
         </label>`).join('');
     return `
@@ -16776,12 +16819,13 @@ function opCustomerPriceRowHtml(it) {
       </div>`;
   }
   const cp = Number(it.customerPrice) || 0;
+  const rangeHint = (!it.unit || it.unit === 'piece') ? opRangeMarkupHintHtml(part, it.price, cp > 0, it, false) : '';
   return `
       <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px;">
         <span style="font-size:.75rem; color:#7c3aed;">Customer ₹</span>
         <input type="number" min="0" step="any" inputmode="decimal" id="op-pm-cprice-${it.id}" value="${cp || ''}" placeholder="same as shop" style="width:90px; padding:5px 8px; border-radius:6px; border:1px solid #b7d3be; background:#ffffff; color:#1f2937; font-size:.8rem;">
         <button type="button" class="op-btn op-btn-push" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opSaveItemCustomerPrice('${it.id}')">💾 Save customer price</button>
-      </div>`;
+      </div>${rangeHint}`;
 }
 function opSaveItemCustomerPrice(itemId) {
   const item = opAvailItems.find(it => it.id === itemId);
