@@ -3876,13 +3876,6 @@
         <button type="button" class="op-btn op-btn-push" onclick="opSaveCommissionTiers()">💾 Save commission</button>
         <p class="op-note" id="op-pm-commission-status" style="margin-top:4px;"></p>
       </div>
-      <div style="margin-top:14px;" id="op-pm-markup-block">
-        <p class="op-note" style="margin-bottom:6px;"><b>Customer price markup (this shop only)</b> — pick a range of an ITEM's price and how much to add to what the customer pays for items in it. Example: items priced 100 to 200 → add ₹10 (or 5%). The shop is still paid its own price. Separate from delivery charge and from the shop's commission. "To" blank = no upper limit; both From and To are included, and if ranges touch (e.g. 200) the first range wins.</p>
-        <div id="op-pm-markup-rows"></div>
-        <button type="button" class="op-btn" onclick="opAddMarkupRow()">+ Add range</button>
-        <button type="button" class="op-btn op-btn-push" onclick="opSaveMarkupTiers()">💾 Save markup</button>
-        <p class="op-note" id="op-pm-markup-status" style="margin-top:4px;"></p>
-      </div>
       <div style="margin-top:14px;">
         <p class="op-note" style="margin-bottom:6px;">Shop photo — shown on this shop's card in the customer app list.</p>
         <button type="button" class="op-btn" id="op-pm-shop-photo-show-btn" style="display:none;" onclick="opShowShopPhoto()">👁️ Show shop photo</button>
@@ -3929,6 +3922,14 @@
       </div>
       <div class="op-groceries-card" id="op-pm-groceries-card">
         <h4 class="op-groceries-card-title" id="op-pm-groceries-card-title">🛒 NESH Store — Groceries Stock</h4>
+      <p class="op-note" style="margin:0 0 6px;">Step 1 — range markup for the whole shop. Step 2 — fine-tune a single item below (fixed Customer ₹ and Trending offer).</p>
+      <div style="margin-top:0;" id="op-pm-markup-block">
+        <p class="op-note" style="margin-bottom:6px;"><b>Customer price markup (this shop only)</b> — pick a range of an ITEM's price and how much to add to what the customer pays for items in it. Example: items priced 100 to 200 → add ₹10 (or 5%). The shop is still paid its own price. Separate from delivery charge and from the shop's commission. "To" blank = no upper limit; both From and To are included, and if ranges touch (e.g. 200) the first range wins.</p>
+        <div id="op-pm-markup-rows"></div>
+        <button type="button" class="op-btn" onclick="opAddMarkupRow()">+ Add range</button>
+        <button type="button" class="op-btn op-btn-push" onclick="opSaveMarkupTiers()">💾 Save markup</button>
+        <p class="op-note" id="op-pm-markup-status" style="margin-top:4px;"></p>
+      </div>
         <div style="margin-top:0;" id="op-pm-stockadd-wrap">
         <p class="op-note" style="margin-bottom:4px;">Let this shop add its own stock — when ON, this shop can add, bulk-import, and re-photo its own items from its own Stock screen (same as Hotel/Other Shop partners), on top of items you add below. When OFF (default for groceries), only you can add new stock items for this shop.</p>
         <button type="button" class="op-btn op-btn-push" id="op-pm-stockadd-toggle-btn" onclick="opToggleStockAddPermission()"></button>
@@ -16758,6 +16759,7 @@ function opRenderAvailabilityList() {
         <button type="button" class="op-btn ${it.unavailable ? 'op-btn-push' : 'op-btn-danger'}" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opToggleItemAvailability('${it.id}')">${it.unavailable ? 'Mark available' : 'Mark unavailable'}</button>
       </div>
     ${opCustomerPriceRowHtml(it)}
+    ${opItemOfferRowHtml(it)}
     </div>
   `).join('');
 }
@@ -16827,6 +16829,105 @@ function opCustomerPriceRowHtml(it) {
         <button type="button" class="op-btn op-btn-push" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opSaveItemCustomerPrice('${it.id}')">💾 Save customer price</button>
       </div>${rangeHint}`;
 }
+// ---- Trending / Food Offers discount, set from the SAME item row as the Customer ₹ (same data + rules as the Trending screen) ----
+// The offer is the price the CUSTOMER pays; it must be lower than the item's current customer price (fixed Customer ₹ if set, else the range price).
+// Saved as offerCustomerPrice / offerCustomerSizePrices, exactly like Trending does. The shop is still paid its own price.
+function opSyncPartnerMenuItem(itemId, fields) {
+  const part = opAllPartners.find(x => x._id === opCurrentPartnerId);
+  if (part && part.menu && part.menu[itemId]) Object.assign(part.menu[itemId], fields);
+}
+function opItemOfferRowHtml(it) {
+  const part = opAllPartners.find(x => x._id === opCurrentPartnerId);
+  if (!part || part.businessType === 'groceries') return '';
+  if (!opTrendCfg.loaded) { opTrendLoadCfg(); return ''; }   // list re-renders once the config has loaded
+  const money = n => String(Math.round(n * 100) / 100);
+  const box = 'width:90px; padding:5px 8px; border-radius:6px; border:1px solid #b7d3be; background:#ffffff; color:#1f2937; font-size:.8rem;';
+  const pt = opTrendPortions(part, it);
+  if (pt.length) {
+    return `<div style="margin-top:6px;"><span style="font-size:.75rem; color:#dc2626;">Trending offer per portion (customer pays)</span>` + pt.map((sz, idx) => {
+      const o = opTrendPortionOffer(part, it, sz);
+      const cust = opTrendCust(part, it, it.sizePrices[sz], true, sz);
+      return `
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:4px;">
+          <span style="font-size:.75rem; color:#6b7280; min-width:90px;">${escapeHtml(sz)} · now ${cust !== null ? '₹' + money(cust) : '…'}</span>
+          <input type="number" min="0" step="any" inputmode="decimal" id="op-pm-poff-${it.id}-${idx}" value="${o ? o : ''}" placeholder="Offer ₹" style="${box}">
+          <button type="button" class="op-btn op-btn-push" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opSaveItemOffer('${it.id}', ${idx})">💾 Save offer</button>
+          ${o ? `<button type="button" class="op-btn op-btn-danger" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opClearItemOffer('${it.id}', ${idx})">Remove</button>` : ''}
+        </div>`;
+    }).join('') + `</div>`;
+  }
+  const o = opTrendItemOffer(part, it);
+  const cust = opTrendCust(part, it, it.price, false);
+  return `
+      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px;">
+        <span style="font-size:.75rem; color:#dc2626;">Offer ₹${cust !== null ? ' (now ₹' + money(cust) + ')' : ''}</span>
+        <input type="number" min="0" step="any" inputmode="decimal" id="op-pm-off-${it.id}" value="${o ? o : ''}" placeholder="Trending offer" style="${box}">
+        <button type="button" class="op-btn op-btn-push" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opSaveItemOffer('${it.id}')">💾 Save offer</button>
+        ${o ? `<button type="button" class="op-btn op-btn-danger" style="padding:4px 10px; font-size:.7rem; flex-shrink:0;" onclick="opClearItemOffer('${it.id}')">Remove</button>` : ''}
+      </div>`;
+}
+function opSaveItemOffer(itemId, z) {
+  const it = opAvailItems.find(x => x.id === itemId);
+  const part = opAllPartners.find(x => x._id === opCurrentPartnerId);
+  const status = document.getElementById('op-pm-avail-status');
+  if (!it || !part || !opCurrentPartnerId) return;
+  if (!opTrendCfg.loaded) { status.textContent = 'Customer prices are still loading — try again in a moment.'; opTrendLoadCfg(); return; }
+  const { db, ref, update } = window.fb;
+  const path = ref(db, 'restaurants/' + opCurrentPartnerId + '/menu/' + itemId);
+  const isPortion = z !== undefined && z !== null;
+  if (isPortion) {
+    const sz = opTrendPortions(part, it)[Number(z)];
+    const inp = document.getElementById('op-pm-poff-' + itemId + '-' + Number(z));
+    if (!sz || !inp) return;
+    const normal = opTrendCust(part, it, it.sizePrices[sz], true, sz);
+    const v = Number(inp.value);
+    if (inp.value.trim() === '' || !isFinite(v) || v <= 0 || normal === null || v >= normal) { status.textContent = 'Offer must be above ₹0 and lower than the customer price of the ' + sz + ' portion (₹' + normal + ').'; return; }
+    const map = {};
+    opTrendPortions(part, it).forEach(k => { const o = opTrendPortionOffer(part, it, k); if (o) map[k] = o; });
+    map[sz] = v;
+    update(path, { offerCustomerSizePrices: map, offerSizePrices: null }).then(() => {
+      it.offerCustomerSizePrices = map; it.offerSizePrices = null;
+      opSyncPartnerMenuItem(itemId, { offerCustomerSizePrices: map, offerSizePrices: null });
+      status.textContent = 'Offer saved: ' + (it.name || itemId) + ' (' + sz + ') → customers pay ₹' + v + ' (was ₹' + normal + '). Shop is still paid its own price.';
+      opRenderAvailabilityList(); try { opRenderTrending(); } catch (e) {}
+    }).catch(err => { status.textContent = 'Error: ' + err.message; });
+    return;
+  }
+  const inp = document.getElementById('op-pm-off-' + itemId);
+  if (!inp) return;
+  const normal = opTrendCust(part, it, it.price, false);
+  const v = Number(inp.value);
+  if (inp.value.trim() === '' || !isFinite(v) || v <= 0 || normal === null || v >= normal) { status.textContent = 'Offer must be above ₹0 and lower than the customer price (₹' + normal + ').'; return; }
+  update(path, { offerCustomerPrice: v, offerPrice: null }).then(() => {
+    it.offerCustomerPrice = v; it.offerPrice = null;
+    opSyncPartnerMenuItem(itemId, { offerCustomerPrice: v, offerPrice: null });
+    status.textContent = 'Offer saved: ' + (it.name || itemId) + ' → customers pay ₹' + v + ' (was ₹' + normal + '). Shop is still paid its own price.';
+    opRenderAvailabilityList(); try { opRenderTrending(); } catch (e) {}
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
+function opClearItemOffer(itemId, z) {
+  const it = opAvailItems.find(x => x.id === itemId);
+  const part = opAllPartners.find(x => x._id === opCurrentPartnerId);
+  const status = document.getElementById('op-pm-avail-status');
+  if (!it || !part || !opCurrentPartnerId) return;
+  const { db, ref, update } = window.fb;
+  const path = ref(db, 'restaurants/' + opCurrentPartnerId + '/menu/' + itemId);
+  const isPortion = z !== undefined && z !== null;
+  let fields;
+  if (isPortion) {
+    if (!opTrendCfg.loaded) { opTrendLoadCfg(); return; }
+    const sz = opTrendPortions(part, it)[Number(z)];
+    if (!sz) return;
+    const map = {};
+    opTrendPortions(part, it).forEach(k => { const o = opTrendPortionOffer(part, it, k); if (o && k !== sz) map[k] = o; });
+    fields = { offerCustomerSizePrices: Object.keys(map).length ? map : null, offerSizePrices: null };
+  } else fields = { offerCustomerPrice: null, offerPrice: null };
+  update(path, fields).then(() => {
+    Object.assign(it, fields); opSyncPartnerMenuItem(itemId, fields);
+    status.textContent = 'Offer removed: ' + (it.name || itemId) + '.';
+    opRenderAvailabilityList(); try { opRenderTrending(); } catch (e) {}
+  }).catch(err => { status.textContent = 'Error: ' + err.message; });
+}
 function opSaveItemCustomerPrice(itemId) {
   const item = opAvailItems.find(it => it.id === itemId);
   if (!item || !opCurrentPartnerId) return;
@@ -16839,6 +16940,8 @@ function opSaveItemCustomerPrice(itemId) {
   update(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu/' + itemId), { customerPrice: val > 0 ? val : null })
     .then(() => {
       item.customerPrice = val > 0 ? val : null;
+      opSyncPartnerMenuItem(itemId, { customerPrice: item.customerPrice });
+      try { opRenderAvailabilityList(); } catch (e) {}
       status.textContent = val > 0
         ? 'Customer price saved: ' + (item.name || itemId) + ' → customers pay ₹' + val + ', shop gets ₹' + (Number(item.price) || 0) + '.'
         : 'Customer price removed: ' + (item.name || itemId) + ' — customers see the shop price again.';
@@ -16863,6 +16966,7 @@ function opSaveItemPortionCustomerPrices(itemId) {
   update(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu/' + itemId), { customerSizePrices: Object.keys(out).length ? out : null })
     .then(() => {
       item.customerSizePrices = Object.keys(out).length ? out : null;
+      opSyncPartnerMenuItem(itemId, { customerSizePrices: item.customerSizePrices });
       status.textContent = Object.keys(out).length
         ? 'Saved for ' + (item.name || itemId) + ': ' + Object.keys(out).map(n => n + ' ₹' + out[n]).join(', ') + '. The shop is still paid its own portion prices.'
         : 'Portion customer prices removed for ' + (item.name || itemId) + ' — customers see the shop prices again.';
