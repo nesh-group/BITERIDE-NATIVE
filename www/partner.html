@@ -16278,6 +16278,7 @@ function opOpenPlaceOrder() {
     .sort((a, b) => String(a.restaurantName || a._id).localeCompare(String(b.restaurantName || b._id)));
   sel.innerHTML = '<option value="">Select shop…</option>' + shops.map(p => '<option value="' + escapeHtml(p._id) + '">' + escapeHtml(p.restaurantName || p._id) + '</option>').join('');
   ['name', 'phone', 'address', 'location', 'delivery'].forEach(k => { document.getElementById('op-po-' + k).value = ''; });
+  opPoNameAuto = { phone: '', name: '' };
   document.getElementById('op-po-items').innerHTML = '';
   document.getElementById('op-po-menu-list').innerHTML = '';
   opPoMenu = [];
@@ -16302,12 +16303,34 @@ function opPoShopChanged() {
   try { opPoRecalc(); } catch (e) {}
   { const q = document.getElementById('op-po-quick'); if (q) q.value = ''; opPoQuickSearch(); }
   const b = document.getElementById('op-po-load-menu'); if (b) { b.disabled = false; b.textContent = '📋 Load this shop\'s menu (customer prices)'; }
-  if (document.getElementById('op-po-shop').value) opPoLoadMenu();   // auto-load (cached for 10 min)
+  { const sid = document.getElementById('op-po-shop').value;
+    if (sid) opPoLoadShopFields(sid).then(() => {   // delivery rules / location / markup first, so free delivery + prices match the customer app
+      if (document.getElementById('op-po-shop').value !== sid) return;
+      try { opPoRecalc(); } catch (e) {}
+      opPoLoadMenu();   // auto-load (cached for 10 min)
+    }); }
+}
+/* The Orders screen keeps shops in a light form (no delivery rules / location / markup). Place order needs those four small
+   fields to apply the free-delivery offer, distance fee and customer prices, so read just them for the picked shop. */
+const OP_PO_SHOP_FIELDS = ['deliveryCharges', 'martRanges', 'location', 'priceMarkup'];
+async function opPoLoadShopFields(id) {
+  if (!opLightMode) return;   // zone mode already holds the full shop
+  const shop = opAllPartners.find(p => p._id === id);
+  if (!shop) return;
+  try {
+    const { db, ref, get } = window.fb;
+    const vals = await Promise.all(OP_PO_SHOP_FIELDS.map(f => get(ref(db, 'restaurants/' + id + '/' + f))));
+    const ld = opLightData[id];
+    OP_PO_SHOP_FIELDS.forEach((f, i) => {
+      const v = vals[i].val();
+      [shop, ld].forEach(o => { if (!o) return; if (v == null) delete o[f]; else o[f] = v; });
+    });
+  } catch (e) {}
 }
 // Customer-app price of a menu item (mirrors index.html rebuildRestaurantsFromSnapshot / neshWithOffer):
 // operator "customer price", Go Series per-item profit, price-range "Add ₹", operator price markup, and offers.
 // Returns [{ name, price (what the customer pays), shopRate (shop's own rate, undefined = same), portion, unit }]
-let opPoMenuCache = {}, opPoCustSeen = {};
+let opPoMenuCache = {}, opPoCustSeen = {}, opPoCustName = {}, opPoNameAuto = { phone: '', name: '' };
 function opPoApplyMenu(list) {
   opPoMenu = list;
   document.getElementById('op-po-menu-list').innerHTML = opPoMenu.map(m => '<option value="' + escapeHtml(m.name) + '">' + (m.weight ? 'weight item — type price' : '₹' + m.price) + '</option>').join('');
@@ -16336,14 +16359,21 @@ function opPoQuickAdd(i) {
   opPoRecalc();
 }
 async function opPoPhoneChanged() {
+  const nameEl = document.getElementById('op-po-name');
   const ph = cleanShopPhone(document.getElementById('op-po-phone').value);
-  if (!isValidShopPhone(ph) || (ph in opPoCustSeen)) return;
+  // The name was auto-filled for an earlier number and the operator did not type their own: the number changed, so drop it.
+  if (opPoNameAuto.name && nameEl.value.trim() === opPoNameAuto.name && ph !== opPoNameAuto.phone) { nameEl.value = ''; opPoNameAuto = { phone: '', name: '' }; }
+  if (!isValidShopPhone(ph)) return;
+  const fill = nm => {
+    if (nm && !nameEl.value.trim() && cleanShopPhone(document.getElementById('op-po-phone').value) === ph) { nameEl.value = nm; opPoNameAuto = { phone: ph, name: nm }; }
+  };
+  if (ph in opPoCustName) { fill(opPoCustName[ph]); return; }
   try {
     const { db, ref, get } = window.fb;
     const sn = await get(ref(db, 'customers/' + ph + '/name'));
     opPoCustSeen[ph] = sn.exists();
-    const nameEl = document.getElementById('op-po-name');
-    if (sn.exists() && !nameEl.value.trim() && cleanShopPhone(document.getElementById('op-po-phone').value) === ph) nameEl.value = String(sn.val());
+    opPoCustName[ph] = sn.exists() ? String(sn.val()) : '';
+    fill(opPoCustName[ph]);
   } catch (e) {}
 }
 function opPoPriceTiers(shop) {
@@ -16948,12 +16978,19 @@ async function opPlaceOrder() {
       payload.customerLocation = m[1] + ', ' + m[2];
       payload.customerLat = parseFloat(m[1]); payload.customerLng = parseFloat(m[2]);
     }
-    // If this phone already belongs to a customer app account, link the order to it so it shows in their
-    // Orders list and they get status pushes. NEVER create customers/{phone} for an unregistered number —
-    // the customer app treats an existing customers/{phone} node as "already registered" at login.
+    // Link the order to the customer app account so it shows in their Orders list. If this number is not registered yet,
+    // register it now with the same record the app's register step writes ({ name, number }). The customer still verifies by OTP
+    // when they log in; they just skip the name step. Created only if nothing exists there (never overwrites a real account).
     let linked = false;
     try {
-      const known = (customerPhone in opPoCustSeen) ? opPoCustSeen[customerPhone] : (await get(ref(db, 'customers/' + customerPhone + '/name'))).exists();
+      let known = (customerPhone in opPoCustSeen) ? opPoCustSeen[customerPhone] : (await get(ref(db, 'customers/' + customerPhone + '/name'))).exists();
+      if (!known) {
+        try {
+          const { runTransaction } = window.fb;
+          await runTransaction(ref(db, 'customers/' + customerPhone), cur => (cur === null ? { name: customerName, number: customerPhone } : undefined));
+          known = true; opPoCustSeen[customerPhone] = true; opPoCustName[customerPhone] = customerName;
+        } catch (e) {}
+      }
       if (known) { payload.customerAccount = customerPhone; linked = true; }
     } catch (e) {}
     await set(newRef, payload);
