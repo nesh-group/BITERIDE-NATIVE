@@ -4125,14 +4125,25 @@
       <p class="op-note" style="margin-bottom:10px;">Creates a normal order in the shop's dashboard (phone / walk-in orders). The shop gets the alert, and delivery boys see it like any other order.</p>
       <div style="margin-bottom:8px;"><select id="op-po-shop" onchange="opPoShopChanged()" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></select></div>
       <div style="margin-bottom:8px;"><input type="text" id="op-po-name" placeholder="Customer name" autocomplete="off" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
-      <div style="margin-bottom:8px;"><input type="tel" id="op-po-phone" placeholder="Customer phone number" autocomplete="off" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
+      <div style="margin-bottom:8px;"><input type="tel" id="op-po-phone" placeholder="Customer phone number" autocomplete="off" oninput="opPoPhoneChanged()" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
       <div style="margin-bottom:8px;"><input type="text" id="op-po-address" placeholder="Delivery address / landmark" autocomplete="off" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
-      <div style="margin-bottom:8px;"><input type="text" id="op-po-location" placeholder="Location (lat, lng) — optional, for map &amp; navigation" autocomplete="off" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
-      <p class="op-note" style="margin:10px 0 6px;"><b>Items</b> (pick from the shop's menu or type any item)</p>
+      <div style="margin-bottom:8px;"><input type="text" id="op-po-location" placeholder="Location — paste Google Maps link or lat, lng" autocomplete="off" oninput="opPoLocInput()" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin:-2px 0 6px;">
+        <button type="button" class="op-btn" style="margin:0; padding:6px 10px; font-size:.75rem;" onclick="opPoFindAddress()">🔎 Find from address</button>
+        <button type="button" class="op-btn" style="margin:0; padding:6px 10px; font-size:.75rem;" onclick="opPoLastLocation()">🕘 Customer's last location</button>
+      </div>
+      <div id="op-po-loc-res" class="op-note" style="margin:0 0 8px;"></div>
+      <div style="margin-bottom:8px;"><input type="text" id="op-po-place" placeholder="Place / Area (auto from location)" autocomplete="off" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
+      <div style="margin-bottom:4px;"><input type="text" id="op-po-landmark" placeholder="🔎 Search landmark * — pick one to set the location" autocomplete="off" oninput="opPoLmInput()" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
+      <div id="op-po-lm-res" style="margin:0 0 8px;"></div>
+      <p class="op-note" style="margin:10px 0 6px;"><b>Items</b> — load the shop's menu to pick items at the same price the customer app shows (no photos are downloaded), or type name &amp; price.</p>
+      <button type="button" class="op-btn" id="op-po-load-menu" style="margin:0 0 8px;" onclick="opPoLoadMenu()">📋 Load this shop's menu (customer prices)</button>
       <datalist id="op-po-menu-list"></datalist>
+      <input type="text" id="op-po-quick" placeholder="🔍 Search item &amp; tap to add" autocomplete="off" oninput="opPoQuickSearch()" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;">
+      <div id="op-po-quick-res" style="display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 8px;"></div>
       <div id="op-po-items"></div>
       <button type="button" class="op-btn" onclick="opPoAddRow()">+ Add item</button>
-      <div style="margin:10px 0 8px;"><input type="number" id="op-po-delivery" placeholder="Delivery fee ₹ (optional)" min="0" step="1" oninput="opPoRecalc()" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
+      <div style="margin:10px 0 8px;"><input type="number" id="op-po-delivery" placeholder="Delivery fee ₹ (auto — type to override)" min="0" step="1" oninput="opPoDelEdited()" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
       <div class="op-mc-row" id="op-po-total"><b>Total: ₹0</b></div>
       <p class="op-note" id="op-po-status" style="min-height:1em;"></p>
       <div style="margin-top:6px;">
@@ -9837,6 +9848,7 @@ async function opPrDeleteShown() {
 
 function opOpenSection(name) {
   if (['orders'].indexOf(name) >= 0) opLoadAllForSection(); else opRestoreZoneLoad();
+  if (OP_MENU_SECTIONS.indexOf(name) >= 0) { try { opEnsureZoneMenus(); } catch (e) {} }
   document.querySelectorAll('#operator-container .op-section').forEach(s => s.classList.remove('active'));
   document.getElementById('op-section-' + name).classList.add('active');
   if (name === 'push') opUpdateAppCodeSizeLabel();
@@ -12612,15 +12624,78 @@ function opScheduleApply() {
       opApplyPartners(llist, false);
       return;
     }
+    Object.keys(opShopData).forEach(id => { if (id in opMenuData) { if (opMenuData[id] == null) delete opShopData[id].menu; else opShopData[id].menu = opMenuData[id]; } });
     const list = Object.keys(opShopData).map(id => opShopData[id]);
     try { opMeasure('zone shops', { val: () => opShopData }); } catch (e) {}
     opApplyPartners(list, false);
   }, 40);
 }
+/* ---- DATA SAVER (zone mode): a zone shop is read child-by-child WITHOUT its `menu` (the heavy part: every item + photo link).
+   A shop's menu is attached only when something needs it (opEnsureMenus): a menu screen, the shop detail, a stock action.
+   Any failure falls back to the old full-shop listener, so behaviour never gets worse than before. ---- */
+const opMenuSubs = {}, opMenuP = {}, opMenuData = {}, opMenuLoaded = new Set(), opFullShops = new Set();
+const OP_SHOP_KNOWN_KEYS = ['orders', 'settlements', 'commissionHistory', 'commissionTiers', 'restaurantName', 'approvalStatus', 'businessType', 'goSeries', 'phone',
+  'itemCategories', 'popularItems', 'suggestItems', 'martRanges', 'bannerPhoto', 'activeSession', 'rejectionReason', 'priceMarkup', 'orderRollup', 'ratingSum', 'ratingCount'];
+const OP_MENU_SECTIONS = ['trending', 'groceries-catalog', 'nesh-item-order', 'nesh-sections', 'nesh-categories', 'item-categories', 'groceries-queue'];
+function opDropShop(id) {
+  try { if (opShopSubs[id]) opShopSubs[id](); } catch (e) {}
+  try { if (opMenuSubs[id]) opMenuSubs[id](); } catch (e) {}
+  delete opShopSubs[id]; delete opShopData[id]; delete opMenuSubs[id]; delete opMenuP[id]; delete opMenuData[id]; opMenuLoaded.delete(id); opFullShops.delete(id);
+}
+function opSubShop(id) {
+  const { db, ref, onValue } = window.fb;
+  const un = []; let dead = false;
+  opShopSubs[id] = () => { dead = true; un.forEach(u => { try { u(); } catch (e) {} }); un.length = 0; };
+  const full = () => {
+    opFullShops.add(id);
+    un.push(onValue(ref(db, 'restaurants/' + id), snap => {
+      if (snap.exists()) opShopData[id] = Object.assign({ _id: id }, snap.val()); else delete opShopData[id];
+      opScheduleApply();
+    }, () => {}));
+  };
+  fetch('https://texi-and-food-default-rtdb.firebaseio.com/restaurants/' + encodeURIComponent(id) + '.json?shallow=true')
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('http')))
+    .then(keys => {
+      if (dead) return;
+      if (!keys || typeof keys !== 'object') { full(); return; }
+      const set = new Set(Object.keys(keys).concat(OP_SHOP_KNOWN_KEYS)); set.delete('menu');
+      set.forEach(ch => {
+        un.push(onValue(ref(db, 'restaurants/' + id + '/' + ch), snap => {
+          const d = opShopData[id] || (opShopData[id] = { _id: id });
+          const v = snap.val();
+          if (v == null) delete d[ch]; else d[ch] = v;
+          if (!Object.keys(d).some(k => k !== '_id' && k !== 'menu')) delete opShopData[id];
+          opScheduleApply();
+        }, () => {}));
+      });
+    })
+    .catch(() => { if (!dead) full(); });
+}
+function opNeedMenu(id) { return !!opShopSubs[id] && !opFullShops.has(id) && !opLightMode && !opFullUnsub && !opMenuLoaded.has(id); }
+function opEnsureMenus(ids) {
+  const { db, ref, onValue } = window.fb; const ps = [];
+  (ids || []).forEach(id => {
+    if (!id || !opShopSubs[id] || opFullShops.has(id) || opLightMode || opFullUnsub) return;
+    if (!opMenuP[id]) {
+      opMenuP[id] = new Promise(res => {
+        let first = true;
+        const done = () => { if (first) { first = false; opMenuLoaded.add(id); res(); } };
+        opMenuSubs[id] = onValue(ref(db, 'restaurants/' + id + '/menu'), snap => {
+          opMenuData[id] = snap.val();
+          if (opShopData[id]) { if (opMenuData[id] == null) delete opShopData[id].menu; else opShopData[id].menu = opMenuData[id]; }
+          done(); opScheduleApply();
+        }, () => done());
+      });
+    }
+    ps.push(opMenuP[id]);
+  });
+  return Promise.all(ps);
+}
+function opEnsureZoneMenus() { return opEnsureMenus(Object.keys(opShopSubs)); }
 function opSyncPartnerLoad() {
   const { db, ref, onValue } = window.fb;
   if (opZoneSel === '__all__') {
-    Object.keys(opShopSubs).forEach(id => { try { opShopSubs[id](); } catch (e) {} delete opShopSubs[id]; delete opShopData[id]; });
+    Object.keys(opShopSubs).forEach(id => opDropShop(id));
     // LIGHT load (bandwidth saver): Orders / Profit / Report need only each shop's orders,
     // settlements, commission and name - NOT the menu, photos, categories. So read just those
     // children per shop instead of the whole `restaurants` node. If the shop index is not
@@ -12628,7 +12703,7 @@ function opSyncPartnerLoad() {
     if (opFullUnsub) return;
     if (opShopIndex && !opShopIndexFailed) {
       opLightMode = true;
-      const LIGHT = ['orders', 'settlements', 'commissionHistory', 'commissionTiers', 'restaurantName', 'approvalStatus', 'businessType', 'goSeries'];
+      const LIGHT = ['orders', 'settlements', 'commissionHistory', 'commissionTiers', 'restaurantName', 'approvalStatus', 'businessType', 'goSeries', 'phone'];
       const { query, orderByKey, startAt, endAt } = window.fb;
       const dStr = opOrdersDayValue(), todayStr = opDateKey(Date.now());
       const winFrom = opPushPrefix(opDayStartMs(dStr) - 864e5 - 600000);
@@ -12666,15 +12741,12 @@ function opSyncPartnerLoad() {
   const want = opWantedShopIds();
   let changed = hadFull;
   Object.keys(opShopSubs).forEach(id => {
-    if (!want.has(id)) { try { opShopSubs[id](); } catch (e) {} delete opShopSubs[id]; delete opShopData[id]; changed = true; }
+    if (!want.has(id)) { opDropShop(id); changed = true; }
   });
   want.forEach(id => {
     if (opShopSubs[id]) return;
     changed = true;
-    opShopSubs[id] = onValue(ref(db, 'restaurants/' + id), snap => {
-      if (snap.exists()) opShopData[id] = Object.assign({ _id: id }, snap.val()); else delete opShopData[id];
-      opScheduleApply();
-    }, () => {});
+    opSubShop(id);
   });
   if (changed) opScheduleApply();
 }
@@ -12726,6 +12798,10 @@ function opApplyPartners(list, full) {
     if (neshCatSec && neshCatSec.classList.contains('active')) opRenderNeshCategories();
     const catEditorModal = document.getElementById('op-category-editor-modal');
     if (catEditorModal && catEditorModal.classList.contains('show')) opRenderCategoryEditorItems();
+    const trendSec = document.getElementById('op-section-trending');
+    if (trendSec && trendSec.classList.contains('active')) { try { opRenderTrending(); } catch (e) {} }
+    const itemCatSec = document.getElementById('op-section-item-categories');
+    if (itemCatSec && itemCatSec.classList.contains('active')) { try { opRenderItemCatShopList(); } catch (e) {} }
   }
 }
 function opTypeLabel(t) { return t === 'groceries' ? 'Groceries' : t === 'online_shop' ? 'Other Shop' : 'Hotel'; }
@@ -13193,6 +13269,7 @@ async function opHandleSectionItemPhoto(e) {
   }
 }
 async function opAddStockToSection() {
+  try { await opEnsureZoneMenus(); } catch (e) {}
   const status = document.getElementById('op-sec-add-status');
   const say = (msg, color) => { status.style.display = 'block'; status.style.color = color || 'var(--chili)'; status.textContent = msg; };
   const sec = opNeshSections.find(x => x.id === document.getElementById('op-sec-add-select').value);
@@ -13329,6 +13406,7 @@ async function opSecBulkPhotoUpload(e) {
   const files = Array.from(e.target.files || []);
   e.target.value = ""; // allow re-selecting the same files later
   if (!files.length) return;
+  try { await opEnsureZoneMenus(); } catch (e2) {}
   const status = document.getElementById('op-sec-bulk-photo-status');
   const btn = document.getElementById('op-sec-bulk-photo-btn');
   const say = (msg, color) => { status.style.display = 'block'; status.style.color = color || 'var(--chili)'; status.textContent = msg; };
@@ -16203,24 +16281,166 @@ function opOpenPlaceOrder() {
   document.getElementById('op-po-items').innerHTML = '';
   document.getElementById('op-po-menu-list').innerHTML = '';
   opPoMenu = [];
+  opPoCalc.delManual = false; opPoRoadKey = ''; opPoRoadKm = null; opPoRoadReq = '';
+  { const q = document.getElementById('op-po-quick'); if (q) q.value = ''; const r = document.getElementById('op-po-quick-res'); if (r) r.innerHTML = ''; opPoLocMsg(''); }
+  ['place', 'landmark'].forEach(k => { const e = document.getElementById('op-po-' + k); if (e) e.value = ''; });
+  { const e = document.getElementById('op-po-lm-res'); if (e) e.innerHTML = ''; }
+  opPoAutoLM = ''; opPoAutoPlace = ''; opPoLMKey = '';
+  opPoLoadLandmarks();
   opPoAddRow();
   opPoRecalc();
+  opPoLoadCfg();
   const st = document.getElementById('op-po-status'); st.textContent = ''; st.style.color = '';
   document.getElementById('op-po-submit').disabled = false;
   document.getElementById('op-place-order-modal').classList.add('show');
 }
 function opPoShopChanged() {
-  const id = document.getElementById('op-po-shop').value;
+  // Menu is loaded photo-free (price fields only) and cached for 10 minutes.
   opPoMenu = [];
+  opPoCalc.delManual = false; document.getElementById('op-po-delivery').value = '';
   document.getElementById('op-po-menu-list').innerHTML = '';
-  if (!id) return;
-  const { db, ref, get } = window.fb;
-  get(ref(db, 'restaurants/' + id + '/menu')).then(snap => {
+  try { opPoRecalc(); } catch (e) {}
+  { const q = document.getElementById('op-po-quick'); if (q) q.value = ''; opPoQuickSearch(); }
+  const b = document.getElementById('op-po-load-menu'); if (b) { b.disabled = false; b.textContent = '📋 Load this shop\'s menu (customer prices)'; }
+  if (document.getElementById('op-po-shop').value) opPoLoadMenu();   // auto-load (cached for 10 min)
+}
+// Customer-app price of a menu item (mirrors index.html rebuildRestaurantsFromSnapshot / neshWithOffer):
+// operator "customer price", Go Series per-item profit, price-range "Add ₹", operator price markup, and offers.
+// Returns [{ name, price (what the customer pays), shopRate (shop's own rate, undefined = same), portion, unit }]
+let opPoMenuCache = {}, opPoCustSeen = {};
+function opPoApplyMenu(list) {
+  opPoMenu = list;
+  document.getElementById('op-po-menu-list').innerHTML = opPoMenu.map(m => '<option value="' + escapeHtml(m.name) + '">' + (m.weight ? 'weight item — type price' : '₹' + m.price) + '</option>').join('');
+  const b = document.getElementById('op-po-load-menu');
+  if (b) { b.disabled = true; b.textContent = '✅ Menu loaded (' + opPoMenu.length + ' items)'; }
+  opPoQuickSearch();
+}
+function opPoQuickSearch() {
+  const box = document.getElementById('op-po-quick-res'); if (!box) return;
+  if (!opPoMenu.length) { box.innerHTML = ''; return; }
+  const q = document.getElementById('op-po-quick').value.trim().toLowerCase();
+  box.innerHTML = opPoMenu.map((m, i) => ({ m, i })).filter(x => !q || x.m.name.toLowerCase().includes(q)).slice(0, 12)
+    .map(x => '<button type="button" class="op-btn" style="margin:0; padding:6px 10px; font-size:.75rem;" onclick="opPoQuickAdd(' + x.i + ')">' + escapeHtml(x.m.name) + (x.m.weight ? '' : ' ₹' + x.m.price) + '</button>').join('');
+}
+function opPoQuickAdd(i) {
+  const m = opPoMenu[Number(i)]; if (!m) return;
+  const rows = Array.prototype.slice.call(document.querySelectorAll('#op-po-items .op-po-row'));
+  let row = rows.find(r => r.querySelector('.po-name').value.trim().toLowerCase() === m.name.toLowerCase());
+  if (row) { const q = row.querySelector('.po-qty'); q.value = (Number(q.value) || 1) + 1; }
+  else {
+    row = rows.find(r => !r.querySelector('.po-name').value.trim());
+    if (!row) { opPoAddRow(); row = document.querySelector('#op-po-items .op-po-row:last-child'); }
+    row.querySelector('.po-name').value = m.name;
+    row.querySelector('.po-price').value = m.weight ? '' : m.price;
+  }
+  opPoRecalc();
+}
+async function opPoPhoneChanged() {
+  const ph = cleanShopPhone(document.getElementById('op-po-phone').value);
+  if (!isValidShopPhone(ph) || (ph in opPoCustSeen)) return;
+  try {
+    const { db, ref, get } = window.fb;
+    const sn = await get(ref(db, 'customers/' + ph + '/name'));
+    opPoCustSeen[ph] = sn.exists();
+    const nameEl = document.getElementById('op-po-name');
+    if (sn.exists() && !nameEl.value.trim() && cleanShopPhone(document.getElementById('op-po-phone').value) === ph) nameEl.value = String(sn.val());
+  } catch (e) {}
+}
+function opPoPriceTiers(shop) {
+  const arr = v => v ? (Array.isArray(v) ? v : Object.values(v)) : [];
+  if (!(shop.businessType === 'groceries' || shop.goSeries)) return arr(shop.deliveryCharges && shop.deliveryCharges.freeTiers);
+  const own = arr(shop.martRanges);
+  if (own.length) return own;
+  const zc = opPoCfg.zoneDelivery || {};
+  const zid = Object.keys(zc).find(id => zc[id] && zc[id].shopIds && zc[id].shopIds[shop._id] && arr(zc[id].freeTiers).length);
+  return zid ? arr(zc[zid].freeTiers) : [];
+}
+function opPoMenuEntries(shop, m) {
+  const arr = v => v ? (Array.isArray(v) ? v : Object.values(v)) : [];
+  const bt = shop.businessType === 'groceries' ? 'groceries' : shop.businessType === 'online_shop' ? 'online_shop' : 'hotel';
+  const mart = bt === 'groceries' || !!shop.goSeries;
+  const goMk = Number((opPoCfg.go || {}).itemMarkup) || 0;
+  const tiers = opPoPriceTiers(shop);
+  const mt = arr(shop.priceMarkup).filter(Boolean);
+  const plain = x => !(Number(x.customerPrice) > 0) && (!x.unit || x.unit === 'piece');
+  const tierFor = x => { const p = Number(x.price) || 0; return tiers.find(t => t && p >= (Number(t.min) || 0) && (t.max == null || p < Number(t.max))); };
+  const bump = x => { if (!tiers.length || !plain(x)) return 0; const t = tierFor(x), a = Number(t && t.add); return (t && a > 0) ? Math.round(a) : 0; };
+  const comm = x => { if (!tiers.length || !plain(x)) return 0; const p = Number(x.price) || 0, t = tierFor(x); return (t && Number(t.commission) > 0 && Number(t.commission) < p) ? Number(t.commission) : 0; };
+  const mark = x => {
+    if (!mt.length || !plain(x)) return 0;
+    const p = Number(x.price) || 0; if (p <= 0) return 0;
+    const t = mt.find(t => p >= (Number(t.min) || 0) && (t.max == null || t.max === '' || p <= Number(t.max)));
+    const val = Number(t && t.add) || 0;
+    if (!t || val <= 0) return 0;
+    return t.type === 'pct' ? Math.round(p * val / 100) : Math.round(val);
+  };
+  const name = String(m.name || '').trim();
+  if (!name || m.unavailable) return [];
+  const unit = m.unit || 'piece';
+  const sizes = Array.isArray(m.sizes) ? m.sizes.filter(Boolean) : [];
+  // Portions (Quarter / Half / Full) — food shops only
+  const sp = m.sizePrices;
+  if (sp && typeof sp === 'object' && sizes.length > 1 && bt === 'hotel') {
+    const out = [];
+    sizes.forEach(sz => {
+      const raw = Number(sp[sz]) || 0; if (raw <= 0) return;
+      const mm = Object.assign({}, m, { price: raw, customerPrice: 0 });
+      const opSz = (m.customerSizePrices && typeof m.customerSizePrices === 'object') ? Number(m.customerSizePrices[sz]) : 0;
+      let pr, rt;
+      if (opSz > 0) { pr = opSz; rt = raw; }
+      else { pr = raw + (shop.goSeries ? goMk : 0) + bump(mm) + mark(mm); rt = (bump(mm) > 0 || mark(mm) > 0 || comm(mm) > 0) ? raw - comm(mm) : undefined; }
+      const offSz = (m.offerSizePrices && typeof m.offerSizePrices === 'object') ? Number(m.offerSizePrices[sz]) : 0;
+      const ocSz = (m.offerCustomerSizePrices && typeof m.offerCustomerSizePrices === 'object') ? Number(m.offerCustomerSizePrices[sz]) : 0;
+      if (ocSz > 0 && ocSz < pr) { if (rt === undefined) rt = pr; pr = ocSz; }
+      else if (offSz > 0 && offSz < raw) { pr = Math.max(1, pr - (raw - offSz)); if (rt !== undefined) rt = Math.max(0, offSz - (opSz > 0 ? 0 : comm(mm))); }
+      out.push({ name: name + ' (' + sz + ')', price: pr, shopRate: rt, portion: true, unit: 'piece' });
+    });
+    if (out.length > 1) return out;
+  }
+  const raw = Number(m.price) || 0;
+  if (unit !== 'piece') return [{ name, price: 0, weight: true, unit }];   // gram / kg items: the customer picks the weight, so type the final price
+  const hasCp = Number(m.customerPrice) > 0 && bt !== 'groceries';
+  let price = hasCp ? Number(m.customerPrice) : raw + (mart ? goMk : 0) + bump(m) + mark(m);
+  let shopRate = hasCp ? raw : ((bump(m) > 0 || mark(m) > 0 || comm(m) > 0) ? raw - comm(m) : undefined);
+  const offElig = bt === 'groceries' || bt === 'online_shop' || bt === 'hotel';
+  const ocp = Number(m.offerCustomerPrice) || 0, op = Number(m.offerPrice) || 0;
+  if (offElig && ocp > 0 && ocp < price) { if (shopRate === undefined) shopRate = price; price = ocp; }
+  else if (offElig && op > 0 && op < raw) { price = Math.max(1, price - (raw - op)); if (shopRate !== undefined) shopRate = op - comm(m); }
+  return [{ name, price, shopRate, unit: 'piece' }];
+}
+async function opPoLoadMenu() {
+  // Photo-free read: item ids via REST shallow=true (keys only), then ONLY the price-related fields of each item
+  // (never the photo). Prices shown are what the CUSTOMER app shows for that item.
+  const id = document.getElementById('op-po-shop').value;
+  const st = document.getElementById('op-po-status');
+  if (!id) { st.style.color = '#dc2626'; st.textContent = 'Select a shop first.'; return; }
+  const shop = opAllPartners.find(p => p._id === id);
+  const b = document.getElementById('op-po-load-menu');
+  const idle = '📋 Load this shop\'s menu (customer prices)';
+  if (opPoMenuCache[id] && Date.now() - opPoMenuCache[id].t < 600000) { opPoApplyMenu(opPoMenuCache[id].list); return; }   // loaded in the last 10 min: instant
+  b.disabled = true; b.textContent = 'Loading menu…';
+  try {
+    if (!opPoCfg.loaded) await opPoLoadCfg();
+    const { db, ref, get } = window.fb;
+    const res = await fetch('https://texi-and-food-default-rtdb.firebaseio.com/restaurants/' + encodeURIComponent(id) + '/menu.json?shallow=true');
+    if (!res.ok) throw new Error('shallow ' + res.status);
+    const keys = await res.json();
+    const ids = Object.keys(keys || {}).slice(0, 300);
+    const bt = shop && (shop.businessType === 'groceries' || shop.businessType === 'online_shop') ? shop.businessType : 'hotel';
+    const fields = ['name', 'price', 'unit', 'unavailable', 'customerPrice', 'offerPrice', 'offerCustomerPrice']
+      .concat(bt === 'hotel' ? ['sizes', 'sizePrices', 'customerSizePrices', 'offerSizePrices', 'offerCustomerSizePrices'] : []);
+    const list = (await Promise.all(ids.map(async k => {
+      const vals = await Promise.all(fields.map(f => get(ref(db, 'restaurants/' + id + '/menu/' + k + '/' + f))));
+      const m = {}; fields.forEach((f, i) => { const v = vals[i].val(); if (v !== null && v !== undefined) m[f] = v; });
+      return opPoMenuEntries(shop, m);
+    }))).reduce((a, x) => a.concat(x), []).filter(e => e.name);
     if (document.getElementById('op-po-shop').value !== id) return;
-    const v = snap.val() || {};
-    opPoMenu = Object.keys(v).map(k => ({ name: v[k].name || '', price: Number(v[k].price) || 0, desc: v[k].desc || '', unit: v[k].unit || 'piece' })).filter(m => m.name);
-    document.getElementById('op-po-menu-list').innerHTML = opPoMenu.map(m => '<option value="' + escapeHtml(m.name) + '">₹' + m.price + '</option>').join('');
-  }).catch(() => {});
+    opPoMenuCache[id] = { t: Date.now(), list: list.map(e => Object.assign({ desc: '' }, e)) };
+    opPoApplyMenu(opPoMenuCache[id].list);
+  } catch (e) {
+    b.disabled = false; b.textContent = idle;
+    st.style.color = '#dc2626'; st.textContent = "Couldn't load the menu — type the items instead.";
+  }
 }
 function opPoAddRow() {
   const IN = 'padding:8px; border:1px solid #cfe6d5; background:#fff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;';
@@ -16236,7 +16456,7 @@ function opPoAddRow() {
 function opPoNameChanged(inp) {
   const m = opPoMenu.find(x => x.name.toLowerCase() === inp.value.trim().toLowerCase());
   const priceEl = inp.parentNode.querySelector('.po-price');
-  if (m && !priceEl.value) { priceEl.value = m.price || ''; opPoRecalc(); }
+  if (m && !priceEl.value && m.price > 0) { priceEl.value = m.price; opPoRecalc(); }
 }
 function opPoReadItems() {
   const items = [];
@@ -16246,15 +16466,432 @@ function opPoReadItems() {
     const price = Number(r.querySelector('.po-price').value) || 0;
     if (!name) return;
     const m = opPoMenu.find(x => x.name.toLowerCase() === name.toLowerCase());
-    items.push({ name, desc: m ? m.desc : '', price, qty, unit: m ? m.unit : 'piece' });
+    const it = { name, desc: m ? m.desc : '', price, qty, unit: m ? m.unit : 'piece' };
+    // Shop's own rate (shop sees / is paid this): fixed for portions, scaled with the typed price otherwise — same as the customer app.
+    if (m && m.shopRate !== undefined && m.price > 0 && price > 0) it.shopPrice = m.portion ? Math.round(m.shopRate * 100) / 100 : Math.round(price * (m.shopRate / m.price) * 100) / 100;
+    items.push(it);
   });
   return items;
 }
+/* ---- Amount calculation: mirrors the customer app (index.html) so operator-placed orders are billed the same way ----
+   Total = max(0, items + platform fee + delivery fee) + rain surge + GST   (shop discount / coupon / tip are customer-only and not applied here). */
+let opPoCfg = { loaded: false, platform: 0, go: {}, gst: {}, extraKmOnly: false, zoneDelivery: {}, rain: {}, zones: [] };
+let opPoCalc = { platformFee: 0, deliveryAuto: 0, free: false, waived: 0, saved: 0, gst: 0, gstPct: 0, rain: null, km: null, road: false, delManual: false };
+let opPoRoadKey = '', opPoRoadKm = null, opPoRoadReq = '', opPoRoadTimer = null;
+async function opPoLoadCfg() {
+  try {
+    const { db, ref, get } = window.fb;
+    const rd = async p => { try { return (await get(ref(db, 'app_config/' + p))).val(); } catch (e) { return null; } };
+    const r = await Promise.all(['extraAmount', 'goSeriesDelivery', 'gst', 'deliveryExtraKmOnly', 'zoneDelivery', 'rainSurge', 'shopZones'].map(rd));
+    opPoCfg.platform = (r[0] && Number(r[0].amount)) || 0;
+    opPoCfg.go = r[1] || {};
+    opPoCfg.gst = r[2] || {};
+    opPoCfg.extraKmOnly = !!(r[3] && r[3].on);
+    opPoCfg.zoneDelivery = r[4] || {};
+    opPoCfg.rain = r[5] || {};
+    opPoCfg.zones = r[6] ? Object.keys(r[6]).map(id => Object.assign({ _id: id }, r[6][id])) : [];
+    opPoCfg.loaded = true;
+  } catch (e) {}
+  opPoRecalc();
+}
+function opPoParseLL(s) {
+  const m = s ? String(s).trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/) : null;
+  return m ? { lat: parseFloat(m[1]), lng: parseFloat(m[2]) } : null;
+}
+function opPoHav(a, b) {
+  const R = 6371, rad = d => d * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+function opPoZonesAt(pt) {
+  return (opPoCfg.zones || []).filter(z => {
+    const b = Array.isArray(z.bounds) ? z.bounds : Object.values(z.bounds || {});
+    return b.length >= 3 && opPointInPoly(pt, b);
+  });
+}
+function opPoZoneCfg(shop, pt) {
+  const cfgs = opPoCfg.zoneDelivery;
+  if (!cfgs || !Object.keys(cfgs).length || !pt) return null;
+  const z = opPoZonesAt(pt).find(z => cfgs[z._id]);
+  if (!z) return null;
+  const c = cfgs[z._id];
+  if (c.shopIds && Object.keys(c.shopIds).length && !c.shopIds[shop._id]) return null;
+  return c;
+}
+function opPoDc(shop, pt) {
+  if (!shop) return null;
+  if (shop.goSeries || shop.businessType === 'groceries') {
+    const g = opPoCfg.go || {};
+    const cfg = opPoZoneCfg(shop, pt) || {
+      baseFee: Number(g.baseFee) || 0, perKmFee: Number(g.perKmFee) || 0,
+      freeAbove: Number(g.freeDeliveryAbove) || 0, freeWithinKm: Number(g.freeDeliveryWithinKm) || 0,
+      smallCartBelow: Number(g.smallCartBelow) || 0, smallCartFee: Number(g.smallCartFee) || 0
+    };
+    const mr = shop.martRanges ? (Array.isArray(shop.martRanges) ? shop.martRanges : Object.values(shop.martRanges)) : [];
+    return mr.length ? Object.assign({}, cfg, { freeTiers: mr }) : cfg;
+  }
+  return shop.deliveryCharges || null;
+}
+function opPoSmall(dc, tot) { const b = Number(dc.smallCartBelow) || 0, f = Number(dc.smallCartFee) || 0; return (b > 0 && f > 0 && tot < b) ? f : 0; }
+function opPoFreeByRange(dc, km, tot) {
+  const tiers = Array.isArray(dc.freeTiers) ? dc.freeTiers : [];
+  if (tiers.length && km != null && tiers.some(t => tot >= (Number(t.min) || 0) && (t.max == null || tot < Number(t.max)) && km <= Number(t.km))) return true;
+  const within = Number(dc.freeWithinKm) || 0;
+  return within > 0 && km != null && km < within;
+}
+function opPoFreeAboveReached(dc, tot) { const m = Number(dc.freeAbove) || 0; return m > 0 && tot >= m; }
+function opPoFreeAboveFee(dc, km) { return Math.round((Number(dc.baseFee) || 0) + (Number(dc.perKmFee) || 0) * Math.max(0, km - 1)); }
+function opPoExtraFreeKm(dc, tot) {
+  let f = Math.max(Number(dc.freeUnderKm) || 0, Number(dc.freeWithinKm) || 0);
+  (Array.isArray(dc.freeTiers) ? dc.freeTiers : []).forEach(t => { if (tot >= (Number(t.min) || 0) && (t.max == null || tot < Number(t.max))) f = Math.max(f, Number(t.km) || 0); });
+  return f;
+}
+function opPoIsFree(dc, km, tot) {
+  if (!dc) return false;
+  if (opPoFreeAboveReached(dc, tot) && !(Number(dc.baseFee) > 0) && !(Number(dc.perKmFee) > 0)) return true;
+  return opPoFreeByRange(dc, km, tot);
+}
+function opPoFeeBeforeFree(dc, km, tot) {
+  if (!dc) return 0;
+  const small = opPoSmall(dc, tot), baseFee = Number(dc.baseFee) || 0, perKm = Number(dc.perKmFee) || 0;
+  if (km == null) return baseFee + small;   // distance unknown: flat base fee only (same as the customer app)
+  if (dc.freeUnderKm != null && km < Number(dc.freeUnderKm)) return small;
+  if (opPoFreeAboveReached(dc, tot) && !opPoFreeByRange(dc, km, tot)) return opPoFreeAboveFee(dc, km) + small;
+  if (opPoCfg.extraKmOnly && perKm > 0) {
+    const freeKm = opPoExtraFreeKm(dc, tot);
+    if (freeKm > 0 && km >= freeKm) return Math.max(1, Math.ceil(baseFee + perKm * Math.max(0, km - freeKm - 1) - 1e-9)) + small;
+  }
+  return Math.round(baseFee + perKm * km) + small;
+}
+function opPoReduction(dc, km, tot) {
+  try {
+    if (!dc || opPoIsFree(dc, km, tot)) return 0;
+    const baseFee = Number(dc.baseFee) || 0, perKm = Number(dc.perKmFee) || 0;
+    if (opPoFreeAboveReached(dc, tot)) {
+      if (km == null) return 0;
+      if (dc.freeUnderKm != null && km < Number(dc.freeUnderKm)) return 0;
+      return Math.max(0, Math.round(baseFee + perKm * km) - opPoFreeAboveFee(dc, km));
+    }
+    if (!opPoCfg.extraKmOnly || perKm <= 0 || km == null) return 0;
+    if (dc.freeUnderKm != null && km < Number(dc.freeUnderKm)) return 0;
+    const freeKm = opPoExtraFreeKm(dc, tot);
+    if (!(freeKm > 0 && km >= freeKm)) return 0;
+    const actual = Math.max(1, Math.ceil(baseFee + perKm * Math.max(0, km - freeKm - 1) - 1e-9));
+    return Math.max(0, Math.round(baseFee + perKm * km) - actual);
+  } catch (e) { return 0; }
+}
+// Road distance (same two routing servers as the customer app); until it arrives the straight-line x1.25 estimate is used.
+function opPoFetchRoad(rp, pt, key) {
+  if (opPoRoadReq === key) return;
+  opPoRoadReq = key;
+  clearTimeout(opPoRoadTimer);
+  opPoRoadTimer = setTimeout(() => {
+    const urls = [
+      'https://router.project-osrm.org/route/v1/cycling/' + rp.lng + ',' + rp.lat + ';' + pt.lng + ',' + pt.lat + '?overview=false',
+      'https://routing.openstreetmap.de/routed-bike/route/v1/driving/' + rp.lng + ',' + rp.lat + ';' + pt.lng + ',' + pt.lat + '?overview=false'
+    ];
+    let done = false;
+    const ok = km => { if (done) return; done = true; opPoRoadKey = key; opPoRoadKm = km; try { opPoRecalc(); } catch (e) {} };
+    urls.forEach((u, i) => setTimeout(() => {
+      if (done) return;
+      fetch(u).then(r => r.json()).then(d => {
+        const m = d && d.routes && d.routes[0] && d.routes[0].distance;
+        if (typeof m === 'number' && m >= 0) ok(m / 1000);
+      }).catch(() => {});
+    }, i * 1200));
+  }, 600);
+}
+function opPoKm(shop, pt) {
+  const rp = opPoParseLL(shop && shop.location);
+  if (!rp || !pt) return null;
+  const key = rp.lat.toFixed(4) + ',' + rp.lng.toFixed(4) + '|' + pt.lat.toFixed(4) + ',' + pt.lng.toFixed(4);
+  if (opPoRoadKey === key && opPoRoadKm != null) return { km: opPoRoadKm, road: true };
+  opPoFetchRoad(rp, pt, key);
+  return { km: opPoHav(rp, pt) * 1.25, road: false };
+}
+function opPoDelEdited() {
+  const el = document.getElementById('op-po-delivery');
+  opPoCalc.delManual = el.value !== '';
+  opPoRecalc();
+}
 function opPoRecalc() {
   const items = opPoReadItems();
-  const sub = items.reduce((s, it) => s + it.price * it.qty, 0);
-  const del = Number(document.getElementById('op-po-delivery').value) || 0;
-  document.getElementById('op-po-total').innerHTML = '<b>Total: ₹' + (Math.round((sub + del) * 100) / 100) + '</b>' + (del ? ' <span class="op-note">(items ₹' + sub + ' + delivery ₹' + del + ')</span>' : '');
+  const sub = Math.round(items.reduce((s, it) => s + it.price * it.qty, 0) * 100) / 100;
+  const shop = opAllPartners.find(p => p._id === document.getElementById('op-po-shop').value);
+  const pt = opPoParseLL(document.getElementById('op-po-location').value);
+  const A = opPoCalc;
+  A.platformFee = 0; A.deliveryAuto = 0; A.free = false; A.waived = 0; A.saved = 0; A.gst = 0; A.gstPct = 0; A.rain = null; A.km = null; A.road = false;
+  if (shop && opPoCfg.loaded) {
+    A.platformFee = shop.goSeries ? (Number((opPoCfg.go || {}).platformFee) || 0) : (Number(opPoCfg.platform) || 0);
+    const dc = opPoDc(shop, pt);
+    const d = opPoKm(shop, pt);
+    const km = d ? d.km : null;
+    if (d) { A.km = d.km; A.road = d.road; }
+    if (dc) {
+      A.free = opPoIsFree(dc, km, sub);
+      const before = opPoFeeBeforeFree(dc, km, sub);
+      A.deliveryAuto = A.free ? 0 : before;
+      if (A.free && before > 0) A.waived = before;
+      if (!A.free) A.saved = opPoReduction(dc, km, sub);
+    }
+    const key = (shop.businessType === 'groceries' || shop.businessType === 'online_shop' || (shop.goSeries && shop.businessType !== 'hotel')) ? 'mart' : 'food';
+    const pct = Number((opPoCfg.gst || {})[key]) || 0;
+    if (pct > 0 && pct <= 100) { A.gstPct = pct; A.gst = Math.round(sub * pct / 100); }
+    if ((shop.goSeries || shop.businessType === 'groceries') && pt) {
+      const cfgs = opPoCfg.rain || {};
+      const z = opPoZonesAt(pt).find(z => cfgs[z._id] && cfgs[z._id].on && Number(cfgs[z._id].amount) > 0);
+      if (z) {
+        const c = cfgs[z._id], amount = Math.round(Number(c.amount));
+        const drv = (c.driverAmount === '' || c.driverAmount == null) ? amount : Math.max(0, Math.round(Number(c.driverAmount) || 0));
+        A.rain = { amount, driverAmount: drv, zoneName: z.name || '' };
+      }
+    }
+  }
+  const delEl = document.getElementById('op-po-delivery');
+  if (!A.delManual || delEl.value === '') { A.delManual = false; delEl.value = shop ? A.deliveryAuto : ''; }
+  const del = Math.max(0, Number(delEl.value) || 0);
+  const rainAmt = A.rain ? A.rain.amount : 0;
+  const total = Math.round((Math.max(0, sub + A.platformFee + del) + rainAmt + A.gst) * 100) / 100;
+  A.total = total;
+  const bits = ['items ₹' + sub];
+  if (A.platformFee) bits.push('platform fee ₹' + A.platformFee);
+  bits.push(A.free && !A.delManual ? 'delivery FREE' + (A.waived ? ' (was ₹' + A.waived + ')' : '') : 'delivery ₹' + del);
+  if (rainAmt) bits.push('rain surge ₹' + rainAmt);
+  if (A.gst) bits.push('GST ' + A.gstPct + '% ₹' + A.gst);
+  let note = '';
+  if (shop && !pt) note = 'Add the customer location (lat, lng) for the distance-based delivery fee — until then only the base fee is charged.';
+  else if (shop && pt && !opPoParseLL(shop.location)) note = "This shop has no saved location, so distance can't be measured — base fee only.";
+  else if (A.km != null) note = 'Distance: ' + (Math.round(A.km * 10) / 10) + ' km (' + (A.road ? 'road route' : 'estimate, road distance loading…') + ').';
+  document.getElementById('op-po-total').innerHTML = '<b>Total: ₹' + total + '</b> <span class="op-note">(' + bits.join(' + ') + ')</span>' + (note ? '<div class="op-note" style="margin-top:4px;">' + note + '</div>' : '');
+}
+/* ---- Place / Landmark: same sources as the customer app (local landmark file -> live Overpass; zone -> locality -> Nominatim) ---- */
+let opPoLM = null, opPoLoc = [], opPoLMPromise = null, opPoLMTimer = null, opPoLMKey = '', opPoAutoLM = '', opPoAutoPlace = '', opPoLocZones = null;
+const opPoLMBounds = { minLat: 11.1961, maxLat: 11.2647, minLng: 75.8857, maxLng: 75.9688 };
+function opPoDistM(lat1, lng1, lat2, lng2) { return opPoHav({ lat: lat1, lng: lng1 }, { lat: lat2, lng: lng2 }) * 1000; }
+function opPoLMType(p) { return String(p.amenity || p.shop || p.office || p.tourism || p.leisure || p.healthcare || p.man_made || (p.building && p.building !== 'yes' ? p.building : 'building')).replace(/_/g, ' '); }
+function opPoLMLabel(p) {
+  if (p.name) return p.name;
+  const label = opPoLMType(p).replace(/\b\w/g, c => c.toUpperCase());
+  return p['addr:street'] ? label + ' (' + p['addr:street'] + ')' : label;
+}
+function opPoLoadLandmarks() {
+  if (opPoLMPromise) return opPoLMPromise;
+  opPoLMPromise = fetch('https://neshapp.in/export.geojson?v=1').then(r => { if (!r.ok) throw new Error('http'); return r.json(); }).then(geo => {
+    const LM = [], LOC = [];
+    let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+    (geo.features || []).forEach(f => {
+      const p = f.properties || {}, c = f.geometry && f.geometry.coordinates;
+      if (!c) return;
+      minLat = Math.min(minLat, c[1]); maxLat = Math.max(maxLat, c[1]); minLng = Math.min(minLng, c[0]); maxLng = Math.max(maxLng, c[0]);
+      if (p.name || p.amenity || p.shop || p.office || p.tourism || p.leisure || p.healthcare || p.man_made || p.building) LM.push({ n: opPoLMLabel(p), t: opPoLMType(p), lat: c[1], lng: c[0], named: !!p.name });
+      else if (p.place_name) LM.push({ n: String(p.place_name).trim(), t: 'place', lat: c[1], lng: c[0], named: true });
+      if (p['addr:city']) LOC.push({ name: String(p['addr:city']).trim().replace(/\b\w/g, x => x.toUpperCase()), lat: c[1], lng: c[0] });
+      if (p.place_name) LOC.push({ name: String(p.place_name).trim(), lat: c[1], lng: c[0] });
+      if (!p.place_name && p.name && String(p['@id'] || f.id || '').indexOf('manual') !== -1 && !/hospital|clinic|house|road|near|junction|shop|store|mosque|school/i.test(p.name)) LOC.push({ name: String(p.name).split(',')[0].trim().replace(/\b\w/g, x => x.toUpperCase()), lat: c[1], lng: c[0] });
+    });
+    opPoLM = LM; opPoLoc = LOC;
+    if (LM.length) { const m = 0.01; opPoLMBounds.minLat = minLat - m; opPoLMBounds.maxLat = maxLat + m; opPoLMBounds.minLng = minLng - m; opPoLMBounds.maxLng = maxLng + m; }
+    return LM;
+  }).catch(() => { opPoLMPromise = null; if (!opPoLM) { opPoLM = []; opPoLoc = []; } return opPoLM; });
+  return opPoLMPromise;
+}
+async function opPoZoneName(lat, lng) {
+  try {
+    if (!opPoLocZones) {
+      const { db, ref, get } = window.fb;
+      const v = (await get(ref(db, 'app_config/locationZones'))).val() || {};
+      opPoLocZones = Object.keys(v).map(id => v[id]);
+    }
+    const hit = opPoLocZones.find(z => { const b = (Array.isArray(z.bounds) ? z.bounds : Object.values(z.bounds || {})).filter(pt => pt && typeof pt.lat === 'number' && typeof pt.lng === 'number'); return z.name && b.length >= 3 && opPointInPoly({ lat, lng }, b); });
+    return hit ? hit.name : null;
+  } catch (e) { return null; }
+}
+async function opPoFillPlace(lat, lng) {
+  await opPoLoadLandmarks();
+  let name = await opPoZoneName(lat, lng);
+  if (!name) {
+    let best = null;
+    opPoLoc.forEach(l => { const d = opPoDistM(lat, lng, l.lat, l.lng); if (d <= 3000 && (!best || d < best.d)) best = { name: l.name, d }; });
+    if (best) name = best.name;
+    else {
+      try {
+        const r = await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=14&addressdetails=1', { headers: { 'Accept-Language': 'ml' } });
+        const a = ((await r.json()).address) || {};
+        name = a.village || a.suburb || a.town || a.hamlet || a.neighbourhood || a.county || null;
+      } catch (e) {}
+    }
+  }
+  const el = document.getElementById('op-po-place');
+  if (name && el && (!el.value.trim() || el.value.trim() === opPoAutoPlace)) { el.value = name; opPoAutoPlace = name; }
+}
+function opPoShowLM(places) {
+  const box = document.getElementById('op-po-lm-res'); if (!box) return;
+  if (!places.length) { box.innerHTML = '<div class="op-note">No landmark found near this pin — type one.</div>'; return; }
+  const inp = document.getElementById('op-po-landmark');
+  const cur = inp.value.trim();
+  if (!cur || cur === opPoAutoLM) { opPoAutoLM = 'Near ' + places[0].name; inp.value = opPoAutoLM; }
+  window.__opPoPlaces = places;
+  box.innerHTML = '<div class="op-note" style="margin:2px 0;"><b>Tap the landmark nearest to the customer:</b></div>' + places.map((p, i) =>
+    '<div class="op-zone-search-item" style="border:1px solid #cfe6d5; margin-top:4px;" onclick="opPoPickLM(' + i + ')">' + escapeHtml(p.name) + '<div class="op-zone-search-item-sub">' + escapeHtml(p.type) + ' • ' + (p.dist < 1000 ? Math.round(p.dist) + 'm' : (p.dist / 1000).toFixed(1) + 'km') + ' away</div></div>').join('');
+}
+function opPoPickLM(i) {
+  const p = (window.__opPoPlaces || [])[i]; if (!p) return;
+  opPoAutoLM = 'Near ' + p.name;
+  document.getElementById('op-po-landmark').value = opPoAutoLM;
+  const box = document.getElementById('op-po-lm-res'); if (box) box.innerHTML = '';
+}
+async function opPoFetchLandmarks(lat, lng) {
+  const box = document.getElementById('op-po-lm-res');
+  if (box) box.innerHTML = '<div class="op-note">Finding nearby landmarks…</div>';
+  const b = opPoLMBounds;
+  if (lat >= b.minLat && lat <= b.maxLat && lng >= b.minLng && lng <= b.maxLng) {
+    await opPoLoadLandmarks();
+    for (const rad of [250, 600, 1500]) {
+      const list = (opPoLM || []).map(p => ({ name: p.n, type: p.t, dist: opPoDistM(lat, lng, p.lat, p.lng), named: p.named }))
+        .filter(p => p.dist <= rad).sort((a, b) => (a.named === b.named) ? a.dist - b.dist : (a.named ? -1 : 1)).slice(0, 8);
+      if (list.length) { opPoShowLM(list); return; }
+    }
+  }
+  try {
+    let places = [];
+    for (const radius of [250, 800]) {
+      const q = '[out:json][timeout:15];(' + ['amenity', 'shop', 'office', 'tourism', 'leisure', 'building'].map(k => 'nwr["name"]["' + k + '"](around:' + radius + ',' + lat + ',' + lng + ');').join('') + ');out center 30;';
+      const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+      const data = await res.json(), seen = new Set();
+      places = (data.elements || []).map(el => {
+        const eLat = el.lat != null ? el.lat : (el.center && el.center.lat), eLng = el.lon != null ? el.lon : (el.center && el.center.lon);
+        if (eLat == null || eLng == null || !el.tags || !el.tags.name) return null;
+        const t = el.tags.amenity || el.tags.shop || el.tags.office || el.tags.tourism || el.tags.leisure || (el.tags.building && el.tags.building !== 'yes' ? el.tags.building : 'building');
+        return { name: el.tags.name, type: String(t).replace(/_/g, ' '), dist: opPoDistM(lat, lng, eLat, eLng) };
+      }).filter(p => p && !seen.has(p.name) && seen.add(p.name)).sort((a, b) => a.dist - b.dist).slice(0, 8);
+      if (places.length) break;
+    }
+    opPoShowLM(places);
+  } catch (e) { if (box) box.innerHTML = '<div class="op-note">Couldn\'t load nearby landmarks — type one.</div>'; }
+}
+function opPoScheduleAuto(pt) {
+  if (!pt) return;
+  const key = pt.lat.toFixed(5) + ',' + pt.lng.toFixed(5);
+  if (key === opPoLMKey) return;
+  opPoLMKey = key;
+  clearTimeout(opPoLMTimer);
+  opPoLMTimer = setTimeout(() => { opPoFillPlace(pt.lat, pt.lng); if (opPoSkipLMKey !== key) opPoFetchLandmarks(pt.lat, pt.lng); }, 500);
+}
+/* ---- Landmark search: pick a landmark -> it becomes the landmark AND sets the customer location (same search as the customer app) ---- */
+let opPoSearchTimer = null, opPoSearchSeq = 0, opPoSkipLMKey = '';
+function opPoNorm(str) { return String(str).toLowerCase().replace(/[^a-z0-9]/g, '').replace(/(.)\1+/g, '$1'); }
+function opPoLmInput() {
+  const inp = document.getElementById('op-po-landmark');
+  const q = inp.value.trim();
+  clearTimeout(opPoSearchTimer);
+  const box = document.getElementById('op-po-lm-res');
+  if (q.length < 3 || q === opPoAutoLM) { if (q.length < 3 && box) box.innerHTML = ''; return; }
+  if (box) box.innerHTML = '<div class="op-note">Searching…</div>';
+  const seq = ++opPoSearchSeq;
+  opPoSearchTimer = setTimeout(async () => {
+    await opPoLoadLandmarks();
+    const nq = opPoNorm(q);
+    const local = (opPoLM || []).filter(p => p.named && opPoNorm(p.n).includes(nq)).slice(0, 6)
+      .map(p => ({ lat: p.lat, lon: p.lng, display_name: p.n + (p.t ? ', ' + p.t.replace(/\b\w/g, c => c.toUpperCase()) : '') }));
+    let remote = [];
+    try {
+      const pt = opPoParseLL(document.getElementById('op-po-location').value) || { lat: 11.23, lng: 75.92 };
+      const bx = 0.35, vb = [pt.lng - bx, pt.lat + bx, pt.lng + bx, pt.lat - bx].join(',');
+      const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&namedetails=1&limit=6&countrycodes=in&viewbox=' + vb + '&bounded=1&q=' + encodeURIComponent(q), { headers: { 'Accept-Language': 'ml' } });
+      const data = await res.json();
+      remote = (Array.isArray(data) ? data : []).filter(r => {
+        const names = [String(r.display_name || '').split(',')[0]];
+        if (r.namedetails) Object.values(r.namedetails).forEach(v => names.push(v));
+        return names.some(nm => opPoNorm(nm).includes(nq));
+      });
+    } catch (e) {}
+    if (seq !== opPoSearchSeq) return;
+    const list = local.concat(remote);
+    window.__opPoSearch = list;
+    if (!box) return;
+    if (!list.length) { box.innerHTML = '<div class="op-note">No landmark found — try another spelling, or paste the customer\'s Google Maps link.</div>'; return; }
+    box.innerHTML = '<div class="op-note" style="margin:2px 0;"><b>Tap the landmark — the location is taken from it:</b></div>' + list.map((r, i) => {
+      const parts = String(r.display_name).split(',');
+      return '<div class="op-zone-search-item" style="border:1px solid #cfe6d5; margin-top:4px;" onclick="opPoPickSearch(' + i + ')">' + escapeHtml(parts[0]) + (parts.length > 1 ? '<div class="op-zone-search-item-sub">' + escapeHtml(parts.slice(1).join(',').trim().slice(0, 90)) + '</div>' : '') + '</div>';
+    }).join('');
+  }, 450);
+}
+function opPoPickSearch(i) {
+  const r = (window.__opPoSearch || [])[i]; if (!r) return;
+  const lat = parseFloat(r.lat), lng = parseFloat(r.lon);
+  const main = String(r.display_name).split(',')[0].trim();
+  opPoSearchSeq++;
+  opPoAutoLM = '';
+  document.getElementById('op-po-landmark').value = 'Near ' + main;
+  const box = document.getElementById('op-po-lm-res'); if (box) box.innerHTML = '';
+  opPoSkipLMKey = lat.toFixed(5) + ',' + lng.toFixed(5);   // keep this landmark: no nearby-landmark auto-fill for this pin
+  opPoSetLoc(lat, lng, main);
+}
+/* ---- Customer location helpers: Google Maps link / address search / last order ---- */
+function opPoLocMsg(h) { const e = document.getElementById('op-po-loc-res'); if (e) e.innerHTML = h || ''; }
+function opPoSetLoc(lat, lng, label) {
+  document.getElementById('op-po-location').value = (Math.round(lat * 1e6) / 1e6) + ', ' + (Math.round(lng * 1e6) / 1e6);
+  opPoLocMsg('✅ Location set' + (label ? ': ' + escapeHtml(label) : '') + '.');
+  opPoRecalc();
+  opPoScheduleAuto({ lat, lng });
+}
+function opPoLocInput() {
+  const el = document.getElementById('op-po-location');
+  const v = el.value.trim();
+  if (v && !opPoParseLL(v)) {
+    let dv = v; try { dv = decodeURIComponent(v); } catch (e) {}
+    const pats = [/@(-?\d+\.\d+),(-?\d+\.\d+)/, /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/, /[?&](?:q|ll|query|destination|center|daddr)=(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/, /(-?\d{1,2}\.\d{4,})\s*,\s*(-?\d{2,3}\.\d{4,})/];
+    for (const re of pats) {
+      const m = dv.match(re);
+      if (m) { opPoSetLoc(parseFloat(m[1]), parseFloat(m[2])); return; }
+    }
+    if (/^https?:\/\//i.test(v)) opPoLocMsg("⚠️ This short link can't be read here. Open it, then copy the full link from the browser address bar (or long-press the pin → copy coordinates) and paste again.");
+    else opPoLocMsg('');
+  } else if (v) opPoLocMsg('');
+  opPoRecalc();
+  { const pt = opPoParseLL(el.value); if (pt) opPoScheduleAuto(pt); }
+}
+async function opPoFindAddress() {
+  const q = document.getElementById('op-po-address').value.trim();
+  if (!q) { opPoLocMsg('⚠️ Type the delivery address / landmark first.'); return; }
+  opPoLocMsg('Searching…');
+  try {
+    const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=in&q=' + encodeURIComponent(q));
+    const list = await res.json();
+    if (!list.length) { opPoLocMsg('No match found. Try a landmark / area name, or paste the customer\'s Google Maps link.'); return; }
+    window.__opPoGeo = list;
+    opPoLocMsg('Tap the right place:' + list.map((r, i) => '<div class="op-zone-search-item" style="border:1px solid #cfe6d5; margin-top:4px;" onclick="opPoPickGeo(' + i + ')">' + escapeHtml(String(r.display_name).slice(0, 110)) + '</div>').join(''));
+  } catch (e) { opPoLocMsg('Could not search right now — check connection.'); }
+}
+function opPoPickGeo(i) {
+  const r = (window.__opPoGeo || [])[i]; if (!r) return;
+  opPoSetLoc(parseFloat(r.lat), parseFloat(r.lon), String(r.display_name).slice(0, 60));
+}
+async function opPoLastLocation() {
+  const ph = cleanShopPhone(document.getElementById('op-po-phone').value);
+  if (!isValidShopPhone(ph)) { opPoLocMsg('⚠️ Enter the customer phone number first.'); return; }
+  opPoLocMsg('Looking up the last order…');
+  try {
+    const { db, ref, get } = window.fb;
+    const idx = (await get(ref(db, 'customers/' + ph + '/orderIndex'))).val();
+    const ids = Object.keys(idx || {}).sort((a, b) => (Number(idx[b].createdAt) || 0) - (Number(idx[a].createdAt) || 0));
+    for (const id of ids.slice(0, 5)) {
+      const o = (await get(ref(db, 'restaurants/' + idx[id].restId + '/orders/' + id))).val();
+      if (!o) continue;
+      let lat = Number(o.customerLat), lng = Number(o.customerLng);
+      if (!(lat && lng)) { const m = o.customerLocation ? opPoParseLL(o.customerLocation) : null; if (m) { lat = m.lat; lng = m.lng; } }
+      if (lat && lng) {
+        const adr = document.getElementById('op-po-address');
+        if (!adr.value.trim()) adr.value = o.customerAddress || [o.customerPlace, o.customerLandmark].filter(Boolean).join(', ') || '';
+        if (o.customerPlace) { document.getElementById('op-po-place').value = o.customerPlace; opPoAutoPlace = o.customerPlace; }
+        if (o.customerLandmark) { document.getElementById('op-po-landmark').value = o.customerLandmark; opPoAutoLM = o.customerLandmark; }
+        opPoSetLoc(lat, lng, 'from their last order');
+        return;
+      }
+    }
+    opPoLocMsg('No saved location found for this customer.');
+  } catch (e) { opPoLocMsg('Could not read the last order.'); }
 }
 async function opPlaceOrder() {
   const status = document.getElementById('op-po-status');
@@ -16267,17 +16904,23 @@ async function opPlaceOrder() {
   const customerPhone = cleanShopPhone(document.getElementById('op-po-phone').value);
   const customerAddress = document.getElementById('op-po-address').value.trim();
   const location = document.getElementById('op-po-location').value.trim();
+  opPoRecalc();
+  const A = opPoCalc;
   const deliveryFee = Math.max(0, Number(document.getElementById('op-po-delivery').value) || 0);
   const items = opPoReadItems();
   if (!shop) { fail('Select a shop.'); return; }
   if (!customerName) { fail('Enter the customer name.'); return; }
   if (!isValidShopPhone(customerPhone)) { fail('Enter the customer phone number (10 digits).'); return; }
+  const customerPlace = document.getElementById('op-po-place').value.trim();
+  const customerLandmark = document.getElementById('op-po-landmark').value.trim();
   if (!customerAddress && !location) { fail('Enter the delivery address or location.'); return; }
+  if (!customerLandmark) { fail('Enter a landmark (tap a suggestion) so the delivery boy can find the customer.'); return; }
   if (location && !/^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(location)) { fail('Location must look like 11.0123, 76.1234'); return; }
   if (!items.length) { fail('Add at least one item.'); return; }
   if (items.some(it => !(it.price > 0))) { fail('Enter a price for every item.'); return; }
   const itemsTotal = items.reduce((s, it) => s + it.price * it.qty, 0);
-  const total = Math.round((itemsTotal + deliveryFee) * 100) / 100;
+  if (!opPoCfg.loaded) { fail('Still loading fee settings — try again in a moment.'); return; }
+  const total = Math.round((Math.max(0, itemsTotal + A.platformFee + deliveryFee) + (A.rain ? A.rain.amount : 0) + A.gst) * 100) / 100;
   btn.disabled = true; status.textContent = 'Placing order…';
   try {
     const { db, ref, push, set, get } = window.fb;
@@ -16288,10 +16931,18 @@ async function opPlaceOrder() {
     const payload = {
       orderNumber, status: 'pending', createdAt: Date.now(),
       customerName, customerPhone, customerAddress,
-      items, total, platformFee: 0, platformDue: 0, deliveryFee,
+      ...(customerPlace ? { customerPlace } : {}), customerLandmark,
+      items, total, platformFee: A.platformFee, platformDue: A.platformFee, deliveryFee,
       shopDiscountApplied: 0, paymentMethod: 'Cash on Delivery',
       placedByOperator: true
     };
+    if (A.rain) { payload.rainSurge = A.rain.amount; payload.rainSurgeDriver = A.rain.driverAmount; payload.rainSurgeZone = A.rain.zoneName; }
+    if (A.gst > 0) { payload.gst = A.gst; payload.gstPercent = A.gstPct; }
+    if (A.km != null) { payload.deliveryDistanceKm = Math.round(A.km * 10) / 10; payload.deliveryDistanceIsRoadRoute = A.road; }
+    if (!A.delManual) {
+      if (A.free && A.waived > 0) { payload.freeDelivery = true; payload.deliveryFeeWaived = A.waived; }
+      if (A.saved > 0) payload.deliverySaved = A.saved;
+    }
     if (location) {
       const m = location.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
       payload.customerLocation = m[1] + ', ' + m[2];
@@ -16302,8 +16953,8 @@ async function opPlaceOrder() {
     // the customer app treats an existing customers/{phone} node as "already registered" at login.
     let linked = false;
     try {
-      const nm = await get(ref(db, 'customers/' + customerPhone + '/name'));
-      if (nm.exists()) { payload.customerAccount = customerPhone; linked = true; }
+      const known = (customerPhone in opPoCustSeen) ? opPoCustSeen[customerPhone] : (await get(ref(db, 'customers/' + customerPhone + '/name'))).exists();
+      if (known) { payload.customerAccount = customerPhone; linked = true; }
     } catch (e) {}
     await set(newRef, payload);
     if (linked) {
@@ -16901,6 +17552,7 @@ function opShowPartnerDetail(id) {
   const p = opAllPartners.find(x => x._id === id);
   if (!p) return;
   opCurrentPartnerId = id;
+  try { opEnsureMenus([id]); } catch (e) {}
   document.getElementById('op-pm-title').textContent = p.restaurantName || id;
   document.getElementById('op-pm-username').textContent = id;
   document.getElementById('op-pm-type').textContent = opTypeLabel(p.businessType);
@@ -17510,6 +18162,7 @@ async function opHandleBulkPhotoUpload(e) {
   const files = Array.from(e.target.files || []);
   e.target.value = ""; // allow re-selecting the same files later
   if (!files.length) return;
+  try { await opEnsureMenus([opCurrentPartnerId]); } catch (e2) {}
   const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
   const menuItems = Object.entries((p && p.menu) || {}).map(([id, it]) => ({ id, name: it.name }));
   await importPhotosForShop(
@@ -17527,6 +18180,7 @@ async function opHandleBulkPhotoUpload(e) {
 // as-is. Built straight from the in-memory opAllPartners copy of this
 // shop's menu — no extra Firebase read.
 function opExportStock() {
+  if (opNeedMenu(opCurrentPartnerId)) { opEnsureMenus([opCurrentPartnerId]).then(() => opExportStock()); return; }
   const status = document.getElementById('op-pm-export-stock-status');
   status.style.display = 'block';
   status.style.color = 'var(--marigold)';
@@ -17597,6 +18251,7 @@ async function opExportPhotos() {
   const status = document.getElementById('op-pm-export-photos-status');
   status.style.display = 'block';
   status.style.color = 'var(--marigold)';
+  try { await opEnsureMenus([opCurrentPartnerId]); } catch (e2) {}
   const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
   const menuObj = (p && p.menu) || {};
   const items = Object.values(menuObj).filter(it => it.photo);
@@ -17688,6 +18343,7 @@ async function opConfirmClearStock() {
   status.style.display = 'block';
   const username = document.getElementById('op-pm-clear-stock-username').value.trim();
   const password = document.getElementById('op-pm-clear-stock-password').value;
+  try { await opEnsureMenus([opCurrentPartnerId]); } catch (e2) {}
   const p = opAllPartners.find(x => x._id === opCurrentPartnerId);
   if (!p) { status.style.color = 'var(--chili)'; status.textContent = 'Shop not found.'; return; }
   if (username !== p._id || password !== p.password) {
