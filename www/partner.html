@@ -911,6 +911,10 @@
         <input id="reg-name" type="text" placeholder="Restaurant name" />
       </div>
       <div class="field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        <input id="reg-phone" type="tel" inputmode="tel" placeholder="Restaurant phone number (delivery boy will call this)" maxlength="15" />
+      </div>
+      <div class="field">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
         <input id="reg-address" type="text" placeholder="Address" />
       </div>
@@ -1220,6 +1224,22 @@
       <p class="rest-title" id="account-rest-name" style="font-size:19px;">Restaurant</p>
       <p class="rest-sub" id="account-rest-address" style="margin-bottom:6px;"></p>
       <span class="type-badge" id="account-type-badge">Hotel</span>
+    </div>
+
+    <div class="px" style="margin-top:16px;">
+      <div class="pay-pending-card" id="shop-phone-card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+          <p class="rest-title" style="font-size:15px; margin:0;">Shop phone number</p>
+          <span class="nav-badge" id="shop-phone-badge" style="background:#6E8CAE;">Not set</span>
+        </div>
+        <p class="hint-text" style="margin-bottom:12px;">Delivery boys see this number on every order and can call you for pickup.</p>
+        <div class="field" style="margin-bottom:10px;">
+          <span style="font-weight:800; color:var(--ink);">📞</span>
+          <input id="shop-phone-input" type="tel" inputmode="tel" maxlength="15" placeholder="e.g. 9876543210" />
+        </div>
+        <button type="button" class="btn-primary" id="shop-phone-save-btn">Save phone number</button>
+        <p class="hint-text" id="shop-phone-status" style="margin-top:10px; margin-bottom:0;"></p>
+      </div>
     </div>
 
     <div class="px" style="margin-top:16px;">
@@ -2157,6 +2177,7 @@
       <label class="op-switch-row"><span class="op-switch-text">🔔 Sound on new order<small>This phone only · off by default</small></span><input type="checkbox" class="op-switch" id="op-alert-sound" onchange="opSetAlertSound(this.checked)"></label>
       <label class="op-switch-row"><span class="op-switch-text">📳 Vibration on new order<small>This phone only · off by default</small></span><input type="checkbox" class="op-switch" id="op-alert-vibrate" onchange="opSetAlertVibrate(this.checked)"></label>
       </div>
+      <button type="button" class="op-btn op-btn-push" style="width:100%; margin:0 0 12px;" onclick="opOpenPlaceOrder()">➕ Place order for a shop</button>
       <div class="op-search-box" style="margin-bottom:6px;"><input type="date" id="op-orders-date" onchange="opOrdersDayChanged()"></div>
       <p class="op-note" style="margin:0 0 10px;">Only the last 2 days up to the picked date are downloaded (data saver). Delivered / Cancelled show the picked date; In Progress shows all open orders in that window.</p>
       <div class="op-order-tabs">
@@ -3845,6 +3866,14 @@
       <div class="op-mc-row"><b>Username:</b> <span id="op-pm-username"></span></div>
       <div class="op-mc-row"><b>Type:</b> <span id="op-pm-type"></span></div>
       <div class="op-mc-row"><b>Address:</b> <span id="op-pm-address"></span></div>
+      <div style="margin:8px 0 12px; padding:10px; border:1px solid #cfe6d5;">
+        <div class="op-mc-row"><b>📞 Shop phone:</b> <span id="op-pm-phone-cur">—</span></div>
+        <div class="op-search-box" style="margin-bottom:6px;">
+          <input type="tel" id="op-pm-phone-input" placeholder="Shop phone number (delivery boys will call)" maxlength="15" autocomplete="off">
+        </div>
+        <button type="button" class="op-btn op-btn-push" onclick="opSavePartnerPhone()">💾 Save phone</button>
+        <p class="op-note" id="op-pm-phone-status" style="margin-top:4px;"></p>
+      </div>
       <div class="op-mc-row"><b>UPI ID:</b> <span id="op-pm-gpay"></span></div>
       <div class="op-mc-row"><b>Status:</b> <span id="op-pm-status"></span></div>
       <div id="op-pm-approval-block" style="display:none; margin-bottom:12px; padding:10px; border:1px solid #cfe6d5;">
@@ -4026,6 +4055,7 @@
         <input type="text" id="op-as-category" list="shop-category-suggestions" placeholder="Shop category e.g. Mobile Shop, Sports" maxlength="24">
       </div>
       <div class="op-search-box" style="padding-bottom:8px;"><input type="text" id="op-as-name" placeholder="Shop name" autocomplete="off"></div>
+      <div class="op-search-box" style="padding-bottom:8px;"><input type="tel" id="op-as-phone" placeholder="Shop phone number (delivery boys will call)" autocomplete="off"></div>
       <div class="op-search-box" style="padding-bottom:8px;"><input type="text" id="op-as-address" placeholder="Address" autocomplete="off"></div>
       <div class="op-search-box" style="padding-bottom:8px; display:flex; gap:8px;">
         <input type="text" id="op-as-location" placeholder="Location (lat, lng)" autocomplete="off" style="flex:1;">
@@ -4088,18 +4118,46 @@
       </div>
     </div>
   </div>
+  <!-- Operator: place an order for a shop -->
+  <div class="op-modal-overlay" id="op-place-order-modal">
+    <div class="op-modal-card" style="max-height:92vh; overflow-y:auto;">
+      <h3>Place order for a shop</h3>
+      <p class="op-note" style="margin-bottom:10px;">Creates a normal order in the shop's dashboard (phone / walk-in orders). The shop gets the alert, and delivery boys see it like any other order.</p>
+      <div style="margin-bottom:8px;"><select id="op-po-shop" onchange="opPoShopChanged()" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></select></div>
+      <div style="margin-bottom:8px;"><input type="text" id="op-po-name" placeholder="Customer name" autocomplete="off" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
+      <div style="margin-bottom:8px;"><input type="tel" id="op-po-phone" placeholder="Customer phone number" autocomplete="off" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
+      <div style="margin-bottom:8px;"><input type="text" id="op-po-address" placeholder="Delivery address / landmark" autocomplete="off" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
+      <div style="margin-bottom:8px;"><input type="text" id="op-po-location" placeholder="Location (lat, lng) — optional, for map &amp; navigation" autocomplete="off" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
+      <p class="op-note" style="margin:10px 0 6px;"><b>Items</b> (pick from the shop's menu or type any item)</p>
+      <datalist id="op-po-menu-list"></datalist>
+      <div id="op-po-items"></div>
+      <button type="button" class="op-btn" onclick="opPoAddRow()">+ Add item</button>
+      <div style="margin:10px 0 8px;"><input type="number" id="op-po-delivery" placeholder="Delivery fee ₹ (optional)" min="0" step="1" oninput="opPoRecalc()" style="width:100%; padding:9px 10px; border:1px solid #cfe6d5; background:#ffffff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;"></div>
+      <div class="op-mc-row" id="op-po-total"><b>Total: ₹0</b></div>
+      <p class="op-note" id="op-po-status" style="min-height:1em;"></p>
+      <div style="margin-top:6px;">
+        <button type="button" class="op-btn op-btn-push" id="op-po-submit" onclick="opPlaceOrder()">✅ Place order</button>
+        <button type="button" class="op-btn" style="border-color:#6b7280;color:#6b7280;" onclick="document.getElementById('op-place-order-modal').classList.remove('show')">Cancel</button>
+      </div>
+    </div>
+  </div>
   <!-- Order → customer detail + block/unblock modal -->
   <div class="op-modal-overlay" id="op-order-customer-modal">
     <div class="op-modal-card">
       <h3 id="op-oc-title">Customer</h3>
       <div class="op-mc-row"><b>Order:</b> <span id="op-oc-order"></span></div>
-      <div class="op-mc-row"><b>Phone:</b> <span id="op-oc-phone"></span></div>
+      <div class="op-mc-row"><b>🏪 Restaurant:</b> <span id="op-oc-rest"></span></div>
+      <div class="op-mc-row"><b>🛵 Delivery boy:</b> <span id="op-oc-driver"></span></div>
+      <div class="op-mc-row"><b>👤 Customer phone:</b> <span id="op-oc-phone"></span></div>
       <div class="op-mc-row"><b>Address:</b> <span id="op-oc-address"></span></div>
       <div class="op-mc-row"><b>Device ID:</b> <span id="op-oc-device" style="word-break:break-all;"></span></div>
       <div style="margin-top:10px;">
         <p class="op-note" style="margin-bottom:6px;"><b>Items:</b></p>
         <div id="op-oc-items" style="border:1px solid #b7d3be; border-radius:6px; padding:8px 10px; max-height:160px; overflow-y:auto;"></div>
         <div class="op-mc-row" id="op-oc-items-total" style="margin-top:6px;"></div>
+      </div>
+      <div id="op-oc-accept-wrap" style="display:none; margin-top:10px;">
+        <button type="button" class="op-btn op-btn-push" id="op-oc-accept-btn" style="width:100%;">✅ Accept this order (stops shop ringing)</button>
       </div>
       <div class="op-mc-row" id="op-oc-block-status" style="margin-top:10px;"></div>
       <div style="margin-top:10px;">
@@ -5379,6 +5437,7 @@ function logInRestaurant(id, data) {
   renderShopAvailability();
   renderShopHours();
   renderMinOrder();
+  renderShopPhone();
   renderShopEta();
   document.getElementById('support-fab').classList.add('show');
 }
@@ -5565,6 +5624,31 @@ function renderMinOrder() {
     status.textContent = "No minimum — customers can order any amount.";
   }
 }
+
+function renderShopPhone() {
+  const r = state.restaurant;
+  const input = document.getElementById('shop-phone-input');
+  const badge = document.getElementById('shop-phone-badge');
+  if (!r || !input || !badge) return;
+  if (document.activeElement !== input) input.value = r.phone || '';
+  badge.textContent = r.phone ? 'Set' : 'Not set';
+  badge.style.background = r.phone ? '#1f7a3d' : '#E5484D';
+}
+document.getElementById('shop-phone-save-btn').addEventListener('click', async () => {
+  const phone = cleanShopPhone(document.getElementById('shop-phone-input').value);
+  if (!isValidShopPhone(phone)) { showToast('Enter a valid phone number (10 digits)'); return; }
+  const btn = document.getElementById('shop-phone-save-btn');
+  btn.disabled = true;
+  try {
+    const { db, ref, update } = window.fb;
+    await update(ref(db, 'restaurants/' + state.restId), { phone });
+    state.restaurant = { ...(state.restaurant || {}), phone };
+    renderShopPhone();
+    showToast('Phone number saved');
+  } catch (e) {
+    showToast("Couldn't save — check your connection and try again.");
+  } finally { btn.disabled = false; }
+});
 
 async function saveMinOrder(amount) {
   const { db, ref, update } = window.fb;
@@ -6123,6 +6207,17 @@ async function removeBannerPhoto() {
   }
 }
 
+// ---------- SHOP PHONE (shown to delivery boys + operator) ----------
+// Saved at restaurants/{id}/phone as digits only (a leading + is kept).
+function cleanShopPhone(v) {
+  const s = String(v || '').trim();
+  return (s.startsWith('+') ? '+' : '') + s.replace(/\D/g, '');
+}
+function isValidShopPhone(v) {
+  const d = String(v || '').replace(/\D/g, '');
+  return d.length >= 10 && d.length <= 13;
+}
+
 // ---------- REGISTER ----------
 let regBusinessType = 'hotel';
 document.getElementById('reg-type-toggle').addEventListener('click', (e) => {
@@ -6151,6 +6246,7 @@ function startFreshRegister() {
   regEditMode = false;
   regEditId = null;
   document.getElementById('reg-name').value = '';
+  document.getElementById('reg-phone').value = '';
   document.getElementById('reg-address').value = '';
   document.getElementById('reg-location').value = '';
   document.getElementById('reg-gst').value = '';
@@ -6174,6 +6270,7 @@ function startEditResubmit() {
   regEditMode = true;
   regEditId = state.restId;
   document.getElementById('reg-name').value = data.restaurantName || '';
+  document.getElementById('reg-phone').value = data.phone || '';
   document.getElementById('reg-address').value = data.address || '';
   document.getElementById('reg-location').value = data.location || '';
   document.getElementById('reg-gst').value = data.gst || '';
@@ -6203,6 +6300,7 @@ function regBackClick() {
 async function doRegister() {
   const businessType = regBusinessType;
   const name = document.getElementById('reg-name').value.trim();
+  const phone = cleanShopPhone(document.getElementById('reg-phone').value);
   const address = document.getElementById('reg-address').value.trim();
   const location = document.getElementById('reg-location').value.trim();
   const gst = document.getElementById('reg-gst').value.trim();
@@ -6214,6 +6312,11 @@ async function doRegister() {
 
   if (!name || !address || !username || !password) {
     errEl.textContent = "Please fill restaurant name, address, username and password";
+    errEl.style.display = "block";
+    return;
+  }
+  if (!isValidShopPhone(phone)) {
+    errEl.textContent = "Please enter the restaurant phone number (10 digits) — the delivery boy will call this number";
     errEl.style.display = "block";
     return;
   }
@@ -6238,6 +6341,7 @@ async function doRegister() {
     if (regEditMode) {
       const updates = {
         restaurantName: name,
+        phone,
         address, location, gst,
         password,
         businessType,
@@ -6269,6 +6373,7 @@ async function doRegister() {
     }
     const record = {
       restaurantName: name,
+      phone,
       address, location, gst,
       username, password,
       businessType,
@@ -8318,6 +8423,16 @@ function listenOrdersBadge() {
       const o = allOrders[id];
       if (o && o.status === 'cancelled') notifyOfferCancelled();
     });
+    // An order left 'pending' without this phone's own Accept/Reject (e.g. the OPERATOR accepted it):
+    // silence the native ringing + clear its notification. Harmless if we caused it ourselves.
+    let droppedAny = false;
+    lastPendingOrderIds.forEach(id => {
+      if (currentPendingIds.has(id)) return;
+      droppedAny = true;
+      const o = allOrders[id];
+      if (o && o.acceptedByOperator && o.status === 'preparing') { try { showToast('Operator accepted order #' + (o.orderNumber || id)); } catch (e) {} }
+    });
+    if (droppedAny && currentPendingIds.size === 0) { try { clearDeliveredNotifications(); } catch (e) {} }
     lastPendingOrderIds = currentPendingIds;
 
     // Always reflects the full set of currently-pending orders, so all of
@@ -15761,7 +15876,7 @@ function opFlattenAllOrders() {
     if (!p.orders) return;
     const shopName = p.restaurantName || p._id;
     Object.keys(p.orders).forEach(oid => {
-      all.push(Object.assign({ _shopId: p._id, _shopName: shopName }, { _id: oid }, p.orders[oid]));
+      all.push(Object.assign({ _shopId: p._id, _shopName: shopName, _shopPhone: p.phone || '' }, { _id: oid }, p.orders[oid]));
     });
   });
   return all;
@@ -16028,6 +16143,193 @@ function opSwitchOrdersTab(tab) {
   });
   opRenderOrdersList();
 }
+/* ---- Operator accepts a shop's pending order (same effect as the shop tapping "Accept order") ----
+   status -> 'preparing', customer gets "Order confirmed!", a delivery boy is searched for, and a stop-ring push
+   (type 'cancel_ring', kind 'order' — same one the customer app sends on cancel) silences the shop's phone. */
+async function opAcceptOrder(shopId, orderId) {
+  const shop = opAllPartners.find(x => x._id === shopId);
+  const o0 = shop && shop.orders && shop.orders[orderId];
+  if (!shop || !o0) { showToast('Order not found'); return; }
+  if (!confirm('Accept order #' + (o0.orderNumber || orderId) + ' for ' + (shop.restaurantName || shopId) + '?\nThe shop will stop ringing and the order moves to Preparing.')) return;
+  const { db, ref, get, update, runTransaction } = window.fb;
+  const orderRef = ref(db, 'restaurants/' + shopId + '/orders/' + orderId);
+  try {
+    let accepted = false;
+    try {
+      const tr = await runTransaction(ref(db, 'restaurants/' + shopId + '/orders/' + orderId + '/status'),
+        cur => ((cur === 'pending' || cur === null) ? 'preparing' : undefined));
+      accepted = !!tr.committed;
+    } catch (e) {
+      const st = (await get(ref(db, 'restaurants/' + shopId + '/orders/' + orderId + '/status'))).val();
+      if (st === 'pending' || st === null) { await update(orderRef, { status: 'preparing' }); accepted = true; }
+    }
+    if (!accepted) { showToast('Already accepted / handled by the shop'); return; }
+    await update(orderRef, { acceptedByOperator: true, acceptedAt: Date.now() });
+    const o = (await get(orderRef)).val() || o0;
+    const WORKER = 'https://broad-paper-6445.raise3715.workers.dev';
+    const post = body => fetch(WORKER, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {});
+    // 1) stop the shop's ringing, even if its app is closed
+    post({ type: 'cancel_ring', kind: 'order', restId: shopId, orderId });
+    // 2) tell the customer
+    const pushPhone = o.customerAccount || o.customerPhone;
+    if (pushPhone) post({ type: 'customer', customerPhone: pushPhone, title: 'Order confirmed!', body: (shop.restaurantName || 'Restaurant') + ' is preparing your order.', orderId, restId: shopId });
+    // 3) look for a delivery boy (same rule as the shop app: Go Series shops only)
+    if (shop.goSeries) {
+      post({ type: 'delivery', restId: shopId, orderId, restName: shop.restaurantName || '', orderNumber: o.orderNumber || '',
+        itemsSummary: Array.isArray(o.items) ? o.items.map(it => it.qty + 'x ' + it.name).join(', ') : '',
+        customerName: o.customerName || '', customerPhone: o.customerPhone || '', customerAddress: o.customerAddress || '',
+        totalAmount: o.total || 0, deliveryFee: o.deliveryFee || 0 });
+    }
+    showToast('Order #' + (o.orderNumber || orderId) + ' accepted');
+    try { opCloseOrderCustomerModal(); } catch (e) {}
+  } catch (e) {
+    showToast("Couldn't accept — check connection and try again.");
+  }
+}
+function opTelLink(num) {
+  const n = String(num || '').replace(/[^0-9+]/g, '');
+  if (!n) return '';
+  return '<a href="tel:' + n + '" onclick="event.stopPropagation()" style="color:inherit; font-weight:700; text-decoration:underline;">' + escapeHtml(String(num)) + '</a>';
+}
+/* ---- Operator: place an order for a shop (phone / walk-in orders) ----
+   Writes the same record the customer app writes: restaurants/{shopId}/orders/{pushKey}. */
+let opPoMenu = [];
+function opOpenPlaceOrder() {
+  const sel = document.getElementById('op-po-shop');
+  const shops = opAllPartners.filter(p => p.approvalStatus !== 'pending' && p.approvalStatus !== 'rejected')
+    .sort((a, b) => String(a.restaurantName || a._id).localeCompare(String(b.restaurantName || b._id)));
+  sel.innerHTML = '<option value="">Select shop…</option>' + shops.map(p => '<option value="' + escapeHtml(p._id) + '">' + escapeHtml(p.restaurantName || p._id) + '</option>').join('');
+  ['name', 'phone', 'address', 'location', 'delivery'].forEach(k => { document.getElementById('op-po-' + k).value = ''; });
+  document.getElementById('op-po-items').innerHTML = '';
+  document.getElementById('op-po-menu-list').innerHTML = '';
+  opPoMenu = [];
+  opPoAddRow();
+  opPoRecalc();
+  const st = document.getElementById('op-po-status'); st.textContent = ''; st.style.color = '';
+  document.getElementById('op-po-submit').disabled = false;
+  document.getElementById('op-place-order-modal').classList.add('show');
+}
+function opPoShopChanged() {
+  const id = document.getElementById('op-po-shop').value;
+  opPoMenu = [];
+  document.getElementById('op-po-menu-list').innerHTML = '';
+  if (!id) return;
+  const { db, ref, get } = window.fb;
+  get(ref(db, 'restaurants/' + id + '/menu')).then(snap => {
+    if (document.getElementById('op-po-shop').value !== id) return;
+    const v = snap.val() || {};
+    opPoMenu = Object.keys(v).map(k => ({ name: v[k].name || '', price: Number(v[k].price) || 0, desc: v[k].desc || '', unit: v[k].unit || 'piece' })).filter(m => m.name);
+    document.getElementById('op-po-menu-list').innerHTML = opPoMenu.map(m => '<option value="' + escapeHtml(m.name) + '">₹' + m.price + '</option>').join('');
+  }).catch(() => {});
+}
+function opPoAddRow() {
+  const IN = 'padding:8px; border:1px solid #cfe6d5; background:#fff; color:#1f2937; font-size:.85rem; font-family:inherit; box-sizing:border-box;';
+  const row = document.createElement('div');
+  row.className = 'op-po-row';
+  row.style.cssText = 'display:flex; gap:6px; margin-bottom:6px;';
+  row.innerHTML = '<input type="text" class="po-name" list="op-po-menu-list" placeholder="Item" style="flex:1; min-width:0; ' + IN + '" oninput="opPoNameChanged(this)">'
+    + '<input type="number" class="po-qty" value="1" min="1" step="1" style="width:52px; ' + IN + '" oninput="opPoRecalc()">'
+    + '<input type="number" class="po-price" placeholder="₹" min="0" step="0.5" style="width:72px; ' + IN + '" oninput="opPoRecalc()">'
+    + '<button type="button" class="op-btn" style="margin:0; padding:0 10px;" onclick="this.parentNode.remove(); opPoRecalc();">✕</button>';
+  document.getElementById('op-po-items').appendChild(row);
+}
+function opPoNameChanged(inp) {
+  const m = opPoMenu.find(x => x.name.toLowerCase() === inp.value.trim().toLowerCase());
+  const priceEl = inp.parentNode.querySelector('.po-price');
+  if (m && !priceEl.value) { priceEl.value = m.price || ''; opPoRecalc(); }
+}
+function opPoReadItems() {
+  const items = [];
+  document.querySelectorAll('#op-po-items .op-po-row').forEach(r => {
+    const name = r.querySelector('.po-name').value.trim();
+    const qty = Math.max(1, Math.round(Number(r.querySelector('.po-qty').value) || 1));
+    const price = Number(r.querySelector('.po-price').value) || 0;
+    if (!name) return;
+    const m = opPoMenu.find(x => x.name.toLowerCase() === name.toLowerCase());
+    items.push({ name, desc: m ? m.desc : '', price, qty, unit: m ? m.unit : 'piece' });
+  });
+  return items;
+}
+function opPoRecalc() {
+  const items = opPoReadItems();
+  const sub = items.reduce((s, it) => s + it.price * it.qty, 0);
+  const del = Number(document.getElementById('op-po-delivery').value) || 0;
+  document.getElementById('op-po-total').innerHTML = '<b>Total: ₹' + (Math.round((sub + del) * 100) / 100) + '</b>' + (del ? ' <span class="op-note">(items ₹' + sub + ' + delivery ₹' + del + ')</span>' : '');
+}
+async function opPlaceOrder() {
+  const status = document.getElementById('op-po-status');
+  const btn = document.getElementById('op-po-submit');
+  const fail = t => { status.style.color = '#dc2626'; status.textContent = t; };
+  status.style.color = ''; status.textContent = '';
+  const shopId = document.getElementById('op-po-shop').value;
+  const shop = opAllPartners.find(p => p._id === shopId);
+  const customerName = document.getElementById('op-po-name').value.trim();
+  const customerPhone = cleanShopPhone(document.getElementById('op-po-phone').value);
+  const customerAddress = document.getElementById('op-po-address').value.trim();
+  const location = document.getElementById('op-po-location').value.trim();
+  const deliveryFee = Math.max(0, Number(document.getElementById('op-po-delivery').value) || 0);
+  const items = opPoReadItems();
+  if (!shop) { fail('Select a shop.'); return; }
+  if (!customerName) { fail('Enter the customer name.'); return; }
+  if (!isValidShopPhone(customerPhone)) { fail('Enter the customer phone number (10 digits).'); return; }
+  if (!customerAddress && !location) { fail('Enter the delivery address or location.'); return; }
+  if (location && !/^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(location)) { fail('Location must look like 11.0123, 76.1234'); return; }
+  if (!items.length) { fail('Add at least one item.'); return; }
+  if (items.some(it => !(it.price > 0))) { fail('Enter a price for every item.'); return; }
+  const itemsTotal = items.reduce((s, it) => s + it.price * it.qty, 0);
+  const total = Math.round((itemsTotal + deliveryFee) * 100) / 100;
+  btn.disabled = true; status.textContent = 'Placing order…';
+  try {
+    const { db, ref, push, set, get } = window.fb;
+    const newRef = push(ref(db, 'restaurants/' + shopId + '/orders'));
+    const orderId = newRef.key;
+    // Same number format the customer app uses: KOT-#### for hotels/restaurants, ORD-#### for everything else.
+    const orderNumber = ((shop.businessType === 'hotel' || !shop.businessType) ? 'KOT-' : 'ORD-') + Math.floor(1000 + Math.random() * 9000);
+    const payload = {
+      orderNumber, status: 'pending', createdAt: Date.now(),
+      customerName, customerPhone, customerAddress,
+      items, total, platformFee: 0, platformDue: 0, deliveryFee,
+      shopDiscountApplied: 0, paymentMethod: 'Cash on Delivery',
+      placedByOperator: true
+    };
+    if (location) {
+      const m = location.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+      payload.customerLocation = m[1] + ', ' + m[2];
+      payload.customerLat = parseFloat(m[1]); payload.customerLng = parseFloat(m[2]);
+    }
+    // If this phone already belongs to a customer app account, link the order to it so it shows in their
+    // Orders list and they get status pushes. NEVER create customers/{phone} for an unregistered number —
+    // the customer app treats an existing customers/{phone} node as "already registered" at login.
+    let linked = false;
+    try {
+      const nm = await get(ref(db, 'customers/' + customerPhone + '/name'));
+      if (nm.exists()) { payload.customerAccount = customerPhone; linked = true; }
+    } catch (e) {}
+    await set(newRef, payload);
+    if (linked) {
+      try { await set(ref(db, 'customers/' + customerPhone + '/orderIndex/' + orderId), { restId: shopId, createdAt: payload.createdAt }); } catch (e) {}
+    }
+    // same fire-and-forget shop alert the customer app / "assign order" uses
+    fetch('https://broad-paper-6445.raise3715.workers.dev', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restId: shopId, orderId, orderNumber,
+        itemsSummary: items.map(it => it.qty + 'x ' + it.name).join(', '),
+        customerName, customerPhone,
+        customerAddress: payload.customerLocation || customerAddress,
+        totalAmount: total,
+      }),
+    }).catch(() => {});
+    status.style.color = '#15803d';
+    status.textContent = 'Order #' + orderNumber + ' placed for ' + (shop.restaurantName || shopId) + '.';
+    showToast('Order #' + orderNumber + ' placed');
+    setTimeout(() => { document.getElementById('op-place-order-modal').classList.remove('show'); }, 900);
+  } catch (e) {
+    fail('Could not place order: ' + (e && e.message ? e.message : 'check connection'));
+    btn.disabled = false;
+  }
+}
+
 function opRenderOrdersList() {
   const wrap = document.getElementById('op-orders-list');
   if (!wrap) return;
@@ -16075,9 +16377,12 @@ function opRenderOrdersList() {
         </div>
         <div class="op-order-amt"><b>₹${o.total || 0}</b> · ${itemCount} item${itemCount === 1 ? '' : 's'}<span class="op-order-no">Order #${escapeHtml(String(o.orderNumber || o._id))}</span></div>
         ${preview ? `<div class="op-order-items">${escapeHtml(preview)}</div>` : ''}
-        <div class="op-order-sub">👤 ${escapeHtml(o.customerName || 'Guest')}${phone ? ' · 📞 ' + escapeHtml(String(phone)) : ''}</div>
+        <div class="op-order-sub">🏪 Restaurant: ${escapeHtml(o._shopName)} · 📞 ${o._shopPhone ? opTelLink(o._shopPhone) : '<i>no number</i>'}</div>
+        <div class="op-order-sub">🛵 Delivery: ${o.deliveryDriverName ? escapeHtml(o.deliveryDriverName) + ' · 📞 ' + (o.deliveryDriverPhone ? opTelLink(o.deliveryDriverPhone) : '<i>no number</i>') : '<i>not assigned yet</i>'}</div>
+        <div class="op-order-sub">👤 Customer: ${escapeHtml(o.customerName || 'Guest')} · 📞 ${phone ? opTelLink(phone) : '<i>no number</i>'}</div>
         <div class="op-order-sub">🕒 ${escapeHtml(placed)} (${timeAgo(o.createdAt || now)})</div>
         ${isLate ? '<span class="op-order-late-tag">⚠ Not accepted/rejected in 5+ min</span>' : ''}
+        ${status === 'pending' ? `<button type="button" class="op-btn op-btn-push" style="margin-top:8px;" onclick="event.stopPropagation(); opAcceptOrder('${o._shopId}','${o._id}')">✅ Accept order</button>` : ''}
       </div>
     `;
   }).join('');
@@ -16102,7 +16407,11 @@ function opOpenOrderCustomer(shopId, orderId) {
   };
   document.getElementById('op-oc-title').textContent = opCurrentOrderCustomer.name;
   document.getElementById('op-oc-order').textContent = '#' + (o.orderNumber || orderId) + ' · ' + (p.restaurantName || shopId);
-  document.getElementById('op-oc-phone').textContent = opCurrentOrderCustomer.phone || '—';
+  document.getElementById('op-oc-phone').innerHTML = opCurrentOrderCustomer.phone ? opTelLink(opCurrentOrderCustomer.phone) : '—';
+  document.getElementById('op-oc-rest').innerHTML = escapeHtml(p.restaurantName || shopId) + ' · ' + (p.phone ? opTelLink(p.phone) : '<i>no number</i>');
+  document.getElementById('op-oc-driver').innerHTML = o.deliveryDriverName
+    ? escapeHtml(o.deliveryDriverName) + ' · ' + (o.deliveryDriverPhone ? opTelLink(o.deliveryDriverPhone) : '<i>no number</i>')
+    : '<i>not assigned yet</i>';
   document.getElementById('op-oc-address').textContent = o.customerAddress || o.customerLocation || '—';
   document.getElementById('op-oc-device').textContent = opCurrentOrderCustomer.deviceId || '—';
   const itemsEl = document.getElementById('op-oc-items');
@@ -16124,6 +16433,9 @@ function opOpenOrderCustomer(shopId, orderId) {
   document.getElementById('op-oc-items-total').innerHTML = '<b>' + totalBits.join(' · ') + '</b>';
   document.getElementById('op-oc-message').value = '';
   document.getElementById('op-oc-status').textContent = '';
+  const acceptWrap = document.getElementById('op-oc-accept-wrap');
+  acceptWrap.style.display = (String(o.status || 'pending').toLowerCase() === 'pending') ? 'block' : 'none';
+  document.getElementById('op-oc-accept-btn').onclick = () => opAcceptOrder(shopId, orderId);
   const modal = document.getElementById('op-order-customer-modal');
   modal.classList.add('show');
 
@@ -16480,7 +16792,7 @@ function opRenderPartnersList() {
 // ---- Operator: add a shop directly (same record the shop's own signup writes,
 // but already approved and with a username/password the operator hands over). ----
 function opOpenAddShop() {
-  ['name','address','location','gst','username','password','category'].forEach(k => { document.getElementById('op-as-' + k).value = ''; });
+  ['name','phone','address','location','gst','username','password','category'].forEach(k => { document.getElementById('op-as-' + k).value = ''; });
   document.getElementById('op-as-type').value = 'hotel';
   document.getElementById('op-as-category-wrap').style.display = 'none';
   const st = document.getElementById('op-as-status'); st.textContent = ''; st.style.color = '';
@@ -16513,6 +16825,7 @@ async function opCreateShop() {
   status.style.color = ''; status.textContent = '';
   const businessType = document.getElementById('op-as-type').value;
   const name = document.getElementById('op-as-name').value.trim();
+  const phone = cleanShopPhone(document.getElementById('op-as-phone').value);
   const address = document.getElementById('op-as-address').value.trim();
   const location = document.getElementById('op-as-location').value.trim();
   const gst = document.getElementById('op-as-gst').value.trim();
@@ -16520,6 +16833,7 @@ async function opCreateShop() {
   const username = document.getElementById('op-as-username').value.trim().toLowerCase();
   const password = document.getElementById('op-as-password').value;
   if (!name || !address || !username || !password) { fail('Fill shop name, address, username and password.'); return; }
+  if (!isValidShopPhone(phone)) { fail('Enter the shop phone number (10 digits).'); return; }
   if (/[.#$\[\]\/\s]/.test(username)) { fail('Username cannot have spaces or . # $ [ ] /'); return; }
   if (businessType === 'groceries' && !location) { fail('Groceries shops need a location (it decides the delivery zone).'); return; }
   if (location && !/^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(location)) { fail('Location must look like 11.0123, 76.1234'); return; }
@@ -16532,7 +16846,7 @@ async function opCreateShop() {
     if (!taken) { try { const ix = await get(ref(db, 'shopIds')); if (ix.exists()) taken = Object.keys(ix.val() || {}).some(k => k.toLowerCase() === username); } catch (e) {} }
     if (taken) { fail('This username is already taken.'); btn.disabled = false; return; }
     const record = {
-      restaurantName: name, address, location, gst,
+      restaurantName: name, phone, address, location, gst,
       username, password, businessType,
       status: 'active',
       approvalStatus: 'approved',
@@ -16568,6 +16882,21 @@ async function opCreateShop() {
     btn.disabled = false;
   }
 }
+function opSavePartnerPhone() {
+  const status = document.getElementById('op-pm-phone-status');
+  const phone = cleanShopPhone(document.getElementById('op-pm-phone-input').value);
+  if (!opCurrentPartnerId) return;
+  if (!isValidShopPhone(phone)) { status.style.color = '#dc2626'; status.textContent = 'Enter a valid phone number (10 digits).'; return; }
+  const { db, ref, update } = window.fb;
+  status.style.color = ''; status.textContent = 'Saving…';
+  update(ref(db, 'restaurants/' + opCurrentPartnerId), { phone }).then(() => {
+    const pp = opAllPartners.find(x => x._id === opCurrentPartnerId);
+    if (pp) pp.phone = phone;
+    document.getElementById('op-pm-phone-cur').textContent = phone;
+    status.style.color = '#15803d'; status.textContent = 'Saved — delivery boys now see ' + phone + '.';
+    try { opRenderOrdersList(); } catch (e) {}
+  }).catch(err => { status.style.color = '#dc2626'; status.textContent = 'Error: ' + err.message; });
+}
 function opShowPartnerDetail(id) {
   const p = opAllPartners.find(x => x._id === id);
   if (!p) return;
@@ -16576,6 +16905,9 @@ function opShowPartnerDetail(id) {
   document.getElementById('op-pm-username').textContent = id;
   document.getElementById('op-pm-type').textContent = opTypeLabel(p.businessType);
   document.getElementById('op-pm-address').textContent = p.address || '—';
+  document.getElementById('op-pm-phone-cur').textContent = p.phone || 'not set';
+  document.getElementById('op-pm-phone-input').value = p.phone || '';
+  document.getElementById('op-pm-phone-status').textContent = '';
   document.getElementById('op-pm-gpay').textContent = p.gpayNumber || '—';
   document.getElementById('op-pm-due').textContent = '₹' + opComputeDue(p);
   opRenderCommissionRows(p); opRenderMarkupRows(p);

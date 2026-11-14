@@ -294,6 +294,11 @@
     background:transparent; color:var(--leaf); font-weight:700; font-size:12px; cursor:pointer;
     font-family:'Inter',sans-serif;
   }
+  .loc-call-btn{
+    display:inline-block; margin:6px 8px 0 0; padding:6px 12px; border-radius:8px; border:1.5px solid #1f7a3d;
+    background:#E8F7EE; color:#1f7a3d; font-weight:700; font-size:12px; text-decoration:none;
+    font-family:'Inter',sans-serif;
+  }
   .order-chit .order-popup-loc-text{ font-size:15px; }
   .order-chit .order-popup-loc-row{ padding:6px 0; }
   .order-popup-cust{ color:#4A6B8A; font-size:12px; margin:8px 0 16px; text-align:center; }
@@ -1115,7 +1120,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, onValue, push, set, get, update, remove, runTransaction, query, orderByChild, equalTo, orderByKey, startAt, endAt, goOffline, goOnline } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getDatabase, ref, onValue, push, set, get, update, remove, runTransaction, query, orderByChild, equalTo, goOffline, goOnline } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   // Same Firebase project as the customer app and the restaurant partner
   // app — rides written here are the exact 'rides' node the customer app's
@@ -1132,7 +1137,7 @@
 
   const fbApp = initializeApp(firebaseConfig);
   const db = getDatabase(fbApp);
-  window.fb = { db, ref, onValue, push, set, get, update, remove, runTransaction, query, orderByChild, equalTo, orderByKey, startAt, endAt };
+  window.fb = { db, ref, onValue, push, set, get, update, remove, runTransaction, query, orderByChild, equalTo };
 
 
   // Keep the realtime socket alive/reconnecting so a minimized driver app
@@ -1432,11 +1437,17 @@ function deliveryNavUrl(pos, text) {
   if (text) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}`;
   return null;
 }
-function deliveryLocRowHtml(kind, label, mainText, subText, url) {
+function deliveryCallBtnHtml(num, who) {
+  const n = String(num || '').replace(/[^0-9+]/g, '');
+  if (!n) return '';
+  return `<a class="loc-call-btn" href="tel:${n}" onclick="event.stopPropagation()">📞 Call ${escapeHtml(who)} · ${escapeHtml(String(num))}</a>`;
+}
+function deliveryLocRowHtml(kind, label, mainText, subText, url, phone, who) {
   return `<div class="order-popup-loc-row ${kind}"><span class="order-popup-loc-dot"></span><span>` +
     `<span class="order-popup-loc-label">${label}</span>` +
     `<span class="order-popup-loc-text">${escapeHtml(mainText || '—')}</span>` +
     (subText ? `<span class="order-popup-loc-sub">${escapeHtml(subText)}</span>` : '') +
+    (phone ? deliveryCallBtnHtml(phone, who) : '') +
     (url ? `<button type="button" class="loc-map-btn" data-map-url="${escapeHtml(url)}">📍 Navigate</button>` : '') +
     `</span></div>`;
 }
@@ -1451,9 +1462,9 @@ function deliveryLocationsHtml(o) {
   const pickupPos = deliveryPickupPos(o);
   const dropPos = deliveryDropPos(o);
   const dropText = deliveryDropText(o);
-  const dropSub = [o.customerLandmark ? 'Landmark: ' + o.customerLandmark : '', o.customerPhone || ''].filter(Boolean).join(' · ');
-  return deliveryLocRowHtml('pickup', 'Pickup', o._restName || 'Shop', o._restAddress || '', deliveryNavUrl(pickupPos, o._restAddress)) +
-         deliveryLocRowHtml('drop', 'Drop', dropText || (dropPos ? 'Pinned location' : '—'), dropSub, deliveryNavUrl(dropPos, dropText));
+  const dropSub = [o.customerLandmark ? 'Landmark: ' + o.customerLandmark : ''].filter(Boolean).join(' · ');
+  return deliveryLocRowHtml('pickup', 'Pickup', o._restName || 'Shop', o._restAddress || '', deliveryNavUrl(pickupPos, o._restAddress), o._restPhone, 'restaurant') +
+         deliveryLocRowHtml('drop', 'Drop', dropText || (dropPos ? 'Pinned location' : '—'), dropSub, deliveryNavUrl(dropPos, dropText), o.customerPhone, 'customer');
 }
 function wireMapButtons(root) {
   root.querySelectorAll('[data-map-url]').forEach(btn => {
@@ -2347,129 +2358,25 @@ function ensureChoiceDriverOfferTimer(rideId) {
 // Same idea, for delivery jobs. Delivery jobs live nested under
 // restaurants/{restId}/orders/{orderId} rather than a flat node, so each
 // job is tracked with a composite id "restId::orderId".
-// ---- Delivery jobs: LIVE WINDOW instead of the whole `restaurants` tree ----
-// The old code listened to the entire `restaurants` node (every shop's menu + EVERY order ever placed,
-// ~0.5 MB and growing) and re-received every change anywhere. Now each shop in the `shopIds` index gets
-// (a) a few tiny live fields and (b) only its orders from yesterday-00:00 onwards (order keys are push ids,
-// so they sort by time). Older orders are fetched ONLY when the driver taps that day in the Earnings
-// screen (loadDeliveryDay). If `shopIds` is empty/unreadable we fall back to the old full listener.
-const PUSH_CHARS = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
-function pushKeyBound(ts, hi) {   // smallest (hi=false) / largest (hi=true) push-id key for a millisecond time
-  let t = Math.max(0, Math.floor(ts)), out = '';
-  for (let i = 0; i < 8; i++) { out = PUSH_CHARS.charAt(t % 64) + out; t = Math.floor(t / 64); }
-  return out + (hi ? 'z' : '-').repeat(12);
-}
-const SHOP_META_FIELDS = ['restaurantName', 'name', 'address', 'location', 'goSeries', 'businessType'];
-let deliveryWindowStartTs = 0;
-let deliveriesFullyLoaded = false;          // true only while the old full-tree fallback is active
-let lastEarningsAll = [];
-const shopLive = {};                        // shopId -> { meta, orders, unsubs }
-const pastDeliveries = new Map();           // 'restId::orderId' -> my order, loaded by tapping a day
-const loadedDays = new Set();               // day-start timestamps already fetched
-const loadingDays = new Set();
-let fullDeliveriesUnsub = null, deliveryRebuildT = null;
+let deliveriesCache = []; // flat array of { _restId, _orderId, ...order }
+const skippedDeliveryIds = new Set();
 
-function deliveryRowFrom(restId, orderId, meta, o) {
-  return Object.assign({ _restId: restId, _orderId: orderId, _restName: meta.restaurantName || meta.name || '', _restAddress: meta.address || '', _restLocation: meta.location || null, _restGoSeries: !!meta.goSeries, _restIsGroceries: meta.businessType === 'groceries' }, o);
-}
-function rebuildDeliveriesFromShops() {
-  clearTimeout(deliveryRebuildT);
-  deliveryRebuildT = setTimeout(() => {
-    if (fullDeliveriesUnsub) return;   // old full-tree fallback owns deliveriesCache
-    const flat = [];
-    Object.keys(shopLive).forEach(restId => {
-      const sh = shopLive[restId];
-      Object.keys(sh.orders).forEach(orderId => flat.push(deliveryRowFrom(restId, orderId, sh.meta, sh.orders[orderId])));
-    });
-    deliveriesCache = flat;
-    renderHomeLists();
-    if (state.isOnline) refreshRidePopupFromCache();
-  }, 30);
-}
-function attachDeliveryShop(id) {
-  const { db, ref, onValue, query, orderByKey, startAt } = window.fb;
-  const sh = { meta: {}, orders: {}, unsubs: [] };
-  shopLive[id] = sh;
-  SHOP_META_FIELDS.forEach(f => {
-    sh.unsubs.push(onValue(ref(db, 'restaurants/' + id + '/' + f), snap => { if (shopLive[id] !== sh) return; sh.meta[f] = snap.val(); rebuildDeliveriesFromShops(); }, () => {}));
-  });
-  const q = query(ref(db, 'restaurants/' + id + '/orders'), orderByKey(), startAt(pushKeyBound(deliveryWindowStartTs, false)));
-  sh.unsubs.push(onValue(q, snap => { if (shopLive[id] !== sh) return; sh.orders = snap.val() || {}; rebuildDeliveriesFromShops(); }, () => {}));
-}
-function detachDeliveryShop(id) {
-  const sh = shopLive[id]; if (!sh) return;
-  sh.unsubs.forEach(u => { try { u(); } catch (e) {} });
-  delete shopLive[id];
-}
-function startFullDeliveriesFallback() {
-  if (fullDeliveriesUnsub) return;
-  clearTimeout(deliveryRebuildT);
-  Object.keys(shopLive).forEach(detachDeliveryShop);
-  deliveriesFullyLoaded = true;
+function listenDeliveryJobs() {
   const { db, ref, onValue } = window.fb;
-  fullDeliveriesUnsub = onValue(ref(db, 'restaurants'), snap => {
+  onValue(ref(db, 'restaurants'), snap => {
     const val = snap.val() || {};
     const flat = [];
     Object.keys(val).forEach(restId => {
       const rest = val[restId] || {};
       const orders = rest.orders || {};
-      Object.keys(orders).forEach(orderId => flat.push(deliveryRowFrom(restId, orderId, rest, orders[orderId])));
+      Object.keys(orders).forEach(orderId => {
+        flat.push(Object.assign({ _restId: restId, _orderId: orderId, _restName: rest.restaurantName || rest.name || '', _restAddress: rest.address || '', _restLocation: rest.location || null, _restPhone: rest.phone || '', _restGoSeries: !!rest.goSeries, _restIsGroceries: rest.businessType === 'groceries' }, orders[orderId]));
+      });
     });
     deliveriesCache = flat;
     renderHomeLists();
     if (state.isOnline) refreshRidePopupFromCache();
   });
-}
-function stopFullDeliveriesFallback() {
-  if (!fullDeliveriesUnsub) return;
-  try { fullDeliveriesUnsub(); } catch (e) {}
-  fullDeliveriesUnsub = null; deliveriesFullyLoaded = false;
-}
-
-let deliveriesCache = []; // flat array of { _restId, _orderId, ...order } (recent window only)
-const skippedDeliveryIds = new Set();
-
-function listenDeliveryJobs() {
-  const { db, ref, onValue } = window.fb;
-  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
-  deliveryWindowStartTs = d0.getTime() - 86400000;   // yesterday 00:00 -> Today + Yesterday are always live
-  onValue(ref(db, 'shopIds'), snap => {
-    const v = snap.val();
-    const ids = v && typeof v === 'object' ? Object.keys(v).filter(k => v[k]) : [];
-    if (!ids.length) { startFullDeliveriesFallback(); return; }
-    stopFullDeliveriesFallback();
-    const want = new Set(ids);
-    Object.keys(shopLive).forEach(id => { if (!want.has(id)) detachDeliveryShop(id); });
-    ids.forEach(id => { if (!shopLive[id]) attachDeliveryShop(id); });
-    rebuildDeliveriesFromShops();
-  }, () => startFullDeliveriesFallback());
-}
-
-// Earnings screen: tap a day older than the live window -> fetch just that day's orders (once), keep only mine.
-async function loadDeliveryDay(dayStart) {
-  if (deliveriesFullyLoaded || loadedDays.has(dayStart) || loadingDays.has(dayStart)) return;
-  loadingDays.add(dayStart);
-  try { renderEarnings(lastEarningsAll); } catch (e) {}
-  let failed = false;
-  try {
-    const { db, ref, get, query, orderByKey, startAt, endAt } = window.fb;
-    const lo = pushKeyBound(dayStart, false), hi = pushKeyBound(dayStart + 86400000 - 1, true);
-    const ids = Object.keys(shopLive);
-    const snaps = await Promise.all(ids.map(id =>
-      get(query(ref(db, 'restaurants/' + id + '/orders'), orderByKey(), startAt(lo), endAt(hi))).catch(() => { failed = true; return null; })));
-    snaps.forEach((snap, i) => {
-      if (!snap) return;
-      const val = snap.val() || {}, meta = (shopLive[ids[i]] && shopLive[ids[i]].meta) || {};
-      Object.keys(val).forEach(oid => {
-        const o = val[oid];
-        if (o && o.deliveryDriverId === state.username) pastDeliveries.set(ids[i] + '::' + oid, deliveryRowFrom(ids[i], oid, meta, o));
-      });
-    });
-    if (!failed) loadedDays.add(dayStart);
-  } catch (e) { failed = true; }
-  loadingDays.delete(dayStart);
-  if (failed) { try { showToast("Couldn't load that day — tap to retry"); } catch (e) {} }
-  try { renderEarnings(lastEarningsAll); } catch (e) {}
 }
 
 async function handlePopupItemAction(id, action, kind) {
@@ -2518,7 +2425,7 @@ async function fetchAndMergeNativeAlert(kind, id) {
         // node (which would drag every order along with it).
         let restMeta = {};
         try {
-          const fields = ['restaurantName', 'name', 'address', 'location', 'goSeries', 'businessType'];
+          const fields = ['restaurantName', 'name', 'address', 'location', 'phone', 'goSeries', 'businessType'];
           const snaps = await Promise.all(fields.map(f => get(ref(db, 'restaurants/' + restId + '/' + f))));
           fields.forEach((f, i) => { restMeta[f] = snaps[i].val(); });
         } catch (e) {}
@@ -2529,6 +2436,7 @@ async function fetchAndMergeNativeAlert(kind, id) {
             _restName: restMeta.restaurantName || restMeta.name || '',
             _restAddress: restMeta.address || '',
             _restLocation: restMeta.location || null,
+            _restPhone: restMeta.phone || '',
             _restGoSeries: !!restMeta.goSeries,
             _restIsGroceries: restMeta.businessType === 'groceries',
           }, snap.val())]);
@@ -3164,37 +3072,21 @@ function renderEarningsScreen(rides, deliveries) {
   const today0 = dayStart(Date.now());
   const DAY = 86400000;
   const sum = (arr) => arr.reduce((a, i) => a + i.amt, 0);
-  // A day's delivery orders are "known" when they're inside the live window or were loaded by tapping the day.
-  const dayKnown = (from) => deliveriesFullyLoaded || from >= deliveryWindowStartTs || loadedDays.has(from);
   const todayItems = items.filter(i => i.t >= today0);
   const weekItems = items.filter(i => i.t >= today0 - 6 * DAY);
-  let weekPartial = false;
-  for (let k = 0; k < 7; k++) if (!dayKnown(today0 - k * DAY)) weekPartial = true;
   document.getElementById('ep-today').textContent = '₹' + money(sum(todayItems));
   document.getElementById('ep-today-trips').textContent = todayItems.length + (todayItems.length === 1 ? ' trip' : ' trips');
-  document.getElementById('ep-week').textContent = '₹' + money(sum(weekItems)) + (weekPartial ? '+' : '');
-  document.getElementById('ep-total').textContent = '₹' + money(sum(items)) + (deliveriesFullyLoaded ? '' : '+');
+  document.getElementById('ep-week').textContent = '₹' + money(sum(weekItems));
+  document.getElementById('ep-total').textContent = '₹' + money(sum(items));
   const list = document.getElementById('ep-days');
   let html = '';
   for (let k = 0; k < 7; k++) {
     const from = today0 - k * DAY;
-    const label = k === 0 ? 'Today' : k === 1 ? 'Yesterday' : new Date(from).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
-    if (!dayKnown(from)) {
-      const busy = loadingDays.has(from);
-      html += '<div class="day-row" data-load-day="' + from + '" style="cursor:pointer;"><div><p class="d">' + label + '</p><p class="t">' + (busy ? 'Loading…' : 'Tap to load') + '</p></div><p class="a" style="opacity:.55;">' + (busy ? '…' : '›') + '</p></div>';
-      continue;
-    }
     const dayItems = items.filter(i => i.t >= from && i.t < from + DAY);
+    const label = k === 0 ? 'Today' : k === 1 ? 'Yesterday' : new Date(from).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
     html += '<div class="day-row"><div><p class="d">' + label + '</p><p class="t">' + dayItems.length + (dayItems.length === 1 ? ' trip' : ' trips') + '</p></div><p class="a">₹' + money(sum(dayItems)) + '</p></div>';
   }
   list.innerHTML = html;
-  if (!list._tapBound) {
-    list._tapBound = true;
-    list.addEventListener('click', (e) => {
-      const row = e.target.closest && e.target.closest('[data-load-day]');
-      if (row) loadDeliveryDay(Number(row.getAttribute('data-load-day')));
-    });
-  }
 }
 
 // ---------- Optional operator config: help number + per-order incentive banner ----------
@@ -4560,16 +4452,12 @@ function renderEarnings(all) {
   // customer for each order this driver has completed (o.deliveryFee —
   // same amount shown on the delivery job card and history list) counts
   // toward this driver's earnings just like a completed ride's fare does.
-  lastEarningsAll = all;
-  const _mineD = new Map();
-  pastDeliveries.forEach((o, k) => _mineD.set(k, o));
-  deliveriesCache.forEach(o => { if (o.deliveryDriverId === state.username) _mineD.set(o._restId + '::' + o._orderId, o); });
-  const myDeliveries = Array.from(_mineD.values()).filter(o => o.status === 'delivered');
+  const myDeliveries = deliveriesCache.filter(o => o.deliveryDriverId === state.username && o.status === 'delivered');
   const deliveryTotal = myDeliveries.reduce((sum, o) => sum + deliveryPayout(o), 0);
   const deliveryToday = myDeliveries.filter(o => (o.createdAt || 0) >= startOfDay.getTime()).reduce((sum, o) => sum + deliveryPayout(o), 0);
 
   document.getElementById('earn-today').textContent = '₹' + money(rideToday + deliveryToday);
-  document.getElementById('earn-total').textContent = '₹' + money(rideTotal + deliveryTotal) + (deliveriesFullyLoaded ? '' : '+');
+  document.getElementById('earn-total').textContent = '₹' + money(rideTotal + deliveryTotal);
   document.getElementById('earn-trips').textContent = String(mine.length + myDeliveries.length);
   try { renderEarningsScreen(mine, myDeliveries); } catch (e) { console.warn('earnings screen:', e); }
 }
