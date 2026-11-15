@@ -12625,7 +12625,7 @@ function opScheduleApply() {
       return;
     }
     Object.keys(opShopData).forEach(id => { if (id in opMenuData) { if (opMenuData[id] == null) delete opShopData[id].menu; else opShopData[id].menu = opMenuData[id]; } });
-    const list = Object.keys(opShopData).map(id => opShopData[id]);
+    const list = Object.keys(opShopData).filter(id => opShopReady.has(id)).map(id => opShopData[id]);
     try { opMeasure('zone shops', { val: () => opShopData }); } catch (e) {}
     opApplyPartners(list, false);
   }, 40);
@@ -12633,14 +12633,14 @@ function opScheduleApply() {
 /* ---- DATA SAVER (zone mode): a zone shop is read child-by-child WITHOUT its `menu` (the heavy part: every item + photo link).
    A shop's menu is attached only when something needs it (opEnsureMenus): a menu screen, the shop detail, a stock action.
    Any failure falls back to the old full-shop listener, so behaviour never gets worse than before. ---- */
-const opMenuSubs = {}, opMenuP = {}, opMenuData = {}, opMenuLoaded = new Set(), opFullShops = new Set();
+const opMenuSubs = {}, opMenuP = {}, opMenuData = {}, opMenuLoaded = new Set(), opFullShops = new Set(), opShopReady = new Set();
 const OP_SHOP_KNOWN_KEYS = ['orders', 'settlements', 'commissionHistory', 'commissionTiers', 'restaurantName', 'approvalStatus', 'businessType', 'goSeries', 'phone',
   'itemCategories', 'popularItems', 'suggestItems', 'martRanges', 'bannerPhoto', 'activeSession', 'rejectionReason', 'priceMarkup', 'orderRollup', 'ratingSum', 'ratingCount'];
 const OP_MENU_SECTIONS = ['trending', 'groceries-catalog', 'nesh-item-order', 'nesh-sections', 'nesh-categories', 'item-categories', 'groceries-queue'];
 function opDropShop(id) {
   try { if (opShopSubs[id]) opShopSubs[id](); } catch (e) {}
   try { if (opMenuSubs[id]) opMenuSubs[id](); } catch (e) {}
-  delete opShopSubs[id]; delete opShopData[id]; delete opMenuSubs[id]; delete opMenuP[id]; delete opMenuData[id]; opMenuLoaded.delete(id); opFullShops.delete(id);
+  delete opShopSubs[id]; delete opShopData[id]; delete opMenuSubs[id]; delete opMenuP[id]; delete opMenuData[id]; opMenuLoaded.delete(id); opFullShops.delete(id); opShopReady.delete(id);
 }
 function opSubShop(id) {
   const { db, ref, onValue } = window.fb;
@@ -12650,8 +12650,9 @@ function opSubShop(id) {
     opFullShops.add(id);
     un.push(onValue(ref(db, 'restaurants/' + id), snap => {
       if (snap.exists()) opShopData[id] = Object.assign({ _id: id }, snap.val()); else delete opShopData[id];
+      opShopReady.add(id);
       opScheduleApply();
-    }, () => {}));
+    }, () => { opShopReady.add(id); }));
   };
   fetch('https://texi-and-food-default-rtdb.firebaseio.com/restaurants/' + encodeURIComponent(id) + '.json?shallow=true')
     .then(r => r.ok ? r.json() : Promise.reject(new Error('http')))
@@ -12659,14 +12660,17 @@ function opSubShop(id) {
       if (dead) return;
       if (!keys || typeof keys !== 'object') { full(); return; }
       const set = new Set(Object.keys(keys).concat(OP_SHOP_KNOWN_KEYS)); set.delete('menu');
+      let pending = set.size; const seen = new Set();
+      const mark = ch => { if (!seen.has(ch)) { seen.add(ch); if (--pending <= 0) { opShopReady.add(id); opScheduleApply(); } } };
       set.forEach(ch => {
         un.push(onValue(ref(db, 'restaurants/' + id + '/' + ch), snap => {
           const d = opShopData[id] || (opShopData[id] = { _id: id });
           const v = snap.val();
           if (v == null) delete d[ch]; else d[ch] = v;
           if (!Object.keys(d).some(k => k !== '_id' && k !== 'menu')) delete opShopData[id];
+          mark(ch);
           opScheduleApply();
-        }, () => {}));
+        }, () => mark(ch)));
       });
     })
     .catch(() => { if (!dead) full(); });
@@ -14219,6 +14223,7 @@ function opOpenGroceriesAssignModal(orderId) {
   const order = opGroceriesQueue.find(o => o._id === orderId);
   if (!order) return;
   opGroceriesAssignOrderId = orderId;
+  try { const sids = new Set(); (order.items || []).forEach(it => (it.shopOptions || []).forEach(o => { if (o.shopId) sids.add(o.shopId); })); opEnsureMenus(Array.from(sids)); } catch (e) {}
   document.getElementById('op-ga-title').textContent = '#' + (order.orderNumber || orderId);
   document.getElementById('op-ga-customer').textContent = `${order.customerName || 'Guest'} · ${order.customerPhone || ''} · ${order.customerLocation || order.customerAddress || ''}`;
   document.getElementById('op-ga-items').innerHTML = (order.items || []).map(it =>
@@ -14260,7 +14265,8 @@ function opOpenGroceriesAssignModal(orderId) {
 // starts out watching the queue entry) knows which shop to switch to.
 async function opAssignGroceryOrder(orderId, shopId) {
   const order = opGroceriesQueue.find(o => o._id === orderId);
-  const shop = opAllPartners.find(p => p._id === shopId);
+  let shop = opAllPartners.find(p => p._id === shopId);
+  if (!shop && order) { let nm = ''; (order.items || []).forEach(it => (it.shopOptions || []).forEach(o => { if (o.shopId === shopId && !nm) nm = o.shopName || ''; })); shop = { _id: shopId, restaurantName: nm || shopId }; }
   const status = document.getElementById('op-ga-status');
   status.style.display = 'block';
   if (!order || !shop) { status.style.color = 'var(--chili)'; status.textContent = 'Order or shop not found.'; return; }
