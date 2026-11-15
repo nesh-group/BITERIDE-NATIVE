@@ -2806,7 +2806,7 @@
       <div style="margin:0 0 10px;"><input type="number" id="op-ref-min" min="0" placeholder="Min order ₹ to use the reward (0 = none)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;width:300px;max-width:100%;"></div>
       <div style="margin:0 0 10px;"><input type="number" id="op-ref-minfirst" min="0" placeholder="Min items ₹ for the friend's first order to count (0 = any)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;width:360px;max-width:100%;"></div>
       <div style="margin:0 0 10px;"><input type="number" id="op-ref-max" min="1" max="500" placeholder="Max rewards one customer can earn (default 20)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;width:320px;max-width:100%;"></div>
-      <div style="margin:0 0 10px;"><input type="text" id="op-ref-link" maxlength="300" placeholder="Share link (empty = Play Store link of the app)" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;width:100%;max-width:420px;"></div>
+      <div style="margin:0 0 10px;"><input type="text" id="op-ref-link" maxlength="300" placeholder="iPhone share link (empty = neshapp.in web app). Android always uses Play Store" style="background:#f4faf5;color:#15803d;border:1px solid #cfe6d5;padding:8px;font-family:inherit;font-size:.85rem;width:100%;max-width:420px;"></div>
       <button type="button" class="op-btn op-btn-push" onclick="opRefSave()">💾 Save Refer &amp; Earn</button>
       <button type="button" class="op-btn" style="margin-left:8px;" onclick="opRefDelete()">🗑 Remove</button>
       <p class="op-note" id="op-ref-status" style="margin-top:10px;"></p>
@@ -19441,6 +19441,10 @@ function opLsDelete() {
 }
 /* ---- REFER & EARN (operator) ---- app_config/referral = { on, value, minOrder, minFirst, maxRewards, link, ts } */
 function opRefMsg(t) { var e = document.getElementById('op-ref-status'); if (e) e.textContent = t || ''; }
+// The share link is what iPhone friends get (Android friends always get the Play Store link). A Play Store link, or a
+// neshapp.in/app / neshapp.in/playstore redirect that ends in Play Store, would send iPhone people to Google Play - so
+// those count as "bad" and are replaced by empty (= the customer app builds https://neshapp.in/?ref=CODE, the web app).
+function opRefBadLink(l) { return !!l && /play\.google\.com|\/\/(www\.)?neshapp\.in\/(app|playstore)\/?([?#]|$)/i.test(l); }
 function opRefLoad() {
   var fb = window.fb; if (!fb) return;
   fb.get(fb.ref(fb.db, 'app_config/referral')).then(function (snap) {
@@ -19450,7 +19454,8 @@ function opRefLoad() {
     document.getElementById('op-ref-min').value = v.minOrder || '';
     document.getElementById('op-ref-minfirst').value = v.minFirst || '';
     document.getElementById('op-ref-max').value = v.maxRewards || '';
-    document.getElementById('op-ref-link').value = v.link || '';
+    document.getElementById('op-ref-link').value = opRefBadLink(v.link) ? '' : (v.link || '');
+    if (opRefBadLink(v.link)) { opRefMsg('The saved share link sends iPhone friends to Google Play. It is cleared here, so tap Save to make iPhone open the web app (neshapp.in).'); return; }
     opRefMsg(v.on === false ? 'Saved, but currently OFF.' : (Number(v.value) > 0 ? 'Live ✅ — reward ₹' + v.value : 'Reward amount is 0, so it is OFF.'));
   }).catch(function () { opRefMsg('Could not load.'); });
 }
@@ -19459,6 +19464,8 @@ function opRefSave() {
   var value = Math.round((parseFloat(document.getElementById('op-ref-value').value) || 0) * 100) / 100;
   if (!(value > 0)) { opRefMsg('Enter the reward amount in ₹ (more than 0). To stop it, untick ON.'); return; }
   var link = document.getElementById('op-ref-link').value.trim();
+  var linkFixed = false;
+  if (opRefBadLink(link)) { link = ''; linkFixed = true; document.getElementById('op-ref-link').value = ''; }
   if (link && !/^https?:\/\//i.test(link)) { opRefMsg('The share link must start with http:// or https://'); return; }
   var max = Math.floor(parseFloat(document.getElementById('op-ref-max').value) || 20);
   if (max < 1) max = 1; if (max > 500) max = 500;
@@ -19468,7 +19475,7 @@ function opRefSave() {
     minOrder: Math.max(0, parseFloat(document.getElementById('op-ref-min').value) || 0),
     minFirst: Math.max(0, parseFloat(document.getElementById('op-ref-minfirst').value) || 0),
     maxRewards: max, link: link, ts: Date.now()
-  }).then(function () { opRefMsg('Saved ✅ — customers see it now (Food home).'); }).catch(function (e) { opRefMsg('Error: ' + ((e && e.message) || 'could not save')); });
+  }).then(function () { opRefMsg('Saved ✅ — customers see it now (Food home).' + (linkFixed ? ' That link opened Google Play on iPhone, so the iPhone link now opens the web app (neshapp.in).' : '')); }).catch(function (e) { opRefMsg('Error: ' + ((e && e.message) || 'could not save')); });
 }
 function opRefDelete() {
   var fb = window.fb; if (!fb) return;
