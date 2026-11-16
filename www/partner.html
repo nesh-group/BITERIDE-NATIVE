@@ -1864,6 +1864,11 @@
         <p class="op-note" id="op-home-search-empty" style="display:none;margin:10px 0 0;">No card matches your search.</p>
       </div>
       <div class="op-home-grid">
+        <div class="op-home-card" onclick="try{localStorage.removeItem('nesh_last_app');localStorage.removeItem('nesh_portal');}catch(e){}; window.location.href='./index.html'">
+          <div class="op-home-icon">🔀</div>
+          <h3>Switch App</h3>
+          <p>Go back to the app selection screen</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('orders')" style="position:relative;">
           <span class="op-home-badge" id="op-orders-home-badge" style="display:none;"></span>
           <div class="op-home-icon">🧾</div>
@@ -1931,6 +1936,11 @@
           <div class="op-home-icon">⬆️</div>
           <h3>Push App Update</h3>
           <p>Push new code (index.html) live to every restaurant partner</p>
+        </div>
+        <div class="op-home-card" onclick="opOpenSection('force-update')">
+          <div class="op-home-icon">🔒</div>
+          <h3>Forced Update</h3>
+          <p>Turn mandatory Driver or Partner app updates ON/OFF without opening Firebase Console</p>
         </div>
         <div class="op-home-card" onclick="opOpenSection('online-upi')">
           <div class="op-home-icon">💳</div>
@@ -2541,6 +2551,38 @@
         <button type="button" class="op-btn op-btn-danger" onclick="opDeletePushedAppUpdate()">🗑 Delete Pushed Update</button>
       </div>
       <p class="op-note" id="op-app-update-status" style="margin-top:10px;"></p>
+    </div>
+  </div>
+
+  <!-- APP FORCED UPDATE SETTINGS -->
+  <div class="op-section" id="op-section-force-update">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Forced Update</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Turn ON to block app versions older than the latest build for that app. Turn OFF to make updates optional again. Driver and Partner are controlled separately.</p>
+      <div style="border:1px solid #cfe6d5;padding:16px;margin-bottom:14px;background:#f8fcf8;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <h3 style="margin:0;color:#14532d;font-size:1rem;">🚗 Driver App</h3>
+          <strong id="op-force-driver-state" style="font-size:.82rem;color:#64748b;">Loading…</strong>
+        </div>
+        <p id="op-force-driver-build" class="op-note" style="margin:8px 0;">Latest Driver build: —</p>
+        <button type="button" class="op-btn op-btn-push" onclick="opSetForceUpdate('driver',true)">🔒 Force Driver Update ON</button>
+        <button type="button" class="op-btn" onclick="opSetForceUpdate('driver',false)">Turn OFF</button>
+      </div>
+      <div style="border:1px solid #cfe6d5;padding:16px;margin-bottom:14px;background:#f8fcf8;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <h3 style="margin:0;color:#14532d;font-size:1rem;">🏪 Partner App</h3>
+          <strong id="op-force-partner-state" style="font-size:.82rem;color:#64748b;">Loading…</strong>
+        </div>
+        <p id="op-force-partner-build" class="op-note" style="margin:8px 0;">Latest Partner build: —</p>
+        <button type="button" class="op-btn op-btn-push" onclick="opSetForceUpdate('partner',true)">🔒 Force Partner Update ON</button>
+        <button type="button" class="op-btn" onclick="opSetForceUpdate('partner',false)">Turn OFF</button>
+      </div>
+      <button type="button" class="op-btn" onclick="opLoadForceUpdateSettings()">↻ Refresh Status</button>
+      <p class="op-note" id="op-force-update-status" style="margin-top:10px;">Loading update settings…</p>
+      <p class="op-note" style="margin-top:12px;">Note: This setting changes the forced-update flag in Firebase automatically. The update APK must already be published and its latest build number and download URL must be available.</p>
     </div>
   </div>
 
@@ -4428,14 +4470,58 @@
 
 <script>
 (function () {
-  // ---- NESH auto-update checker ----
+  // ---- NESH auto-update checker (with FORCED-update support) ----
   // Reads appConfig/latestVersion from Firebase and compares it to the
-  // build number of the APK currently running. If a newer build has been
-  // published, shows a small "UPDATE" banner. Tapping it opens the APK
-  // download link in the system browser -- Android downloads it and lets
-  // the user tap to install. This installs OVER the existing app (no
-  // uninstall, no data loss) ONLY IF every APK is signed with the SAME
-  // keystore -- see the signing step added in build-apk.yml.
+  // build number of the APK currently running (baked in by build-apk.yml).
+  //   * Normal update  -> small "UPDATE" banner at the bottom (can be ignored).
+  //   * FORCED update  -> full-screen blocking "Update required" screen; the
+  //                       app can't be used until the new APK is installed.
+  // Which updates are forced:
+  //   PARTNER app -> only when the build was pushed with the force option (build-apk.yml
+  //   writes appConfig/latestVersion/forcePartnerBuild). FORCE_ALWAYS = false.
+  // Installs OVER the existing app (no uninstall, no data loss) as long as
+  // every APK is signed with the SAME keystore -- see build-apk.yml.
+  var APP_LABEL = 'NESH Partner';
+  var FORCE_ALWAYS = false;
+  var FORCE_FIELD = 'forcePartnerBuild';
+  // Newest build that was pushed FOR this app (written by build-apk.yml: driverBuild / partnerBuild),
+  // so a push aimed at the other app never shows a banner / blocking screen here.
+  var BUILD_FIELD = 'partnerBuild';
+  var lastCheckAt = 0;
+
+  // Never block a restaurant while a NEW ORDER popup is waiting for accept/reject:
+  // the banner is shown instead, and the blocking screen appears once it is handled.
+  function isBusyNow() {
+    try {
+      var ov = document.getElementById('order-popup-overlay');
+      return !!(ov && ov.classList.contains('show'));
+    } catch (e) { return false; }
+  }
+
+  // Hands the download URL to the native ApkInstaller plugin (downloads in
+  // plain Java, then fires Android's own "Install this app?" prompt).
+  // Returns false if the plugin isn't available (e.g. plain browser tab).
+  function nativeInstall(apkUrl, onStart, onDone, onFail) {
+    var ApkInstaller = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ApkInstaller;
+    if (!ApkInstaller) return false;
+    onStart();
+    ApkInstaller.downloadAndInstall({ url: apkUrl }).then(onDone).catch(onFail);
+    return true;
+  }
+
+  function openInBrowser(apkUrl) {
+    try {
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Browser) {
+        window.Capacitor.Plugins.Browser.open({ url: apkUrl });
+      } else {
+        window.open(apkUrl, '_system');
+      }
+    } catch (e) {
+      window.open(apkUrl, '_blank');
+    }
+  }
+
+  // ---------- normal (optional) update banner ----------
   function showUpdateBanner(apkUrl, versionName) {
     if (document.getElementById('nesh-update-banner')) return;
     var bar = document.createElement('div');
@@ -4450,69 +4536,119 @@
     btn.textContent = 'UPDATE';
     btn.style.cssText = 'background:#22c55e;color:#fff;border:0;border-radius:6px;' +
       'padding:8px 14px;font-weight:bold;flex-shrink:0;';
-
-    // Hands the download URL straight to the native ApkInstaller plugin,
-    // which downloads the APK itself (in plain Java, straight to a file —
-    // never through the JS-native bridge, which can choke on multi-MB
-    // payloads) and then fires Android's own "Install this app?" prompt.
-    // Falls back to the old browser-download flow if anything here is
-    // unavailable (e.g. testing in a plain browser tab).
     function installSilently() {
-      var ApkInstaller = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ApkInstaller;
-      if (!ApkInstaller) return false;
-      label.textContent = 'Downloading update…';
-      btn.disabled = true;
-      btn.style.opacity = '0.6';
-      ApkInstaller.downloadAndInstall({ url: apkUrl }).then(function () {
+      return nativeInstall(apkUrl, function () {
+        label.textContent = 'Downloading update…';
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+      }, function () {
         bar.remove();
-      }).catch(function () {
+      }, function () {
         label.textContent = 'Download failed — tap to try in browser';
         btn.disabled = false;
         btn.style.opacity = '1';
-        btn.onclick = openInBrowser;
+        btn.onclick = function () { openInBrowser(apkUrl); };
       });
-      return true;
     }
-
-    function openInBrowser() {
-      try {
-        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Browser) {
-          window.Capacitor.Plugins.Browser.open({ url: apkUrl });
-        } else {
-          window.open(apkUrl, '_system');
-        }
-      } catch (e) {
-        window.open(apkUrl, '_blank');
-      }
-    }
-
     btn.onclick = function () {
-      if (!installSilently()) openInBrowser();
+      if (!installSilently()) openInBrowser(apkUrl);
     };
     bar.appendChild(label);
     bar.appendChild(btn);
     document.body.appendChild(bar);
   }
 
+  // ---------- FORCED update: full-screen, cannot be dismissed ----------
+  function showForceUpdate(apkUrl, versionName) {
+    var old = document.getElementById('nesh-update-banner');
+    if (old) old.remove();
+    if (document.getElementById('nesh-force-update')) return;
+
+    var ov = document.createElement('div');
+    ov.id = 'nesh-force-update';
+    ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:2147483647;' +
+      'background:#0f172a;color:#fff;display:flex;flex-direction:column;align-items:center;' +
+      'justify-content:center;padding:32px;text-align:center;font-family:sans-serif;' +
+      'touch-action:none;';
+    var icon = document.createElement('div');
+    icon.textContent = '⬆️';
+    icon.style.cssText = 'font-size:56px;margin-bottom:16px;';
+    var title = document.createElement('div');
+    title.textContent = 'Update required';
+    title.style.cssText = 'font-size:24px;font-weight:bold;margin-bottom:12px;';
+    var msg = document.createElement('div');
+    msg.textContent = 'A new version of ' + APP_LABEL + (versionName ? ' (' + versionName + ')' : '') +
+      ' is available. Please update to keep using the app.';
+    msg.style.cssText = 'font-size:15px;color:#cbd5e1;max-width:320px;line-height:1.5;margin-bottom:28px;';
+    var btn = document.createElement('button');
+    btn.textContent = 'UPDATE NOW';
+    btn.style.cssText = 'background:#22c55e;color:#fff;border:0;border-radius:12px;' +
+      'padding:16px 40px;font-size:18px;font-weight:bold;min-width:240px;';
+    var status = document.createElement('div');
+    status.style.cssText = 'font-size:13px;color:#94a3b8;margin-top:16px;min-height:18px;max-width:320px;';
+
+    function start() {
+      var ok = nativeInstall(apkUrl, function () {
+        status.textContent = 'Downloading update… please wait';
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+      }, function () {
+        // Install prompt is up. If the person cancels it, let them try again.
+        status.textContent = 'Tap INSTALL on the screen that opened. If it closed, tap UPDATE NOW again.';
+        setTimeout(function () { btn.disabled = false; btn.style.opacity = '1'; }, 3000);
+      }, function () {
+        status.textContent = 'Download failed. Tap to open the download in your browser instead.';
+        btn.textContent = 'OPEN DOWNLOAD';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.onclick = function () { openInBrowser(apkUrl); };
+      });
+      if (!ok) openInBrowser(apkUrl);
+    }
+    btn.onclick = start;
+
+    ov.appendChild(icon);
+    ov.appendChild(title);
+    ov.appendChild(msg);
+    ov.appendChild(btn);
+    ov.appendChild(status);
+    document.body.appendChild(ov);
+  }
+
   function checkForUpdate() {
     // Only makes sense inside the native app, not a plain browser tab.
     if (!window.Capacitor) return;
     if (!window.fb || !window.fb.db) { setTimeout(checkForUpdate, 1500); return; }
-    // Build number is baked in by build-apk.yml at build time (see
-    // NESH_BUILD_NUMBER in <head>) — this avoids depending on the
-    // @capacitor/app plugin, which isn't reliably available in every build.
+    lastCheckAt = Date.now();
     var currentBuild = parseInt(window.NESH_BUILD_NUMBER, 10) || 0;
     var db = window.fb.db, ref = window.fb.ref, get = window.fb.get;
     get(ref(db, 'appConfig/latestVersion')).then(function (snap) {
       var v = snap.val();
       if (!v || !v.build || !v.apkUrl) return;
-      if (parseInt(v.build, 10) > currentBuild) {
+      // Only this app's own build counter can trigger its update prompt.
+      // Missing app-specific data means no update for this app.
+      var relevantBuild = parseInt(v[BUILD_FIELD], 10);
+      if (!Number.isFinite(relevantBuild) || relevantBuild <= currentBuild) return;
+      // Forced if this app always forces, or if any build newer than the one
+      // installed here was pushed with the force flag (so skipping a forced
+      // build can never sneak past it).
+      var forced = FORCE_ALWAYS || (parseInt(v[FORCE_FIELD], 10) || 0) > currentBuild;
+      if (forced && !isBusyNow()) {
+        showForceUpdate(v.apkUrl, v.name || '');
+      } else {
         showUpdateBanner(v.apkUrl, v.name || '');
+        // Forced but busy with a job: look again shortly, block once it's done.
+        if (forced) setTimeout(checkForUpdate, 20000);
       }
     }).catch(function () {});
   }
 
   setTimeout(checkForUpdate, 3000);
+  // Also re-check whenever the app comes back to the foreground, so an app
+  // that was left open still gets the forced update (throttled to 1 / minute).
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && Date.now() - lastCheckAt > 60000) checkForUpdate();
+  });
 })();
 </script>
 
@@ -9852,6 +9988,7 @@ function opOpenSection(name) {
   document.querySelectorAll('#operator-container .op-section').forEach(s => s.classList.remove('active'));
   document.getElementById('op-section-' + name).classList.add('active');
   if (name === 'push') opUpdateAppCodeSizeLabel();
+  if (name === 'force-update') opLoadForceUpdateSettings();
   if (name === 'partners') { opPopulatePartnersAreaFilter(); opRenderPartnersList(); }
   if (name === 'deletions') opRenderDeletionsList();
   if (name === 'pay-requests') opPrLoad();
@@ -9914,6 +10051,78 @@ function opOpenSection(name) {
   } else if (opOrdersLateTimer) {
     clearInterval(opOrdersLateTimer);
     opOrdersLateTimer = null;
+  }
+}
+
+/* ---- Operator controls for app-specific forced updates ---- */
+let opForceUpdateConfig = null;
+
+function opForceInt(v, fallback) {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n > 0 ? n : (fallback || 0);
+}
+
+function opRenderForceUpdateSettings(v) {
+  v = v || opForceUpdateConfig || {};
+  opForceUpdateConfig = v;
+  const base = opForceInt(v.build, 0);
+  ['driver', 'partner'].forEach(function (app) {
+    const cap = app.charAt(0).toUpperCase() + app.slice(1);
+    const build = opForceInt(v[app + 'Build'], base);
+    const forceBuild = opForceInt(v['force' + cap + 'Build'], 0);
+    const state = document.getElementById('op-force-' + app + '-state');
+    const info = document.getElementById('op-force-' + app + '-build');
+    if (state) {
+      state.textContent = forceBuild > 0 ? ('ON · forced through build ' + forceBuild) : 'OFF · optional update';
+      state.style.color = forceBuild > 0 ? '#b91c1c' : '#15803d';
+    }
+    if (info) info.textContent = 'Latest ' + cap + ' build: ' + (build || 'Not published yet');
+  });
+}
+
+async function opLoadForceUpdateSettings() {
+  const status = document.getElementById('op-force-update-status');
+  if (status) status.textContent = 'Loading latest update settings…';
+  try {
+    const f = window.fb;
+    if (!f || !f.db) throw new Error('Firebase is not ready. Please try again.');
+    const snap = await f.get(f.ref(f.db, 'appConfig/latestVersion'));
+    const v = snap.exists() ? (snap.val() || {}) : {};
+    opRenderForceUpdateSettings(v);
+    if (status) status.textContent = v.apkUrl ? 'Connected · latest APK URL is available.' : 'No published APK URL found yet. Publish a build before enabling Forced Update.';
+  } catch (e) {
+    if (status) status.textContent = 'Could not load settings: ' + (e && e.message ? e.message : e);
+  }
+}
+
+async function opSetForceUpdate(app, enable) {
+  if (app !== 'driver' && app !== 'partner') return;
+  const cap = app.charAt(0).toUpperCase() + app.slice(1);
+  const field = 'force' + cap + 'Build';
+  const status = document.getElementById('op-force-update-status');
+  try {
+    const f = window.fb;
+    if (!f || !f.db) throw new Error('Firebase is not ready.');
+    const snap = await f.get(f.ref(f.db, 'appConfig/latestVersion'));
+    const v = snap.exists() ? (snap.val() || {}) : {};
+    const latestBuild = opForceInt(v[app + 'Build'], opForceInt(v.build, 0));
+    if (enable && (!latestBuild || !v.apkUrl)) {
+      throw new Error('No published ' + cap + ' build / APK URL. Publish the app update first.');
+    }
+    const action = enable ? 'FORCE ' + cap.toUpperCase() + ' APP UPDATE' : 'TURN OFF ' + cap.toUpperCase() + ' FORCED UPDATE';
+    const message = enable
+      ? 'Force update for ' + cap + ' app? Users on builds older than ' + latestBuild + ' will be asked to update before using the app.'
+      : 'Turn OFF forced update for ' + cap + '? Older versions can use the app again and update optionally.';
+    if (!confirm(message)) return;
+    if (status) status.textContent = 'Saving ' + cap + ' setting…';
+    const patch = {};
+    patch[field] = enable ? latestBuild : 0;
+    await f.update(f.ref(f.db, 'appConfig/latestVersion'), patch);
+    const fresh = await f.get(f.ref(f.db, 'appConfig/latestVersion'));
+    opRenderForceUpdateSettings(fresh.exists() ? (fresh.val() || {}) : {});
+    if (status) status.textContent = cap + ' Forced Update ' + (enable ? 'ON' : 'OFF') + ' saved successfully.';
+  } catch (e) {
+    if (status) status.textContent = 'Save failed: ' + (e && e.message ? e.message : e) + ' (check Firebase database rules).';
   }
 }
 

@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* A native "Open App" tap can call handleNativeRideAction before the main script below has even been parsed
+   (cold start). Queue those calls here and replay them as soon as the real handler exists. */
+window.__nativeQ = [];
+window.handleNativeRideAction = function () { window.__nativeQ.push(Array.prototype.slice.call(arguments)); };
+</script>
 <script>window.NESH_BUILD_NUMBER = 0; /* replaced by CI at build time */</script>
 <meta charset="UTF-8" />
 <script>
@@ -19,9 +25,14 @@
 <link rel="apple-touch-icon" href="./icon-512.png">
 <link rel="icon" href="./icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Fonts load without blocking the first paint (fallback fonts are used until they arrive). -->
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
+<!-- Start downloading the Firebase SDK in parallel with the rest of the page (it gates everything else). -->
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js">
 <style>
   :root{
     --ink:#0B2545;
@@ -489,6 +500,10 @@
   .day-row .d{ margin:0; font-weight:700; font-size:14px; color:var(--ink); }
   .day-row .t{ margin:2px 0 0; font-size:12px; color:var(--muted); }
   .day-row .a{ margin:0; font-weight:800; font-size:15px; color:var(--ink); }
+  .day-row.tap{ cursor:pointer; }
+  .day-row.tap:active{ background:var(--field-bg); }
+  .earn-mini > div.tap{ cursor:pointer; }
+  .earn-day-empty{ text-align:center; color:var(--muted); font-size:14px; padding:24px 0; }
   .refer-card{ margin:16px 16px 0; padding:22px; border-radius:20px; background:#fff; border:1px solid var(--field-border); text-align:center; }
   .refer-card h2{ margin:10px 0 6px; font-size:22px; font-weight:800; font-family:'Plus Jakarta Sans','Inter',sans-serif; color:var(--ink); }
   .refer-card p{ margin:0 0 16px; color:var(--muted); font-size:14px; line-height:1.5; }
@@ -573,6 +588,7 @@
        of relying on them to notice the passive bg-location-warning banner. -->
   <div class="reason-modal-overlay" id="bg-location-modal-overlay">
     <div class="reason-modal-card">
+      <p class="reason-modal-sub" id="step-label-location" style="font-weight:700;margin-bottom:2px;"></p>
       <p class="reason-modal-title">Turn on background location</p>
       <p class="reason-modal-sub">Riders need to see you moving even when the app is in the background or the screen is off. Android needs this set manually — no popup for it, just these steps:</p>
       <ol class="bg-location-steps">
@@ -594,12 +610,29 @@
        banner can. -->
   <div class="reason-modal-overlay" id="battery-modal-overlay">
     <div class="reason-modal-card">
+      <p class="reason-modal-sub" id="step-label-battery" style="font-weight:700;margin-bottom:2px;"></p>
       <p class="reason-modal-title">Allow background battery use</p>
       <p class="reason-modal-sub">Android's battery saver can stop your location and ride alerts a while after you swipe the app away. Tap below and choose "Allow" / "Don't optimize" for this app.</p>
       <p class="reason-modal-error" id="battery-modal-error">Still showing as optimized — open settings again and choose "Allow" / "Don't optimize".</p>
       <div class="reason-modal-btns">
         <button class="btn-danger" id="battery-modal-later-btn" type="button">Not now</button>
         <button class="btn-primary" id="battery-modal-settings-btn" type="button">Open settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ALERT PERMISSIONS MODAL — step 4 of the go-online chain: "Display over other apps" +
+       "Full-screen notifications". Without both, a ride alert can't open the app by itself
+       (over the lock screen / while the phone is in use). -->
+  <div class="reason-modal-overlay" id="alert-perm-modal-overlay">
+    <div class="reason-modal-card">
+      <p class="reason-modal-sub" id="alert-perm-step" style="font-weight:700;margin-bottom:2px;"></p>
+      <p class="reason-modal-title" id="alert-perm-title">Allow ride alerts to open the app</p>
+      <p class="reason-modal-sub" id="alert-perm-sub"></p>
+      <p class="reason-modal-error" id="alert-perm-modal-error">Still not allowed — open settings and turn it on, then come back.</p>
+      <div class="reason-modal-btns">
+        <button class="btn-danger" id="alert-perm-later-btn" type="button">Not now</button>
+        <button class="btn-primary" id="alert-perm-settings-btn" type="button">Open settings</button>
       </div>
     </div>
   </div>
@@ -614,6 +647,7 @@
        result back. -->
   <div class="reason-modal-overlay" id="autostart-modal-overlay">
     <div class="reason-modal-card">
+      <p class="reason-modal-sub" id="step-label-autostart" style="font-weight:700;margin-bottom:2px;"></p>
       <p class="reason-modal-title">Turn on Auto-start</p>
       <p class="reason-modal-sub">On many phones (Xiaomi/Vivo/Oppo/Realme and others), Auto-start has to be turned on manually — otherwise the OS can kill ride tracking after you swipe the app away.</p>
       <p class="reason-modal-sub" id="autostart-modal-manual-hint">Tap <b>Open settings</b> below, then find and enable Auto-start for this app.</p>
@@ -816,6 +850,15 @@
         <p class="hb-sub" id="home-due-banner-sub">Amount due is high</p>
       </div>
       <button class="hb-btn" type="button" onclick="showScreen('due')">Pay due</button>
+    </div>
+
+    <!-- Shown while the driver is online but the phone's location / GPS switch is OFF.
+         Without it no GPS fix arrives, so no job can be offered. Detected natively
+         (DriverTrackingPlugin.isLocationEnabled) and re-checked every few seconds. -->
+    <div class="bg-location-warning hidden" id="gps-off-warning">
+      <p class="bg-location-warning-title">GPS is off</p>
+      <p class="bg-location-warning-text">Turn on your phone's location (GPS) to receive orders. Until it is on, no new ride or delivery can be offered to you.</p>
+      <button class="bg-location-warning-btn" id="gps-off-warning-btn" type="button">Turn on GPS</button>
     </div>
 
     <!-- Shown only when Android's location permission is granted as "While
@@ -1021,6 +1064,7 @@
         <p style="color:#fff; font-family:'Fraunces',serif; font-size:32px; font-weight:700; margin:0;" id="due-total-amount">₹0</p>
         <p class="hint-text" style="margin-top:6px;" id="due-ride-count">From 0 completed rides</p>
       </div>
+      <button class="btn-outline" id="due-recalc-btn" type="button" style="margin-top:12px; width:100%;">Recalculate from my rides</button>
       <p class="hint-text" style="margin-top:14px;">Every completed ride adds that ride's platform fee to your due. This clears when the operator marks a settlement against your account.</p>
       <h2 class="section-title" style="margin-top:20px; font-size:16px;">Settlement history</h2>
       <div id="due-settlements-list" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
@@ -1036,12 +1080,34 @@
       <p class="lbl" id="ep-today-trips">0 trips</p>
     </div>
     <div class="earn-mini">
-      <div><p class="v" id="ep-week">₹0</p><p class="l">Last 7 days</p></div>
-      <div><p class="v" id="ep-total">₹0</p><p class="l">All time</p></div>
+      <div class="tap" id="ep-week-card"><p class="v" id="ep-week">₹—</p><p class="l">Last 7 days</p></div>
+      <div class="tap" id="ep-total-card"><p class="v" id="ep-total">₹—</p><p class="l">All time</p></div>
     </div>
+    <p class="hint-text" id="ep-load-hint" style="margin:8px 24px 0;">Tap "Last 7 days" or "All time" to load the totals.</p>
     <div class="px stack" style="margin-top:8px;">
       <h2 class="section-title" style="margin-top:14px; font-size:16px;">Day by day</h2>
       <div id="ep-days" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+  </section>
+
+  <!-- EARNINGS: ONE DAY (loaded only when a date is tapped) -->
+  <section class="screen" id="screen-earn-day">
+    <div class="top-row">
+      <button class="btn-back" id="earn-day-back-btn" type="button">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E8A33D" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div>
+        <p class="eyebrow">EARNINGS</p>
+        <h1 class="title" id="earn-day-title">Day</h1>
+      </div>
+    </div>
+    <div class="earn-tabs-card">
+      <p class="lbl">Total</p>
+      <p class="big" id="earn-day-total">₹0</p>
+      <p class="lbl" id="earn-day-trips">0 trips</p>
+    </div>
+    <div class="px" style="margin-top:12px;">
+      <div id="earn-day-list" style="display:flex; flex-direction:column; gap:10px;"></div>
     </div>
   </section>
 
@@ -1120,7 +1186,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, onValue, push, set, get, update, remove, runTransaction, query, orderByChild, equalTo, goOffline, goOnline } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getDatabase, ref, onValue, push, set, get, update, remove, runTransaction, query, orderByChild, equalTo, startAt, endAt, limitToLast, goOffline, goOnline } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   // Same Firebase project as the customer app and the restaurant partner
   // app — rides written here are the exact 'rides' node the customer app's
@@ -1137,7 +1203,7 @@
 
   const fbApp = initializeApp(firebaseConfig);
   const db = getDatabase(fbApp);
-  window.fb = { db, ref, onValue, push, set, get, update, remove, runTransaction, query, orderByChild, equalTo };
+  window.fb = { db, ref, onValue, push, set, get, update, remove, runTransaction, query, orderByChild, equalTo, startAt, endAt, limitToLast };
 
 
   // Keep the realtime socket alive/reconnecting so a minimized driver app
@@ -1187,14 +1253,54 @@
 
 <script>
 (function () {
-  // ---- NESH auto-update checker ----
+  // ---- NESH auto-update checker (with FORCED-update support) ----
   // Reads appConfig/latestVersion from Firebase and compares it to the
-  // build number of the APK currently running. If a newer build has been
-  // published, shows a small "UPDATE" banner. Tapping it opens the APK
-  // download link in the system browser -- Android downloads it and lets
-  // the user tap to install. This installs OVER the existing app (no
-  // uninstall, no data loss) ONLY IF every APK is signed with the SAME
-  // keystore -- see the signing step added in build-apk.yml.
+  // build number of the APK currently running (baked in by build-apk.yml).
+  //   * Normal update  -> small "UPDATE" banner at the bottom (can be ignored).
+  //   * FORCED update  -> full-screen blocking "Update required" screen; the
+  //                       app can't be used until the new APK is installed.
+  // Which updates are forced:
+  //   DRIVER app  -> only builds explicitly marked with forceDriverBuild.
+  // Installs OVER the existing app (no uninstall, no data loss) as long as
+  // every APK is signed with the SAME keystore -- see build-apk.yml.
+  var APP_LABEL = 'NESH Driver';
+  var FORCE_ALWAYS = false;
+  var FORCE_FIELD = 'forceDriverBuild';
+  // Newest build that was pushed FOR this app (written by build-apk.yml: driverBuild / partnerBuild),
+  // so a push aimed at the other app never shows a banner / blocking screen here.
+  var BUILD_FIELD = 'driverBuild';
+  var lastCheckAt = 0;
+
+  // Never block a driver in the middle of a ride / delivery: the banner is
+  // shown instead, and the blocking screen appears as soon as the job ends.
+  function isBusyNow() {
+    try { return typeof window.computeAmIBusy === 'function' && !!window.computeAmIBusy(); } catch (e) { return false; }
+  }
+
+  // Hands the download URL to the native ApkInstaller plugin (downloads in
+  // plain Java, then fires Android's own "Install this app?" prompt).
+  // Returns false if the plugin isn't available (e.g. plain browser tab).
+  function nativeInstall(apkUrl, onStart, onDone, onFail) {
+    var ApkInstaller = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ApkInstaller;
+    if (!ApkInstaller) return false;
+    onStart();
+    ApkInstaller.downloadAndInstall({ url: apkUrl }).then(onDone).catch(onFail);
+    return true;
+  }
+
+  function openInBrowser(apkUrl) {
+    try {
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Browser) {
+        window.Capacitor.Plugins.Browser.open({ url: apkUrl });
+      } else {
+        window.open(apkUrl, '_system');
+      }
+    } catch (e) {
+      window.open(apkUrl, '_blank');
+    }
+  }
+
+  // ---------- normal (optional) update banner ----------
   function showUpdateBanner(apkUrl, versionName) {
     if (document.getElementById('nesh-update-banner')) return;
     var bar = document.createElement('div');
@@ -1209,69 +1315,118 @@
     btn.textContent = 'UPDATE';
     btn.style.cssText = 'background:#22c55e;color:#fff;border:0;border-radius:6px;' +
       'padding:8px 14px;font-weight:bold;flex-shrink:0;';
-
-    // Hands the download URL straight to the native ApkInstaller plugin,
-    // which downloads the APK itself (in plain Java, straight to a file —
-    // never through the JS-native bridge, which can choke on multi-MB
-    // payloads) and then fires Android's own "Install this app?" prompt.
-    // Falls back to the old browser-download flow if anything here is
-    // unavailable (e.g. testing in a plain browser tab).
     function installSilently() {
-      var ApkInstaller = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ApkInstaller;
-      if (!ApkInstaller) return false;
-      label.textContent = 'Downloading update…';
-      btn.disabled = true;
-      btn.style.opacity = '0.6';
-      ApkInstaller.downloadAndInstall({ url: apkUrl }).then(function () {
+      return nativeInstall(apkUrl, function () {
+        label.textContent = 'Downloading update…';
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+      }, function () {
         bar.remove();
-      }).catch(function () {
+      }, function () {
         label.textContent = 'Download failed — tap to try in browser';
         btn.disabled = false;
         btn.style.opacity = '1';
-        btn.onclick = openInBrowser;
+        btn.onclick = function () { openInBrowser(apkUrl); };
       });
-      return true;
     }
-
-    function openInBrowser() {
-      try {
-        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Browser) {
-          window.Capacitor.Plugins.Browser.open({ url: apkUrl });
-        } else {
-          window.open(apkUrl, '_system');
-        }
-      } catch (e) {
-        window.open(apkUrl, '_blank');
-      }
-    }
-
     btn.onclick = function () {
-      if (!installSilently()) openInBrowser();
+      if (!installSilently()) openInBrowser(apkUrl);
     };
     bar.appendChild(label);
     bar.appendChild(btn);
     document.body.appendChild(bar);
   }
 
+  // ---------- FORCED update: full-screen, cannot be dismissed ----------
+  function showForceUpdate(apkUrl, versionName) {
+    var old = document.getElementById('nesh-update-banner');
+    if (old) old.remove();
+    if (document.getElementById('nesh-force-update')) return;
+
+    var ov = document.createElement('div');
+    ov.id = 'nesh-force-update';
+    ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:2147483647;' +
+      'background:#0f172a;color:#fff;display:flex;flex-direction:column;align-items:center;' +
+      'justify-content:center;padding:32px;text-align:center;font-family:sans-serif;' +
+      'touch-action:none;';
+    var icon = document.createElement('div');
+    icon.textContent = '⬆️';
+    icon.style.cssText = 'font-size:56px;margin-bottom:16px;';
+    var title = document.createElement('div');
+    title.textContent = 'Update required';
+    title.style.cssText = 'font-size:24px;font-weight:bold;margin-bottom:12px;';
+    var msg = document.createElement('div');
+    msg.textContent = 'A new version of ' + APP_LABEL + (versionName ? ' (' + versionName + ')' : '') +
+      ' is available. Please update to keep using the app.';
+    msg.style.cssText = 'font-size:15px;color:#cbd5e1;max-width:320px;line-height:1.5;margin-bottom:28px;';
+    var btn = document.createElement('button');
+    btn.textContent = 'UPDATE NOW';
+    btn.style.cssText = 'background:#22c55e;color:#fff;border:0;border-radius:12px;' +
+      'padding:16px 40px;font-size:18px;font-weight:bold;min-width:240px;';
+    var status = document.createElement('div');
+    status.style.cssText = 'font-size:13px;color:#94a3b8;margin-top:16px;min-height:18px;max-width:320px;';
+
+    function start() {
+      var ok = nativeInstall(apkUrl, function () {
+        status.textContent = 'Downloading update… please wait';
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+      }, function () {
+        // Install prompt is up. If the person cancels it, let them try again.
+        status.textContent = 'Tap INSTALL on the screen that opened. If it closed, tap UPDATE NOW again.';
+        setTimeout(function () { btn.disabled = false; btn.style.opacity = '1'; }, 3000);
+      }, function () {
+        status.textContent = 'Download failed. Tap to open the download in your browser instead.';
+        btn.textContent = 'OPEN DOWNLOAD';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.onclick = function () { openInBrowser(apkUrl); };
+      });
+      if (!ok) openInBrowser(apkUrl);
+    }
+    btn.onclick = start;
+
+    ov.appendChild(icon);
+    ov.appendChild(title);
+    ov.appendChild(msg);
+    ov.appendChild(btn);
+    ov.appendChild(status);
+    document.body.appendChild(ov);
+  }
+
   function checkForUpdate() {
     // Only makes sense inside the native app, not a plain browser tab.
     if (!window.Capacitor) return;
     if (!window.fb || !window.fb.db) { setTimeout(checkForUpdate, 1500); return; }
-    // Build number is baked in by build-apk.yml at build time (see
-    // NESH_BUILD_NUMBER in <head>) — this avoids depending on the
-    // @capacitor/app plugin, which isn't reliably available in every build.
+    lastCheckAt = Date.now();
     var currentBuild = parseInt(window.NESH_BUILD_NUMBER, 10) || 0;
     var db = window.fb.db, ref = window.fb.ref, get = window.fb.get;
     get(ref(db, 'appConfig/latestVersion')).then(function (snap) {
       var v = snap.val();
       if (!v || !v.build || !v.apkUrl) return;
-      if (parseInt(v.build, 10) > currentBuild) {
+      // Only this app's own build counter can trigger its update prompt.
+      // Missing app-specific data means no update for this app.
+      var relevantBuild = parseInt(v[BUILD_FIELD], 10);
+      if (!Number.isFinite(relevantBuild) || relevantBuild <= currentBuild) return;
+      // Forced only if a build newer than the one installed here was
+      // explicitly marked as mandatory for this app.
+      var forced = FORCE_ALWAYS || (parseInt(v[FORCE_FIELD], 10) || 0) > currentBuild;
+      if (forced && !isBusyNow()) {
+        showForceUpdate(v.apkUrl, v.name || '');
+      } else {
         showUpdateBanner(v.apkUrl, v.name || '');
+        // Forced but busy with a job: look again shortly, block once it's done.
+        if (forced) setTimeout(checkForUpdate, 20000);
       }
     }).catch(function () {});
   }
 
   setTimeout(checkForUpdate, 3000);
+  // Also re-check whenever the app comes back to the foreground, so an app
+  // that was left open still gets the forced update (throttled to 1 / minute).
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && Date.now() - lastCheckAt > 60000) checkForUpdate();
+  });
 })();
 </script>
 <script>
@@ -1477,12 +1632,13 @@ function wireMapButtons(root) {
 // in their popup. Mirrors NEAREST_TIMEOUT_MS in the worker, but is
 // enforced here too (independent of push delivery) so the in-app popup
 // never lags behind by the worker's minute-level Cron granularity.
+const OFFER_OPEN_AFTER_CYCLE = true;
 const NEAREST_WINDOW_MS = 25 * 1000;
 // Same idea, but for Go Series delivery jobs specifically — kept on its
 // own constant (rather than sharing NEAREST_WINDOW_MS) so delivery's
 // nearest-only window can be tuned independently of taxi rides. Mirrors
 // DELIVERY_NEAREST_TIMEOUT_MS in the worker.
-const DELIVERY_NEAREST_WINDOW_MS = 2 * 60 * 1000;
+const DELIVERY_NEAREST_WINDOW_MS = 45 * 1000;
 const MAX_MATCH_RADIUS_KM = 12;
 const NEAR_OVERRIDE_KM = 0.5; // within this distance of the nearest candidate, order count decides instead of raw distance (see rankAmongCandidates)
 const LOCATION_STALE_MS = 3 * 60 * 1000;
@@ -1565,6 +1721,10 @@ function startLocationHeartbeat() {
   if (locationHeartbeatInterval) return;
   locationHeartbeatInterval = setInterval(() => {
     if (!state.isOnline || !state.myLocation || !state.username || !window.fb) return;
+    // Phone's GPS/location switch is off: the last position is no longer trustworthy, so do NOT keep re-stamping it as
+    // fresh (that would keep this driver in matching at a position they may have left). After LOCATION_STALE_MS the
+    // driver drops out of the pool by itself; as soon as GPS is back, fixes + this heartbeat resume. (see checkGpsEnabled)
+    if (typeof gpsWasOff !== 'undefined' && gpsWasOff) return;
     const { db, ref, update } = window.fb;
     const now = Date.now();
     state.myLocation.updatedAt = now;
@@ -1665,6 +1825,7 @@ let awaitingBgLocationGrantKeepOnlineSince = false;
 
 function openBgLocationModal() {
   if (!bgLocationModalEl || bgLocationModalEl.classList.contains('show')) return;
+  setStepLabel(document.getElementById('step-label-location'), 1);
   bgLocationModalShownThisSession = true;
   if (bgLocationModalErrorEl) bgLocationModalErrorEl.style.display = bgLocationModalWasOpened ? 'block' : 'none';
   bgLocationModalEl.classList.add('show');
@@ -1677,9 +1838,24 @@ function closeBgLocationModal() {
 // currently be tracked, so the WorkManager health-check knows what "should
 // be online" means and can schedule/cancel itself accordingly. Safe no-op
 // on web/outside the native app.
+// Copy of the driver profile (name / phone / vehicle number) for the native popup's Accept, which writes
+// these into the ride without the WebView. Only sent when it changed. Safe no-op outside the native app.
+let lastNativeProfileJson = '';
+function setNativeDriverProfile() {
+  try {
+    const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DriverTrackingPlugin;
+    if (!P || !P.saveDriverProfile || !state.driver || !state.username) return;
+    const prof = { username: state.username, name: state.driver.name || '', phone: state.driver.phone || '', vehicleNumber: state.driver.vehicleNumber || '' };
+    const js = JSON.stringify(prof);
+    if (js === lastNativeProfileJson) return;
+    lastNativeProfileJson = js;
+    Promise.resolve(P.saveDriverProfile(prof)).catch(() => { lastNativeProfileJson = ''; });
+  } catch (e) {}
+}
 function setNativeOnlineState(online) {
+  if (online) setNativeDriverProfile();
   if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DriverTrackingPlugin) {
-    Promise.resolve(window.Capacitor.Plugins.DriverTrackingPlugin.setOnlineState({ online: !!online })).catch(() => {});
+    Promise.resolve(window.Capacitor.Plugins.DriverTrackingPlugin.setOnlineState({ online: !!online, username: state.username || '' })).catch(() => {});
   }
 }
 
@@ -1721,6 +1897,25 @@ function revertOnlineToggle() {
   } catch (err) {}
 }
 
+// "Step N of M" labels shared by every go-online permission modal:
+// 1 Location, 2 Auto-start, 3 Battery, 4 Display over other apps, 5 Full-screen notifications (Android 14+ only).
+let goOnlineTotalSteps = null;
+async function getGoOnlineTotalSteps() {
+  if (goOnlineTotalSteps) return goOnlineTotalSteps;
+  let supported = false;
+  try {
+    const RC = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RingControl;
+    if (RC && RC.canUseFullScreenIntent) { const f = await RC.canUseFullScreenIntent(); supported = !!(f && f.supported); }
+  } catch (e) {}
+  goOnlineTotalSteps = supported ? 5 : 4;
+  return goOnlineTotalSteps;
+}
+function setStepLabel(el, n) {
+  if (!el) return;
+  el.textContent = 'Step ' + n + ' of ' + (goOnlineTotalSteps || 4);
+  getGoOnlineTotalSteps().then(t => { el.textContent = 'Step ' + n + ' of ' + t; });
+}
+
 async function checkBackgroundLocationPermission() {
   if (!bgLocationWarningEl || !hasBackgroundGeolocationPlugin()) return;
   try {
@@ -1732,16 +1927,17 @@ async function checkBackgroundLocationPermission() {
     // A pending "go online" attempt (or app-reopen restore) is waiting on
     // this exact result — resolve it one way or the other, once.
     if (awaitingBgLocationGrant) {
-      awaitingBgLocationGrant = false;
       if (grantedAllTheTime) {
-        // Location is step 1 of 3 — hand off to the battery-optimization
-        // gate next, rather than going online yet.
-        proceedToAutostartGate(awaitingBgLocationGrantKeepOnlineSince);
+        // Step 1 done — carry straight on to the next step automatically.
+        awaitingBgLocationGrant = false;
+        const keepLoc = awaitingBgLocationGrantKeepOnlineSince;
+        awaitingBgLocationGrantKeepOnlineSince = false;
+        closeBgLocationModal();
+        proceedToAutostartGate(keepLoc);
       } else {
-        revertOnlineToggle();
+        // Stay waiting (don't bounce to offline) — the driver turns it on in Settings and comes back.
         openBgLocationModal();
       }
-      awaitingBgLocationGrantKeepOnlineSince = false;
       return;
     }
 
@@ -1782,7 +1978,12 @@ if (bgLocationModalSettingsBtn) {
   });
 }
 if (bgLocationModalLaterBtn) {
-  bgLocationModalLaterBtn.addEventListener('click', closeBgLocationModal);
+  bgLocationModalLaterBtn.addEventListener('click', () => {
+    awaitingBgLocationGrant = false;
+    awaitingBgLocationGrantKeepOnlineSince = false;
+    closeBgLocationModal();
+    revertOnlineToggle();
+  });
 }
 
 // Re-check whenever the driver comes back to the app — covers the case
@@ -1791,9 +1992,52 @@ if (bgLocationModalLaterBtn) {
 (function () {
   if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
   window.Capacitor.Plugins.App.addListener('resume', () => {
-    if (state.isOnline) checkBackgroundLocationPermission();
-    if (state.isOnline) checkBatteryOptimization();
+    if (state.isOnline || awaitingBgLocationGrant) checkBackgroundLocationPermission();
+    if (state.isOnline || awaitingBatteryGrant) checkBatteryOptimization();
+    if (state.isOnline || awaitingAlertPerm || (alertPermModalEl && alertPermModalEl.classList.contains('show'))) checkAlertPermissions();
   });
+})();
+
+// ---------- GPS / location switch OFF warning ----------
+// While online, ask the native app whether the phone's location service is on. If it is off, show a banner on
+// Home (+ a toast on the moment it turns off) and hide it again as soon as it is back on. Needs the new APK
+// (DriverTrackingPlugin.isLocationEnabled); on an old APK / in a browser the call fails and nothing is shown,
+// exactly as before. Checked every 8 s, on resume and when the tab becomes visible.
+const gpsOffWarningEl = document.getElementById('gps-off-warning');
+const gpsOffWarningBtn = document.getElementById('gps-off-warning-btn');
+var gpsWasOff = false;
+let gpsCheckBusy = false;
+async function checkGpsEnabled() {
+  if (!gpsOffWarningEl || gpsCheckBusy) return;
+  gpsCheckBusy = true;
+  try {
+    let off = false;
+    const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DriverTrackingPlugin;
+    if (state.isOnline && P) {
+      try {
+        const r = await P.isLocationEnabled();
+        off = !!r && r.enabled === false;
+      } catch (e) { off = false; }   // old APK without this method -> stay silent
+    }
+    gpsOffWarningEl.classList.toggle('hidden', !off);
+    if (off && !gpsWasOff) {
+      showToast('GPS is off - turn it on to receive orders');
+      try { if (navigator.vibrate) navigator.vibrate([300, 150, 300]); } catch (e) {}
+    }
+    gpsWasOff = off;
+  } finally { gpsCheckBusy = false; }
+}
+if (gpsOffWarningBtn) {
+  gpsOffWarningBtn.addEventListener('click', () => {
+    const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DriverTrackingPlugin;
+    if (P) Promise.resolve(P.openLocationSettings()).catch(() => {});
+  });
+}
+setInterval(checkGpsEnabled, 8000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkGpsEnabled(); });
+(function () {
+  if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
+  window.Capacitor.Plugins.App.addListener('resume', () => { checkGpsEnabled(); });
 })();
 
 // ---------- Battery optimization exemption check ----------
@@ -1827,6 +2071,7 @@ let awaitingBatteryGrantKeepOnlineSince = false;
 
 function openBatteryModal() {
   if (!batteryModalEl || batteryModalEl.classList.contains('show')) return;
+  setStepLabel(document.getElementById('step-label-battery'), 3);
   batteryModalShownThisSession = true;
   if (batteryModalErrorEl) batteryModalErrorEl.style.display = batteryModalWasOpened ? 'block' : 'none';
   batteryModalEl.classList.add('show');
@@ -1841,7 +2086,7 @@ function closeBatteryModal() {
 function proceedToBatteryGate(keepExistingOnlineSince) {
   if (!hasBatteryOptimizationPlugin()) {
     // No plugin available (e.g. browser/testing) — nothing to gate on here.
-    finalizeGoOnline({ keepExistingOnlineSince });
+    proceedToAlertGate(keepExistingOnlineSince);
     return;
   }
   awaitingBatteryGrant = true;
@@ -1854,7 +2099,7 @@ async function checkBatteryOptimization() {
   if (!hasBatteryOptimizationPlugin()) {
     if (awaitingBatteryGrant) {
       awaitingBatteryGrant = false;
-      finalizeGoOnline({ keepExistingOnlineSince: awaitingBatteryGrantKeepOnlineSince });
+      proceedToAlertGate(awaitingBatteryGrantKeepOnlineSince);
       awaitingBatteryGrantKeepOnlineSince = false;
     }
     return;
@@ -1867,14 +2112,15 @@ async function checkBatteryOptimization() {
     // A pending "go online" attempt is waiting on this exact result —
     // resolve it one way or the other, once.
     if (awaitingBatteryGrant) {
-      awaitingBatteryGrant = false;
       if (exempted) {
-        finalizeGoOnline({ keepExistingOnlineSince: awaitingBatteryGrantKeepOnlineSince });
+        awaitingBatteryGrant = false;
+        const keepBat = awaitingBatteryGrantKeepOnlineSince;
+        awaitingBatteryGrantKeepOnlineSince = false;
+        closeBatteryModal();
+        proceedToAlertGate(keepBat);
       } else {
-        revertOnlineToggle();
         openBatteryModal();
       }
-      awaitingBatteryGrantKeepOnlineSince = false;
       return;
     }
 
@@ -1919,10 +2165,122 @@ if (batteryModalSettingsBtn) {
 }
 if (batteryModalLaterBtn) {
   batteryModalLaterBtn.addEventListener('click', () => {
+    awaitingBatteryGrant = false;
+    awaitingBatteryGrantKeepOnlineSince = false;
     closeBatteryModal();
     revertOnlineToggle();
   });
 }
+
+// ---------- Alert permissions gate (step 4, last) ----------
+// "Display over other apps" + "Full-screen notifications" (Android 14+). Both are needed for a ride
+// alert to open the app by itself over the lock screen / while the phone is in use.
+const alertPermModalEl = document.getElementById('alert-perm-modal-overlay');
+const alertPermErrorEl = document.getElementById('alert-perm-modal-error');
+const alertPermStepEl = document.getElementById('alert-perm-step');
+const alertPermTitleEl = document.getElementById('alert-perm-title');
+const alertPermSubEl = document.getElementById('alert-perm-sub');
+let alertPermCurrentStep = 'overlay';
+let alertPermModalShownThisSession = false;
+let alertPermModalWasOpened = false;
+let awaitingAlertPerm = false;
+let awaitingAlertPermKeep = false;
+let alertPermHasFsiStep = false;
+let alertPermOverlayMissed = false;
+let lastAlertPermStatus = { overlay: true, fsi: true };
+function getRingControl() {
+  return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RingControl) || null;
+}
+async function getAlertPermStatus() {
+  const RC = getRingControl();
+  let overlay = true, fsi = true, fsiNeeded = false;
+  try { const o = await RC.canShowOverApps(); overlay = !(o && o.granted === false); } catch (e) {}
+  try { if (RC.canUseFullScreenIntent) { const f = await RC.canUseFullScreenIntent(); fsi = !(f && f.granted === false); fsiNeeded = !!(f && f.granted === false); } } catch (e) {}
+  return { overlay, fsi, fsiNeeded };
+}
+function renderAlertPermModal(st) {
+  lastAlertPermStatus = st;
+  if (!st.overlay) {
+    alertPermCurrentStep = 'overlay';
+    setStepLabel(alertPermStepEl, 4);
+    if (alertPermTitleEl) alertPermTitleEl.textContent = 'Display over other apps';
+    if (alertPermSubEl) alertPermSubEl.textContent = 'So a new ride can open the app by itself while the phone is in use. Tap Open settings, find NESH and turn on "Allow display over other apps".';
+  } else {
+    alertPermCurrentStep = 'fsi';
+    setStepLabel(alertPermStepEl, 5);
+    if (alertPermTitleEl) alertPermTitleEl.textContent = 'Full-screen notifications';
+    if (alertPermSubEl) alertPermSubEl.textContent = 'So a new ride shows over the lock screen. Tap Open settings and turn on "Allow full-screen notifications" for NESH.';
+  }
+}
+function openAlertPermModal() {
+  if (!alertPermModalEl || alertPermModalEl.classList.contains('show')) return;
+  alertPermModalShownThisSession = true;
+  if (alertPermErrorEl) alertPermErrorEl.style.display = alertPermModalWasOpened ? 'block' : 'none';
+  alertPermModalEl.classList.add('show');
+}
+function closeAlertPermModal() {
+  if (alertPermModalEl) alertPermModalEl.classList.remove('show');
+}
+function proceedToAlertGate(keepExistingOnlineSince) {
+  if (!getRingControl() || !getRingControl().canShowOverApps) {
+    // Not the native app (browser/testing) — nothing to gate on.
+    finalizeGoOnline({ keepExistingOnlineSince });
+    return;
+  }
+  awaitingAlertPerm = true;
+  awaitingAlertPermKeep = !!keepExistingOnlineSince;
+  alertPermModalShownThisSession = false;
+  checkAlertPermissions();
+}
+async function checkAlertPermissions() {
+  const RC = getRingControl();
+  if (!RC || !RC.canShowOverApps) return;
+  const st = await getAlertPermStatus();
+  const ok = st.overlay && st.fsi;
+  if (!ok) {
+    // total steps: overlay + (fsi if this phone has it off now or needed it earlier this session)
+    if (st.fsiNeeded) alertPermHasFsiStep = true;
+    st.fsiNeeded = st.fsiNeeded || alertPermHasFsiStep;
+    renderAlertPermModal(st);
+    // Pending "go online": stay waiting while the driver turns them on one by one.
+    if (awaitingAlertPerm) { openAlertPermModal(); return; }
+    // Revoked mid-session — surface it, but don't force the driver offline on our own.
+    if (state.isOnline && !alertPermModalShownThisSession) openAlertPermModal();
+    return;
+  }
+  const wasOpen = alertPermModalEl && alertPermModalEl.classList.contains('show');
+  if (wasOpen) closeAlertPermModal();
+  if (awaitingAlertPerm) {
+    awaitingAlertPerm = false;
+    const keep = awaitingAlertPermKeep;
+    awaitingAlertPermKeep = false;
+    alertPermHasFsiStep = false;
+    alertPermOverlayMissed = false;
+    finalizeGoOnline({ keepExistingOnlineSince: keep });
+  } else if (wasOpen) {
+    showToast('Alert permissions on ✓');
+  }
+}
+(function () {
+  const settingsBtn = document.getElementById('alert-perm-settings-btn');
+  const laterBtn = document.getElementById('alert-perm-later-btn');
+  if (settingsBtn) settingsBtn.addEventListener('click', () => {
+    alertPermModalWasOpened = true;
+    const RC = getRingControl();
+    if (!RC) return;
+    // Opens the settings screen for the step shown right now.
+    if (alertPermCurrentStep === 'overlay') Promise.resolve(RC.requestOverlayPermission()).catch(() => {});
+    else if (RC.openFullScreenIntentSettings) Promise.resolve(RC.openFullScreenIntentSettings()).catch(() => {});
+  });
+  if (laterBtn) laterBtn.addEventListener('click', () => {
+    awaitingAlertPerm = false;
+    awaitingAlertPermKeep = false;
+    alertPermHasFsiStep = false;
+    alertPermOverlayMissed = false;
+    closeAlertPermModal();
+    revertOnlineToggle();
+  });
+})();
 
 // ---------- Autostart confirmation (step 3) ----------
 // Android has no API to check or request OEM "autostart manager"
@@ -1966,6 +2324,7 @@ function autostartConfirmedKey() {
 }
 function openAutostartModal() {
   if (!autostartModalEl || autostartModalEl.classList.contains('show')) return;
+  setStepLabel(document.getElementById('step-label-autostart'), 2);
   if (autostartModalCheckbox) autostartModalCheckbox.checked = false;
   if (autostartModalSettingsBtn) autostartModalSettingsBtn.disabled = true;
   if (autostartModalManualHintEl) {
@@ -2053,7 +2412,189 @@ function stopLocationTracking() {
   if (batteryWarningEl) batteryWarningEl.classList.add('hidden');
 }
 
+/* ---- DATA SAVER for the drivers directory ----
+   Every phone used to listen to the WHOLE taxi_drivers node, so each driver's 10-second location write was pushed to every
+   other online driver all day (N writers x N phones). Matching only needs other drivers' LOCATION while a job is being ranked.
+   So now:
+   1) each phone keeps a small live directory of the other drivers (isOnline, isBusy, vehicleType, services, zone, onlineSince,
+      rideCountToday) with one listener per field - these change rarely;
+   2) other drivers' location is streamed ONLY while a job that needs ranking is pending (shouldOfferToMe -> driverLocTouch),
+      and stops ~20 s after the last such job. While it streams it is exactly the live data the ranking used before, so every
+      phone still ranks the same way. The offer is held back (usually < 1 s) until the first locations have arrived, so a phone
+      never thinks it is the only/nearest driver just because locations are still loading;
+   3) this driver's own record is still listened to in full; writes to taxi_drivers/{id}/location are unchanged (customer app
+      and operator panel read them as before). If the directory can't be loaded the old whole-node listener is used. */
+var DRIVER_LITE_LISTENERS = true;
+var DRIVER_DB_URL = 'https://texi-and-food-default-rtdb.firebaseio.com';
+var DRIVER_DIR_FIELDS = ['isOnline', 'isBusy', 'vehicleType', 'services', 'zone', 'onlineSince', 'rideCountToday'];
+var DRIVER_LOC_IDLE_STOP_MS = 20 * 1000;
+var DRIVER_LOC_READY_TIMEOUT_MS = 3000;
+// ZONE-LIMITED WATCH: true = while ranking a job, other drivers' locations are streamed ONLY for drivers that can be candidates
+// (same zone as the pickup, or the zone group for deliveries - exactly the set candidatesInZone uses). Pickups with no zone keep
+// watching every online driver. false = old behaviour (every online driver). Switch to false to turn this off quickly.
+var DRIVER_LOC_ZONE_LIMIT = true;
+
+/* ---- ROAD-DISTANCE RANKING (6B) ----
+   Straight-line distance can rank wrongly where roads wind (river, bypass). When ROAD_RANKING is on, ONE phone per job asks the
+   Cloudflare route Worker (which asks OpenRouteService; the key lives only in the Worker) for the road distance of the nearest
+   ROAD_SHORTLIST candidates and writes the answer into the job (<job>/roadKm). Every phone reads that SAME answer, so every phone
+   ranks the same. Shortlisted drivers are ranked by road distance, everyone else after them by straight line. If the Worker, ORS
+   or the write fails, or the answer takes longer than ROAD_WAIT_MS, everything falls back to straight-line exactly as before.
+   Switch off quickly: ROAD_RANKING = false (or leave ROAD_WORKER_URL empty). */
+var ROAD_RANKING = true;
+var ROAD_WORKER_URL = 'https://route-worker.neshgroup1.workers.dev';                // <- paste the route Worker URL here (https://....workers.dev) after creating it
+var ROAD_SHORTLIST = 5;                  // road distance is asked for the nearest N candidates
+var ROAD_MIN_CANDIDATES = 2;             // with only 1 candidate there is nothing to rank -> no request
+var ROAD_SKIP_RATIO = 2.5;               // nearest is already clearly nearest (2nd straight-line > ratio x nearest) -> no request (saves ORS quota). 0 = always ask
+var ROAD_WAIT_MS = 6000;                 // max time an offer is held while the answer is fetched; after this -> straight-line
+var ROAD_FETCH_TIMEOUT_MS = 4000;
+// Refresh: a job that stays unaccepted gets a NEW road answer from the CURRENT live locations every interval below (a driver who
+// came closer enters the shortlist; one who drove away leaves it). Each refresh is one more Worker call, at most ROAD_MAX_REFRESH
+// per job; after the last one the road answer is dropped and ranking is plain straight-line again (never stale). 0 = no refresh.
+var ROAD_REFRESH_RIDE_MS = 80 * 1000;
+var ROAD_REFRESH_DELIVERY_MS = 150 * 1000;
+var ROAD_MAX_REFRESH = 2;
+var roadInFlight = {};                   // job path -> time this phone started a road request (avoids asking every 5 s)
+function roadActive() { return !!ROAD_RANKING && /^https:\/\//.test(ROAD_WORKER_URL || ''); }
+var DRIVER_DIR_READY_TIMEOUT_MS = 4000;
+var driverDirIds = {};            // id -> [unsubscribe fns] for the field listeners
+var driverDirOk = false, driverDirReady = false, driverDirPending = 0, driverDirTimer = null;
+var driverLocUnsubs = {};         // id -> unsubscribe (live location, only while a job is being ranked)
+var driverLocWatching = false, driverLocStopTimer = null, driverLocTouched = false;
+var driverLocPending = {};        // id -> time its location listener was attached, until the first location arrived
+var driverLocWantAll = false, driverLocWantZones = {};   // which drivers the current watch covers (zone-limited watch)
+var driverLocRefreshTimer = null;
+
+function driverDirAttach(id) {
+  if (driverDirIds[id]) return;
+  const { db, ref, onValue } = window.fb;
+  const subs = [];
+  driverDirIds[id] = subs;
+  DRIVER_DIR_FIELDS.forEach(f => {
+    let first = true;
+    subs.push(onValue(ref(db, 'taxi_drivers/' + id + '/' + f), snap => {
+      const d = driversCache[id] || (driversCache[id] = {});
+      const v = snap.val();
+      if (v == null) delete d[f]; else d[f] = v;
+      if (f === 'isOnline' && driverLocWatching && v === true && !driverLocUnsubs[id] && (driverLocWantAll || !d.zone || driverLocWantZones[d.zone])) driverLocAttach(id);
+      if (first) { first = false; if (f === 'isOnline' && driverDirPending > 0 && --driverDirPending === 0) driverDirMarkReady(); }
+    }, () => {
+      if (first) { first = false; if (f === 'isOnline' && driverDirPending > 0 && --driverDirPending === 0) driverDirMarkReady(); }
+    }));
+  });
+}
+function driverDirMarkReady() {
+  if (driverDirReady) return;
+  driverDirReady = true;
+  setTimeout(() => { if (state.isOnline) refreshRidePopupFromCache(); }, 0);
+}
+// How often the list of driver ids is re-downloaded (shallow, ~25 bytes per registered driver, on EVERY phone). 2 min was fine
+// for a few drivers but at hundreds of drivers it is the biggest download of the app. New drivers only need to be picked up
+// eventually (their data then arrives through the normal per-driver listeners), and the list is also refreshed whenever the
+// app comes back to the screen (see below), so 15 min is plenty.
+var DRIVER_DIR_SYNC_MS = 15 * 60 * 1000;
+var DRIVER_DIR_RESUME_MIN_GAP_MS = 5 * 60 * 1000;   // coming back to the app re-syncs only if the last sync is older than this
+var driverDirLastSyncAt = 0;
+function driverDirSync() {
+  driverDirLastSyncAt = Date.now();
+  fetch(DRIVER_DB_URL + '/taxi_drivers.json?shallow=true')
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)))
+    .then(ids => {
+      if (!ids || typeof ids !== 'object') throw new Error('no ids');
+      const firstTime = !driverDirOk;
+      driverDirOk = true;
+      const list = Object.keys(ids).filter(id => id !== state.username && !driverDirIds[id]);
+      if (firstTime) {
+        driverDirPending = list.length;
+        if (!list.length) driverDirMarkReady();
+        else setTimeout(driverDirMarkReady, DRIVER_DIR_READY_TIMEOUT_MS);
+      }
+      list.forEach(driverDirAttach);
+    })
+    .catch(() => {
+      // Directory unavailable (offline / rules): fall back to the original whole-node listener, once.
+      if (!driverDirOk && !driverDirIds.__full) { driverDirIds.__full = true; driverDirReady = true; listenDriversFull(); }
+    });
+  if (!driverDirTimer) driverDirTimer = setInterval(() => { if (driverDirOk) driverDirSync(); }, DRIVER_DIR_SYNC_MS);
+  if (!window.__driverDirResumeHooked) {
+    window.__driverDirResumeHooked = true;
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && driverDirOk && Date.now() - driverDirLastSyncAt > DRIVER_DIR_RESUME_MIN_GAP_MS) driverDirSync();
+    });
+  }
+}
+function driverLocScheduleRefresh(ms) {
+  if (driverLocRefreshTimer) return;
+  driverLocRefreshTimer = setTimeout(() => { driverLocRefreshTimer = null; if (state.isOnline) refreshRidePopupFromCache(); }, ms || 0);
+}
+function driverLocAttach(id) {
+  if (driverLocUnsubs[id]) return;
+  const { db, ref, onValue } = window.fb;
+  const arrived = () => {
+    if (driverLocPending[id]) { delete driverLocPending[id]; driverLocScheduleRefresh(0); }
+  };
+  driverLocUnsubs[id] = onValue(ref(db, 'taxi_drivers/' + id + '/location'), snap => {
+    const d = driversCache[id] || (driversCache[id] = {});
+    const v = snap.val();
+    if (v == null) delete d.location; else d.location = v;
+    arrived();
+  }, arrived);
+}
+function driverLocStop() {
+  Object.keys(driverLocUnsubs).forEach(id => {
+    try { driverLocUnsubs[id](); } catch (e) {}
+    if (driversCache[id]) delete driversCache[id].location;   // never rank on an old position next time
+  });
+  driverLocUnsubs = {};
+  driverLocWatching = false; driverLocPending = {}; driverLocWantAll = false; driverLocWantZones = {}; driverLocStopTimer = null;
+}
+// Called by shouldOfferToMe just before it ranks drivers. true = other drivers' live locations are loaded and ranking may go on.
+function driverLocTouch(pickup, useGroup) {
+  if (!DRIVER_LITE_LISTENERS || driverDirIds.__full) return true;   // old behaviour: locations come with the whole node
+  driverLocTouched = true;
+  if (driverLocStopTimer) { clearTimeout(driverLocStopTimer); driverLocStopTimer = null; }
+  if (!driverDirReady) return false;                                // directory (who is online) not loaded yet
+  // Same candidate set as candidatesInZone: the pickup's zone (or zone group for deliveries). null = no zone -> everyone online.
+  let zoneSet = null;
+  if (DRIVER_LOC_ZONE_LIMIT && pickup) zoneSet = zoneMatchSet(zoneForPickup(pickup), useGroup);
+  driverLocWatching = true;
+  if (!zoneSet) driverLocWantAll = true; else zoneSet.forEach(z => { driverLocWantZones[z] = true; });
+  const now = Date.now();
+  let ready = true;
+  Object.keys(driversCache).forEach(id => {
+    const d = driversCache[id];
+    if (id === state.username || !d || d.isOnline !== true) return;
+    if (zoneSet && !zoneSet.has(d.zone)) return;                    // cannot be a candidate for this job -> its location is not needed
+    if (!driverLocUnsubs[id]) {
+      driverLocPending[id] = now;
+      driverLocAttach(id);
+      driverLocScheduleRefresh(DRIVER_LOC_READY_TIMEOUT_MS + 100);  // never block an offer for long
+    }
+    if (driverLocPending[id] && now - driverLocPending[id] < DRIVER_LOC_READY_TIMEOUT_MS) ready = false;
+  });
+  return ready;
+}
+// Called at the end of every refreshRidePopupFromCache run.
+function driverLocAfterRun() {
+  if (!DRIVER_LITE_LISTENERS || driverDirIds.__full) return;
+  if (!driverLocTouched && driverLocWatching && !driverLocStopTimer) driverLocStopTimer = setTimeout(driverLocStop, DRIVER_LOC_IDLE_STOP_MS);
+}
 function listenDrivers() {
+  if (!DRIVER_LITE_LISTENERS) { listenDriversFull(); return; }
+  const { db, ref, onValue } = window.fb;
+  // This driver's own record, in full (same fields the old whole-node listener kept current).
+  onValue(ref(db, 'taxi_drivers/' + state.username), snap => {
+    const me = snap.val();
+    if (!me) return;
+    driversCache[state.username] = me;
+    state.driver = me;
+    setNativeDriverProfile();
+    const zoneEl = document.getElementById('account-zone');
+    if (zoneEl) zoneEl.value = state.driver.zoneName || '';
+  });
+  driverDirSync();
+}
+function listenDriversFull() {
   const { db, ref, onValue } = window.fb;
   onValue(ref(db, 'taxi_drivers'), snap => {
     driversCache = snap.val() || {};
@@ -2062,6 +2603,7 @@ function listenDrivers() {
     // current without requiring a re-login.
     if (state.username && driversCache[state.username]) {
       state.driver = driversCache[state.username];
+      setNativeDriverProfile();
       const zoneEl = document.getElementById('account-zone');
       if (zoneEl) zoneEl.value = state.driver.zoneName || '';
     }
@@ -2089,7 +2631,7 @@ function listenZonesForRegistration() {
     const sel = document.getElementById('reg-zone');
     if (!sel) return;
     const current = sel.value;
-    sel.innerHTML = '<option value="">Select your zone…</option>' + list.map(z => `<option value="${z._id}">${z.name}</option>`).join('');
+    sel.innerHTML = '<option value="">Select your zone…</option>' + list.map(z => `<option value="${escapeHtml(z._id)}">${escapeHtml(z.name)}</option>`).join('');
     if (current && list.some(z => z._id === current)) sel.value = current;
   });
 }
@@ -2138,6 +2680,28 @@ function showToast(msg) {
   t.classList.add('show');
   clearTimeout(window._toastTimer);
   window._toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// Firebase server clock (driver phone's own clock can be minutes off). Kept in sync from .info/serverTimeOffset.
+var serverTimeOffsetMs = 0;
+function serverNow() { return Date.now() + serverTimeOffsetMs; }
+function listenServerTimeOffset() {
+  try {
+    const { db, ref, onValue } = window.fb;
+    onValue(ref(db, '.info/serverTimeOffset'), snap => {
+      const v = Number(snap.val());
+      serverTimeOffsetMs = isFinite(v) ? v : 0;
+    }, () => {});
+  } catch (e) {}
+}
+// If we are online but have no GPS fix, jobs are silently withheld - tell the driver (at most once a minute).
+var lastNoLocationToastAt = 0;
+function noteNoLocation() {
+  if (!state.isOnline) return;
+  const now = Date.now();
+  if (now - lastNoLocationToastAt < 60000) return;
+  lastNoLocationToastAt = now;
+  showToast('Location not available - turn on GPS/location to receive orders');
 }
 
 function escapeHtml(s) {
@@ -2240,6 +2804,21 @@ function stopRinging() {
 // ---------- New-ride popup — same shape as the restaurant partner app's
 // new-order popup: keeps ringing until every request on screen is actioned. ----------
 const RIDE_TYPE_LABEL = { bike: 'Bike', auto: 'Auto', cab: 'Cab' };
+// The ride popup went away. If the driver did NOT just accept/reject it (it timed out, the customer
+// cancelled, another driver took it) and the app is still sitting over the lock screen, send it back
+// behind the lock screen. Does nothing when the phone is unlocked.
+let lockReleaseTimer = null;
+function scheduleLockScreenRelease() {
+  const RC = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RingControl;
+  if (!RC || !RC.releaseLockScreen) return;
+  clearTimeout(lockReleaseTimer);
+  lockReleaseTimer = setTimeout(() => {
+    const ov = document.getElementById('order-popup-overlay');
+    if (ov && ov.classList.contains('show')) return;                       // a new popup is up - leave it
+    if (Date.now() - (window.__lastDriverActionAt || 0) < 8000) return;    // driver just acted - unlock flow owns it
+    Promise.resolve(RC.releaseLockScreen()).catch(() => {});
+  }, 3000);
+}
 function renderOrderPopup(pendingList) {
   const overlay = document.getElementById('order-popup-overlay');
   const listEl = document.getElementById('popup-list');
@@ -2249,6 +2828,7 @@ function renderOrderPopup(pendingList) {
     overlay.classList.remove('show');
     stopRinging();
     listEl.innerHTML = "";
+    scheduleLockScreenRelease();
     return;
   }
 
@@ -2265,34 +2845,34 @@ function renderOrderPopup(pendingList) {
       : '';
     if (item._kind === 'delivery') {
       card.innerHTML = `
-        <h2 class="order-popup-title">Delivery${item.orderNumber ? ' #' + item.orderNumber : ''} · ₹${deliveryPayout(item)}</h2>
+        <h2 class="order-popup-title">Delivery${item.orderNumber ? ' #' + escapeHtml(item.orderNumber) : ''} · ${item._placeholder && item.deliveryFee == null && !item.items ? 'loading details…' : '₹' + deliveryPayout(item)}</h2>
         <div class="order-popup-body">
           ${awayText}
           ${item.rainSurgeDriver > 0 ? `<div class="order-popup-row"><span>🌧️ Rain bonus (included)</span><span>₹${item.rainSurgeDriver}</span></div>` : ''}
           ${item.tip > 0 ? `<div class="order-popup-row"><span>🙏 Customer tip (included)</span><span>₹${item.tip}</span></div>` : ''}
           ${deliveryLocationsHtml(item)}
           ${deliveryInstrHtml(item)}
-          <div class="order-popup-row order-popup-row-total"><span>Items</span><span>${item.items ? item.items.map(it => `${it.qty}x ${it.name}`).join(', ') : '—'}</span></div>
+          <div class="order-popup-row order-popup-row-total"><span>Items</span><span>${item.items ? item.items.map(it => `${escapeHtml(it.qty)}x ${escapeHtml(it.name)}`).join(', ') : '—'}</span></div>
         </div>
-        <p class="order-popup-cust">${item.customerName || 'Customer'}</p>
+        <p class="order-popup-cust">${escapeHtml(item.customerName || 'Customer')}</p>
         <div class="order-popup-btns">
-          <button class="btn-danger" data-action="reject" data-kind="delivery" data-id="${item._id}">Skip</button>
-          <button class="btn-primary" data-action="accept" data-kind="delivery" data-id="${item._id}">Accept delivery</button>
+          <button class="btn-danger" data-action="reject" data-kind="delivery" data-id="${escapeHtml(item._id)}">Skip</button>
+          <button class="btn-primary" data-action="accept" data-kind="delivery" data-id="${escapeHtml(item._id)}">Accept delivery</button>
         </div>
       `;
     } else {
       card.innerHTML = `
-        <h2 class="order-popup-title">${RIDE_TYPE_LABEL[item.vehicleType] || 'Ride'} · ₹${item.fare || 0}</h2>
+        <h2 class="order-popup-title">${RIDE_TYPE_LABEL[item.vehicleType] || 'Ride'} · ${item._placeholder && item.fare == null ? 'loading details…' : '₹' + escapeHtml(item.fare || 0)}</h2>
         <div class="order-popup-body">
           ${awayText}
-          <div class="order-popup-loc-row pickup"><span class="order-popup-loc-dot"></span><span><span class="order-popup-loc-label">Pickup</span><span class="order-popup-loc-text" id="popup-pickup-${item._id}">${(item.pickup && item.pickup.text) || '—'}</span></span></div>
-          <div class="order-popup-loc-row drop"><span class="order-popup-loc-dot"></span><span><span class="order-popup-loc-label">Drop</span><span class="order-popup-loc-text" id="popup-drop-${item._id}">${(item.drop && item.drop.text) || '—'}</span></span></div>
-          <div class="order-popup-row order-popup-row-total"><span>Trip distance</span><span>${item.distanceKm || 0} km</span></div>
+          <div class="order-popup-loc-row pickup"><span class="order-popup-loc-dot"></span><span><span class="order-popup-loc-label">Pickup</span><span class="order-popup-loc-text" id="popup-pickup-${escapeHtml(item._id)}">${escapeHtml((item.pickup && item.pickup.text) || '—')}</span></span></div>
+          <div class="order-popup-loc-row drop"><span class="order-popup-loc-dot"></span><span><span class="order-popup-loc-label">Drop</span><span class="order-popup-loc-text" id="popup-drop-${escapeHtml(item._id)}">${escapeHtml((item.drop && item.drop.text) || '—')}</span></span></div>
+          <div class="order-popup-row order-popup-row-total"><span>Trip distance</span><span>${escapeHtml(item.distanceKm || 0)} km</span></div>
         </div>
-        <p class="order-popup-cust">${item.customerName || 'Rider'}</p>
+        <p class="order-popup-cust">${escapeHtml(item.customerName || 'Rider')}</p>
         <div class="order-popup-btns">
-          <button class="btn-danger" data-action="reject" data-kind="ride" data-id="${item._id}">Skip</button>
-          <button class="btn-primary" data-action="accept" data-kind="ride" data-id="${item._id}">Accept ride</button>
+          <button class="btn-danger" data-action="reject" data-kind="ride" data-id="${escapeHtml(item._id)}">Skip</button>
+          <button class="btn-primary" data-action="accept" data-kind="ride" data-id="${escapeHtml(item._id)}">Accept ride</button>
         </div>
       `;
     }
@@ -2301,8 +2881,8 @@ function renderOrderPopup(pendingList) {
     // background, same as the ride-detail screen — doesn't block the popup
     // from showing (and ringing) immediately.
     if (item._kind !== 'delivery') {
-      applyFriendlyLocationLabel(document.getElementById('popup-pickup-' + item._id), item.pickup);
-      applyFriendlyLocationLabel(document.getElementById('popup-drop-' + item._id), item.drop);
+      applyFriendlyLocationLabel(card.querySelector('.order-popup-loc-row.pickup .order-popup-loc-text'), item.pickup);
+      applyFriendlyLocationLabel(card.querySelector('.order-popup-loc-row.drop .order-popup-loc-text'), item.drop);
     }
   });
 
@@ -2361,7 +2941,199 @@ function ensureChoiceDriverOfferTimer(rideId) {
 let deliveriesCache = []; // flat array of { _restId, _orderId, ...order }
 const skippedDeliveryIds = new Set();
 
+/* ---- DATA SAVER for delivery jobs ----
+   This used to listen to the WHOLE `restaurants` node on every driver phone: every shop's full menu (items + photo links),
+   categories, settlements and order history, re-sent whenever any of it changed. A driver only needs, per shop, its name /
+   address / location / phone / goSeries / businessType, and the ORDERS of Go Series shops (the only shops whose jobs go to
+   delivery boys). So: one small listener per field per shop, and an `orders` listener only for Go Series shops. The job list
+   (deliveriesCache) is rebuilt in exactly the same shape as before. If the shop list can't be loaded, the old whole-node
+   listener is used instead. */
+var DELIVERY_LITE_LISTENERS = true;
+// Only the last 24 hours of each Go Series shop's orders are kept live. Older days are fetched on demand when the
+// driver taps a date on the Earnings screen. (Add ".indexOn": ["createdAt"] on restaurants/$restId/orders in the
+// database rules so Firebase filters on the server; without it everything still works, it just can't save bandwidth.)
+var DELIVERY_WINDOW_MS = 24 * 60 * 60 * 1000;
+var deliveriesReady = false;
+// LIGHT mode: the live orders listener only needs recent orders that may still be waiting for a rider (2 hours), and this
+// rider's OWN orders are looked up through a per-day index (driver_delivery_days/{id}/{yyyy-mm-dd}/{restId::orderId}),
+// so other riders' orders from the last 24 hours are no longer downloaded. The index is built once (and re-checked weekly)
+// from the old 24-hour load, see deliveryBuildIndex. If anything about the index fails, the app stays in the old mode.
+var DELIVERY_PENDING_WINDOW_MS = 2 * 60 * 60 * 1000;
+var DELIVERY_RECHECK_MS = 7 * 24 * 3600 * 1000;
+var deliveryLight = false;
+var ownDeliveryOrders = {};   // 'restId::orderId' -> { restId, orderId, data, unsub }
+var DELIVERY_SHOP_FIELDS = ['restaurantName', 'name', 'address', 'location', 'phone', 'goSeries', 'businessType'];
+var deliveryShopData = {};   // restId -> { restaurantName, name, address, location, phone, goSeries, businessType, orders }
+var deliveryShopSubs = {};   // restId -> { meta: [unsub], orders: unsub|null }
+var deliveryDirOk = false, deliveryDirTimer = null, deliveryRebuildTimer = null, deliveryFullMode = false;
+function deliveryRebuild() {
+  if (deliveryRebuildTimer) return;
+  deliveryRebuildTimer = setTimeout(() => {
+    deliveryRebuildTimer = null;
+    const flat = [];
+    Object.keys(deliveryShopData).forEach(restId => {
+      const rest = deliveryShopData[restId] || {};
+      const orders = rest.orders || {};
+      Object.keys(orders).forEach(orderId => {
+        flat.push(Object.assign({ _restId: restId, _orderId: orderId, _restName: rest.restaurantName || rest.name || '', _restAddress: rest.address || '', _restLocation: rest.location || null, _restPhone: rest.phone || '', _restGoSeries: !!rest.goSeries, _restIsGroceries: rest.businessType === 'groceries' }, orders[orderId]));
+      });
+    });
+    // this rider's own orders (light mode) that the shop listeners above did not already bring in
+    const seenKeys = {};
+    flat.forEach(o => { seenKeys[o._restId + '::' + o._orderId] = 1; });
+    Object.keys(ownDeliveryOrders).forEach(key => {
+      const e = ownDeliveryOrders[key];
+      if (!e || !e.data || seenKeys[key]) return;
+      const rest = deliveryShopData[e.restId] || {};
+      flat.push(Object.assign({ _restId: e.restId, _orderId: e.orderId, _restName: rest.restaurantName || rest.name || '', _restAddress: rest.address || '', _restLocation: rest.location || null, _restPhone: rest.phone || '', _restGoSeries: !!rest.goSeries, _restIsGroceries: rest.businessType === 'groceries' }, e.data));
+    });
+    deliveriesCache = flat;
+    deliveriesReady = true;
+    renderHomeLists();
+    if (state.isOnline) refreshRidePopupFromCache();
+  }, 60);   // many small snapshots arrive together on start - rebuild once
+}
+function deliveryShopAttach(restId) {
+  if (deliveryShopSubs[restId]) return;
+  const { db, ref, onValue, query, orderByChild, startAt } = window.fb;
+  const entry = { meta: [], goUnsub: null, orders: null };
+  deliveryShopSubs[restId] = entry;
+  deliveryShopData[restId] = deliveryShopData[restId] || {};
+  // Only the tiny `goSeries` flag is watched for every shop. The other shop fields and the orders are watched ONLY
+  // while the shop is a Go Series shop (the only shops whose jobs go to delivery boys), and dropped again if it stops being one.
+  const attachDetails = () => {
+    if (entry.orders) return;
+    DELIVERY_SHOP_FIELDS.filter(f => f !== 'goSeries').forEach(f => {
+      entry.meta.push(onValue(ref(db, 'restaurants/' + restId + '/' + f), snap => {
+        const d = deliveryShopData[restId] || (deliveryShopData[restId] = {});
+        const v = snap.val();
+        if (v == null) delete d[f]; else d[f] = v;
+        deliveryRebuild();
+      }, () => {}));
+    });
+    const since = Date.now() - (deliveryLight ? DELIVERY_PENDING_WINDOW_MS : DELIVERY_WINDOW_MS);
+    entry.orders = onValue(query(ref(db, 'restaurants/' + restId + '/orders'), orderByChild('createdAt'), startAt(since)), osnap => {
+      const dd = deliveryShopData[restId] || (deliveryShopData[restId] = {});
+      const ov = osnap.val();
+      if (ov == null) delete dd.orders; else dd.orders = ov;
+      deliveryRebuild();
+    }, () => {});
+  };
+  const detachDetails = () => {
+    entry.meta.forEach(u => { try { u(); } catch (e) {} });
+    entry.meta = [];
+    if (entry.orders) { try { entry.orders(); } catch (e) {} entry.orders = null; }
+    const d = deliveryShopData[restId];
+    if (d) Object.keys(d).forEach(k => { if (k !== 'goSeries') delete d[k]; });
+  };
+  entry.detach = detachDetails;
+  entry.goUnsub = onValue(ref(db, 'restaurants/' + restId + '/goSeries'), snap => {
+    const d = deliveryShopData[restId] || (deliveryShopData[restId] = {});
+    const v = snap.val();
+    if (v == null) delete d.goSeries; else d.goSeries = v;
+    if (v) attachDetails(); else detachDetails();
+    deliveryRebuild();
+  }, () => {});
+}
+function deliveryShopDetach(restId) {
+  const e = deliveryShopSubs[restId];
+  if (e) {
+    if (e.goUnsub) { try { e.goUnsub(); } catch (x) {} }
+    e.meta.forEach(u => { try { u(); } catch (x) {} });
+    if (e.orders) { try { e.orders(); } catch (x) {} }
+  }
+  delete deliveryShopSubs[restId]; delete deliveryShopData[restId];
+}
+// The shop list (shallow, ~25 bytes per shop) used to be re-downloaded every 2 min on EVERY phone. A new shop only needs to be
+// picked up eventually, and the list also refreshes when the app comes back to the screen.
+var DELIVERY_DIR_SYNC_MS = 15 * 60 * 1000;
+var DELIVERY_DIR_RESUME_MIN_GAP_MS = 5 * 60 * 1000;
+var deliveryDirLastSyncAt = 0;
+function deliveryDirSync() {
+  fetch(DRIVER_DB_URL + '/restaurants.json?shallow=true')
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)))
+    .then(ids => {
+      if (!ids || typeof ids !== 'object') throw new Error('no ids');
+      deliveryDirOk = true;
+      Object.keys(ids).forEach(deliveryShopAttach);
+      deliveryRebuild();   // marks the list as loaded even when there are no shops
+      Object.keys(deliveryShopSubs).forEach(id => { if (!(id in ids)) { deliveryShopDetach(id); deliveryRebuild(); } });
+    })
+    .catch(() => {
+      if (!deliveryDirOk && !deliveryFullMode) { deliveryFullMode = true; listenDeliveryJobsFull(); }   // old behaviour
+    });
+  deliveryDirLastSyncAt = Date.now();
+  if (!deliveryDirTimer) deliveryDirTimer = setInterval(() => { if (deliveryDirOk) deliveryDirSync(); }, DELIVERY_DIR_SYNC_MS);
+  if (!window.__deliveryDirResumeHooked) {
+    window.__deliveryDirResumeHooked = true;
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && deliveryDirOk && Date.now() - deliveryDirLastSyncAt > DELIVERY_DIR_RESUME_MIN_GAP_MS) deliveryDirSync();
+    });
+  }
+}
+function ownDeliveryAttach(key) {
+  if (ownDeliveryOrders[key]) return;
+  const parts = String(key).split('::');
+  if (parts.length < 2) return;
+  const restId = parts[0], orderId = parts.slice(1).join('::');
+  const { db, ref, onValue } = window.fb;
+  const entry = { restId, orderId, data: null, unsub: null };
+  ownDeliveryOrders[key] = entry;
+  entry.unsub = onValue(ref(db, 'restaurants/' + restId + '/orders/' + orderId), snap => {
+    entry.data = snap.val();
+    if (entry.data && entry.data.status === 'delivered' && entry.unsub) { try { entry.unsub(); } catch (e) {} entry.unsub = null; }   // a delivered order never changes
+    deliveryRebuild();
+  }, () => {});
+}
+async function ownDeliveriesStart() {
+  try {
+    const { db, ref, get } = window.fb;
+    const keys = [rideDayKey(Date.now()), rideDayKey(Date.now() - 86400000)];
+    const snaps = await Promise.all(keys.map(k => get(ref(db, 'driver_delivery_days/' + state.username + '/' + k))));
+    snaps.forEach(sn => Object.keys(sn.val() || {}).forEach(ownDeliveryAttach));
+  } catch (e) { console.warn('own deliveries:', e); }
+}
+// Builds the per-day index of this rider's deliveries from the last 2 days. Self-contained (asks Firebase itself), so it
+// never depends on which shops happened to have loaded already. "deliveriesIndexedAt" is set only after the index was
+// written, so a refused write keeps the app in the old (heavier but complete) mode.
+async function deliveryBuildIndex() {
+  if (deliveryLight || deliveryFullMode) return;
+  try {
+    const { db, ref, get, update, set, query, orderByChild, startAt } = window.fb;
+    const idsRes = await fetch(DRIVER_DB_URL + '/restaurants.json?shallow=true');
+    if (!idsRes.ok) throw new Error('http ' + idsRes.status);
+    const ids = Object.keys((await idsRes.json()) || {});
+    const since = Date.now() - 2 * 86400000;
+    const upd = {};
+    await Promise.all(ids.map(async restId => {
+      const gs = await get(ref(db, 'restaurants/' + restId + '/goSeries'));
+      if (!gs.val()) return;
+      const snap = await get(query(ref(db, 'restaurants/' + restId + '/orders'), orderByChild('createdAt'), startAt(since)));
+      const v = snap.val() || {};
+      Object.keys(v).forEach(orderId => {
+        const o = v[orderId];
+        if (o && o.deliveryDriverId === state.username) upd['driver_delivery_days/' + state.username + '/' + rideDayKey(o.createdAt) + '/' + restId + '::' + orderId] = true;
+      });
+    }));
+    if (Object.keys(upd).length) await update(ref(db), upd);
+    await set(ref(db, 'taxi_drivers/' + state.username + '/deliveriesIndexedAt'), Date.now());
+  } catch (e) { console.warn('delivery index:', e); }
+}
 function listenDeliveryJobs() {
+  if (!DELIVERY_LITE_LISTENERS) { listenDeliveryJobsFull(); return; }
+  const { db, ref, get } = window.fb;
+  const go = (light) => {
+    deliveryLight = light;
+    if (light) ownDeliveriesStart();
+    deliveryDirSync();
+    if (!light) deliveryBuildIndex();
+  };
+  get(ref(db, 'taxi_drivers/' + state.username + '/deliveriesIndexedAt')).then(snap => {
+    const t = Number(snap.val()) || 0;
+    go(t > 0 && (Date.now() - t) < DELIVERY_RECHECK_MS);
+  }).catch(() => go(false));
+}
+function listenDeliveryJobsFull() {
   const { db, ref, onValue } = window.fb;
   onValue(ref(db, 'restaurants'), snap => {
     const val = snap.val() || {};
@@ -2374,12 +3146,22 @@ function listenDeliveryJobs() {
       });
     });
     deliveriesCache = flat;
+    deliveriesReady = true;
     renderHomeLists();
     if (state.isOnline) refreshRidePopupFromCache();
   });
 }
 
+const acceptInFlight = new Set();   // ids whose Accept is being processed - ignores double taps
 async function handlePopupItemAction(id, action, kind) {
+  nativePinned.delete(id);   // any decision ends the native pin
+  if (action === 'accept') {
+    if (acceptInFlight.has(id)) return;
+    acceptInFlight.add(id);
+    try {
+      return await (kind === 'delivery' ? handlePopupDeliveryAction(id, action) : handlePopupRideAction(id, action));
+    } finally { acceptInFlight.delete(id); }
+  }
   if (kind === 'delivery') return handlePopupDeliveryAction(id, action);
   return handlePopupRideAction(id, action);
 }
@@ -2398,11 +3180,86 @@ async function handlePopupItemAction(id, action, kind) {
 // refreshRidePopupFromCache() for the real, correctly nearest-ordered/
 // filtered popup. That naturally replaces the placeholder (or clears it, if
 // the job's already been taken by someone else by the time we open).
-window.handleNativeRideAction = function (action, id, kind) {
+// Jobs opened from a native alert are PINNED: the push already chose THIS driver, so the in-app
+// nearest-first rotation (which needs the whole driver directory + live locations + road distance
+// to load first) must not hide it again - that wait was the delay, and it could even wipe the
+// placeholder card. Pinned jobs skip the ranking for NATIVE_PIN_MS, as long as they are still open.
+const NATIVE_PIN_MS = 90 * 1000;
+const nativePinned = new Map();   // id -> { kind, at, resolved, seed }
+function isNativePinned(id) {
+  const p = nativePinned.get(id);
+  return !!p && (Date.now() - p.at) < NATIVE_PIN_MS;
+}
+// Optional 4th argument: the job's fields (fare, pickup, drop, customerName, items...) as an object or
+// JSON string, if the push carries them - then the card shows real details instantly, no fetch needed.
+// Native popup "Accept": the driver already tapped Accept in the native card, so do the real accept as
+// soon as Firebase + the driver profile are ready (same atomic handler as the in-app Accept button).
+const nativeAcceptStarted = new Set();
+function nativeAcceptWhenReady(id, kind) {
+  if (nativeAcceptStarted.has(id)) return;
+  nativeAcceptStarted.add(id);
+  const t0 = Date.now();
+  try { showToast(kind === 'delivery' ? 'Accepting delivery...' : 'Accepting ride...'); } catch (e) {}
+  (function wait() {
+    if (window.fb && state.driver && state.username) {
+      Promise.resolve(handlePopupItemAction(id, 'accept', kind)).catch(() => {});
+      return;
+    }
+    if (Date.now() - t0 > 30000) {
+      try { alert("Couldn't accept - check your connection and try again."); } catch (e) {}
+      return;
+    }
+    setTimeout(wait, 200);
+  })();
+}
+// Jobs skipped in the native popup while this page was not running: mark them skipped here too.
+async function syncNativeSkips() {
+  try {
+    const RC = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RingControl;
+    if (!RC || !RC.consumeSkippedIds) return;
+    const r = await RC.consumeSkippedIds();
+    const ids = (r && r.ids) || [];
+    if (!ids.length) return;
+    ids.forEach(sid => {
+      if (String(sid).indexOf('::') > -1) skippedDeliveryIds.add(sid); else skippedRideIds.add(sid);
+      nativePinned.delete(sid);
+    });
+    if (state.driver) refreshRidePopupFromCache();
+  } catch (e) {}
+}
+window.addEventListener('fb-ready', syncNativeSkips);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) syncNativeSkips(); });
+
+// The native popup already accepted this job over Firebase REST (no WebView involved). Nothing to accept here -
+// just make sure it is never accepted/shown again, attach a delivery to the own-orders list, and clear the alert.
+function nativeAcceptedDone(id, kind) {
+  nativePinned.delete(id);
+  nativeAcceptStarted.add(id);
+  try { showToast(kind === 'delivery' ? 'Delivery accepted' : 'Ride accepted'); } catch (e) {}
+  try { clearDeliveredNotifications(); } catch (e) {}
+  if (kind === 'delivery') {
+    const attach = () => { try { ownDeliveryAttach(id); } catch (e) {} };
+    if (window.fb) attach(); else window.addEventListener('fb-ready', attach, { once: true });
+  }
+}
+window.handleNativeRideAction = function (action, id, kind, payload) {
+  if (action === 'accepted' && id && (kind === 'ride' || kind === 'delivery')) { nativeAcceptedDone(id, kind); return; }
+  if (action === 'accept' && id && (kind === 'ride' || kind === 'delivery')) { nativeAcceptWhenReady(id, kind); return; }
   if (action !== 'open' || !id || (kind !== 'ride' && kind !== 'delivery')) return;
-  renderOrderPopup([{ _id: id, _kind: kind }]); // instant placeholder — starts the ring right away
+  let seed = null;
+  if (payload) {
+    try { seed = typeof payload === 'string' ? JSON.parse(payload) : payload; } catch (e) { seed = null; }
+    if (!seed || typeof seed !== 'object') seed = null;
+  }
+  nativePinned.set(id, { kind, at: Date.now(), resolved: false, seed });
+  renderOrderPopup([Object.assign({}, seed || {}, { _id: id, _kind: kind, _placeholder: true })]); // instant card - starts the ring right away
   fetchAndMergeNativeAlert(kind, id);
 };
+// Replay any taps that arrived before this point (see the queue stub at the top of <head>).
+(function () {
+  const drain = () => (window.__nativeQ || []).splice(0).forEach(a => { try { window.handleNativeRideAction.apply(null, a); } catch (e) {} });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', drain); else drain();
+})();
 
 async function fetchAndMergeNativeAlert(kind, id) {
   // Firebase may not have finished connecting yet at cold start (its SDK is
@@ -2416,18 +3273,21 @@ async function fetchAndMergeNativeAlert(kind, id) {
   try {
     if (kind === 'ride') {
       const snap = await get(ref(db, 'rides/' + id));
-      if (snap.exists()) ridesCache[id] = snap.val();
+      if (snap.exists()) ridesCache[id] = snap.val(); else nativePinned.delete(id);
     } else {
       const [restId, orderId] = id.split('::');
+      // Shop fields are requested IN PARALLEL with the order itself (one round trip instead of two).
+      const metaFields = ['restaurantName', 'name', 'address', 'location', 'phone', 'goSeries', 'businessType'];
+      const metaPromise = Promise.all(metaFields.map(f => get(ref(db, 'restaurants/' + restId + '/' + f)))).catch(() => null);
       const snap = await get(ref(db, 'restaurants/' + restId + '/orders/' + orderId));
+      if (!snap.exists()) nativePinned.delete(id);
       if (snap.exists()) {
         // Only the few small shop fields we need — not the whole restaurant
         // node (which would drag every order along with it).
         let restMeta = {};
         try {
-          const fields = ['restaurantName', 'name', 'address', 'location', 'phone', 'goSeries', 'businessType'];
-          const snaps = await Promise.all(fields.map(f => get(ref(db, 'restaurants/' + restId + '/' + f))));
-          fields.forEach((f, i) => { restMeta[f] = snaps[i].val(); });
+          const snaps = await metaPromise;
+          if (snaps) metaFields.forEach((f, i) => { restMeta[f] = snaps[i].val(); });
         } catch (e) {}
         deliveriesCache = deliveriesCache
           .filter(o => (o._restId + '::' + o._orderId) !== id)
@@ -2447,6 +3307,8 @@ async function fetchAndMergeNativeAlert(kind, id) {
     // listenDeliveryJobs() sync will still catch up shortly and refresh
     // the popup once it does.
   }
+  const pin = nativePinned.get(id);
+  if (pin) pin.resolved = true;   // stop showing the bare placeholder; real data (or nothing, if it is gone) takes over
   // driver profile (state.driver) comes from cached localStorage data set
   // in init(), which also waits on 'fb-ready' — by the time we get here
   // it's virtually always already set, but guard just in case.
@@ -2459,6 +3321,15 @@ async function handlePopupRideAction(rideId, action) {
     skippedRideIds.add(rideId);
     clearDeliveredNotifications();
     const rideInCache = ridesCache[rideId];
+    // Operator assigned this ride to me and I skipped it: release it back to normal routing (otherwise it
+    // would stay reserved for me forever and nobody else would ever see it).
+    if (rideInCache && rideInCache.assignedDriverId === state.username) {
+      const { db, ref, update } = window.fb;
+      update(ref(db, 'rides/' + rideId), {
+        assignedDriverId: null,
+        ['declinedDriverIds/' + state.username]: true,
+      }).catch(() => {});
+    }
     // If the customer specifically approved me as the candidate for this
     // ride (see index.html's driver-candidate approval flow), skipping it
     // must hand it back rather than let it quietly vanish — clear the
@@ -2487,28 +3358,37 @@ async function handlePopupRideAction(rideId, action) {
     refreshRidePopupFromCache();
     return;
   }
-  const { db, ref, get, update } = window.fb;
+  const { db, ref, runTransaction } = window.fb;
   try {
-    // Re-check the ride is still unclaimed right before writing, to shrink
-    // the window where two drivers could both tap Accept on the same ride.
-    const snap = await get(ref(db, 'rides/' + rideId));
-    const ride = snap.val();
-    if (!ride || ride.status !== 'searching') {
+    // ATOMIC claim: Firebase runs this on the server's current value, so if two drivers tap Accept
+    // together exactly one transaction commits and the other aborts (returns undefined).
+    const me = state.username;
+    const res = await runTransaction(ref(db, 'rides/' + rideId), cur => {
+      if (cur === null) return cur;                       // not loaded locally yet - Firebase retries with the real value
+      if (cur.status !== 'searching') return;             // already taken / cancelled -> abort
+      const forcedTo = cur.assignedDriverId || cur.candidateDriverId || cur.chosenDriverId;
+      if (forcedTo && forcedTo !== me) return;            // reserved for another driver -> abort
+      cur.status = 'accepted';
+      cur.driverId = me;
+      cur.driverName = state.driver.name;
+      cur.driverPhone = state.driver.phone || '';
+      cur.driverVehicleNumber = state.driver.vehicleNumber || '';
+      return cur;
+    });
+    const ride = res.snapshot && res.snapshot.val();
+    if (!ride || ride.driverId !== me || ride.status !== 'accepted') {   // already mine (native accept landed first) counts as success too
       showToast("That ride was already taken");
       refreshRidePopupFromCache();
       return;
     }
     clearChoiceDriverOfferTimer(rideId);
-    await update(ref(db, 'rides/' + rideId), {
-      status: 'accepted',
-      driverId: state.username,
-      driverName: state.driver.name,
-      driverPhone: state.driver.phone || '',
-      driverVehicleNumber: state.driver.vehicleNumber || '',
-    });
     bumpDriverDailyCount('rides/' + rideId + '/driverCounted', state.username);
+    try { window.fb.set(ref(db, 'driver_days/' + state.username + '/' + rideDayKey(ride.createdAt || Date.now()) + '/' + rideId), true).catch(() => {}); } catch (e) {}   // per-day ride index
     showToast("Ride accepted");
     clearDeliveredNotifications();
+    // Taken: stop the ring / close the popup on the other drivers' phones (also when their app is swiped away).
+    fetch('https://broad-paper-6445.raise3715.workers.dev', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'cancel_ring', kind: 'ride', rideId }) }).catch(() => {});
     // Fire-and-forget: let the customer know who's coming, via a real
     // OS-level push (same Cloudflare Worker used for ride/delivery alerts).
     if (ride.customerNumber) {
@@ -2533,30 +3413,43 @@ async function handlePopupDeliveryAction(compositeId, action) {
   if (action === 'reject') {
     skippedDeliveryIds.add(compositeId);
     clearDeliveredNotifications();
+    // Operator-assigned delivery skipped by me: release it so other riders can be offered it.
+    const skipped = deliveriesCache.find(o => (o._restId + '::' + o._orderId) === compositeId);
+    if (skipped && skipped.assignedDriverId === state.username) {
+      const [sRest, sOrder] = compositeId.split('::');
+      const { db, ref, update } = window.fb;
+      update(ref(db, 'restaurants/' + sRest + '/orders/' + sOrder), { assignedDriverId: null }).catch(() => {});
+    }
     refreshRidePopupFromCache();
     return;
   }
   const [restId, orderId] = compositeId.split('::');
-  const { db, ref, get, update } = window.fb;
+  const { db, ref, runTransaction } = window.fb;
   try {
-    // Re-check the order is still unclaimed and still open (accepted while
-    // preparing, or already ready) right before writing, to shrink the
-    // window where two drivers could both tap Accept on the same delivery.
-    const snap = await get(ref(db, 'restaurants/' + restId + '/orders/' + orderId));
-    const order = snap.val();
-    if (!order || !['preparing', 'ready'].includes(order.status) || order.deliveryDriverId) {
+    // ATOMIC claim (see ride accept above): only one driver can ever commit this order.
+    const me = state.username;
+    const res = await runTransaction(ref(db, 'restaurants/' + restId + '/orders/' + orderId), cur => {
+      if (cur === null) return cur;                                       // not loaded locally yet - Firebase retries
+      if (!['preparing', 'ready'].includes(cur.status) || cur.deliveryDriverId) return;   // taken / closed -> abort
+      if (cur.assignedDriverId && cur.assignedDriverId !== me) return;    // reserved for another driver -> abort
+      cur.deliveryDriverId = me;
+      cur.deliveryDriverName = state.driver.name;
+      cur.deliveryDriverPhone = state.driver.phone || '';
+      return cur;
+    });
+    const order = res.snapshot && res.snapshot.val();
+    if (!order || order.deliveryDriverId !== me) {   // already mine counts as success too
       showToast("That delivery was already taken");
       refreshRidePopupFromCache();
       return;
     }
-    await update(ref(db, 'restaurants/' + restId + '/orders/' + orderId), {
-      deliveryDriverId: state.username,
-      deliveryDriverName: state.driver.name,
-      deliveryDriverPhone: state.driver.phone || '',
-    });
     bumpDriverDailyCount('restaurants/' + restId + '/orders/' + orderId + '/driverCounted', state.username);
+    try { window.fb.set(ref(db, 'driver_delivery_days/' + state.username + '/' + rideDayKey(order.createdAt || Date.now()) + '/' + restId + '::' + orderId), true).catch(() => {}); } catch (e) {}   // per-day index of my deliveries
+    ownDeliveryAttach(restId + '::' + orderId);
     showToast("Delivery accepted");
     clearDeliveredNotifications();
+    fetch('https://broad-paper-6445.raise3715.workers.dev', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'cancel_ring', kind: 'delivery', restId, orderId }) }).catch(() => {});
     // Fire-and-forget: let the customer know who's picking up their order.
     // customerAccount = logged-in account (push token lives there); customerPhone is only the delivery contact.
     if (order.customerAccount || order.customerPhone) {
@@ -2603,9 +3496,10 @@ function parseLatLngStr(str) {
 // (taxi_drivers/{id}/rideCountToday = { date, count }), so nothing has to
 // scan the whole rides / deliveries history. index.html reads the same
 // counter, so both apps always agree on the order. Resets each new day.
+// India date (IST = UTC+5:30), NOT the phone's own timezone, so every phone and the Worker (todayKeyIST in index.js) always agree
+// on what "today" is - otherwise a phone with another timezone setting would reset/keep order counts at a different time and rank differently.
 function todayKey() {
-  const d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return new Date(Date.now() + 19800000).toISOString().slice(0, 10);   // YYYY-MM-DD
 }
 function driverOrderCount(driverId) {
   const d = driversCache[driverId];
@@ -2724,36 +3618,165 @@ function stableTieBreakKey(createdAt, driverId) {
   }
   return h;
 }
-function rankAmongCandidates(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, createdAt, useGroup) {
-  const zoneId = zoneForPickup(pickup);
-  const candidates = candidatesInZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, zoneId, useGroup);
-  // Distance-first: sort everyone by raw distance to the pickup, nearest
-  // first. Then pull out the "cluster" — every candidate within
-  // NEAR_OVERRIDE_KM of whoever's nearest — since a few hundred metres
-  // shouldn't be the deciding factor among drivers who are all basically
-  // right there. Within that cluster, order count decides (fewest orders
-  // so far wins), then onlineSince (longest-waiting session first), then a
-  // stable arbitrary tiebreak so ties are still settled, and settled the
-  // same way on every device. Anyone farther than the cluster keeps their
-  // plain distance ranking.
-  const byDistance = candidates.slice().sort((a, b) => a.distanceKm - b.distanceKm);
-  if (!byDistance.length) return { rank: -1, total: 0 };
+// One cluster-aware ordering pass (see the long comment above rankAmongCandidates): nearest first, but candidates within
+// NEAR_OVERRIDE_KM of the nearest are ordered by fewest orders today, then longest online, then a stable hash.
+function rankPool(list, createdAt) {
+  const byDistance = list.slice().sort((a, b) => a.distanceKm - b.distanceKm);
+  if (!byDistance.length) return [];
   const minDistanceKm = byDistance[0].distanceKm;
   const cluster = byDistance.filter(c => c.distanceKm - minDistanceKm <= NEAR_OVERRIDE_KM);
   const rest = byDistance.filter(c => c.distanceKm - minDistanceKm > NEAR_OVERRIDE_KM);
   cluster.sort((a, b) => {
     const countDiff = driverOrderCount(a.id) - driverOrderCount(b.id);
     if (countDiff !== 0) return countDiff;
-    const onlineDiff = driverOnlineSince(a.id) - driverOnlineSince(b.id);
-    if (onlineDiff !== 0) return onlineDiff;
+    const oa = driverOnlineSince(a.id), ob = driverOnlineSince(b.id);   // Infinity - Infinity = NaN, so compare instead of subtract
+    if (oa !== ob) return oa < ob ? -1 : 1;
     return stableTieBreakKey(createdAt, a.id) - stableTieBreakKey(createdAt, b.id);
   });
-  const pool = [...cluster, ...rest];
+  return [...cluster, ...rest];
+}
+// road = optional { driverId: roadKm } stored on the job (6B). Candidates that have a road distance are ranked first, by road
+// distance; the others follow, by straight line. Without road this is exactly the old ranking.
+function rankAmongCandidates(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, createdAt, useGroup, road) {
+  const zoneId = zoneForPickup(pickup);
+  const candidates = candidatesInZone(pickup, matchFn, myDistanceKm, amIBusy, includeBusy, zoneId, useGroup);
+  let pool;
+  if (road && typeof road === 'object') {
+    const withRoad = [], without = [];
+    candidates.forEach(c => {
+      const rk = road[c.id];
+      if (typeof rk === 'number' && isFinite(rk) && rk >= 0) withRoad.push({ id: c.id, distanceKm: rk }); else without.push(c);
+    });
+    pool = [...rankPool(withRoad, createdAt), ...rankPool(without, createdAt)];
+  } else {
+    pool = rankPool(candidates, createdAt);
+  }
+  if (!pool.length) return { rank: -1, total: 0 };
   return { rank: pool.findIndex(c => c.id === state.username), total: pool.length };
 }
 function myDistanceToPickup(pickup) {
   if (!state.myLocation) return Infinity;
   return haversineKm(pickup.lat, pickup.lng, state.myLocation.lat, state.myLocation.lng);
+}
+
+// ---- 6B helpers: ask the route Worker for road distances of the shortlist, store the answer in the job ----
+function roadPoolForRequest(pickup, matchFn, myDistanceKm, amIBusy, useGroup) {
+  const zoneId = zoneForPickup(pickup);
+  let c = candidatesInZone(pickup, matchFn, myDistanceKm, amIBusy, false, zoneId, useGroup);
+  if (!c.length) c = candidatesInZone(pickup, matchFn, myDistanceKm, amIBusy, true, zoneId, useGroup);
+  return c.slice().sort((a, b) => a.distanceKm - b.distanceKm);
+}
+async function roadFetch(pickup, shortlist) {
+  const drivers = shortlist.map(c => {
+    const loc = c.id === state.username ? state.myLocation : (driversCache[c.id] && driversCache[c.id].location);
+    return loc ? { id: c.id, lat: loc.lat, lng: loc.lng } : null;
+  }).filter(Boolean);
+  if (!drivers.length) throw new Error('no coordinates');
+  const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  const t = setTimeout(() => { if (ctl) ctl.abort(); }, ROAD_FETCH_TIMEOUT_MS);
+  try {
+    const resp = await fetch(ROAD_WORKER_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pickup: { lat: pickup.lat, lng: pickup.lng }, drivers }),
+      signal: ctl ? ctl.signal : undefined
+    });
+    if (!resp.ok) throw new Error('http ' + resp.status);
+    const j = await resp.json();
+    const km = {};
+    let n = 0;
+    Object.keys((j && j.km) || {}).forEach(id => { const v = j.km[id]; if (typeof v === 'number' && isFinite(v) && v >= 0) { km[id] = Math.round(v * 1000) / 1000; n++; } });
+    if (!n) throw new Error('empty answer');
+    return km;
+  } finally { clearTimeout(t); }
+}
+// First phone to win the transaction asks the Worker and writes the answer; the others just read it from the job.
+async function roadClaimAndFetch(job, pickup, shortlist, round) {
+  const { db, ref, runTransaction } = window.fb;
+  try {
+    const claim = await runTransaction(ref(db, job.path + '/roadKm'), v => (v ? undefined : { status: 'pending', by: state.username, at: Date.now(), round: round || 0 }));
+    if (!claim.committed) return;
+    let km = null;
+    try { km = await roadFetch(pickup, shortlist); } catch (e) { console.warn('road distance failed, using straight-line:', e && e.message); }
+    const done = Date.now();
+    await runTransaction(ref(db, job.path + '/roadKm'), v => {
+      if (!v || v.status !== 'pending' || v.by !== state.username) return undefined;
+      return (km && done - v.at <= ROAD_WAIT_MS) ? { status: 'ok', by: state.username, at: v.at, km, round: v.round || 0 } : { status: 'failed', by: state.username, at: v.at, round: v.round || 0 };
+    });
+  } catch (e) {
+    console.warn('road claim failed:', e && e.message);
+  } finally {
+    driverLocScheduleRefresh(0);
+  }
+}
+// Which refresh round this job is in now (0 = first answer). ROAD_MAX_REFRESH + 1 means "too old: no road answer any more".
+function roadWantedRound(createdAt, useGroup) {
+  if (!(ROAD_MAX_REFRESH > 0) || !createdAt) return 0;
+  const every = useGroup ? ROAD_REFRESH_DELIVERY_MS : ROAD_REFRESH_RIDE_MS;
+  return Math.max(0, Math.min(Math.floor((Date.now() - createdAt) / every), ROAD_MAX_REFRESH + 1));
+}
+// Refresh of an existing road answer. ONE phone wins the claim (transaction), asks the Worker for the shortlist taken from the
+// current live locations and replaces roadKm; the offer is NOT held meanwhile (the old answer is used until the new one is in).
+// If there is nothing to ask (too old / <2 candidates / nearest clearly nearest) or the request fails, the old road answer is
+// removed and ranking is straight-line (the old behaviour).
+async function roadRefresh(job, pickup, matchFn, myDistanceKm, amIBusy, useGroup, want) {
+  const { db, ref, runTransaction } = window.fb;
+  try {
+    const pool = roadPoolForRequest(pickup, matchFn, myDistanceKm, amIBusy, useGroup);
+    let shortlist = null;
+    if (want <= ROAD_MAX_REFRESH && pool.length >= ROAD_MIN_CANDIDATES &&
+        !(ROAD_SKIP_RATIO > 0 && pool[1].distanceKm > ROAD_SKIP_RATIO * pool[0].distanceKm)) shortlist = pool.slice(0, ROAD_SHORTLIST);
+    const mine = Date.now();
+    const claim = await runTransaction(ref(db, job.path + '/roadKm'), v => {
+      if (!v || (v.status !== 'ok' && v.status !== 'skip') || (v.round || 0) >= want) return undefined;
+      if (!shortlist) return { status: 'skip', by: state.username, at: mine, round: want };
+      if (v.next && (v.next.round || 0) >= want && mine - (v.next.at || 0) <= ROAD_WAIT_MS) return undefined;
+      return Object.assign({}, v, { next: { round: want, by: state.username, at: mine } });
+    });
+    if (!claim.committed || !shortlist) return;
+    let km = null;
+    try { km = await roadFetch(pickup, shortlist); } catch (e) { console.warn('road refresh failed, using straight-line:', e && e.message); }
+    const done = Date.now();
+    await runTransaction(ref(db, job.path + '/roadKm'), v => {
+      if (!v || !v.next || v.next.by !== state.username || v.next.round !== want || (v.round || 0) >= want) return undefined;
+      return (km && done - v.next.at <= ROAD_WAIT_MS) ? { status: 'ok', by: state.username, at: v.next.at, km, round: want } : { status: 'failed', by: state.username, at: v.next.at, round: want };
+    });
+  } catch (e) {
+    console.warn('road refresh claim failed:', e && e.message);
+  } finally {
+    driverLocScheduleRefresh(0);
+  }
+}
+function roadMaybeRefresh(job, pickup, matchFn, myDistanceKm, amIBusy, useGroup, createdAt, rk) {
+  const want = roadWantedRound(createdAt, useGroup);
+  if (want <= (rk.round || 0)) return;
+  const now = Date.now();
+  if (rk.next && (rk.next.round || 0) >= want && now - (rk.next.at || 0) <= ROAD_WAIT_MS) return;   // someone is already on it
+  const key = job.path + '#' + want;
+  if (roadInFlight[key] && now - roadInFlight[key] <= ROAD_WAIT_MS) return;                          // this phone just tried
+  roadInFlight[key] = now;
+  roadRefresh(job, pickup, matchFn, myDistanceKm, amIBusy, useGroup, want);
+}
+// Returns true when the offer should be HELD because a road answer is (about to be) available.
+function roadWantsHold(pickup, matchFn, myDistanceKm, amIBusy, useGroup, job, createdAt) {
+  const rk = job.road;
+  const now = Date.now();
+  if (rk && rk.status) {
+    if (rk.status === 'ok' || rk.status === 'skip') roadMaybeRefresh(job, pickup, matchFn, myDistanceKm, amIBusy, useGroup, createdAt, rk);
+    if (rk.status === 'ok' && rk.km) return false;                        // answer is there: rank with it
+    if (rk.status === 'pending') return now - (rk.at || 0) <= ROAD_WAIT_MS; // someone is fetching: hold (until the wait runs out)
+    return false;                                                          // failed: straight-line
+  }
+  // nobody has asked yet
+  const started = roadInFlight[job.path];
+  if (started) return now - started <= ROAD_WAIT_MS;                       // we (or a lost claim) are already on it
+  const round = roadWantedRound(createdAt, useGroup);
+  if (ROAD_MAX_REFRESH > 0 && round > ROAD_MAX_REFRESH) return false;                    // job is too old for a road answer: straight-line
+  const pool = roadPoolForRequest(pickup, matchFn, myDistanceKm, amIBusy, useGroup);
+  if (pool.length < ROAD_MIN_CANDIDATES) return false;
+  if (ROAD_SKIP_RATIO > 0 && pool[1].distanceKm > ROAD_SKIP_RATIO * pool[0].distanceKm) return false;
+  roadInFlight[job.path] = now;
+  roadClaimAndFetch(job, pickup, pool.slice(0, ROAD_SHORTLIST), round);
+  return true;
 }
 
 // Decides whether THIS driver should be shown a given ride/delivery right
@@ -2779,25 +3802,88 @@ function myDistanceToPickup(pickup) {
 // SAME zone too (including this one) — still never crossing into another
 // zone — so a job never goes completely unoffered just because everyone
 // nearby is already on something.
-function shouldOfferToMe(pickup, createdAt, matchFn, amIBusy, useGroup) {
+// ---- FROZEN POOL OFFERS (bandwidth fix) ----
+// The Worker writes the ranked driver order into the job (dispatch.pool, nearest-first; dispatch.poolBusy). With it this phone
+// only needs the clock to know whose turn it is, so it does NOT stream every other driver's live location any more.
+// Drivers who went offline / became busy are skipped using the small per-driver fields already in driversCache - the Worker's
+// cron applies the same rule. Jobs without a pool (Worker down, older jobs, nobody-has-a-location fallback) use the old
+// ranking below exactly as before. Set POOL_OFFERS = false to switch this off.
+var POOL_OFFERS = true;
+var POOL_WAIT_MS = 7000;   // a brand-new job is held this long for the Worker to write its pool, then the old ranking takes over
+function dispatchPoolOf(job) {
+  const raw = job && job.dispatch && job.dispatch.pool;
+  const arr = Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.values(raw) : null);
+  return arr && arr.length ? arr : null;
+}
+// true / false = decided; null = no usable pool -> caller uses the old ranking.
+function poolOfferDecision(pickup, createdAt, amIBusy, useGroup, job) {
+  if (!POOL_OFFERS || !job) return null;
+  const elapsed = Math.max(0, serverNow() - (createdAt || 0));
+  const pool = dispatchPoolOf(job);
+  if (!pool) {
+    // Worker has not written the order yet (a second or two): hold instead of watching everybody's location.
+    if (!job.dispatch && elapsed < POOL_WAIT_MS) return false;
+    return null;
+  }
+  const me = state.username;
+  const poolBusy = !!(job.dispatch && job.dispatch.poolBusy);
+  const dirReady = driverDirReady || !!driverDirIds.__full;
+  const eligible = pool.filter(id => {
+    if (id === me) return poolBusy || !amIBusy;
+    if (!dirReady) return true;
+    const d = driversCache[id];
+    if (!d || d.isOnline !== true) return false;
+    if (d.isBusy && !poolBusy) return false;
+    return true;
+  });
+  if (!eligible.length) return null;
+  const total = eligible.length;
+  const windowMs = useGroup ? DELIVERY_NEAREST_WINDOW_MS : NEAREST_WINDOW_MS;
+  const rank = eligible.indexOf(me);
+  const open = OFFER_OPEN_AFTER_CYCLE && elapsed >= (total + 1) * windowMs;
+  if (rank < 0) {
+    // Not in the list (came online after it was made): only once the whole rotation has run, only if free, only in the pickup's zone.
+    if (!open || amIBusy) return false;
+    const zoneSet = zoneMatchSet(zoneForPickup(pickup), useGroup);
+    return !zoneSet || !!(state.driver && zoneSet.has(state.driver.zone));
+  }
+  if (open) return true;
+  return rank === Math.min(Math.floor(elapsed / windowMs), total - 1);
+}
+function shouldOfferToMe(pickup, createdAt, matchFn, amIBusy, useGroup, job) {
   if (!pickup) return true; // no pickup coords on record — can't rank, so don't withhold it
   const distanceKm = myDistanceToPickup(pickup);
-  if (distanceKm === Infinity) return false; // we don't know where we are yet
+  if (distanceKm === Infinity) { noteNoLocation(); return false; } // we don't know where we are yet - tell the driver
   if (distanceKm > MAX_MATCH_RADIUS_KM) return false; // outside matching radius — never offered
 
-  let { rank, total } = rankAmongCandidates(pickup, matchFn, distanceKm, amIBusy, false, createdAt, useGroup);
+  const pooled = poolOfferDecision(pickup, createdAt, amIBusy, useGroup, job);
+  if (pooled !== null) return pooled;   // decided from the Worker's frozen driver order - no location streaming
+  if (!driverLocTouch(pickup, useGroup)) return false; // other drivers' live locations are still loading - hold the offer for a moment
+  let road = null;
+  if (job && job.path && roadActive()) {
+    if (roadWantsHold(pickup, matchFn, distanceKm, amIBusy, useGroup, job, createdAt)) return false;   // road answer is coming - hold the offer for a moment
+    if (job.road && job.road.status === 'ok' && job.road.km) road = job.road.km;
+  }
+  let { rank, total } = rankAmongCandidates(pickup, matchFn, distanceKm, amIBusy, false, createdAt, useGroup, road);
   if (total === 0) {
     // Nobody free in this zone — widen to busy drivers in the SAME zone
     // only, so it isn't left unoffered.
-    ({ rank, total } = rankAmongCandidates(pickup, matchFn, distanceKm, amIBusy, true, createdAt, useGroup));
+    ({ rank, total } = rankAmongCandidates(pickup, matchFn, distanceKm, amIBusy, true, createdAt, useGroup, road));
   }
   if (rank < 0) return false;
-  const elapsed = Date.now() - (createdAt || 0);
+  // serverNow() = Firebase server clock; clamped at 0 so a job whose createdAt is ahead of our clock
+  // (customer phone clock fast) can never produce a negative turn that nobody matches.
+  const elapsed = Math.max(0, serverNow() - (createdAt || 0));
   // Delivery jobs (useGroup === true — see the Go Series delivery call
   // site below) get their own, longer nearest-only window than taxi
   // rides.
   const windowMs = useGroup ? DELIVERY_NEAREST_WINDOW_MS : NEAREST_WINDOW_MS;
   const turn = Math.min(Math.floor(elapsed / windowMs), total - 1);
+  // Safety net: every phone ranks from its own cache, so views can disagree. Once the whole rotation has
+  // run (+1 extra window), every driver in the pool sees the job so it can never stay hidden. Accept is
+  // atomic (transaction), so showing it to several drivers is safe. Set OFFER_OPEN_AFTER_CYCLE=false to
+  // keep the old "last driver keeps it" behaviour.
+  if (OFFER_OPEN_AFTER_CYCLE && elapsed >= (total + 1) * windowMs) return true;
   return rank === turn;
 }
 
@@ -2814,6 +3900,15 @@ const DRIVER_DUE_QUALIFYING_STATUSES = ['completed', 'done', 'finished'];
 let driverDueGrossTotal = 0;
 let driverDueRideCount = 0;
 let driverDueSettlements = [];
+// RUNNING TOTAL (bandwidth saver): taxi_drivers/{id}/dueAgg = { gross, count, checkedAt }. Instead of downloading every
+// ride this driver ever did just to add up platformFee, the app reads this one small number. A ride adds its fee to it
+// the moment it is completed (bumpDriverDue). Once a week - and whenever the number is missing - the full ride history
+// is downloaded once to re-check it (dueReconcileFromRides), so any drift corrects itself. The Operator Panel keeps
+// adding up rides exactly as before, so both sides still agree.
+var driverDueAgg = null;
+var ridesWindowed = false;     // true while only the newest rides of this driver are kept live (see listenRides)
+var RIDES_NEWEST = 5;          // light mode: always keep the newest few rides live (current ride + anything not indexed yet)
+var DUE_RECHECK_MS = 7 * 24 * 3600 * 1000;
 
 // Round to 2 decimals (money sums can pick up floating-point noise like
 // 76.80000000000001) and drop a trailing ".00" so amounts on screen always
@@ -2842,7 +3937,7 @@ function renderDriverDueUI() {
       const sorted = [...driverDueSettlements].sort((a, b) => (b.settledAt || 0) - (a.settledAt || 0));
       listEl.innerHTML = sorted.map(s => `
         <div style="display:flex; justify-content:space-between; background:var(--field-bg); border:1px solid var(--field-border); border-radius:8px; padding:10px 12px; color:var(--cloud); font-size:13px;">
-          <span>${s.note ? s.note : 'Settled by operator'}</span>
+          <span>${s.note ? escapeHtml(s.note) : 'Settled by operator'}</span>
           <span>₹${money(s.amount || 0)}</span>
         </div>
       `).join('');
@@ -2854,6 +3949,12 @@ function renderDriverDueUI() {
 // so this just recomputes the gross total from it rather than opening a
 // second listener on the same node. Called whenever ridesCache changes.
 function recomputeDriverDueGross() {
+  if (driverDueAgg && typeof driverDueAgg.gross === 'number') {
+    driverDueGrossTotal = driverDueAgg.gross;
+    driverDueRideCount = Number(driverDueAgg.count) || 0;
+    renderDriverDueUI();
+    return;
+  }
   let gross = 0, count = 0;
   Object.values(ridesCache).forEach(r => {
     const status = (r.status || '').toLowerCase();
@@ -2866,6 +3967,61 @@ function recomputeDriverDueGross() {
   driverDueRideCount = count;
   renderDriverDueUI();
 }
+
+function listenDriverDueAgg() {
+  const { db, ref, onValue } = window.fb;
+  onValue(ref(db, 'taxi_drivers/' + state.username + '/dueAgg'), snap => {
+    driverDueAgg = snap.val();
+    recomputeDriverDueGross();
+  }, () => {});
+}
+
+// Adds a just-completed ride's platform fee to the running total, exactly once (guard flag on the ride).
+async function bumpDriverDue(rideId) {
+  try {
+    const ride = ridesCache[rideId];
+    const fee = Number(ride && ride.platformFee) || 0;
+    if (!fee || !driverDueAgg || typeof driverDueAgg.gross !== 'number') return;   // no total yet: the first full check will count this ride
+    const { db, ref, runTransaction } = window.fb;
+    const guard = await runTransaction(ref(db, 'rides/' + rideId + '/dueCounted'), v => (v ? undefined : true));
+    if (!guard.committed) return;
+    await runTransaction(ref(db, 'taxi_drivers/' + state.username + '/dueAgg'), v =>
+      (v && typeof v.gross === 'number') ? Object.assign({}, v, { gross: v.gross + fee, count: (Number(v.count) || 0) + 1 }) : undefined);
+  } catch (e) { /* the weekly check will fix any miss */ }
+}
+
+// Adds up platformFee over a full set of this driver's rides (same rule as before) and stores it as the running total.
+async function dueReconcileFromRides(ridesObj) {
+  try {
+    let gross = 0, count = 0;
+    Object.keys(ridesObj || {}).forEach(id => {
+      const r = ridesObj[id] || {};
+      const st = (r.status || '').toLowerCase();
+      if (r.driverId === state.username && DRIVER_DUE_QUALIFYING_STATUSES.includes(st) && r.platformFee) {
+        gross += Number(r.platformFee) || 0;
+        count++;
+      }
+    });
+    const { db, ref, set } = window.fb;
+    await set(ref(db, 'taxi_drivers/' + state.username + '/dueAgg'), { gross, count, checkedAt: Date.now() });
+    return true;
+  } catch (e) { return false; }
+}
+
+async function dueRecalculate() {
+  const btn = document.getElementById('due-recalc-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Recalculating…'; }
+  try {
+    const { db, ref, get, query, orderByChild, equalTo } = window.fb;
+    const snap = await get(query(ref(db, 'rides'), orderByChild('driverId'), equalTo(state.username)));
+    const ok = await dueReconcileFromRides(snap.val() || {});
+    showToast(ok ? 'Due amount recalculated' : "Couldn't recalculate — try again");
+  } catch (e) {
+    showToast("Couldn't recalculate — check your connection and try again.");
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Recalculate from my rides'; }
+}
+document.getElementById('due-recalc-btn').addEventListener('click', dueRecalculate);
 
 function listenDriverDue() {
   const { db, ref, onValue } = window.fb;
@@ -2954,12 +4110,14 @@ function notifyOfferCancelled() {
 
 function refreshRidePopupFromCache() {
   syncBusyStatus();
+  driverLocTouched = false;
   const amIBusy = state.isBusy;
   const rideMatchFn = d => d.isOnline === true && d.vehicleType === state.driver.vehicleType && (!d.services || d.services.taxi !== false);
   const pendingRides = driverDoesTaxi()
     ? Object.keys(ridesCache)
         .map(id => Object.assign({ _id: id, _kind: 'ride' }, ridesCache[id]))
         .filter(r => r.status === 'searching' && !skippedRideIds.has(r._id))
+        .filter(r => !(r.declinedDriverIds && r.declinedDriverIds[state.username]))
         // Operator-assigned rides, rides the customer has specifically
         // approved this driver for (candidateDriverId — see index.html's
         // driver-candidate approval flow), and rides the customer picked
@@ -2971,7 +4129,7 @@ function refreshRidePopupFromCache() {
           const forcedTo = r.assignedDriverId || r.candidateDriverId || r.chosenDriverId;
           return forcedTo ? forcedTo === state.username : r.vehicleType === state.driver.vehicleType;
         })
-        .filter(r => r.assignedDriverId === state.username || r.candidateDriverId === state.username || r.chosenDriverId === state.username || shouldOfferToMe(r.pickup, r.createdAt, rideMatchFn, amIBusy))
+        .filter(r => r.assignedDriverId === state.username || r.candidateDriverId === state.username || r.chosenDriverId === state.username || isNativePinned(r._id) || shouldOfferToMe(r.pickup, r.createdAt, rideMatchFn, amIBusy, undefined, { path: 'rides/' + r._id, road: r.roadKm, dispatch: r.dispatch }))
         .map(r => Object.assign({}, r, { _distanceKm: r.pickup ? myDistanceToPickup(r.pickup) : null }))
     : [];
 
@@ -2993,7 +4151,7 @@ function refreshRidePopupFromCache() {
         .filter(o => !skippedDeliveryIds.has(o._id))
         // Same operator-assignment bypass as rides, above.
         .filter(o => o.assignedDriverId ? o.assignedDriverId === state.username : true)
-        .filter(o => o.assignedDriverId === state.username || shouldOfferToMe(parseLatLngStr(o._restLocation), o.createdAt, deliveryMatchFn, amIBusy, true))
+        .filter(o => o.assignedDriverId === state.username || isNativePinned(o._id) || shouldOfferToMe(parseLatLngStr(o._restLocation), o.createdAt, deliveryMatchFn, amIBusy, true, { path: 'restaurants/' + o._restId + '/orders/' + o._orderId, road: o.roadKm, dispatch: o.dispatch }))
         .map(o => Object.assign({}, o, { _distanceKm: (() => { const p = parseLatLngStr(o._restLocation); return p ? myDistanceToPickup(p) : null; })() }))
     : [];
 
@@ -3004,6 +4162,14 @@ function refreshRidePopupFromCache() {
     return da - db_;
   });
 
+  // A native-opened job whose data has not arrived yet stays on screen as the placeholder card
+  // (otherwise the first refresh, with nothing cached, would wipe it and stop the ring).
+  nativePinned.forEach((p, id) => {
+    if (!isNativePinned(id)) { nativePinned.delete(id); return; }
+    if (p.resolved || skippedRideIds.has(id) || skippedDeliveryIds.has(id)) return;
+    if (!sorted.some(x => x._id === id)) sorted.unshift(Object.assign({}, p.seed || {}, { _id: id, _kind: p.kind, _placeholder: true }));
+  });
+
   // Anything that was ringing on the last render but has now dropped out —
   // if that's because the customer cancelled it (not accepted elsewhere,
   // not us skipping it), cut the ring short with the capped chime above.
@@ -3011,10 +4177,15 @@ function refreshRidePopupFromCache() {
   lastPendingIds.forEach(id => {
     if (currentIds.has(id)) return;
     const r = ridesCache[id];
-    if (r && normalizeRideStatus(r.status) === 'cancelled') notifyOfferCancelled();
+    if (r && normalizeRideStatus(r.status) === 'cancelled') { notifyOfferCancelled(); return; }
+    if (String(id).indexOf('::') > -1) {   // delivery: composite "restId::orderId"
+      const d = deliveriesCache.find(o => (o._restId + '::' + o._orderId) === id);
+      if (d && !d.deliveryDriverId && ['cancelled', 'canceled', 'rejected'].includes(String(d.status || '').toLowerCase())) notifyOfferCancelled();
+    }
   });
   lastPendingIds = currentIds;
 
+  driverLocAfterRun();
   renderOrderPopup(sorted);
 }
 
@@ -3063,31 +4234,253 @@ function deliveryPayout(o) {
   return real + (Number(o && o.rainSurgeDriver) || 0) + (Number(o && o.tip) || 0);
 }
 // ---------- Earnings screen (Today / last 7 days / all time / per day) ----------
+var EARN_DAY_MS = 86400000;
+var EARN_DAY_ROWS = 7;          // how many dates are listed under "Day by day"
+var earnAllCache = null;        // every delivered order of this driver (loaded once, on demand)
+var earnAllLoading = false;
+var earnDayCache = {};          // dayStart -> that day's delivered orders (loaded when the date is tapped)
+var earnDayOpenFrom = null;
+
+// ---- Saved on the phone (localStorage): days that are over (2+ days old) never change, so once a date has been opened
+// it is kept even after the app is closed and is not downloaded again. Today and yesterday are always fetched fresh.
+var EARN_SAVED_PREFIX = 'nesh_earn_day_';
+var EARN_SAVED_MAX_DAYS = 60;
+function earnSavedKey(from) { return EARN_SAVED_PREFIX + state.username + '_' + rideDayKey(from); }
+function earnSavedLoad(from) {
+  try {
+    const raw = localStorage.getItem(earnSavedKey(from));
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    return (v && Array.isArray(v.d)) ? v : null;
+  } catch (e) { return null; }
+}
+function earnSavedSave(from, deliveries, rides) {
+  if (from > earnDayStart(Date.now()) - 2 * EARN_DAY_MS) return;   // only days that are definitely over
+  try {
+    localStorage.setItem(earnSavedKey(from), JSON.stringify({ d: deliveries, r: rides, t: Date.now() }));
+    const prefix = EARN_SAVED_PREFIX + state.username + '_';
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf(prefix) === 0) keys.push(k); }
+    keys.sort();   // date is the end of the key, so oldest first
+    while (keys.length > EARN_SAVED_MAX_DAYS) localStorage.removeItem(keys.shift());
+  } catch (e) { /* storage full or blocked - just fetch next time */ }
+}
+// Puts a saved day (if there is one) into the in-memory caches. Returns true if it was found.
+function earnSavedHydrate(from) {
+  if (earnDayCache[from]) return true;
+  const saved = earnSavedLoad(from);
+  if (!saved) return false;
+  earnDayCache[from] = saved.d;
+  (saved.r || []).forEach(r => { earnRidesDay[r._id] = r; });
+  earnRidesDayLoaded[rideDayKey(from)] = true;
+  return true;
+}
+
+function earnDayStart(t) { const x = new Date(t); x.setHours(0, 0, 0, 0); return x.getTime(); }
+function earnDayLabel(from) {
+  const k = Math.round((earnDayStart(Date.now()) - from) / EARN_DAY_MS);
+  return k === 0 ? 'Today' : k === 1 ? 'Yesterday' : new Date(from).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+function earnAllDeliveries(live) {
+  if (!earnAllCache) return null;
+  const map = {};
+  earnAllCache.forEach(o => { map[o._restId + '::' + o._orderId] = o; });
+  (live || []).forEach(o => { map[o._restId + '::' + o._orderId] = o; });
+  return Object.values(map);
+}
+function refreshEarnings() {
+  renderEarnings(Object.keys(ridesCache).map(id => Object.assign({ _id: id }, ridesCache[id])));
+}
+function myCompletedRides() {
+  return Object.keys(ridesCache).map(id => Object.assign({ _id: id }, ridesCache[id]))
+    .filter(r => r.driverId === state.username && normalizeRideStatus(r.status) === 'completed');
+}
+// While only the newest rides are kept live, older completed rides are fetched on demand (once) for the Earnings screen.
+var earnRidesAll = null;
+async function ensureEarnRidesAll() {
+  if (!ridesWindowed || earnRidesAll) return;
+  const { db, ref, get, query, orderByChild, equalTo } = window.fb;
+  const snap = await get(query(ref(db, 'rides'), orderByChild('driverId'), equalTo(state.username)));
+  const v = snap.val() || {};
+  earnRidesAll = Object.keys(v).map(id => Object.assign({ _id: id }, v[id])).filter(r => normalizeRideStatus(r.status) === 'completed');
+}
+var earnRidesDay = {};   // rideId -> ride, for dates opened from the Earnings screen
+var earnRidesDayLoaded = {};
+async function ensureEarnRidesDay(from) {
+  if (!ridesWindowed || earnRidesAll) return;
+  const key = rideDayKey(from);
+  if (earnRidesDayLoaded[key]) return;
+  const part = await fetchRidesOfDay(key);
+  Object.keys(part).forEach(id => { earnRidesDay[id] = Object.assign({ _id: id }, part[id]); });
+  earnRidesDayLoaded[key] = true;
+}
+function allMyCompletedRides() {
+  const map = {};
+  Object.values(earnRidesDay).forEach(r => { if (normalizeRideStatus(r.status) === 'completed') map[r._id] = r; });
+  if (earnRidesAll) earnRidesAll.forEach(r => { map[r._id] = r; });
+  myCompletedRides().forEach(r => { map[r._id] = r; });
+  return Object.values(map);
+}
+
+// Fetches this driver's delivered orders created between [from, to] straight from Firebase.
+// Only Go Series shops are asked (the only shops whose jobs go to delivery boys).
+async function fetchMyDeliveriesRange(from, to) {
+  const inRange = o => (o.createdAt || 0) >= from && (o.createdAt || 0) <= to;
+  const mineDelivered = o => o && o.deliveryDriverId === state.username && o.status === 'delivered';
+  if (deliveryFullMode) return deliveriesCache.filter(o => mineDelivered(o) && inRange(o));   // old whole-node listener already has everything
+  const { db, ref, get, query, orderByChild, startAt, endAt } = window.fb;
+  const shopIds = Object.keys(deliveryShopData).filter(id => deliveryShopData[id] && deliveryShopData[id].goSeries);
+  if (!shopIds.length && !deliveriesReady) throw new Error('shops not loaded yet');
+  const out = [];
+  await Promise.all(shopIds.map(async restId => {
+    const rest = deliveryShopData[restId] || {};
+    const snap = await get(query(ref(db, 'restaurants/' + restId + '/orders'), orderByChild('createdAt'), startAt(from), endAt(to)));
+    const v = snap.val() || {};
+    Object.keys(v).forEach(orderId => {
+      const o = v[orderId];
+      if (!mineDelivered(o)) return;
+      out.push(Object.assign({ _restId: restId, _orderId: orderId, _restName: rest.restaurantName || rest.name || '' }, o));
+    });
+  }));
+  return out;
+}
+
+async function loadEarnTotals() {
+  if (earnAllCache || earnAllLoading) return;
+  earnAllLoading = true;
+  showToast('Loading earnings…');
+  try {
+    await ensureEarnRidesAll();
+    earnAllCache = await fetchMyDeliveriesRange(0, Date.now() + EARN_DAY_MS);
+  } catch (e) {
+    showToast("Couldn't load — check your connection and try again.");
+  }
+  earnAllLoading = false;
+  refreshEarnings();
+}
+
 function renderEarningsScreen(rides, deliveries) {
-  const items = [
-    ...rides.map(r => ({ t: r.createdAt || 0, amt: r.fare || 0 })),
-    ...deliveries.map(o => ({ t: o.createdAt || 0, amt: deliveryPayout(o) })),
-  ];
-  const dayStart = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); };
-  const today0 = dayStart(Date.now());
-  const DAY = 86400000;
+  const allD = earnAllDeliveries(deliveries);
+  const toItem = (t, amt) => ({ t: t || 0, amt: amt });
+  const rideItems = rides.map(r => toItem(r.createdAt, r.fare || 0));
+  const liveItems = deliveries.map(o => toItem(o.createdAt, deliveryPayout(o)));
+  const today0 = earnDayStart(Date.now());
   const sum = (arr) => arr.reduce((a, i) => a + i.amt, 0);
-  const todayItems = items.filter(i => i.t >= today0);
-  const weekItems = items.filter(i => i.t >= today0 - 6 * DAY);
+  const inDay = (arr, from) => arr.filter(i => i.t >= from && i.t < from + EARN_DAY_MS);
+  const todayItems = rideItems.concat(liveItems).filter(i => i.t >= today0);
   document.getElementById('ep-today').textContent = '₹' + money(sum(todayItems));
   document.getElementById('ep-today-trips').textContent = todayItems.length + (todayItems.length === 1 ? ' trip' : ' trips');
-  document.getElementById('ep-week').textContent = '₹' + money(sum(weekItems));
-  document.getElementById('ep-total').textContent = '₹' + money(sum(items));
+
+  let allItems = null;
+  if (allD) {
+    allItems = rideItems.concat(allD.map(o => toItem(o.createdAt, deliveryPayout(o))));
+    document.getElementById('ep-week').textContent = '₹' + money(sum(allItems.filter(i => i.t >= today0 - 6 * EARN_DAY_MS)));
+    document.getElementById('ep-total').textContent = '₹' + money(sum(allItems));
+  } else {
+    document.getElementById('ep-week').textContent = '₹—';
+    document.getElementById('ep-total').textContent = '₹—';
+  }
+  document.getElementById('ep-load-hint').style.display = allD ? 'none' : 'block';
+
   const list = document.getElementById('ep-days');
   let html = '';
-  for (let k = 0; k < 7; k++) {
-    const from = today0 - k * DAY;
-    const dayItems = items.filter(i => i.t >= from && i.t < from + DAY);
-    const label = k === 0 ? 'Today' : k === 1 ? 'Yesterday' : new Date(from).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
-    html += '<div class="day-row"><div><p class="d">' + label + '</p><p class="t">' + dayItems.length + (dayItems.length === 1 ? ' trip' : ' trips') + '</p></div><p class="a">₹' + money(sum(dayItems)) + '</p></div>';
+  for (let k = 0; k < EARN_DAY_ROWS; k++) {
+    const from = today0 - k * EARN_DAY_MS;
+    let dayItems = null;
+    if (k === 0) dayItems = todayItems;
+    else if (allItems) dayItems = inDay(allItems, from);
+    else if (earnDayCache[from]) dayItems = inDay(rideItems.concat(earnDayCache[from].map(o => toItem(o.createdAt, deliveryPayout(o)))), from);
+    html += '<div class="day-row tap" data-from="' + from + '"><div><p class="d">' + earnDayLabel(from) + '</p><p class="t">' +
+      (dayItems ? dayItems.length + (dayItems.length === 1 ? ' trip' : ' trips') : 'Tap to view') +
+      '</p></div><p class="a">' + (dayItems ? '₹' + money(sum(dayItems)) : '›') + '</p></div>';
   }
   list.innerHTML = html;
 }
+
+// ---- One day, full screen: loads only that date when tapped ----
+function renderEarnDay(from, deliveries) {
+  const rides = allMyCompletedRides().filter(r => (r.createdAt || 0) >= from && (r.createdAt || 0) < from + EARN_DAY_MS);
+  const rows = [
+    ...rides.map(r => ({ t: r.createdAt || 0, amt: r.fare || 0, html:
+      '<div class="order-top"><p class="order-num">' + (VEHICLE_LABEL[r.vehicleType] || 'Ride') + ' · ' + escapeHtml(r.distanceKm || 0) + ' km</p><p class="order-time">' + earnTimeStr(r.createdAt) + '</p></div>' +
+      '<div class="order-mid"><p class="order-cust">' + escapeHtml(r.customerName || 'Rider') + '</p><p class="order-total">₹' + escapeHtml(r.fare || 0) + '</p></div>' +
+      '<div style="margin-top:8px;"><span class="pill pill-completed">completed</span></div>' })),
+    ...deliveries.map(o => ({ t: o.createdAt || 0, amt: deliveryPayout(o), html:
+      '<div class="order-top"><p class="order-num">' + escapeHtml(o._restName || '') + (o.orderNumber ? ' · #' + escapeHtml(o.orderNumber) : '') + '</p><p class="order-time">' + earnTimeStr(o.createdAt) + '</p></div>' +
+      '<div class="order-mid"><p class="order-cust">' + escapeHtml(o.customerName || 'Customer') + '</p><p class="order-total">₹' + deliveryPayout(o) + '</p></div>' +
+      '<div style="margin-top:8px;"><span class="pill pill-completed">delivered</span></div>' })),
+  ].sort((a, b) => b.t - a.t);
+  const total = rows.reduce((a, r) => a + r.amt, 0);
+  document.getElementById('earn-day-total').textContent = '₹' + money(total);
+  document.getElementById('earn-day-trips').textContent = rows.length + (rows.length === 1 ? ' trip' : ' trips');
+  const el = document.getElementById('earn-day-list');
+  el.innerHTML = rows.length
+    ? rows.map(r => '<div class="order-chit" style="cursor:default;">' + r.html + '</div>').join('')
+    : '<p class="earn-day-empty">No trips on this day.</p>';
+}
+function earnTimeStr(t) {
+  return t ? new Date(t).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+async function openEarnDay(from) {
+  earnDayOpenFrom = from;
+  document.getElementById('earn-day-title').textContent = earnDayLabel(from);
+  document.getElementById('earn-day-total').textContent = '₹—';
+  document.getElementById('earn-day-trips').textContent = '';
+  const el = document.getElementById('earn-day-list');
+  el.innerHTML = '<p class="earn-day-empty">Loading…</p>';
+  showScreen('earn-day');
+
+  const to = from + EARN_DAY_MS - 1;
+  const inRange = o => (o.createdAt || 0) >= from && (o.createdAt || 0) <= to;
+  const live = deliveriesCache.filter(o => o.deliveryDriverId === state.username && o.status === 'delivered' && inRange(o));
+  let deliveries;
+  try {
+    if (from === earnDayStart(Date.now())) deliveries = live;
+    else if (earnAllCache) deliveries = earnAllCache.filter(inRange);
+    else if (earnDayCache[from]) deliveries = earnDayCache[from];
+    else if (earnSavedHydrate(from)) deliveries = earnDayCache[from];
+    else {
+      await ensureEarnRidesDay(from);
+      deliveries = await fetchMyDeliveriesRange(from, to);
+      earnDayCache[from] = deliveries;
+      earnSavedSave(from, deliveries, allMyCompletedRides().filter(r => (r.createdAt || 0) >= from && (r.createdAt || 0) <= to));
+    }
+  } catch (e) {
+    if (earnDayOpenFrom !== from) return;
+    el.innerHTML = '<p class="earn-day-empty">Couldn\'t load this day.</p><button class="btn-outline" id="earn-day-retry" type="button" style="width:100%;">Try again</button>';
+    document.getElementById('earn-day-retry').addEventListener('click', () => openEarnDay(from));
+    return;
+  }
+  if (earnDayOpenFrom !== from) return;   // the driver already went back / opened another date
+  renderEarnDay(from, deliveries);
+  try { refreshEarnings(); } catch (e) {}  // the date row on the Earnings list now shows its amount
+}
+function closeEarnDay() {
+  earnDayOpenFrom = null;
+  showScreen('earnings');
+}
+
+document.getElementById('ep-days').addEventListener('click', (e) => {
+  const row = e.target.closest('.day-row');
+  if (row && row.dataset.from) openEarnDay(Number(row.dataset.from));
+});
+document.getElementById('ep-week-card').addEventListener('click', loadEarnTotals);
+document.getElementById('ep-total-card').addEventListener('click', loadEarnTotals);
+document.getElementById('earn-day-back-btn').addEventListener('click', closeEarnDay);
+
+// Phone's own back button: from a day screen go back to Earnings; anywhere else keep the default behaviour.
+(function () {
+  try {
+    const CapApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+    if (!CapApp || !CapApp.addListener) return;
+    CapApp.addListener('backButton', (ev) => {
+      const dayScreen = document.getElementById('screen-earn-day');
+      if (dayScreen && dayScreen.classList.contains('active')) { closeEarnDay(); return; }
+      if (ev && ev.canGoBack) window.history.back(); else if (CapApp.exitApp) CapApp.exitApp();
+    });
+  } catch (e) { console.warn('backButton:', e); }
+})();
 
 // ---------- Optional operator config: help number + per-order incentive banner ----------
 // Reads /driver_config { supportPhone, incentiveAmount, incentiveText } if the
@@ -3863,10 +5256,12 @@ function logInDriver(username, data) {
 
   if (!state.listenersAttached) {
     state.listenersAttached = true;
+    listenServerTimeOffset();
     listenRides();
     listenDeliveryJobs();
     listenDrivers();
     listenDriverDue();
+    listenDriverDueAgg();
     listenDriverRatings();
     checkAndShowAppVideo('driverAppVideo', 'nesh_driver_video_seen');
   }
@@ -4113,6 +5508,46 @@ function normalizeRideStatus(raw) {
   return 'searching';
 }
 
+// ---------- Per-day ride index (so the app can load ONLY today's rides, and one date's rides on tap) ----------
+// driver_days/{driverId}/{yyyy-mm-dd}/{rideId} = true. Written when this driver accepts a ride. A day's node is tiny
+// (just ride ids), so "today" = read one small node + fetch those few rides; a date tapped on the Earnings screen = the same
+// for that date. No database rule/index is needed - these are plain paths - only permission to write driver_days.
+function rideDayKey(t) {
+  const d = new Date(t || 0);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+async function fetchRidesOfDay(dayKey) {
+  const { db, ref, get } = window.fb;
+  const idsSnap = await get(ref(db, 'driver_days/' + state.username + '/' + dayKey));
+  const ids = Object.keys(idsSnap.val() || {});
+  const out = {};
+  await Promise.all(ids.map(async id => {
+    const sn = await get(ref(db, 'rides/' + id));
+    if (sn.exists()) out[id] = sn.val();
+  }));
+  return out;
+}
+// Builds the index from a full set of this driver's rides (done once, then re-checked together with the weekly due check).
+// "ridesIndexed" is only set after the index was written successfully - if the write is refused, the app keeps the
+// old (heavier but correct) loading instead of silently hiding rides.
+async function buildRidesIndex(ridesObj) {
+  try {
+    const { db, ref, update, set } = window.fb;
+    const upd = {};
+    Object.keys(ridesObj || {}).forEach(id => {
+      const r = ridesObj[id] || {};
+      if (r.driverId === state.username) upd['driver_days/' + state.username + '/' + rideDayKey(r.createdAt) + '/' + id] = true;
+    });
+    const keys = Object.keys(upd);
+    for (let i = 0; i < keys.length; i += 400) {
+      const chunk = {};
+      keys.slice(i, i + 400).forEach(k => { chunk[k] = true; });
+      await update(ref(db), chunk);
+    }
+    await set(ref(db, 'taxi_drivers/' + state.username + '/ridesIndexed'), true);
+  } catch (e) { console.warn('rides index:', e); }
+}
+
 // Everything this app does with rides only ever needs two things: rides that
 // are still open for pickup (status === 'searching') and this driver's own
 // rides (history, earnings/due, current trip). So instead of every driver's
@@ -4123,13 +5558,14 @@ function normalizeRideStatus(raw) {
 // just can't save anything. If either query is rejected for any reason, we
 // fall back to the original whole-node listener so the app never breaks.
 function listenRides() {
-  const { db, ref, onValue, query, orderByChild, equalTo } = window.fb;
+  const { db, ref, onValue, get, query, orderByChild, equalTo, limitToLast } = window.fb;
   if (typeof query !== 'function' || !state.username) { listenRidesAll(); return; }
   let searchingVal = {}, mineVal = {};
   let fellBack = false;
   const fallback = (e) => {
     if (fellBack) return;
     fellBack = true;
+    ridesWindowed = false;
     console.warn('Filtered rides listener failed, using full listener:', e);
     listenRidesAll();
   };
@@ -4143,21 +5579,52 @@ function listenRides() {
       renderRideDetail(state.selectedRideId, ridesCache[state.selectedRideId]);
     }
   };
+  // LIGHT mode: only today's + yesterday's rides (looked up through the per-day index, so just those few rides come
+  // down) plus the newest few rides live (current ride, anything not indexed yet). Older days load when tapped.
+  const startLight = () => {
+    ridesWindowed = true;
+    let newestAcc = {}, dayVal = {};
+    const merge = () => { mineVal = Object.assign({}, dayVal, newestAcc); apply(); };
+    onValue(query(ref(db, 'rides'), orderByChild('driverId'), equalTo(state.username), limitToLast(RIDES_NEWEST)), snap => {
+      newestAcc = Object.assign(newestAcc, snap.val() || {});
+      merge();
+    }, fallback);
+    Promise.all([rideDayKey(Date.now()), rideDayKey(Date.now() - 86400000)].map(fetchRidesOfDay)).then(parts => {
+      parts.forEach(part => Object.keys(part).forEach(id => { if (!newestAcc[id]) dayVal[id] = part[id]; }));
+      merge();
+    }).catch(() => {});
+  };
+  // HEAVY mode (first time, or the weekly re-check): the full history comes down once, rebuilds the due running total
+  // and the per-day index, then the next app open is light again.
+  const startHeavy = () => {
+    ridesWindowed = false;
+    let done = false;
+    onValue(query(ref(db, 'rides'), orderByChild('driverId'), equalTo(state.username)), snap => {
+      mineVal = snap.val() || {};
+      apply();
+      if (!done && !fellBack) { done = true; dueReconcileFromRides(mineVal); buildRidesIndex(mineVal); }
+    }, fallback);
+  };
   try {
     onValue(query(ref(db, 'rides'), orderByChild('status'), equalTo('searching')), snap => {
       searchingVal = snap.val() || {};
       apply();
     }, fallback);
-    onValue(query(ref(db, 'rides'), orderByChild('driverId'), equalTo(state.username)), snap => {
-      mineVal = snap.val() || {};
-      apply();
-    }, fallback);
+    Promise.all([
+      get(ref(db, 'taxi_drivers/' + state.username + '/dueAgg')),
+      get(ref(db, 'taxi_drivers/' + state.username + '/ridesIndexed')),
+    ]).then(([aggSnap, idxSnap]) => {
+      const a = aggSnap.val();
+      const fresh = a && typeof a.gross === 'number' && (Date.now() - (Number(a.checkedAt) || 0)) < DUE_RECHECK_MS;
+      if (fresh && idxSnap.val() === true) startLight(); else startHeavy();
+    }).catch(() => startHeavy());
   } catch (e) { fallback(e); }
 }
 
 // Original behaviour: listen to the entire 'rides' node. Kept only as a
 // safety net for listenRides() above.
 function listenRidesAll() {
+  ridesWindowed = false;
   const { db, ref, onValue } = window.fb;
   onValue(ref(db, 'rides'), snap => {
     const val = snap.val() || {};
@@ -4232,11 +5699,11 @@ function renderHomeLists() {
     card.innerHTML = `
       <div class="order-top">
         <p class="order-num">Current ride · ${VEHICLE_LABEL[current.vehicleType] || ''}</p>
-        <span class="pill pill-${status}">${status}</span>
+        <span class="pill pill-${escapeHtml(status)}">${escapeHtml(status)}</span>
       </div>
       <div class="order-mid">
-        <p class="order-cust">${current.customerName || 'Rider'}</p>
-        <p class="order-total">₹${current.fare || 0}</p>
+        <p class="order-cust">${escapeHtml(current.customerName || 'Rider')}</p>
+        <p class="order-total">₹${escapeHtml(current.fare || 0)}</p>
       </div>
     `;
     card.addEventListener('click', () => openRideDetail(current._id));
@@ -4246,6 +5713,7 @@ function renderHomeLists() {
   // Recent (completed/cancelled) rides for this driver, most recent first
   const past = all
     .filter(r => r.driverId === state.username && ['completed', 'cancelled'].includes(normalizeRideStatus(r.status)))
+    .filter(r => (r.createdAt || 0) >= Date.now() - 24 * 3600 * 1000)   // home shows the last 24 hours only; older days are on the Earnings screen
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     .slice(0, 30);
 
@@ -4259,14 +5727,14 @@ function renderHomeLists() {
     card.className = 'order-chit';
     card.innerHTML = `
       <div class="order-top">
-        <p class="order-num">${VEHICLE_LABEL[r.vehicleType] || ''} · ${(r.distanceKm || 0)} km</p>
+        <p class="order-num">${VEHICLE_LABEL[r.vehicleType] || ''} · ${escapeHtml(r.distanceKm || 0)} km</p>
         <p class="order-time">${timeAgo(r.createdAt)}</p>
       </div>
       <div class="order-mid">
-        <p class="order-cust">${r.customerName || 'Rider'}</p>
-        <p class="order-total">₹${r.fare || 0}</p>
+        <p class="order-cust">${escapeHtml(r.customerName || 'Rider')}</p>
+        <p class="order-total">₹${escapeHtml(r.fare || 0)}</p>
       </div>
-      <div style="margin-top:8px;"><span class="pill pill-${status}">${status}</span></div>
+      <div style="margin-top:8px;"><span class="pill pill-${escapeHtml(status)}">${escapeHtml(status)}</span></div>
     `;
     card.addEventListener('click', () => openRideDetail(r._id));
     listEl.appendChild(card);
@@ -4301,7 +5769,7 @@ function renderHomeLists() {
   currentDeliveries.forEach(currentDelivery => {
     const st = currentDelivery.status;
     const pillLabel = st === 'picked_up' ? 'picked up' : st === 'ready' ? 'ready for pickup' : 'shop preparing';
-    const items = (currentDelivery.items || []).map(it => `${it.qty}x ${it.name}`).join(', ');
+    const items = (currentDelivery.items || []).map(it => `${escapeHtml(it.qty)}x ${escapeHtml(it.name)}`).join(', ');
     const card = document.createElement('div');
     card.className = 'order-chit';
     card.style.margin = '16px 24px 0';
@@ -4309,9 +5777,9 @@ function renderHomeLists() {
     // Ready → driver picks it up from the shop; Picked up → driver hands it
     // to the customer and marks delivered. Preparing → nothing to do yet.
     const actionHtml = st === 'ready'
-      ? `<button class="btn-primary" style="margin-top:12px; width:100%;" data-pickup="${currentDelivery._restId}::${currentDelivery._orderId}">Picked up</button>`
+      ? `<button class="btn-primary" style="margin-top:12px; width:100%;" data-pickup="${escapeHtml(currentDelivery._restId)}::${escapeHtml(currentDelivery._orderId)}">Picked up</button>`
       : st === 'picked_up'
-      ? `<button class="btn-primary" style="margin-top:12px; width:100%;" data-mark-delivered="${currentDelivery._restId}::${currentDelivery._orderId}">Mark as delivered</button>`
+      ? `<button class="btn-primary" style="margin-top:12px; width:100%;" data-mark-delivered="${escapeHtml(currentDelivery._restId)}::${escapeHtml(currentDelivery._orderId)}">Mark as delivered</button>`
       : `<p class="hint-text" style="margin-top:10px;">Head to the shop — "Picked up" unlocks once they mark it ready.</p>`;
     // "Collect from customer" is always the full COD total — order amount +
     // delivery charge + platform fee — same for every shop type. (The
@@ -4335,13 +5803,13 @@ function renderHomeLists() {
         <p class="order-num">${escapeHtml(currentDelivery.customerName || 'Customer')}</p>
         <span class="pill pill-accepted">${pillLabel}</span>
       </div>
-      <p class="order-time" style="margin-top:2px;">${currentDelivery.orderNumber ? '#' + currentDelivery.orderNumber : ''}${currentDelivery._restName ? ' · ' + escapeHtml(currentDelivery._restName) : ''}</p>
+      <p class="order-time" style="margin-top:2px;">${currentDelivery.orderNumber ? '#' + escapeHtml(currentDelivery.orderNumber) : ''}${currentDelivery._restName ? ' · ' + escapeHtml(currentDelivery._restName) : ''}</p>
       <div class="order-mid" style="justify-content:flex-end;">
         <p class="order-total">₹${deliveryPayout(currentDelivery)}</p>
       </div>
       ${currentDelivery.rainSurgeDriver > 0 ? `<p style="margin:4px 0 0; text-align:right; font-size:12px; font-weight:700; color:var(--muted);">🌧️ includes ₹${currentDelivery.rainSurgeDriver} rain bonus</p>` : ''}
       ${currentDelivery.tip > 0 ? `<p style="margin:4px 0 0; text-align:right; font-size:12px; font-weight:700; color:#0E8A5C;">🙏 includes ₹${currentDelivery.tip} customer tip</p>` : ''}
-      ${collectAmount ? `<div class="order-popup-row order-popup-row-total"><span>Collect from customer</span><span>₹${collectAmount}</span></div>` : ''}
+      ${collectAmount ? `<div class="order-popup-row order-popup-row-total"><span>Collect from customer</span><span>₹${escapeHtml(collectAmount)}</span></div>` : ''}
       ${giveShopAmount != null ? `<div class="order-popup-row"><span>Give to shop</span><span>₹${giveShopAmount}</span></div>` : ''}
       <p style="margin:8px 0 0; color:var(--muted); font-size:13px;">${items || ''}</p>
       <div style="margin-top:8px;">${deliveryLocationsHtml(currentDelivery)}</div>
@@ -4362,23 +5830,25 @@ function renderHomeLists() {
 
   const pastDeliveries = myDeliveries
     .filter(o => o.status === 'delivered')
+    .filter(o => (o.createdAt || 0) >= Date.now() - DELIVERY_WINDOW_MS)
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     .slice(0, 30);
 
   const dListEl = document.getElementById('home-deliveries-list');
   const dEmptyEl = document.getElementById('home-deliveries-empty-text');
   dListEl.innerHTML = '';
+  dEmptyEl.textContent = deliveriesReady ? 'No deliveries in the last 24 hours. Older days are under Earnings.' : 'Loading…';
   dEmptyEl.style.display = pastDeliveries.length ? 'none' : 'block';
   pastDeliveries.forEach(o => {
     const card = document.createElement('div');
     card.className = 'order-chit';
     card.innerHTML = `
       <div class="order-top">
-        <p class="order-num">${o._restName || ''}${o.orderNumber ? ' · #' + o.orderNumber : ''}</p>
+        <p class="order-num">${escapeHtml(o._restName || '')}${o.orderNumber ? ' · #' + escapeHtml(o.orderNumber) : ''}</p>
         <p class="order-time">${timeAgo(o.createdAt)}</p>
       </div>
       <div class="order-mid">
-        <p class="order-cust">${o.customerName || 'Customer'}</p>
+        <p class="order-cust">${escapeHtml(o.customerName || 'Customer')}</p>
         <p class="order-total">₹${deliveryPayout(o)}</p>
       </div>
       <div style="margin-top:8px;"><span class="pill pill-completed">delivered</span></div>
@@ -4443,23 +5913,28 @@ async function markDeliveryDelivered(compositeId) {
 }
 
 function renderEarnings(all) {
-  const mine = all.filter(r => r.driverId === state.username && normalizeRideStatus(r.status) === 'completed');
+  const t0 = earnDayStart(Date.now());
+  for (let k = 2; k < EARN_DAY_ROWS; k++) earnSavedHydrate(t0 - k * EARN_DAY_MS);   // dates opened before (even in an earlier session) show their amount straight away
+  const mine = allMyCompletedRides();
   const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
   const rideTotal = mine.reduce((sum, r) => sum + (r.fare || 0), 0);
   const rideToday = mine.filter(r => (r.createdAt || 0) >= startOfDay.getTime()).reduce((sum, r) => sum + (r.fare || 0), 0);
 
-  // Shop/grocery deliveries: the delivery charge collected from the
-  // customer for each order this driver has completed (o.deliveryFee —
-  // same amount shown on the delivery job card and history list) counts
-  // toward this driver's earnings just like a completed ride's fare does.
-  const myDeliveries = deliveriesCache.filter(o => o.deliveryDriverId === state.username && o.status === 'delivered');
-  const deliveryTotal = myDeliveries.reduce((sum, o) => sum + deliveryPayout(o), 0);
-  const deliveryToday = myDeliveries.filter(o => (o.createdAt || 0) >= startOfDay.getTime()).reduce((sum, o) => sum + deliveryPayout(o), 0);
+  // Deliveries kept live are only the last 24 hours, which always covers "today".
+  // All-time numbers need the older ones, fetched on demand (see loadEarnTotals).
+  const myLive = deliveriesCache.filter(o => o.deliveryDriverId === state.username && o.status === 'delivered');
+  const deliveryToday = myLive.filter(o => (o.createdAt || 0) >= startOfDay.getTime()).reduce((sum, o) => sum + deliveryPayout(o), 0);
+  const allD = earnAllDeliveries(myLive);
 
   document.getElementById('earn-today').textContent = '₹' + money(rideToday + deliveryToday);
-  document.getElementById('earn-total').textContent = '₹' + money(rideTotal + deliveryTotal);
-  document.getElementById('earn-trips').textContent = String(mine.length + myDeliveries.length);
-  try { renderEarningsScreen(mine, myDeliveries); } catch (e) { console.warn('earnings screen:', e); }
+  if (allD) {
+    document.getElementById('earn-total').textContent = '₹' + money(rideTotal + allD.reduce((sum, o) => sum + deliveryPayout(o), 0));
+    document.getElementById('earn-trips').textContent = String(mine.length + allD.length);
+  } else {
+    document.getElementById('earn-total').textContent = '₹—';
+    document.getElementById('earn-trips').textContent = '—';
+  }
+  try { renderEarningsScreen(mine, myLive); } catch (e) { console.warn('earnings screen:', e); }
 }
 
 function buildMapUrl(pos) {
@@ -4543,6 +6018,7 @@ async function updateRideStatus(rideId, newStatus) {
     const { db, ref, update } = window.fb;
     await update(ref(db, 'rides/' + rideId), { status: newStatus });
     showToast('Ride marked as ' + newStatus);
+    if (newStatus === 'completed') bumpDriverDue(rideId);   // adds this ride's platform fee to the due running total
     // Fire-and-forget: let the customer know via a real OS-level push,
     // for the two moments they most want to know about — driver reaching
     // the pickup point, and the trip wrapping up.
@@ -4707,12 +6183,18 @@ function init() {
 // already been handled. No-op outside the native (Capacitor) wrapped app.
 // ---------------------------------------------------------------------
 function clearDeliveredNotifications() {
+  window.__lastDriverActionAt = Date.now();
   try {
     if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications) {
       window.Capacitor.Plugins.PushNotifications.removeAllDeliveredNotifications().catch(() => {});
     }
     if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RingControl) {
       window.Capacitor.Plugins.RingControl.stopRinging().catch(() => {});
+      // If the app is showing over the lock screen (opened by a ride alert), now ask the driver to
+      // unlock — the app stays open and is simply there once they do. No-op when already unlocked.
+      if (window.Capacitor.Plugins.RingControl.requireUnlock) {
+        Promise.resolve(window.Capacitor.Plugins.RingControl.requireUnlock()).catch(() => {});
+      }
     }
   } catch (e) {}
 }
