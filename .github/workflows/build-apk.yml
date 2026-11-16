@@ -30,6 +30,28 @@ name: Build Combined APK (Driver + Partner)
 # com.yourcompany.restaurantpartner) will NOT work here.
 on:
   workflow_dispatch:
+    inputs:
+      force_driver_update:
+        description: 'Force the DRIVER app to update (blocks Driver until updated).'
+        type: boolean
+        default: false
+      force_partner_update:
+        description: 'Force the PARTNER app to update (blocks Partner until updated).'
+        type: boolean
+        default: false
+      update_for:
+        description: 'Which app should get this update prompt?'
+        type: choice
+        options:
+          - all
+          - driver
+          - partner
+        default: all
+  # A normal push can't show a checkbox, so for pushes put [force-partner]
+  # anywhere in the commit message to force the Partner app update for that build.
+  # Likewise [driver-only] or [partner-only] in the commit message sends the update
+  # prompt to just that app (default: both apps). [force-driver] forces the Driver
+  # app update the same way [force-partner] forces the Partner one.
   push:
     branches: [main]
 
@@ -273,6 +295,14 @@ jobs:
                   </intent-filter>
               </service>
               <service android:name=".RingingService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
+              <activity android:name=".RideAlertActivity"
+                  android:exported="false"
+                  android:launchMode="singleTask"
+                  android:taskAffinity=""
+                  android:excludeFromRecents="true"
+                  android:showWhenLocked="true"
+                  android:turnScreenOn="true"
+                  android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
               <activity android:name=".RingingActivity"
                   android:exported="false"
                   android:launchMode="singleInstance"
@@ -374,6 +404,23 @@ jobs:
           PYEOF
           fi
 
+          # Foreground service (type location) that uploads the driver's position natively - see
+          # NativeLocationService.java. stopWithTask="false" so it survives a swipe from Recents.
+          if ! grep -q "NativeLocationService" "$MANIFEST"; then
+            python3 - "$MANIFEST" << 'PYEOF'
+          import sys
+          path = sys.argv[1]
+          with open(path) as f:
+              content = f.read()
+          injection = '''
+              <service android:name=".NativeLocationService" android:exported="false" android:foregroundServiceType="location" android:stopWithTask="false" />
+          </application>'''
+          content = content.replace('</application>', injection, 1)
+          with open(path, 'w') as f:
+              f.write(content)
+          PYEOF
+          fi
+
       - name: Generate app icon from resources/icon.png
         run: |
           npm install -D @capacitor/assets --legacy-peer-deps
@@ -451,7 +498,12 @@ jobs:
           cat > "$PKG_PATH/DriverTrackingPlugin.java" << 'EOF'
           package com.yourcompany.neshapp;
 
+          import android.content.Context;
           import android.content.SharedPreferences;
+          import android.location.LocationManager;
+          import android.os.Build;
+          import android.provider.Settings;
+          import com.getcapacitor.JSObject;
           import androidx.work.ExistingPeriodicWorkPolicy;
           import androidx.work.PeriodicWorkRequest;
           import androidx.work.WorkManager;
@@ -460,6 +512,8 @@ jobs:
           import com.getcapacitor.PluginMethod;
           import com.getcapacitor.annotation.CapacitorPlugin;
           import java.util.concurrent.TimeUnit;
+          import android.content.Intent;
+          import androidx.core.content.ContextCompat;
 
           // JS usage (see driver.html):
           //   window.Capacitor.Plugins.DriverTrackingPlugin.setOnlineState({ online: true/false })
@@ -469,15 +523,40 @@ jobs:
               public static final String PREFS_NAME = "nesh_driver_tracking";
               public static final String KEY_ONLINE = "should_be_online";
               public static final String KEY_HEARTBEAT = "last_heartbeat_ms";
+              public static final String KEY_USERNAME = "driver_username";
+              // Driver profile copy for the native (WebView-free) accept in RideAlertActivity.
+              public static final String KEY_DRIVER_NAME = "driver_name";
+              public static final String KEY_DRIVER_PHONE = "driver_phone";
+              public static final String KEY_DRIVER_VEHICLE = "driver_vehicle_number";
+              // Last time NativeLocationService itself uploaded a fix (while the web app was gone).
+              public static final String KEY_NATIVE_UPLOAD = "last_native_upload_ms";
               private static final String HEALTH_CHECK_WORK_NAME = "nesh_location_health_check";
 
               @PluginMethod
               public void setOnlineState(PluginCall call) {
                   boolean online = call.getBoolean("online", false);
+                  String username = call.getString("username", "");
                   SharedPreferences prefs = getContext().getSharedPreferences(PREFS_NAME, 0 /* MODE_PRIVATE */);
                   SharedPreferences.Editor editor = prefs.edit().putBoolean(KEY_ONLINE, online);
                   if (online) editor.putLong(KEY_HEARTBEAT, System.currentTimeMillis());
+                  if (username != null && !username.isEmpty()) editor.putString(KEY_USERNAME, username);
                   editor.apply();
+
+                  // Native location uploader: keeps taxi_drivers/{id}/location fresh in Firebase after the app is swiped
+                  // away (the WebView - and with it driver.html's own Firebase writes - is destroyed then).
+                  // Started here, while the app is on screen, because Android only allows starting a foreground
+                  // service from the foreground.
+                  try {
+                      Intent locationService = new Intent(getContext(), NativeLocationService.class);
+                      String savedUser = prefs.getString(KEY_USERNAME, "");
+                      if (online && savedUser != null && !savedUser.isEmpty()) {
+                          ContextCompat.startForegroundService(getContext(), locationService);
+                      } else {
+                          getContext().stopService(locationService);
+                      }
+                  } catch (Exception e) {
+                      // never let the uploader break the normal go-online / go-offline flow
+                  }
 
                   WorkManager workManager = WorkManager.getInstance(getContext());
                   if (online) {
@@ -500,11 +579,366 @@ jobs:
               }
 
               @PluginMethod
+              public void saveDriverProfile(PluginCall call) {
+                  String username = call.getString("username", "");
+                  String name = call.getString("name", "");
+                  if (username == null || username.isEmpty() || name == null || name.isEmpty()) { call.resolve(); return; }
+                  getContext().getSharedPreferences(PREFS_NAME, 0).edit()
+                      .putString(KEY_USERNAME, username)
+                      .putString(KEY_DRIVER_NAME, name)
+                      .putString(KEY_DRIVER_PHONE, call.getString("phone", ""))
+                      .putString(KEY_DRIVER_VEHICLE, call.getString("vehicleNumber", ""))
+                      .apply();
+                  call.resolve();
+              }
+
+              @PluginMethod
               public void recordHeartbeat(PluginCall call) {
                   getContext().getSharedPreferences(PREFS_NAME, 0)
                       .edit().putLong(KEY_HEARTBEAT, System.currentTimeMillis()).apply();
                   call.resolve();
               }
+
+              // true = the phone's location service (GPS/network) is switched on. driver.html shows a
+              // "GPS is off" banner when this says false while the driver is online.
+              @PluginMethod
+              public void isLocationEnabled(PluginCall call) {
+                  boolean enabled = true;
+                  try {
+                      LocationManager lm = (LocationManager) getContext().getSystemService(Context.LOCATION_SERVICE);
+                      if (lm != null) {
+                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                              enabled = lm.isLocationEnabled();
+                          } else {
+                              enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
+                                  || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+                          }
+                      }
+                  } catch (Exception e) {
+                      enabled = true;   // can't tell -> don't show a false warning
+                  }
+                  JSObject ret = new JSObject();
+                  ret.put("enabled", enabled);
+                  call.resolve(ret);
+              }
+
+              // Opens the system Location settings screen (for the "Turn on GPS" button).
+              @PluginMethod
+              public void openLocationSettings(PluginCall call) {
+                  try {
+                      Intent i = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                      getContext().startActivity(i);
+                  } catch (Exception ignored) { }
+                  call.resolve();
+              }
+          }
+          EOF
+
+          # Uploads this driver's location to Firebase from NATIVE code, so it keeps working after the app is
+          # swiped away from Recents (see the comment at the top of the class for the full reason).
+          cat > "$PKG_PATH/NativeLocationService.java" << 'EOF'
+          package com.yourcompany.neshapp;
+
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.app.Service;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.content.pm.ServiceInfo;
+          import android.location.Location;
+          import android.location.LocationListener;
+          import android.location.LocationManager;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.IBinder;
+          import android.os.Looper;
+          import androidx.annotation.Nullable;
+          import androidx.core.app.NotificationCompat;
+          import java.io.ByteArrayOutputStream;
+          import java.io.InputStream;
+          import java.io.OutputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.net.URLEncoder;
+          import java.util.Locale;
+          import java.util.concurrent.ExecutorService;
+          import java.util.concurrent.Executors;
+
+          // Keeps taxi_drivers/{id}/location fresh in Firebase EVEN AFTER THE APP IS SWIPED AWAY.
+          //
+          // Why this exists: @capgo/background-geolocation's own service keeps running after a swipe
+          // (stopWithTask=false), but it hands every fix to JavaScript, and the JS that writes to Firebase
+          // (handleDriverLocationFix + the 60s heartbeat in driver.html) lives in the WebView, which Android
+          // destroys together with the Activity. So the GPS kept running and nothing was uploaded.
+          //
+          // This service does its own GPS + a plain HTTPS write to the Realtime Database REST API (same node and
+          // same fields the JS writes), with no WebView involved. It only uploads while the web app is NOT
+          // doing it (Activity not visible AND no JS heartbeat for 90s), so there are no duplicate writes.
+          // Started/stopped from DriverTrackingPlugin.setOnlineState().
+          public class NativeLocationService extends Service implements LocationListener {
+              private static final String CHANNEL_ID = "nesh_native_location";
+              private static final int NOTIFICATION_ID = 9102;
+              private static final String DB_URL = "https://texi-and-food-default-rtdb.firebaseio.com";
+              private static final long TICK_MS = 30 * 1000L;
+              private static final long JS_ALIVE_MS = 90 * 1000L;          // JS wrote a heartbeat this recently -> it owns the upload (JS beats every 60s; 90s leaves room for a throttled background timer)
+              private static final long MIN_UPLOAD_GAP_MS = 10 * 1000L;    // same throttle as driver.html
+              private static final long HEARTBEAT_MS = 55 * 1000L;         // re-write last fix when parked (driver.html does 60s)
+              private static final long ONLINE_CHECK_MS = 3 * 60 * 1000L;  // safety: stop if Firebase says the driver is offline
+
+              private final Handler handler = new Handler(Looper.getMainLooper());
+              private final ExecutorService executor = Executors.newSingleThreadExecutor();
+              private boolean hasFix = false;
+              private double lastLat = 0;
+              private double lastLng = 0;
+              private long lastGpsAt = 0;
+              private long lastUploadAt = 0;
+              private long lastOnlineCheckAt = 0;
+
+              private final Runnable ticker = new Runnable() {
+                  @Override
+                  public void run() {
+                      long now = System.currentTimeMillis();
+                      if (now - lastUploadAt >= HEARTBEAT_MS) maybeUpload(true);
+                      if (now - lastOnlineCheckAt >= ONLINE_CHECK_MS) {
+                          lastOnlineCheckAt = now;
+                          checkStillOnline();
+                      }
+                      handler.postDelayed(this, TICK_MS);
+                  }
+              };
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  SharedPreferences prefs = getSharedPreferences(DriverTrackingPlugin.PREFS_NAME, 0);
+                  String user = prefs.getString(DriverTrackingPlugin.KEY_USERNAME, "");
+                  boolean online = prefs.getBoolean(DriverTrackingPlugin.KEY_ONLINE, false);
+                  if (!online || user == null || user.isEmpty()) {
+                      stopSelf();
+                      return START_NOT_STICKY;
+                  }
+                  try {
+                      startInForeground();
+                  } catch (Exception e) {
+                      // e.g. Android refused a foreground start from the background - give up quietly
+                      stopSelf();
+                      return START_NOT_STICKY;
+                  }
+                  lastOnlineCheckAt = System.currentTimeMillis();   // first Firebase online-check in 3 min, not immediately
+                  startLocationUpdates();
+                  handler.removeCallbacks(ticker);
+                  handler.postDelayed(ticker, TICK_MS);
+                  return START_STICKY;
+              }
+
+              private void startInForeground() {
+                  NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && manager != null) {
+                      NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Live location", NotificationManager.IMPORTANCE_LOW);
+                      channel.setShowBadge(false);
+                      manager.createNotificationChannel(channel);
+                  }
+                  Intent open = new Intent(this, MainActivity.class);
+                  open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                  int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) piFlags |= PendingIntent.FLAG_IMMUTABLE;
+                  PendingIntent pi = PendingIntent.getActivity(this, 0, open, piFlags);
+                  Notification n = new NotificationCompat.Builder(this, CHANNEL_ID)
+                      .setContentTitle("NESH Driver - Online")
+                      .setContentText("Your location stays live so you keep receiving orders.")
+                      .setSmallIcon(getApplicationInfo().icon)
+                      .setOngoing(true)
+                      .setPriority(NotificationCompat.PRIORITY_LOW)
+                      .setContentIntent(pi)
+                      .build();
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                      startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+                  } else {
+                      startForeground(NOTIFICATION_ID, n);
+                  }
+              }
+
+              private void startLocationUpdates() {
+                  LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                  if (lm == null) return;
+                  try { lm.removeUpdates(this); } catch (Exception ignored) { }
+                  try {
+                      if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                          lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000L, 15f, this, Looper.getMainLooper());
+                      }
+                  } catch (Exception ignored) { }
+                  try {
+                      if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                          lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 20000L, 50f, this, Looper.getMainLooper());
+                      }
+                  } catch (Exception ignored) { }
+                  // Seed with the last known position so a parked driver is uploaded right away.
+                  if (!hasFix) {
+                      try {
+                          Location seed = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                          if (seed == null) seed = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                          if (seed != null) {
+                              lastLat = seed.getLatitude();
+                              lastLng = seed.getLongitude();
+                              hasFix = true;
+                          }
+                      } catch (Exception ignored) { }
+                  }
+              }
+
+              @Override
+              public void onLocationChanged(Location loc) {
+                  if (loc == null) return;
+                  boolean isGps = LocationManager.GPS_PROVIDER.equals(loc.getProvider());
+                  long now = System.currentTimeMillis();
+                  if (!isGps && now - lastGpsAt < 60 * 1000L) return;   // prefer GPS while it is delivering
+                  if (isGps) lastGpsAt = now;
+                  lastLat = loc.getLatitude();
+                  lastLng = loc.getLongitude();
+                  hasFix = true;
+                  maybeUpload(false);
+              }
+
+              private void maybeUpload(boolean force) {
+                  if (!hasFix) return;
+                  SharedPreferences prefs = getSharedPreferences(DriverTrackingPlugin.PREFS_NAME, 0);
+                  if (!prefs.getBoolean(DriverTrackingPlugin.KEY_ONLINE, false)) {
+                      stopSelf();
+                      return;
+                  }
+                  long now = System.currentTimeMillis();
+                  // Phone's location switch is OFF: the last fix is not trustworthy, don't keep re-stamping it as fresh.
+                  if (!isLocationOn()) return;
+                  // The web app is alive and writing (screen on, or backgrounded with its WebView still running): stay out of the way.
+                  if (AppState.isForeground || now - prefs.getLong(DriverTrackingPlugin.KEY_HEARTBEAT, 0) < JS_ALIVE_MS) return;
+                  if (!force && now - lastUploadAt < MIN_UPLOAD_GAP_MS) return;
+                  final String user = prefs.getString(DriverTrackingPlugin.KEY_USERNAME, "");
+                  if (user == null || user.isEmpty()) return;
+                  lastUploadAt = now;
+                  final double lat = lastLat;
+                  final double lng = lastLng;
+                  final long ts = now;
+                  executor.execute(new Runnable() {
+                      @Override
+                      public void run() { putLocation(user, lat, lng, ts); }
+                  });
+              }
+
+              private boolean isLocationOn() {
+                  try {
+                      LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                      if (lm == null) return true;
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) return lm.isLocationEnabled();
+                      return lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+                  } catch (Exception e) {
+                      return true;   // can't tell -> behave as before
+                  }
+              }
+
+              private void putLocation(String user, double lat, double lng, long ts) {
+                  HttpURLConnection c = null;
+                  try {
+                      c = open(DB_URL + "/taxi_drivers/" + enc(user) + "/location.json", "PUT");
+                      c.setDoOutput(true);
+                      c.setRequestProperty("Content-Type", "application/json");
+                      byte[] body = String.format(Locale.US, "{\"lat\":%.7f,\"lng\":%.7f,\"updatedAt\":%d}", lat, lng, ts).getBytes("UTF-8");
+                      c.setFixedLengthStreamingMode(body.length);
+                      OutputStream os = c.getOutputStream();
+                      os.write(body);
+                      os.close();
+                      int code = c.getResponseCode();
+                      if (code >= 200 && code < 300) {
+                          getSharedPreferences(DriverTrackingPlugin.PREFS_NAME, 0)
+                              .edit().putLong(DriverTrackingPlugin.KEY_NATIVE_UPLOAD, ts).apply();
+                      }
+                  } catch (Exception ignored) {
+                      // no network right now - the next tick tries again
+                  } finally {
+                      if (c != null) c.disconnect();
+                  }
+              }
+
+              // If the driver went offline some other way (operator, another device) don't keep a ghost service alive.
+              private void checkStillOnline() {
+                  SharedPreferences prefs = getSharedPreferences(DriverTrackingPlugin.PREFS_NAME, 0);
+                  final String user = prefs.getString(DriverTrackingPlugin.KEY_USERNAME, "");
+                  if (user == null || user.isEmpty()) return;
+                  executor.execute(new Runnable() {
+                      @Override
+                      public void run() {
+                          HttpURLConnection c = null;
+                          try {
+                              c = open(DB_URL + "/taxi_drivers/" + enc(user) + "/isOnline.json", "GET");
+                              if (c.getResponseCode() == 200) {
+                                  String body = readAll(c.getInputStream()).trim();
+                                  if ("false".equals(body)) {
+                                      getSharedPreferences(DriverTrackingPlugin.PREFS_NAME, 0)
+                                          .edit().putBoolean(DriverTrackingPlugin.KEY_ONLINE, false).apply();
+                                      handler.post(new Runnable() {
+                                          @Override
+                                          public void run() { stopSelf(); }
+                                      });
+                                  }
+                              }
+                          } catch (Exception ignored) {
+                          } finally {
+                              if (c != null) c.disconnect();
+                          }
+                      }
+                  });
+              }
+
+              private HttpURLConnection open(String url, String method) throws Exception {
+                  HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                  c.setRequestMethod(method);
+                  c.setConnectTimeout(8000);
+                  c.setReadTimeout(8000);
+                  return c;
+              }
+
+              private static String enc(String s) {
+                  try { return URLEncoder.encode(s, "UTF-8"); } catch (Exception e) { return s; }
+              }
+
+              private static String readAll(InputStream in) throws Exception {
+                  ByteArrayOutputStream out = new ByteArrayOutputStream();
+                  byte[] buf = new byte[256];
+                  int n;
+                  while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                  in.close();
+                  return out.toString("UTF-8");
+              }
+
+              @Override
+              public void onDestroy() {
+                  handler.removeCallbacks(ticker);
+                  try {
+                      LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                      if (lm != null) lm.removeUpdates(this);
+                  } catch (Exception ignored) { }
+                  executor.shutdown();
+                  super.onDestroy();
+              }
+
+              @Override
+              public void onProviderEnabled(String provider) {
+                  startLocationUpdates();
+              }
+
+              @Override
+              public void onProviderDisabled(String provider) { }
+
+              @Override
+              @SuppressWarnings("deprecation")
+              public void onStatusChanged(String provider, int status, Bundle extras) { }
+
+              @Nullable
+              @Override
+              public IBinder onBind(Intent intent) { return null; }
           }
           EOF
 
@@ -559,7 +993,7 @@ jobs:
                   boolean shouldBeOnline = prefs.getBoolean(DriverTrackingPlugin.KEY_ONLINE, false);
                   if (!shouldBeOnline) return Result.success();
 
-                  long lastHeartbeat = prefs.getLong(DriverTrackingPlugin.KEY_HEARTBEAT, 0);
+                  long lastHeartbeat = Math.max(prefs.getLong(DriverTrackingPlugin.KEY_HEARTBEAT, 0), prefs.getLong(DriverTrackingPlugin.KEY_NATIVE_UPLOAD, 0)); // native uploads count too
                   long age = System.currentTimeMillis() - lastHeartbeat;
                   if (age < STALE_THRESHOLD_MS) return Result.success(); // tracking is fine, nothing to do
 
@@ -687,13 +1121,95 @@ jobs:
                       manager.createNotificationChannel(pickupReadyChannel);
                   }
 
+                  applyLockScreenMode(getIntent());
                   handleIncomingIntent(getIntent());
+              }
+
+              // Launched from a ride/delivery alert (RingingService sets "lockscreen"):
+              // show this Activity ON TOP of the lock screen and wake the screen, so the
+              // driver sees the ride popup and can accept/reject without unlocking
+              // (Uber-style). A normal launch from the icon turns it back off.
+              private final android.os.Handler lockHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+              private final Runnable lockRelease = new Runnable() {
+                  @Override public void run() { releaseOverLockScreen(); }
+              };
+
+              private void setOverLockScreen(boolean on) {
+                  if (Build.VERSION.SDK_INT >= 27) {
+                      setShowWhenLocked(on);
+                      setTurnScreenOn(on);
+                  } else {
+                      int f = android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON;
+                      if (on) getWindow().addFlags(f); else getWindow().clearFlags(f);
+                  }
+              }
+
+              public void releaseOverLockScreenFromJs() {
+                  runOnUiThread(new Runnable() { @Override public void run() { releaseOverLockScreen(); } });
+              }
+
+              // Stop showing over the lock screen. If the phone is still locked, push the app behind the
+              // lock screen so nobody can use it without unlocking.
+              private void releaseOverLockScreen() {
+                  try {
+                      android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+                      boolean locked = km != null && km.isKeyguardLocked();
+                      setOverLockScreen(false);
+                      if (locked) moveTaskToBack(true);
+                  } catch (Exception ignored) {}
+              }
+
+              private void applyLockScreenMode(Intent intent) {
+                  boolean on = intent != null && intent.getBooleanExtra("lockscreen", false);
+                  setOverLockScreen(on);
+                  // Safety net: if nobody accepts/rejects (ride timed out, cancelled, driver walked away),
+                  // don't leave the app open over the lock screen for more than 2 minutes.
+                  lockHandler.removeCallbacks(lockRelease);
+                  if (on) lockHandler.postDelayed(lockRelease, 120000L);
+              }
+
+              // Accept from the native popup: if the phone is locked, ask for the PIN / pattern / fingerprint
+              // right away (the accept itself runs in the page meanwhile), so the whole app is never usable
+              // over the lock screen. Shared with RingControlPlugin.requireUnlock via unlockInFlight.
+              public static volatile boolean unlockInFlight = false;
+              private boolean pendingUnlock = false;
+
+              private void runPendingUnlock() {
+                  if (!pendingUnlock) return;
+                  pendingUnlock = false;
+                  lockHandler.postDelayed(new Runnable() {
+                      @Override public void run() { startUnlock(); }
+                  }, 200L);
+              }
+
+              private void startUnlock() {
+                  if (Build.VERSION.SDK_INT < 27) return;
+                  try {
+                      android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+                      if (km == null || !km.isKeyguardLocked() || unlockInFlight) return;
+                      unlockInFlight = true;
+                      km.requestDismissKeyguard(this, new android.app.KeyguardManager.KeyguardDismissCallback() {
+                          @Override public void onDismissSucceeded() { unlockInFlight = false; setOverLockScreen(false); }
+                          @Override public void onDismissCancelled() { unlockInFlight = false; setOverLockScreen(false); }
+                          @Override public void onDismissError() { unlockInFlight = false; setOverLockScreen(false); }
+                      });
+                  } catch (Exception e) {
+                      unlockInFlight = false;
+                  }
+              }
+
+              @Override
+              public void onDestroy() {
+                  lockHandler.removeCallbacks(lockRelease);
+                  unlockInFlight = false;
+                  super.onDestroy();
               }
 
               @Override
               public void onNewIntent(Intent intent) {
                   super.onNewIntent(intent);
                   setIntent(intent);
+                  applyLockScreenMode(intent);
                   handleIncomingIntent(intent);
               }
 
@@ -701,6 +1217,7 @@ jobs:
               public void onResume() {
                   super.onResume();
                   AppState.isForeground = true;
+                  runPendingUnlock();
                   // NOTE: opening the app by itself does NOT stop
                   // RingingService any more — only an explicit accept/
                   // reject/skip action (via the RingControl plugin, called
@@ -736,6 +1253,9 @@ jobs:
               //               expects — see RingingActivity for where this
               //               composite id gets built)
               //   order    -> plain orderId
+              private static String lastAlertKey = "";
+              private static long lastAlertAt = 0;
+
               private void handleIncomingIntent(Intent intent) {
                   if (intent == null) return;
                   String kind = intent.getStringExtra("kind");
@@ -743,7 +1263,24 @@ jobs:
                   String id = intent.getStringExtra("id");
                   if (kind == null || action == null) return;
 
+                  // Same alert delivered twice within a few seconds (e.g. lock-screen intent + direct
+                  // start) - only handle it once.
+                  String alertKey = kind + "|" + action + "|" + (id != null ? id : "");
+                  long nowMs = System.currentTimeMillis();
+                  if (alertKey.equals(lastAlertKey) && nowMs - lastAlertAt < 8000L) return;
+                  lastAlertKey = alertKey;
+                  lastAlertAt = nowMs;
+                  if ("accept".equals(action) || "accepted".equals(action)) {
+                      pendingUnlock = true;
+                      if (AppState.isForeground) runPendingUnlock();
+                  }
+
                   boolean isDriverSide = "ride".equals(kind) || "delivery".equals(kind);
+                  // Optional job details JSON (see Worker "payload"). Passed as a properly escaped JS string
+                  // literal (JSONObject.quote) - driver.html parses it and shows the card instantly.
+                  String payload = intent.getStringExtra("payload");
+                  final String payloadArg = (isDriverSide && payload != null && !payload.isEmpty())
+                      ? "," + org.json.JSONObject.quote(payload) : "";
                   String page = isDriverSide ? "driver.html" : "partner.html";
                   String jsFunction = isDriverSide ? "handleNativeRideAction" : "handleNativeOrderAction";
 
@@ -755,15 +1292,19 @@ jobs:
                       // inside the app. Capacitor serves the app's www/
                       // folder from https://localhost/ by default, so the
                       // full origin has to be included explicitly.
-                      getBridge().getWebView().loadUrl("https://localhost/" + page);
+                      // Already on the right page (driver is using the app)? Do not reload it - just hand
+                      // the alert to the page, so an ongoing ride screen is not wiped by a new request.
+                      String curUrl = getBridge().getWebView().getUrl();
+                      boolean alreadyThere = curUrl != null && curUrl.contains("/" + page);
+                      if (!alreadyThere) getBridge().getWebView().loadUrl("https://localhost/" + page);
                       String js = "(function retry(){"
                           + "if (window." + jsFunction + ") {"
                           + "window." + jsFunction + "("
-                          + jsString(action) + "," + jsString(id != null ? id : "") + "," + jsString(kind)
+                          + jsString(action) + "," + jsString(id != null ? id : "") + "," + jsString(kind) + payloadArg
                           + ");"
                           + "} else { setTimeout(retry, 300); } })();";
                       getBridge().getWebView().postDelayed(() ->
-                          getBridge().getWebView().evaluateJavascript(js, null), 400);
+                          getBridge().getWebView().evaluateJavascript(js, null), alreadyThere ? 0 : 400);
                   });
               }
 
@@ -821,6 +1362,106 @@ jobs:
                       i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                       getContext().startActivity(i);
                   } catch (Exception ignored) {}
+                  call.resolve();
+              }
+
+              // Android 14+: is the "Full-screen notifications" permission on? (Always true below 14.)
+              @PluginMethod
+              public void canUseFullScreenIntent(PluginCall call) {
+                  JSObject r = new JSObject();
+                  boolean ok = true;
+                  if (android.os.Build.VERSION.SDK_INT >= 34) {
+                      android.app.NotificationManager nm = getContext().getSystemService(android.app.NotificationManager.class);
+                      ok = nm == null || nm.canUseFullScreenIntent();
+                  }
+                  r.put("granted", ok);
+                  r.put("supported", android.os.Build.VERSION.SDK_INT >= 34);
+                  call.resolve(r);
+              }
+
+              // Opens this app's "Full-screen notifications" settings screen (Android 14+).
+              @PluginMethod
+              public void openFullScreenIntentSettings(PluginCall call) {
+                  try {
+                      if (android.os.Build.VERSION.SDK_INT >= 34) {
+                          Intent i = new Intent(
+                              android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                              android.net.Uri.parse("package:" + getContext().getPackageName())
+                          );
+                          i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                          getContext().startActivity(i);
+                      }
+                  } catch (Exception ignored) {}
+                  call.resolve();
+              }
+
+              // Called from driver.html right after the driver accepts / rejects a ride. If the phone is
+              // locked (the app was showing over the lock screen), this brings up the normal PIN / pattern /
+              // fingerprint screen; once the driver unlocks, the app is simply there, already open. Whatever
+              // happens, the app stops showing over the lock screen afterwards (so after the next lock, the
+              // phone's own lock screen protects it again). Does nothing if the phone is already unlocked.
+              @PluginMethod
+              public void requireUnlock(PluginCall call) {
+                  if (MainActivity.unlockInFlight) { call.resolve(); return; }   // PIN prompt already up (native Accept)
+                  final android.app.Activity act = getActivity();
+                  if (act == null || android.os.Build.VERSION.SDK_INT < 27) { call.resolve(); return; }
+                  act.runOnUiThread(new Runnable() {
+                      @Override
+                      public void run() {
+                          try {
+                              android.app.KeyguardManager km = (android.app.KeyguardManager) act.getSystemService(android.content.Context.KEYGUARD_SERVICE);
+                              if (km == null || !km.isKeyguardLocked()) {
+                                  act.setShowWhenLocked(false);
+                                  act.setTurnScreenOn(false);
+                                  return;
+                              }
+                              km.requestDismissKeyguard(act, new android.app.KeyguardManager.KeyguardDismissCallback() {
+                                  @Override
+                                  public void onDismissSucceeded() {
+                                      act.setShowWhenLocked(false);
+                                      act.setTurnScreenOn(false);
+                                  }
+                                  @Override
+                                  public void onDismissCancelled() {
+                                      act.setShowWhenLocked(false);
+                                      act.setTurnScreenOn(false);
+                                  }
+                                  @Override
+                                  public void onDismissError() {
+                                      act.setShowWhenLocked(false);
+                                      act.setTurnScreenOn(false);
+                                  }
+                              });
+                          } catch (Exception ignored) {}
+                      }
+                  });
+                  call.resolve();
+              }
+
+              // Jobs the driver skipped in the native popup while the app was closed. driver.html adds them to
+              // its own skipped lists so the same job does not pop up again inside the app. Cleared on read.
+              @PluginMethod
+              public void consumeSkippedIds(PluginCall call) {
+                  JSObject r = new JSObject();
+                  org.json.JSONArray arr = new org.json.JSONArray();
+                  try {
+                      android.content.SharedPreferences sp = getContext().getSharedPreferences(RideAlertActivity.SKIP_PREFS, 0);
+                      long now = System.currentTimeMillis();
+                      for (java.util.Map.Entry<String, ?> e : sp.getAll().entrySet()) {
+                          Object v = e.getValue();
+                          if (v instanceof Long && now - ((Long) v).longValue() < 1800000L) arr.put(e.getKey());
+                      }
+                      sp.edit().clear().apply();
+                  } catch (Exception ignored) {}
+                  r.put("ids", arr);
+                  call.resolve(r);
+              }
+
+              // Ride finished without the driver acting (timed out / cancelled / taken): stop showing over
+              // the lock screen. If the phone is still locked, the app goes behind the lock screen.
+              @PluginMethod
+              public void releaseLockScreen(PluginCall call) {
+                  if (getActivity() instanceof MainActivity) ((MainActivity) getActivity()).releaseOverLockScreenFromJs();
                   call.resolve();
               }
           }
@@ -1024,6 +1665,9 @@ jobs:
                   serviceIntent.putExtra("id", id);
                   serviceIntent.putExtra("title", data.get("title"));
                   serviceIntent.putExtra("body", data.get("body"));
+                  // Ride/delivery details JSON from the Worker (optional) - lets the popup show real
+                  // fare/pickup/drop instantly instead of waiting for Firebase.
+                  serviceIntent.putExtra("payload", data.get("payload"));
                   serviceIntent.putExtra("sound", operatorSound);
                   serviceIntent.putExtra("vibrate", operatorVibrate);
                   ContextCompat.startForegroundService(this, serviceIntent);
@@ -1089,6 +1733,12 @@ jobs:
               // stopped, already moved on to a different alert, or this
               // cancel arrived for something this device was never
               // ringing for in the first place).
+              // True while this service is ringing for exactly this kind+id (RideAlertActivity uses it
+              // to close itself if the alert already ended before the popup came up).
+              public static boolean isRinging(String kind, String id) {
+                  return kind != null && id != null && kind.equals(currentKind) && id.equals(currentId);
+              }
+
               public static void cancelIfMatches(android.content.Context ctx, String kind, String id) {
                   if (kind == null || id == null) return;
                   if (kind.equals(currentKind) && id.equals(currentId)) {
@@ -1102,6 +1752,7 @@ jobs:
                   String id = intent.getStringExtra("id");
                   String title = intent.getStringExtra("title");
                   String body = intent.getStringExtra("body");
+                  String payload = intent.getStringExtra("payload");
                   currentKind = kind;
                   currentId = id;
 
@@ -1116,7 +1767,7 @@ jobs:
                   if (timeoutRunnable != null) timeoutHandler.removeCallbacks(timeoutRunnable);
 
                   currentNotifId = "operator".equals(kind) ? (5000 + Math.abs((id == null ? "" : id).hashCode() % 90000)) : NOTIF_ID;
-                  startForeground(currentNotifId, buildNotification(kind, id, title, body));
+                  startForeground(currentNotifId, buildNotification(kind, id, title, body, payload));
                   // Operator alerts are full-screen but SILENT: no sound, no vibration.
                   // Operator alerts are silent unless this phone's Operator Panel has the
                   // "alert sound" switch on (sound only - no vibration).
@@ -1143,6 +1794,26 @@ jobs:
                       } catch (Exception ignored) {}
                   }
 
+                  // Ride/delivery alert while the phone is UNLOCKED (or app swiped away): open the
+                  // driver app itself straight onto the ride popup. Needs "Display over other apps".
+                  if (("ride".equals(kind) || "delivery".equals(kind)) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                          && android.provider.Settings.canDrawOverlays(this)) {
+                      try {
+                          // App not on screen -> instant native popup (no WebView wait).
+                          // App already open -> old path: the in-app popup, screen not reloaded.
+                          Intent openApp = new Intent(this, AppState.isForeground ? MainActivity.class : RideAlertActivity.class);
+                          openApp.putExtra("kind", kind);
+                          openApp.putExtra("action", "open");
+                          openApp.putExtra("id", id);
+                          openApp.putExtra("title", title);
+                          openApp.putExtra("body", body);
+                          openApp.putExtra("lockscreen", true);
+                          if (payload != null) openApp.putExtra("payload", payload);
+                          openApp.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                          startActivity(openApp);
+                      } catch (Exception ignored) {}
+                  }
+
                   boolean isDriverSide = "ride".equals(kind) || "delivery".equals(kind) || "operator".equals(kind);
                   if (isDriverSide) {
                       if ("operator".equals(kind)) {
@@ -1165,7 +1836,7 @@ jobs:
                   return START_NOT_STICKY;
               }
 
-              private Notification buildNotification(String kind, String id, String title, String body) {
+              private Notification buildNotification(String kind, String id, String title, String body, String payload) {
                   String channelId;
                   String channelName;
                   String defaultTitle;
@@ -1191,16 +1862,38 @@ jobs:
                       }
                   }
 
-                  Intent fullScreenIntent = new Intent(this, RingingActivity.class);
+                  boolean driverJob = "ride".equals(kind) || "delivery".equals(kind);
+                  // Ride/delivery: lock-screen full-screen intent opens the driver app directly
+                  // (MainActivity shows over the lock screen) instead of the "OPEN APP" screen.
+                  Intent fullScreenIntent = new Intent(this, driverJob ? MainActivity.class : RingingActivity.class);
+                  if (driverJob) { fullScreenIntent.putExtra("action", "open"); fullScreenIntent.putExtra("lockscreen", true); }
                   fullScreenIntent.putExtra("kind", kind);
                   fullScreenIntent.putExtra("id", id);
                   fullScreenIntent.putExtra("title", title);
                   fullScreenIntent.putExtra("body", body);
+                  if (driverJob && payload != null) fullScreenIntent.putExtra("payload", payload);
                   fullScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                   PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
                       this, 0, fullScreenIntent,
                       PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                   );
+
+                  // Lock-screen / full-screen path for ride + delivery: the native popup. Tapping the
+                  // notification itself still opens the driver app (fallback if a phone blocks the popup).
+                  PendingIntent popupPendingIntent = fullScreenPendingIntent;
+                  if (driverJob) {
+                      Intent popup = new Intent(this, RideAlertActivity.class);
+                      popup.putExtra("kind", kind);
+                      popup.putExtra("id", id);
+                      popup.putExtra("title", title);
+                      popup.putExtra("body", body);
+                      if (payload != null) popup.putExtra("payload", payload);
+                      popup.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                      popupPendingIntent = PendingIntent.getActivity(
+                          this, 2, popup,
+                          PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                      );
+                  }
 
                   boolean isOperatorAlert = "operator".equals(kind);
                   PendingIntent contentPi = fullScreenPendingIntent;
@@ -1220,7 +1913,7 @@ jobs:
                       .setContentText(body != null ? body : "Tap to view")
                       .setPriority(NotificationCompat.PRIORITY_MAX)
                       .setCategory(NotificationCompat.CATEGORY_CALL)
-                      .setFullScreenIntent(fullScreenPendingIntent, true)
+                      .setFullScreenIntent(popupPendingIntent, true)
                       .setContentIntent(contentPi)
                       .setOngoing(!isOperatorAlert)
                       .setAutoCancel(isOperatorAlert);
@@ -1303,6 +1996,15 @@ jobs:
                       timeoutHandler.removeCallbacks(timeoutRunnable);
                       timeoutRunnable = null;
                   }
+                  // Tell RideAlertActivity (if it is showing) that this alert is over: 25 s timeout,
+                  // cancel_ring, accept or skip all end up here.
+                  try {
+                      Intent stopped = new Intent("com.yourcompany.neshapp.RING_STOPPED");
+                      stopped.setPackage(getPackageName());
+                      stopped.putExtra("kind", currentKind);
+                      stopped.putExtra("id", currentId);
+                      sendBroadcast(stopped);
+                  } catch (Exception ignored) {}
                   currentKind = null;
                   currentId = null;
               }
@@ -1322,6 +2024,776 @@ jobs:
               public IBinder onBind(Intent intent) { return null; }
           }
           EOF
+
+          cat > "$PKG_PATH/RideAlertActivity.java" << 'EOF'
+          package com.yourcompany.neshapp;
+
+          import android.app.Activity;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.IntentFilter;
+          import android.content.SharedPreferences;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.view.WindowManager;
+          import android.widget.Button;
+          import android.widget.LinearLayout;
+          import android.widget.ScrollView;
+          import android.widget.TextView;
+          import java.io.ByteArrayOutputStream;
+          import java.io.InputStream;
+          import java.io.OutputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.net.URLEncoder;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          // Native ride / delivery request popup. Opens straight from the push (no WebView, no Firebase wait),
+          // over the lock screen, showing the job details that the Worker put in the FCM "payload" field.
+          //   Accept -> stops the ring, opens the driver app with action=accept; driver.html does the real
+          //             (atomic) accept as soon as Firebase is ready, and the phone's PIN screen is requested
+          //             at once if the phone is locked.
+          //   Skip   -> stops the ring, releases a job that was routed specifically to this driver (Firebase
+          //             REST, same fields driver.html clears), remembers the skip for the app.
+          // The popup closes by itself when the ring stops (25 s timeout, cancel_ring, taken, accept, skip).
+          public class RideAlertActivity extends Activity {
+              static final String ACTION_RING_STOPPED = "com.yourcompany.neshapp.RING_STOPPED";
+              static final String SKIP_PREFS = "nesh_native_skips";
+              private static final String DB_URL = "https://texi-and-food-default-rtdb.firebaseio.com";
+              private static final long OFFER_MS = 25000L;
+
+              private String kind;
+              private String alertId;
+              private String payloadStr;
+              private String fallbackTitle;
+              private String fallbackBody;
+              private boolean decided = false;
+              private boolean closing = false;
+              private long shownAt = 0L;
+              private TextView countdownView;
+              private Button acceptBtn;
+              private Button skipBtn;
+              private BroadcastReceiver stopReceiver;
+              private final Handler handler = new Handler(Looper.getMainLooper());
+              private final Runnable tick = new Runnable() {
+                  @Override public void run() {
+                      if (decided) return;
+                      long left = OFFER_MS - (System.currentTimeMillis() - shownAt);
+                      if (left <= 0) { closeQuietly(); return; }
+                      if (countdownView != null) countdownView.setText("Offer ends in " + ((left + 999) / 1000) + " s");
+                      handler.postDelayed(this, 500L);
+                  }
+              };
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setOverLockScreen();
+                  readIntent(getIntent());
+                  if (!RingingService.isRinging(kind, alertId)) { closeQuietly(); return; }
+                  buildUi();
+                  registerStopReceiver();
+                  handler.post(tick);
+                  verifyStillOpen();
+              }
+
+              @Override
+              protected void onNewIntent(Intent intent) {
+                  super.onNewIntent(intent);
+                  setIntent(intent);
+                  String oldId = alertId;
+                  readIntent(intent);
+                  if (!RingingService.isRinging(kind, alertId)) { closeQuietly(); return; }
+                  if (oldId == null || !oldId.equals(alertId)) { decided = false; }
+                  buildUi();
+                  handler.removeCallbacks(tick);
+                  handler.post(tick);
+                  verifyStillOpen();
+              }
+
+              @Override
+              protected void onDestroy() {
+                  handler.removeCallbacks(tick);
+                  if (stopReceiver != null) {
+                      try { unregisterReceiver(stopReceiver); } catch (Exception ignored) {}
+                      stopReceiver = null;
+                  }
+                  super.onDestroy();
+              }
+
+              // Back button does nothing: Accept / Skip are explicit choices.
+              @Override
+              public void onBackPressed() { }
+
+              private void setOverLockScreen() {
+                  if (Build.VERSION.SDK_INT >= 27) {
+                      setShowWhenLocked(true);
+                      setTurnScreenOn(true);
+                  } else {
+                      getWindow().addFlags(
+                          WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                              | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+                  }
+                  getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+              }
+
+              private void readIntent(Intent i) {
+                  kind = i.getStringExtra("kind");
+                  String newId = i.getStringExtra("id");
+                  if (alertId == null || !alertId.equals(newId)) shownAt = System.currentTimeMillis();
+                  alertId = newId;
+                  payloadStr = i.getStringExtra("payload");
+                  fallbackTitle = i.getStringExtra("title");
+                  fallbackBody = i.getStringExtra("body");
+              }
+
+              private void registerStopReceiver() {
+                  stopReceiver = new BroadcastReceiver() {
+                      @Override public void onReceive(Context c, Intent in) {
+                          String id = in.getStringExtra("id");
+                          if (decided) return;
+                          if (id == null || alertId == null || id.equals(alertId)) closeQuietly();
+                      }
+                  };
+                  IntentFilter f = new IntentFilter(ACTION_RING_STOPPED);
+                  if (Build.VERSION.SDK_INT >= 33) registerReceiver(stopReceiver, f, Context.RECEIVER_NOT_EXPORTED);
+                  else registerReceiver(stopReceiver, f);
+              }
+
+              private void closeQuietly() {
+                  if (closing) return;
+                  closing = true;
+                  try { finishAndRemoveTask(); } catch (Exception e) { finish(); }
+              }
+
+              // ---------------------------------------------------------------- UI
+
+              private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density + 0.5f); }
+
+              private JSONObject payload() {
+                  try {
+                      if (payloadStr != null && !payloadStr.isEmpty()) return new JSONObject(payloadStr);
+                  } catch (Exception ignored) {}
+                  return new JSONObject();
+              }
+
+              private static String money(double v) {
+                  if (v == Math.rint(v)) return "\u20b9" + (long) v;
+                  return "\u20b9" + String.format(java.util.Locale.US, "%.2f", v);
+              }
+
+              private TextView text(String s, int sp, int color, boolean bold) {
+                  TextView t = new TextView(this);
+                  t.setText(s);
+                  t.setTextSize(sp);
+                  t.setTextColor(color);
+                  if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+                  return t;
+              }
+
+              private void addRow(LinearLayout col, String label, String value) {
+                  if (value == null || value.trim().isEmpty()) return;
+                  TextView l = text(label, 12, Color.parseColor("#94a3b8"), true);
+                  l.setPadding(0, dp(14), 0, dp(2));
+                  col.addView(l);
+                  col.addView(text(value, 18, Color.WHITE, false));
+              }
+
+              private static String locText(JSONObject p, String key) {
+                  JSONObject o = p.optJSONObject(key);
+                  return o == null ? "" : o.optString("text", "");
+              }
+
+              private Button bigButton(String label, String bg) {
+                  Button b = new Button(this);
+                  b.setText(label);
+                  b.setAllCaps(false);
+                  b.setTextSize(20);
+                  b.setTextColor(Color.WHITE);
+                  b.setTypeface(Typeface.DEFAULT_BOLD);
+                  GradientDrawable d = new GradientDrawable();
+                  d.setColor(Color.parseColor(bg));
+                  d.setCornerRadius(dp(14));
+                  b.setBackground(d);
+                  return b;
+              }
+
+              private void buildUi() {
+                  JSONObject p = payload();
+                  boolean delivery = "delivery".equals(kind);
+
+                  ScrollView sv = new ScrollView(this);
+                  sv.setFillViewport(true);
+                  sv.setBackgroundColor(Color.parseColor("#0f172a"));
+
+                  LinearLayout col = new LinearLayout(this);
+                  col.setOrientation(LinearLayout.VERTICAL);
+                  col.setPadding(dp(24), dp(40), dp(24), dp(24));
+                  sv.addView(col, new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+                  col.addView(text(delivery ? "NEW DELIVERY" : "NEW RIDE REQUEST", 14, Color.parseColor("#4ade80"), true));
+
+                  boolean haveDetails = p.length() > 0;
+                  if (!haveDetails) {
+                      // No details in the push (too big / older Worker): show the push text instead.
+                      TextView t = text(fallbackTitle != null ? fallbackTitle : (delivery ? "New Delivery" : "New Ride Request"), 26, Color.WHITE, true);
+                      t.setPadding(0, dp(12), 0, dp(8));
+                      col.addView(t);
+                      if (fallbackBody != null) col.addView(text(fallbackBody.replace(" \u00b7 ", "\n"), 18, Color.WHITE, false));
+                  } else if (!delivery) {
+                      double fare = p.optDouble("fare", Double.NaN);
+                      if (!Double.isNaN(fare)) {
+                          TextView f = text(money(fare), 52, Color.WHITE, true);
+                          f.setPadding(0, dp(8), 0, 0);
+                          col.addView(f);
+                      }
+                      String vt = p.optString("vehicleType", "");
+                      if (!vt.isEmpty()) vt = vt.substring(0, 1).toUpperCase() + vt.substring(1);
+                      double dist = p.optDouble("distanceKm", Double.NaN);
+                      String sub = vt;
+                      if (!Double.isNaN(dist)) sub = (sub.isEmpty() ? "" : sub + " \u00b7 ") + String.format(java.util.Locale.US, "%.1f km", dist);
+                      if (!sub.isEmpty()) col.addView(text(sub, 18, Color.parseColor("#cbd5e1"), false));
+                      addRow(col, "PICKUP", locText(p, "pickup"));
+                      addRow(col, "DROP", locText(p, "drop"));
+                      addRow(col, "CUSTOMER", p.optString("customerName", ""));
+                  } else {
+                      double fee = p.optDouble("deliveryFee", 0);
+                      double real = fee > 0 ? fee : p.optDouble("deliveryFeeWaived", 0);
+                      double payout = real + p.optDouble("rainSurgeDriver", 0) + p.optDouble("tip", 0);
+                      TextView f = text(money(payout), 52, Color.WHITE, true);
+                      f.setPadding(0, dp(8), 0, 0);
+                      col.addView(f);
+                      String on = p.optString("orderNumber", "");
+                      if (!on.isEmpty()) col.addView(text("Order #" + on, 18, Color.parseColor("#cbd5e1"), false));
+                      String shop = p.optString("_restName", "");
+                      String shopAddr = p.optString("_restAddress", "");
+                      addRow(col, "PICKUP", shop.isEmpty() ? shopAddr : (shopAddr.isEmpty() ? shop : shop + "\n" + shopAddr));
+                      String drop = p.optString("customerPlace", "");
+                      if (drop.isEmpty()) drop = p.optString("customerAddress", "");
+                      if (drop.isEmpty()) drop = p.optString("customerLocation", "");
+                      String lm = p.optString("customerLandmark", "");
+                      addRow(col, "DROP", lm.isEmpty() ? drop : (drop.isEmpty() ? "Landmark: " + lm : drop + "\nLandmark: " + lm));
+                      addRow(col, "CUSTOMER", p.optString("customerName", ""));
+                      JSONArray items = p.optJSONArray("items");
+                      if (items != null && items.length() > 0) {
+                          StringBuilder sb = new StringBuilder();
+                          for (int i = 0; i < items.length(); i++) {
+                              JSONObject it = items.optJSONObject(i);
+                              if (it == null) continue;
+                              if (sb.length() > 0) sb.append("\n");
+                              sb.append(it.optInt("qty", 1)).append(" \u00d7 ").append(it.optString("name", ""));
+                          }
+                          addRow(col, "ITEMS", sb.toString());
+                      }
+                  }
+
+                  View spacer = new View(this);
+                  col.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1f));
+
+                  countdownView = text("", 14, Color.parseColor("#94a3b8"), false);
+                  countdownView.setGravity(Gravity.CENTER);
+                  countdownView.setPadding(0, dp(20), 0, dp(10));
+                  col.addView(countdownView, new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+                  LinearLayout row = new LinearLayout(this);
+                  row.setOrientation(LinearLayout.HORIZONTAL);
+                  skipBtn = bigButton("Skip", "#334155");
+                  acceptBtn = bigButton("Accept", "#16a34a");
+                  LinearLayout.LayoutParams lpSkip = new LinearLayout.LayoutParams(0, dp(68), 1f);
+                  lpSkip.rightMargin = dp(8);
+                  LinearLayout.LayoutParams lpAccept = new LinearLayout.LayoutParams(0, dp(68), 1.4f);
+                  lpAccept.leftMargin = dp(8);
+                  row.addView(skipBtn, lpSkip);
+                  row.addView(acceptBtn, lpAccept);
+                  col.addView(row, new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+                  skipBtn.setOnClickListener(new View.OnClickListener() {
+                      @Override public void onClick(View v) { onSkip(); }
+                  });
+                  acceptBtn.setOnClickListener(new View.OnClickListener() {
+                      @Override public void onClick(View v) { onAccept(); }
+                  });
+                  setContentView(sv);
+              }
+
+              // ------------------------------------------------------------ actions
+
+              private void stopRing() {
+                  try { stopService(new Intent(this, RingingService.class)); } catch (Exception ignored) {}
+              }
+
+              // A push can arrive late (FCM delay, or the Worker's escalation racing with another driver's accept) for a
+              // job that is already taken / cancelled. One tiny check when the popup opens: if the job is gone, stop the
+              // ring and close the popup, so the driver never sees a dead request. If the check itself fails (no network)
+              // the popup simply stays - Accept still re-checks atomically.
+              private void verifyStillOpen() {
+                  final Context app = getApplicationContext();
+                  final String k = kind;
+                  final String id = alertId;
+                  new Thread(new Runnable() {
+                      @Override public void run() {
+                          if (!isJobGone(app, k, id)) return;
+                          handler.post(new Runnable() {
+                              @Override public void run() {
+                                  if (decided || id == null || !id.equals(alertId)) return;
+                                  stopRing();
+                                  closeQuietly();
+                              }
+                          });
+                      }
+                  }).start();
+              }
+
+              private static boolean isJobGone(Context ctx, String kind, String id) {
+                  try {
+                      if (id == null || id.isEmpty()) return false;
+                      if ("delivery".equals(kind)) {
+                          String[] parts = id.split("::", 2);
+                          if (parts.length < 2) return false;
+                          String base = DB_URL + "/restaurants/" + enc(parts[0]) + "/orders/" + enc(parts[1]);
+                          String st = httpGet(base + "/status.json");
+                          String dd = httpGet(base + "/deliveryDriverId.json");
+                          if (st == null || dd == null) return false;   // no answer -> keep the popup
+                          String s = unquote(st);
+                          if (!(s.equals("preparing") || s.equals("ready"))) return true;
+                          String d = unquote(dd);
+                          return !(d.isEmpty() || d.equals("null"));
+                      }
+                      String st = httpGet(DB_URL + "/rides/" + enc(id) + "/status.json");
+                      if (st == null) return false;
+                      return !"searching".equals(unquote(st));
+                  } catch (Exception e) {
+                      return false;
+                  }
+              }
+
+
+              private static final int ACCEPT_OK = 0;
+              private static final int ACCEPT_TAKEN = 1;
+              private static final int ACCEPT_FALLBACK = 2;
+              private static final String WORKER_URL = "https://broad-paper-6445.raise3715.workers.dev";
+
+              // Accept done natively (Firebase REST) - the WebView is NOT needed. Same atomic claim as driver.html's
+              // handlePopupRideAction / handlePopupDeliveryAction. Anything unexpected (no saved profile, offline,
+              // permission denied) falls back to the old path: open the app and let driver.html accept.
+              private void onAccept() {
+                  if (decided) return;
+                  decided = true;
+                  acceptBtn.setEnabled(false);
+                  skipBtn.setEnabled(false);
+                  acceptBtn.setText("Accepting...");
+                  stopRing();
+                  final Context app = getApplicationContext();
+                  final String k = kind;
+                  final String id = alertId;
+                  final String pl = payloadStr;
+                  new Thread(new Runnable() {
+                      @Override public void run() {
+                          final JSONObject[] won = new JSONObject[1];
+                          final int result = nativeAccept(app, k, id, won);
+                          handler.post(new Runnable() {
+                              @Override public void run() { onAcceptResult(app, result, k, id, pl); }
+                          });
+                          if (result == ACCEPT_OK && won[0] != null) afterAccept(app, k, id, won[0]);
+                      }
+                  }).start();
+              }
+
+              private void onAcceptResult(Context app, int result, String k, String id, String pl) {
+                  if (result == ACCEPT_OK) {
+                      launchApp(app, k, id, pl, "accepted");
+                      closeQuietly();
+                  } else if (result == ACCEPT_TAKEN) {
+                      if (acceptBtn != null) acceptBtn.setText("No longer available");
+                      handler.postDelayed(new Runnable() {
+                          @Override public void run() { closeQuietly(); }
+                      }, 1800L);
+                  } else {
+                      launchApp(app, k, id, pl, "accept");
+                      closeQuietly();
+                  }
+              }
+
+              private static void launchApp(Context ctx, String kind, String id, String payload, String action) {
+                  try {
+                      Intent i = new Intent(ctx, MainActivity.class);
+                      i.putExtra("kind", kind);
+                      i.putExtra("action", action);
+                      i.putExtra("id", id);
+                      i.putExtra("lockscreen", true);
+                      if (payload != null) i.putExtra("payload", payload);
+                      i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                      ctx.startActivity(i);
+                  } catch (Exception ignored) {}
+              }
+
+              private void onSkip() {
+                  if (decided) return;
+                  decided = true;
+                  final Context app = getApplicationContext();
+                  final String k = kind;
+                  final String id = alertId;
+                  try {
+                      app.getSharedPreferences(SKIP_PREFS, 0).edit().putLong(id, System.currentTimeMillis()).apply();
+                  } catch (Exception ignored) {}
+                  new Thread(new Runnable() {
+                      @Override public void run() { releaseRouting(app, k, id); }
+                  }).start();
+                  stopRing();
+                  closeQuietly();
+              }
+
+              // Same Firebase fields driver.html clears when the driver skips a job that was routed to them.
+              // A plain broadcast job needs no write. Failures are silent: the Worker's own timers still
+              // move the job on, exactly as when a driver simply ignores it.
+              private static void releaseRouting(Context ctx, String kind, String id) {
+                  try {
+                      SharedPreferences tp = ctx.getSharedPreferences(DriverTrackingPlugin.PREFS_NAME, 0);
+                      String me = tp.getString(DriverTrackingPlugin.KEY_USERNAME, "");
+                      if (me == null || me.isEmpty() || id == null || id.isEmpty()) return;
+                      if ("delivery".equals(kind)) {
+                          String[] parts = id.split("::", 2);
+                          if (parts.length < 2) return;
+                          String base = DB_URL + "/restaurants/" + enc(parts[0]) + "/orders/" + enc(parts[1]);
+                          String cur = unquote(httpGet(base + "/assignedDriverId.json"));
+                          if (me.equals(cur)) httpPut(base + "/assignedDriverId.json", "null");
+                          return;
+                      }
+                      String base = DB_URL + "/rides/" + enc(id);
+                      String json = httpGet(base + ".json");
+                      if (json == null || json.trim().equals("null")) return;
+                      JSONObject r = new JSONObject(json);
+                      if (me.equals(r.optString("assignedDriverId", ""))) {
+                          httpPut(base + "/assignedDriverId.json", "null");
+                          httpPut(base + "/declinedDriverIds/" + enc(me) + ".json", "true");
+                      }
+                      if (me.equals(r.optString("candidateDriverId", ""))) {
+                          httpPut(base + "/candidateDriverId.json", "null");
+                          httpPut(base + "/declinedDriverIds/" + enc(me) + ".json", "true");
+                      }
+                      if (me.equals(r.optString("chosenDriverId", ""))) {
+                          httpPut(base + "/chosenDriverId.json", "null");
+                          httpPut(base + "/chosenDriverStatus.json", "\"declined\"");
+                      }
+                  } catch (Exception ignored) {}
+              }
+
+              private static String unquote(String s) {
+                  if (s == null) return "";
+                  String v = s.trim();
+                  if (v.length() >= 2 && v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length() - 1);
+                  return v;
+              }
+
+              private static String enc(String s) {
+                  try { return URLEncoder.encode(s, "UTF-8").replace("+", "%20"); } catch (Exception e) { return s; }
+              }
+
+              private static String httpGet(String url) {
+                  HttpURLConnection c = null;
+                  try {
+                      c = (HttpURLConnection) new URL(url).openConnection();
+                      c.setRequestMethod("GET");
+                      c.setConnectTimeout(8000);
+                      c.setReadTimeout(8000);
+                      if (c.getResponseCode() != 200) return null;
+                      InputStream in = c.getInputStream();
+                      ByteArrayOutputStream out = new ByteArrayOutputStream();
+                      byte[] buf = new byte[1024];
+                      int n;
+                      while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                      in.close();
+                      return out.toString("UTF-8");
+                  } catch (Exception e) {
+                      return null;
+                  } finally {
+                      if (c != null) c.disconnect();
+                  }
+              }
+
+              private static String dayKey(long t) {
+                  java.util.Calendar c = java.util.Calendar.getInstance();
+                  c.setTimeInMillis(t);
+                  return String.format(java.util.Locale.US, "%04d-%02d-%02d",
+                      c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH) + 1, c.get(java.util.Calendar.DAY_OF_MONTH));
+              }
+
+              private static String firstNonEmpty(String a, String b, String c) {
+                  if (a != null && !a.isEmpty()) return a;
+                  if (b != null && !b.isEmpty()) return b;
+                  return c == null ? "" : c;
+              }
+
+              // Atomic claim: GET with ETag, check the same conditions as driver.html, PUT with if-match.
+              // HTTP 412 = another driver (or the shop/customer app) changed the node first -> re-read and re-check,
+              // exactly like a Firebase transaction retry. Whoever's PUT lands first wins; everyone else sees the new
+              // status and gets TAKEN.
+              private static int nativeAccept(Context ctx, String kind, String id, JSONObject[] wonOut) {
+                  try {
+                      SharedPreferences tp = ctx.getSharedPreferences(DriverTrackingPlugin.PREFS_NAME, 0);
+                      String me = tp.getString(DriverTrackingPlugin.KEY_USERNAME, "");
+                      String name = tp.getString(DriverTrackingPlugin.KEY_DRIVER_NAME, "");
+                      String phone = tp.getString(DriverTrackingPlugin.KEY_DRIVER_PHONE, "");
+                      String vehicle = tp.getString(DriverTrackingPlugin.KEY_DRIVER_VEHICLE, "");
+                      if (!tp.getBoolean(DriverTrackingPlugin.KEY_ONLINE, false)) return ACCEPT_FALLBACK;
+                      if (me == null || me.isEmpty() || name == null || name.isEmpty() || id == null || id.isEmpty()) return ACCEPT_FALLBACK;
+                      boolean delivery = "delivery".equals(kind);
+                      String nodeUrl;
+                      if (delivery) {
+                          String[] parts = id.split("::", 2);
+                          if (parts.length < 2) return ACCEPT_FALLBACK;
+                          nodeUrl = DB_URL + "/restaurants/" + enc(parts[0]) + "/orders/" + enc(parts[1]) + ".json";
+                      } else {
+                          nodeUrl = DB_URL + "/rides/" + enc(id) + ".json";
+                      }
+                      final long t0 = System.currentTimeMillis();
+                      for (int attempt = 0; attempt < 5; attempt++) {
+                          if (System.currentTimeMillis() - t0 > 12000L) return ACCEPT_FALLBACK;
+                          String[] got = httpGetEtag(nodeUrl);
+                          if (got == null) return ACCEPT_FALLBACK;
+                          String body = got[1] == null ? "" : got[1].trim();
+                          if (body.equals("null")) return ACCEPT_TAKEN;
+                          JSONObject cur = new JSONObject(body);
+                          if (delivery) {
+                              String st = cur.optString("status", "");
+                              if (!(st.equals("preparing") || st.equals("ready"))) return ACCEPT_TAKEN;
+                              if (cur.optString("deliveryDriverId", "").length() > 0) return ACCEPT_TAKEN;
+                              String forced = cur.optString("assignedDriverId", "");
+                              if (forced.length() > 0 && !forced.equals(me)) return ACCEPT_TAKEN;
+                              cur.put("deliveryDriverId", me);
+                              cur.put("deliveryDriverName", name);
+                              cur.put("deliveryDriverPhone", phone);
+                          } else {
+                              if (!"searching".equals(cur.optString("status", ""))) return ACCEPT_TAKEN;
+                              String forced = firstNonEmpty(cur.optString("assignedDriverId", ""),
+                                  cur.optString("candidateDriverId", ""), cur.optString("chosenDriverId", ""));
+                              if (forced.length() > 0 && !forced.equals(me)) return ACCEPT_TAKEN;
+                              cur.put("status", "accepted");
+                              cur.put("driverId", me);
+                              cur.put("driverName", name);
+                              cur.put("driverPhone", phone);
+                              cur.put("driverVehicleNumber", vehicle);
+                          }
+                          int code = httpPutCond(nodeUrl, cur.toString(), got[0]);
+                          if (code == 200) { wonOut[0] = cur; return ACCEPT_OK; }
+                          if (code == -1) {
+                              // Unknown outcome (timeout / dropped connection): check whether our write actually landed.
+                              String chk = httpGet(nodeUrl);
+                              if (chk != null && !chk.trim().equals("null")) {
+                                  JSONObject now = new JSONObject(chk.trim());
+                                  boolean mine = delivery ? me.equals(now.optString("deliveryDriverId", ""))
+                                      : ("accepted".equals(now.optString("status", "")) && me.equals(now.optString("driverId", "")));
+                                  if (mine) { wonOut[0] = now; return ACCEPT_OK; }
+                              }
+                              return ACCEPT_FALLBACK;
+                          }
+                          if (code != 412) return ACCEPT_FALLBACK;   // 401/403 (rules) etc.
+                      }
+                      return ACCEPT_FALLBACK;
+                  } catch (Exception e) {
+                      return ACCEPT_FALLBACK;
+                  }
+              }
+
+              // Side effects of a won accept - same as driver.html (all best-effort, the accept itself is already done).
+              private static void afterAccept(Context ctx, String kind, String id, JSONObject node) {
+                  try {
+                      SharedPreferences tp = ctx.getSharedPreferences(DriverTrackingPlugin.PREFS_NAME, 0);
+                      String me = tp.getString(DriverTrackingPlugin.KEY_USERNAME, "");
+                      String name = tp.getString(DriverTrackingPlugin.KEY_DRIVER_NAME, "");
+                      boolean delivery = "delivery".equals(kind);
+                      long created = node.optLong("createdAt", 0L);
+                      if (created <= 0) created = System.currentTimeMillis();
+                      String day = dayKey(created);
+                      String base;
+                      String daysUrl;
+                      if (delivery) {
+                          String[] parts = id.split("::", 2);
+                          base = DB_URL + "/restaurants/" + enc(parts[0]) + "/orders/" + enc(parts[1]);
+                          daysUrl = DB_URL + "/driver_delivery_days/" + enc(me) + "/" + day + "/" + enc(id) + ".json";
+                      } else {
+                          base = DB_URL + "/rides/" + enc(id);
+                          daysUrl = DB_URL + "/driver_days/" + enc(me) + "/" + day + "/" + enc(id) + ".json";
+                      }
+                      // Job is taken: stop the ring + close the popup on every OTHER driver's phone that was notified
+                      // (the Worker looks them up). Best-effort; the winner's own ring is already stopped.
+                      try {
+                          JSONObject cr = new JSONObject();
+                          cr.put("type", "cancel_ring");
+                          cr.put("kind", kind);
+                          if (delivery) {
+                              String[] cp = id.split("::", 2);
+                              cr.put("restId", cp[0]);
+                              cr.put("orderId", cp[1]);
+                          } else {
+                              cr.put("rideId", id);
+                          }
+                          httpPostJson(WORKER_URL, cr.toString());
+                      } catch (Exception ignored) {}
+
+                      httpPut(daysUrl, "true");   // per-day index the app uses for Earnings / own deliveries
+            httpPut(DB_URL + "/taxi_drivers/" + enc(me) + "/isBusy.json", "true");   // same flag driver.html syncs while on a job
+
+                      // Tell the customer who is coming (same Worker call as driver.html).
+                      JSONObject push = new JSONObject();
+                      push.put("type", "customer");
+                      push.put("title", "Driver assigned!");
+                      String to;
+                      if (delivery) {
+                          to = node.optString("customerAccount", "");
+                          if (to.isEmpty()) to = node.optString("customerPhone", "");
+                          push.put("body", name + " is picking up your order.");
+                          String[] parts = id.split("::", 2);
+                          push.put("orderId", parts[1]);
+                          push.put("restId", parts[0]);
+                      } else {
+                          to = node.optString("customerNumber", "");
+                          push.put("body", name + " is on the way to pick you up.");
+                      }
+                      if (!to.isEmpty()) {
+                          push.put("customerPhone", to);
+                          httpPostJson(WORKER_URL, push.toString());
+                      }
+
+                      bumpDailyCount(base + "/driverCounted.json", me);
+                  } catch (Exception ignored) {}
+              }
+
+              // +1 on taxi_drivers/{me}/rideCountToday exactly once per job (guard flag on the job itself, shared with
+              // index.html / driver.html so a job is never counted twice).
+              private static void bumpDailyCount(String guardUrl, String me) {
+                  try {
+                      String[] g = httpGetEtag(guardUrl);
+                      if (g == null || g[1] == null || !g[1].trim().equals("null")) return;
+                      if (httpPutCond(guardUrl, "true", g[0]) != 200) return;
+                      String cu = DB_URL + "/taxi_drivers/" + enc(me) + "/rideCountToday.json";
+                      String today = dayKey(System.currentTimeMillis());
+                      for (int i = 0; i < 4; i++) {
+                          String[] c = httpGetEtag(cu);
+                          if (c == null) return;
+                          long count = 1;
+                          String b = c[1] == null ? "null" : c[1].trim();
+                          if (!b.equals("null")) {
+                              JSONObject o = new JSONObject(b);
+                              if (today.equals(o.optString("date", ""))) count = o.optLong("count", 0L) + 1;
+                          }
+                          JSONObject n = new JSONObject();
+                          n.put("date", today);
+                          n.put("count", count);
+                          int code = httpPutCond(cu, n.toString(), c[0]);
+                          if (code != 412) return;
+                      }
+                  } catch (Exception ignored) {}
+              }
+
+              // GET with the ETag Firebase assigns to this exact node value. Returns {etag, body} or null.
+              private static String[] httpGetEtag(String url) {
+                  HttpURLConnection c = null;
+                  try {
+                      c = (HttpURLConnection) new URL(url).openConnection();
+                      c.setRequestMethod("GET");
+                      c.setRequestProperty("X-Firebase-ETag", "true");
+                      c.setConnectTimeout(8000);
+                      c.setReadTimeout(8000);
+                      if (c.getResponseCode() != 200) return null;
+                      String etag = c.getHeaderField("ETag");
+                      if (etag == null) return null;
+                      InputStream in = c.getInputStream();
+                      ByteArrayOutputStream out = new ByteArrayOutputStream();
+                      byte[] buf = new byte[1024];
+                      int n;
+                      while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                      in.close();
+                      return new String[] { etag, out.toString("UTF-8") };
+                  } catch (Exception e) {
+                      return null;
+                  } finally {
+                      if (c != null) c.disconnect();
+                  }
+              }
+
+              // PUT that only succeeds if the node still has this ETag. Returns the HTTP status (200 ok, 412 changed), -1 on error.
+              private static int httpPutCond(String url, String jsonBody, String etag) {
+                  HttpURLConnection c = null;
+                  try {
+                      c = (HttpURLConnection) new URL(url).openConnection();
+                      c.setRequestMethod("PUT");
+                      c.setConnectTimeout(8000);
+                      c.setReadTimeout(8000);
+                      c.setDoOutput(true);
+                      c.setRequestProperty("Content-Type", "application/json");
+                      c.setRequestProperty("if-match", etag);
+                      byte[] body = jsonBody.getBytes("UTF-8");
+                      c.setFixedLengthStreamingMode(body.length);
+                      OutputStream os = c.getOutputStream();
+                      os.write(body);
+                      os.close();
+                      return c.getResponseCode();
+                  } catch (Exception e) {
+                      return -1;
+                  } finally {
+                      if (c != null) c.disconnect();
+                  }
+              }
+
+              private static void httpPostJson(String url, String jsonBody) {
+                  HttpURLConnection c = null;
+                  try {
+                      c = (HttpURLConnection) new URL(url).openConnection();
+                      c.setRequestMethod("POST");
+                      c.setConnectTimeout(8000);
+                      c.setReadTimeout(8000);
+                      c.setDoOutput(true);
+                      c.setRequestProperty("Content-Type", "application/json");
+                      byte[] body = jsonBody.getBytes("UTF-8");
+                      c.setFixedLengthStreamingMode(body.length);
+                      OutputStream os = c.getOutputStream();
+                      os.write(body);
+                      os.close();
+                      c.getResponseCode();
+                  } catch (Exception ignored) {
+                  } finally {
+                      if (c != null) c.disconnect();
+                  }
+              }
+
+              private static boolean httpPut(String url, String jsonBody) {
+                  HttpURLConnection c = null;
+                  try {
+                      c = (HttpURLConnection) new URL(url).openConnection();
+                      c.setRequestMethod("PUT");
+                      c.setConnectTimeout(8000);
+                      c.setReadTimeout(8000);
+                      c.setDoOutput(true);
+                      c.setRequestProperty("Content-Type", "application/json");
+                      byte[] body = jsonBody.getBytes("UTF-8");
+                      c.setFixedLengthStreamingMode(body.length);
+                      OutputStream os = c.getOutputStream();
+                      os.write(body);
+                      os.close();
+                      int code = c.getResponseCode();
+                      return code >= 200 && code < 300;
+                  } catch (Exception e) {
+                      return false;
+                  } finally {
+                      if (c != null) c.disconnect();
+                  }
+              }
+          }
+          EOF
+
 
           cat > "$PKG_PATH/RingingActivity.java" << 'EOF'
           package com.yourcompany.neshapp;
@@ -1664,21 +3136,100 @@ jobs:
           PYEOF
           fi
 
-      # ---- Makes the in-app "UPDATE" banner reliable ----
-      # The @capacitor/app plugin isn't guaranteed to be registered in
-      # every build, so instead of asking the plugin for the running
-      # app's version at runtime, we bake the real build number directly
-      # into the HTML here, at build time. driver.html and partner.html
-      # each start with a placeholder:
-      #   <script>window.NESH_BUILD_NUMBER = 0; ...</script>
-      # This step replaces the 0 with this run's actual version code.
-      - name: Bake build number into driver.html and partner.html
+      # Resolve independent portal build counters BEFORE baking them into the HTML.
+      # The Android package still has one global versionCode, but Driver and Partner
+      # each carry their own in-app build number so only the selected portal prompts.
+      - name: Resolve app-specific update counters
+        id: app_versions
+        env:
+          DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          TARGET_INPUT: ${{ github.event.inputs.update_for }}
+          FORCE_DRIVER_INPUT: ${{ github.event.inputs.force_driver_update }}
+          FORCE_PARTNER_INPUT: ${{ github.event.inputs.force_partner_update }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          RUN_NUMBER: ${{ github.run_number }}
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          VERSION_CODE="${{ github.run_number }}"
-          sed -i "s/window.NESH_BUILD_NUMBER = [0-9]*;/window.NESH_BUILD_NUMBER = ${VERSION_CODE};/" www/driver.html
-          sed -i "s/window.NESH_BUILD_NUMBER = [0-9]*;/window.NESH_BUILD_NUMBER = ${VERSION_CODE};/" www/partner.html
-          grep -o "NESH_BUILD_NUMBER = [0-9]*" www/driver.html
-          grep -o "NESH_BUILD_NUMBER = [0-9]*" www/partner.html
+          TARGET=all
+          if [ -n "$TARGET_INPUT" ]; then TARGET="$TARGET_INPUT"; fi
+          DRV_TAG=false; PAR_TAG=false
+          if echo "$COMMIT_MSG" | grep -qi '\[driver-only\]'; then DRV_TAG=true; fi
+          if echo "$COMMIT_MSG" | grep -qi '\[partner-only\]'; then PAR_TAG=true; fi
+          if [ "$DRV_TAG" = "true" ] && [ "$PAR_TAG" = "false" ]; then TARGET=driver; fi
+          if [ "$PAR_TAG" = "true" ] && [ "$DRV_TAG" = "false" ]; then TARGET=partner; fi
+
+          FORCE_DRIVER=false; FORCE_PARTNER=false
+          if [ "$FORCE_DRIVER_INPUT" = "true" ] || echo "$COMMIT_MSG" | grep -qi '\[force-driver\]'; then FORCE_DRIVER=true; fi
+          if [ "$FORCE_PARTNER_INPUT" = "true" ] || echo "$COMMIT_MSG" | grep -qi '\[force-partner\]'; then FORCE_PARTNER=true; fi
+          # A force flag only applies when this run actually targets that app.
+          if [ "$TARGET" != "all" ] && [ "$TARGET" != "driver" ]; then FORCE_DRIVER=false; fi
+          if [ "$TARGET" != "all" ] && [ "$TARGET" != "partner" ]; then FORCE_PARTNER=false; fi
+
+          # Safety: a forced update shows a blocking screen the user cannot leave.
+          # Without the persistent signing keystore the new APK cannot install over
+          # the old one, and without FIREBASE_DB_URL the prompt is never announced,
+          # so refuse to build a forced update in either case.
+          if [ "$FORCE_DRIVER" = "true" ] || [ "$FORCE_PARTNER" = "true" ]; then
+            if [ -z "$KEYSTORE_BASE64" ]; then
+              echo "::error::Forced update requested but ANDROID_KEYSTORE_BASE64 is not set. The APK would be signed with a throwaway key and could not install over the installed app, locking users on the blocking screen."
+              exit 1
+            fi
+            if [ -z "$DB_URL" ]; then
+              echo "::error::Forced update requested but FIREBASE_DB_URL is not set, so the update could never be announced."
+              exit 1
+            fi
+          fi
+
+          if [ -n "$DB_URL" ]; then
+            curl -fsS "${DB_URL}/appConfig/latestVersion.json" -o prev.json || { echo "Could not read Firebase appConfig/latestVersion; refusing to guess the other portal's build counter."; exit 1; }
+          else
+            printf '{"build":%s,"driverBuild":%s,"partnerBuild":%s}' "$RUN_NUMBER" "$RUN_NUMBER" "$RUN_NUMBER" > prev.json
+            echo "FIREBASE_DB_URL not set: using this run number as the baseline for both portals; Firebase announcements will be skipped."
+          fi
+
+          TARGET="$TARGET" FORCE_DRIVER="$FORCE_DRIVER" FORCE_PARTNER="$FORCE_PARTNER" RUN_NUMBER="$RUN_NUMBER" python3 - <<'PYEOF'
+          import json, os
+          try:
+              prev=json.load(open('prev.json')) or {}
+          except Exception:
+              prev={}
+          if not isinstance(prev, dict): prev={}
+          def num(k, default=0):
+              try: return int(prev.get(k, default) or 0)
+              except Exception: return default
+          run=int(os.environ['RUN_NUMBER'])
+          target=os.environ['TARGET']
+          driver=num('driverBuild', num('build', 0))
+          partner=num('partnerBuild', num('build', 0))
+          force_driver=num('forceDriverBuild', 0)
+          force_partner=num('forcePartnerBuild', 0)
+          if target in ('all','driver'):
+              driver=run
+              if os.environ['FORCE_DRIVER']=='true': force_driver=run
+          if target in ('all','partner'):
+              partner=run
+              if os.environ['FORCE_PARTNER']=='true': force_partner=run
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              out.write(f'driver_build={driver}\n')
+              out.write(f'partner_build={partner}\n')
+              out.write(f'target={target}\n')
+              out.write(f'force_driver={str(os.environ["FORCE_DRIVER"]=="true").lower()}\n')
+              out.write(f'force_partner={str(os.environ["FORCE_PARTNER"]=="true").lower()}\n')
+          print(f'Target={target}; Driver build={driver}; Partner build={partner}; Force Driver={force_driver}; Force Partner={force_partner}')
+          PYEOF
+
+      # Each HTML portal compares its own baked counter with its own Firebase field.
+      - name: Bake separate Driver and Partner build numbers
+        env:
+          DRIVER_BUILD: ${{ steps.app_versions.outputs.driver_build }}
+          PARTNER_BUILD: ${{ steps.app_versions.outputs.partner_build }}
+        run: |
+          sed -i "s/window.NESH_BUILD_NUMBER = [0-9]*;/window.NESH_BUILD_NUMBER = ${DRIVER_BUILD};/" www/driver.html
+          sed -i "s/window.NESH_BUILD_NUMBER = [0-9]*;/window.NESH_BUILD_NUMBER = ${PARTNER_BUILD};/" www/partner.html
+          grep -q "window.NESH_BUILD_NUMBER = ${DRIVER_BUILD};" www/driver.html || { echo "::error::Could not bake build number into www/driver.html"; exit 1; }
+          grep -q "window.NESH_BUILD_NUMBER = ${PARTNER_BUILD};" www/partner.html || { echo "::error::Could not bake build number into www/partner.html"; exit 1; }
+          echo "Driver HTML:"; grep -o "NESH_BUILD_NUMBER = [0-9]*" www/driver.html
+          echo "Partner HTML:"; grep -o "NESH_BUILD_NUMBER = [0-9]*" www/partner.html
 
       - name: Sync Capacitor Android project
         run: npx cap sync android
@@ -1749,15 +3300,38 @@ jobs:
       # "appConfig" — if they don't, either open that one path up for
       # writes, or add a FIREBASE_DB_AUTH secret (a database secret / ID
       # token) and append `&auth=$FIREBASE_DB_AUTH` to the URL below.
-      - name: Announce the new version to the app (Firebase)
+      - name: Announce app-specific versions to Firebase
         env:
           DB_URL: ${{ secrets.FIREBASE_DB_URL }}
           APK_URL: ${{ steps.release.outputs.url }}
+          DRIVER_BUILD: ${{ steps.app_versions.outputs.driver_build }}
+          PARTNER_BUILD: ${{ steps.app_versions.outputs.partner_build }}
+          FORCE_DRIVER: ${{ steps.app_versions.outputs.force_driver }}
+          FORCE_PARTNER: ${{ steps.app_versions.outputs.force_partner }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
           if [ -z "$DB_URL" ]; then
-            echo "FIREBASE_DB_URL secret not set — skipping. The in-app update banner won't know about this build until you add that secret."
+            echo "::warning::FIREBASE_DB_URL secret not set - build completed, but update announcements were skipped."
             exit 0
           fi
-          ASSET_URL=$(echo "$APK_URL" | sed 's#/tag/#/download/#')/app-debug.apk
-          curl -s -X PUT -d "{\"build\": ${{ github.run_number }}, \"name\": \"1.0.${{ github.run_number }}\", \"apkUrl\": \"$ASSET_URL\"}" \
-            "${DB_URL}/appConfig/latestVersion.json"
+          ASSET_URL="$(echo "$APK_URL" | sed 's#/tag/#/download/#')/app-debug.apk"
+          export ASSET_URL
+          python3 - <<'PYEOF' > payload.json
+          import json, os
+          e = os.environ
+          p = {
+              "build": int(e["RUN_NUMBER"]),
+              "name": "1.0." + e["RUN_NUMBER"],
+              "apkUrl": e["ASSET_URL"],
+              "driverBuild": int(e["DRIVER_BUILD"]),
+              "partnerBuild": int(e["PARTNER_BUILD"]),
+          }
+          # Force markers are only written when this run forces that app; otherwise
+          # they are left untouched in Firebase (PATCH), so an earlier force or an
+          # operator-panel setting is never wiped by a normal build.
+          if e["FORCE_DRIVER"] == "true": p["forceDriverBuild"] = int(e["RUN_NUMBER"])
+          if e["FORCE_PARTNER"] == "true": p["forcePartnerBuild"] = int(e["RUN_NUMBER"])
+          print(json.dumps(p))
+          PYEOF
+          cat payload.json
+          curl -fsS -X PATCH -H 'Content-Type: application/json' -d @payload.json "${DB_URL}/appConfig/latestVersion.json"
