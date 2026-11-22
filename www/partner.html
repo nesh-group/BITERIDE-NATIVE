@@ -5280,7 +5280,11 @@ async function doLogin() {
     errEl.style.display = "block";
     return;
   }
-  if (username === OPERATOR_USERNAME && password === OPERATOR_PASSWORD) {
+  // Server checks the operator password and hands back a token for /operator/menu. If the server is unreachable the
+  // old local check still lets the operator in (that check goes away once the server login is proven).
+  const opTok = username === OPERATOR_USERNAME ? await neshOpLogin(username, password) : null;
+  if (username === OPERATOR_USERNAME && opTok !== 'denied' && (opTok || password === OPERATOR_PASSWORD)) {
+    try { if (opTok) localStorage.setItem('nesh_op_token', opTok); else localStorage.removeItem('nesh_op_token'); } catch (e) {}
     localStorage.setItem('asfood_is_operator', '1');
     document.getElementById('login-username').value = '';
     document.getElementById('login-password').value = '';
@@ -9946,6 +9950,7 @@ function opSetAlertVibrate(on) {
   } catch (e) {}
 }
 function opEnterPanel() {
+  try { neshOpListenConfig(); } catch (e) {}
   opRegisterOperatorPush();
   opLoadProfitStart();
   try { const vb = document.getElementById('op-alert-vibrate'); if (vb) vb.checked = localStorage.getItem('op_alert_vibrate') === '1'; } catch (e) {}
@@ -9979,7 +9984,7 @@ function opLogout() {
     try { const { db, ref, remove } = window.fb; remove(ref(db, 'operator_devices/' + opDeviceKey)).catch(() => {}); } catch (e) {}
     opDeviceKey = null;
   }
-  localStorage.removeItem('asfood_is_operator');
+  localStorage.removeItem('asfood_is_operator'); try { localStorage.removeItem('nesh_op_token'); } catch (e) {}
   try { opZoneSel = ''; opSyncPartnerLoad(); opAllPartners = []; } catch (e) {}
   document.documentElement.classList.remove('op-boot');
   document.getElementById('operator-container').classList.remove('show');
@@ -12662,7 +12667,7 @@ function opTrendSave(shopId, itemKey, z) {
     opTrendPortions(p, it).forEach(k => { const o = opTrendPortionOffer(p, it, k); if (o) map[k] = o; });
     map[sz] = v;
     status.textContent = 'Saving...';
-    update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerCustomerSizePrices: map, offerSizePrices: null }).then(() => {
+    neshOpItemUpdate(shopId, itemKey, { offerCustomerSizePrices: map, offerSizePrices: null }).then(() => {
       it.offerCustomerSizePrices = map; it.offerSizePrices = null;
       status.textContent = 'Saved — customers pay ₹' + v + ' for "' + (it.name || 'Item') + ' (' + sz + ')" (customer price ₹' + normal + '). It is now in ' + opTrendWhere(p) + '.'; opRenderTrending();
     }).catch(err => { status.textContent = 'Error: ' + err.message; });
@@ -12674,7 +12679,7 @@ function opTrendSave(shopId, itemKey, z) {
   const v = Number(inp.value);
   if (inp.value.trim() === '' || !isFinite(v) || v <= 0 || normal === null || v >= normal) { status.textContent = 'Offer price must be above ₹0 and lower than the customer price (₹' + normal + ').'; return; }
   status.textContent = 'Saving...';
-  update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerCustomerPrice: v, offerPrice: null }).then(() => {
+  neshOpItemUpdate(shopId, itemKey, { offerCustomerPrice: v, offerPrice: null }).then(() => {
     it.offerCustomerPrice = v; it.offerPrice = null;
     status.textContent = 'Saved — customers pay ₹' + v + ' for "' + (it.name || 'Item') + '" (customer price ₹' + normal + '). It is now in ' + opTrendWhere(p) + '.'; opRenderTrending();
   }).catch(err => { status.textContent = 'Error: ' + err.message; });
@@ -12693,14 +12698,14 @@ function opTrendClear(shopId, itemKey, z) {
     const map = {};
     opTrendPortions(p, it).forEach(k => { const o = opTrendPortionOffer(p, it, k); if (o && k !== sz) map[k] = o; });
     const val = Object.keys(map).length ? map : null;
-    update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerCustomerSizePrices: val, offerSizePrices: null }).then(() => {
+    neshOpItemUpdate(shopId, itemKey, { offerCustomerSizePrices: val, offerSizePrices: null }).then(() => {
       it.offerCustomerSizePrices = val; it.offerSizePrices = null;
       const st = document.getElementById('op-trend-status'); if (st) st.textContent = 'Offer removed.'; opRenderTrending();
     }).catch(err => { alert('Error: ' + err.message); });
     return;
   }
   if (!confirm('Remove the offer on "' + (it.name || 'this item') + '"? It leaves ' + opTrendWhere(p) + ' right away.')) return;
-  update(ref(db, 'restaurants/' + shopId + '/menu/' + itemKey), { offerCustomerPrice: null, offerPrice: null }).then(() => {
+  neshOpItemUpdate(shopId, itemKey, { offerCustomerPrice: null, offerPrice: null }).then(() => {
     it.offerCustomerPrice = null; it.offerPrice = null; const st = document.getElementById('op-trend-status'); if (st) st.textContent = 'Offer removed.'; opRenderTrending();
   }).catch(err => { alert('Error: ' + err.message); });
 }
@@ -12942,6 +12947,105 @@ function opScheduleApply() {
     opApplyPartners(list, false);
   }, 40);
 }
+/* ================= ORACLE OPERATOR MENU (Bhaagam C) =================
+   Operator menu reads come from https://api.neshapp.in/shops/:id (one shop, only when needed) and every menu write goes
+   through POST /operator/menu (server writes Firebase + Postgres together). Firebase stays the source of truth and the
+   automatic fallback for reads AND writes.
+   Switch (Firebase app_config/oracleOperator):  missing/false = Firebase only (old behaviour)
+     { "shopid1": true } = only those shops (test shop first)   |   true = all shops
+   Needs a login token (given by the server at operator login); a device logged in before this update has none and
+   simply keeps using Firebase until the operator logs out and in again.  ?oracle=0 on this device forces Firebase. */
+let neshOpCfg = null, neshOpCfgUnsub = null;
+const opMenuViaOracle = new Set();
+function neshOpToken() { try { return localStorage.getItem('nesh_op_token') || ''; } catch (e) { return ''; } }
+function neshOpOn(shopId) {
+  try { const q = new URLSearchParams(location.search).get('oracle'); if (q === '0') localStorage.setItem('nesh_op_oracle_off', '1'); if (q === '1') localStorage.removeItem('nesh_op_oracle_off'); if (localStorage.getItem('nesh_op_oracle_off') === '1') return false; } catch (e) {}
+  if (!neshOpToken()) return false;
+  const c = neshOpCfg;
+  return c === true || (!!c && typeof c === 'object' && c[shopId] === true);
+}
+function neshOpAttach(id, m) {
+  const menu = m && typeof m === 'object' && Object.keys(m).length ? m : null;
+  opMenuData[id] = menu;
+  if (opShopData[id]) { if (menu == null) delete opShopData[id].menu; else opShopData[id].menu = menu; }
+}
+function neshOpListenConfig() {
+  if (!neshOpCfgUnsub) { const { db, ref, onValue } = window.fb; neshOpCfgUnsub = onValue(ref(db, 'app_config/oracleOperator'), s => { neshOpCfg = s.val(); }, () => {}); }
+  if (!window.__neshOpPoll) window.__neshOpPoll = setInterval(async () => {   // the shop itself may change its menu: refresh the open shop once a minute
+    if (document.hidden) return;
+    const id = typeof opCurrentPartnerId !== 'undefined' ? opCurrentPartnerId : null;
+    if (!id || !opMenuViaOracle.has(id) || !neshOpOn(id)) return;
+    try { const m = await neshFetchMenu(id); if (JSON.stringify(m) !== JSON.stringify(opMenuData[id] || {})) { neshOpAttach(id, m); opScheduleApply(); } } catch (e) {}
+  }, 60000);
+}
+// 'denied' = server said wrong password | token string = ok | null = server unreachable / not set up yet
+async function neshOpLogin(username, password) {
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const r = await fetch(NESH_API + '/operator/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), signal: ctl.signal });
+    if (r.status === 401) return 'denied';
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok && j.token ? j.token : null;
+  } catch (e) { return null; } finally { clearTimeout(tm); }
+}
+async function neshOpPost(body) {
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 30000);
+  try {
+    const r = await fetch(NESH_API + '/operator/menu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ token: neshOpToken() }, body)), signal: ctl.signal });
+    if (r.status === 401) { try { localStorage.removeItem('nesh_op_token'); } catch (e) {} }   // expired / password changed: Firebase until next login
+    let j = null; try { j = await r.json(); } catch (e) {}
+    return { ok: r.ok && !!(j && j.ok), json: j };
+  } catch (e) { console.warn('Oracle operator write failed, using Firebase', e && e.message); return { ok: false, json: null }; }
+  finally { clearTimeout(tm); }
+}
+function neshOpLocal(shopId, updates, clear) {   // no Firebase listener runs for an Oracle-read menu, so refresh our copy ourselves
+  if (!opMenuViaOracle.has(shopId)) return;
+  if (clear) neshOpAttach(shopId, null);
+  else { const cur = opMenuData[shopId] || {}; neshApplyPaths(cur, updates); neshOpAttach(shopId, cur); }
+  opScheduleApply();
+}
+// updates = Firebase multi-path update RELATIVE to restaurants/{shopId}/menu
+async function neshOpMenuWrite(shopId, updates) {
+  const { db, ref, update } = window.fb;
+  let done = false;
+  if (neshOpOn(shopId)) { const r = await neshOpPost({ shopId, updates }); done = r.ok; }
+  if (!done) await update(ref(db, 'restaurants/' + shopId + '/menu'), updates);
+  neshOpLocal(shopId, updates, false);
+}
+function neshOpItemUpdate(shopId, itemKey, fields) {
+  const u = {}; Object.keys(fields).forEach(k => { if (fields[k] !== undefined) u[itemKey + '/' + k] = fields[k]; });
+  return neshOpMenuWrite(shopId, u);
+}
+async function neshOpMenuClear(shopId) {
+  const { db, ref, remove } = window.fb;
+  let done = false;
+  if (neshOpOn(shopId)) { const r = await neshOpPost({ shopId, clear: true }); done = r.ok; }
+  if (!done) await remove(ref(db, 'restaurants/' + shopId + '/menu'));
+  neshOpLocal(shopId, null, true);
+}
+// list = [{ shopId, updates }]. Oracle shops go 50 per request; the rest (or any failure) via Firebase.
+// Returns [{status:'fulfilled'|'rejected'}] in the same order, like Promise.allSettled.
+async function neshOpMulti(list) {
+  const { db, ref, update } = window.fb;
+  const out = new Array(list.length), done = new Set();
+  const via = []; list.forEach((m, i) => { if (neshOpOn(m.shopId)) via.push(i); });
+  for (let s = 0; s < via.length; s += 50) {
+    const idx = via.slice(s, s + 50);
+    const r = await neshOpPost({ multi: idx.map(i => ({ shopId: list[i].shopId, updates: list[i].updates })) });
+    if (r.ok && r.json && Array.isArray(r.json.results)) r.json.results.forEach(x => {
+      const i = idx.find(k => list[k].shopId === x.shopId && !done.has(k));
+      if (i !== undefined && x.ok) { done.add(i); out[i] = { status: 'fulfilled' }; neshOpLocal(list[i].shopId, list[i].updates, false); }
+    });
+  }
+  await Promise.all(list.map(async (m, i) => {
+    if (done.has(i)) return;
+    try { await update(ref(db, 'restaurants/' + m.shopId + '/menu'), m.updates); neshOpLocal(m.shopId, m.updates, false); out[i] = { status: 'fulfilled' }; }
+    catch (e) { out[i] = { status: 'rejected', reason: e }; }
+  }));
+  return out;
+}
+
 /* ---- DATA SAVER (zone mode): a zone shop is read child-by-child WITHOUT its `menu` (the heavy part: every item + photo link).
    A shop's menu is attached only when something needs it (opEnsureMenus): a menu screen, the shop detail, a stock action.
    Any failure falls back to the old full-shop listener, so behaviour never gets worse than before. ---- */
@@ -12952,7 +13056,7 @@ const OP_MENU_SECTIONS = ['trending', 'groceries-catalog', 'nesh-item-order', 'n
 function opDropShop(id) {
   try { if (opShopSubs[id]) opShopSubs[id](); } catch (e) {}
   try { if (opMenuSubs[id]) opMenuSubs[id](); } catch (e) {}
-  delete opShopSubs[id]; delete opShopData[id]; delete opMenuSubs[id]; delete opMenuP[id]; delete opMenuData[id]; opMenuLoaded.delete(id); opFullShops.delete(id); opShopReady.delete(id);
+  delete opShopSubs[id]; delete opShopData[id]; delete opMenuSubs[id]; delete opMenuP[id]; delete opMenuData[id]; opMenuLoaded.delete(id); opMenuViaOracle.delete(id); opFullShops.delete(id); opShopReady.delete(id);
 }
 function opSubShop(id) {
   const { db, ref, onValue } = window.fb;
@@ -12996,11 +13100,18 @@ function opEnsureMenus(ids) {
       opMenuP[id] = new Promise(res => {
         let first = true;
         const done = () => { if (first) { first = false; opMenuLoaded.add(id); res(); } };
-        opMenuSubs[id] = onValue(ref(db, 'restaurants/' + id + '/menu'), snap => {
-          opMenuData[id] = snap.val();
-          if (opShopData[id]) { if (opMenuData[id] == null) delete opShopData[id].menu; else opShopData[id].menu = opMenuData[id]; }
-          done(); opScheduleApply();
-        }, () => done());
+        const viaFirebase = () => {
+          opMenuViaOracle.delete(id);
+          opMenuSubs[id] = onValue(ref(db, 'restaurants/' + id + '/menu'), snap => {
+            opMenuData[id] = snap.val();
+            if (opShopData[id]) { if (opMenuData[id] == null) delete opShopData[id].menu; else opShopData[id].menu = opMenuData[id]; }
+            done(); opScheduleApply();
+          }, () => done());
+        };
+        if (neshOpOn(id)) {
+          neshFetchMenu(id).then(m => { opMenuViaOracle.add(id); neshOpAttach(id, m); done(); opScheduleApply(); })
+            .catch(e => { console.warn('Oracle operator menu read failed, using Firebase', id, e && e.message); viaFirebase(); });
+        } else viaFirebase();
       });
     }
     ps.push(opMenuP[id]);
@@ -13611,8 +13722,8 @@ async function opAddStockToSection() {
   say('Adding…', 'var(--marigold)');
   const { db, ref, push, set } = window.fb;
   const data = { name, desc, price: 0, unit, photo: opSecItemPhotoUrl || '', unavailable: true, sizes: [] };
-  const results = await Promise.allSettled(
-    targets.map(shop => set(push(ref(db, 'restaurants/' + shop._id + '/menu')), Object.assign({}, data)))
+  const results = await neshOpMulti(
+    targets.map(shop => ({ shopId: shop._id, updates: { [push(ref(db, 'restaurants/' + shop._id + '/menu')).key]: Object.assign({}, data) } }))
   );
   const failed = targets.filter((_, i) => results[i].status === 'rejected');
   const okCount = targets.length - failed.length;
@@ -13685,6 +13796,7 @@ async function opSecBulkImportFile(e) {
 
     const { db, ref, push, update } = window.fb;
     let totalAdded = 0, totalSkipped = 0;
+    const batch = [];
     for (let s = 0; s < shops.length; s++) {
       const shop = shops[s];
       say(`Importing… shop ${s + 1}/${shops.length}`, 'var(--marigold)');
@@ -13699,7 +13811,13 @@ async function opSecBulkImportFile(e) {
         existing.add(key); // don't re-add the same name twice within this one import
         totalAdded++;
       });
-      if (Object.keys(updates).length) await update(menuRef, updates);
+      if (Object.keys(updates).length) batch.push({ shopId: shop._id, updates });
+    }
+    if (batch.length) {
+      say('Saving to ' + batch.length + ' shop' + (batch.length === 1 ? '' : 's') + '…', 'var(--marigold)');
+      const rs = await neshOpMulti(batch);
+      const bad = batch.filter((_, i) => rs[i].status === 'rejected');
+      if (bad.length) throw new Error('could not save for: ' + bad.map(b => b.shopId).join(', ') + '. Import again to retry (shops that already have the items are skipped).');
     }
     let msg = `Done — ${totalAdded} item${totalAdded === 1 ? '' : 's'} added across ${shops.length} shop${shops.length === 1 ? '' : 's'} in "${sec.name}"`;
     if (totalSkipped) msg += ` (${totalSkipped} skipped — shop already had that item)`;
@@ -13769,7 +13887,7 @@ async function opSecBulkPhotoUpload(e) {
           const ids = s.byName[key];
           if (!ids) continue;
           for (const id of ids) {
-            await update(ref(db, 'restaurants/' + s.shopId + '/menu/' + id), { photo: url });
+            await neshOpItemUpdate(s.shopId, id, { photo: url });
             matchedThisFile++;
           }
         }
@@ -18224,7 +18342,7 @@ function opSaveItemOffer(itemId, z) {
     const map = {};
     opTrendPortions(part, it).forEach(k => { const o = opTrendPortionOffer(part, it, k); if (o) map[k] = o; });
     map[sz] = v;
-    update(path, { offerCustomerSizePrices: map, offerSizePrices: null }).then(() => {
+    neshOpItemUpdate(opCurrentPartnerId, itemId, { offerCustomerSizePrices: map, offerSizePrices: null }).then(() => {
       it.offerCustomerSizePrices = map; it.offerSizePrices = null;
       opSyncPartnerMenuItem(itemId, { offerCustomerSizePrices: map, offerSizePrices: null });
       status.textContent = 'Offer saved: ' + (it.name || itemId) + ' (' + sz + ') → customers pay ₹' + v + ' (was ₹' + normal + '). Shop is still paid its own price.';
@@ -18237,7 +18355,7 @@ function opSaveItemOffer(itemId, z) {
   const normal = opTrendCust(part, it, it.price, false);
   const v = Number(inp.value);
   if (inp.value.trim() === '' || !isFinite(v) || v <= 0 || normal === null || v >= normal) { status.textContent = 'Offer must be above ₹0 and lower than the customer price (₹' + normal + ').'; return; }
-  update(path, { offerCustomerPrice: v, offerPrice: null }).then(() => {
+  neshOpItemUpdate(opCurrentPartnerId, itemId, { offerCustomerPrice: v, offerPrice: null }).then(() => {
     it.offerCustomerPrice = v; it.offerPrice = null;
     opSyncPartnerMenuItem(itemId, { offerCustomerPrice: v, offerPrice: null });
     status.textContent = 'Offer saved: ' + (it.name || itemId) + ' → customers pay ₹' + v + ' (was ₹' + normal + '). Shop is still paid its own price.';
@@ -18261,7 +18379,7 @@ function opClearItemOffer(itemId, z) {
     opTrendPortions(part, it).forEach(k => { const o = opTrendPortionOffer(part, it, k); if (o && k !== sz) map[k] = o; });
     fields = { offerCustomerSizePrices: Object.keys(map).length ? map : null, offerSizePrices: null };
   } else fields = { offerCustomerPrice: null, offerPrice: null };
-  update(path, fields).then(() => {
+  neshOpItemUpdate(opCurrentPartnerId, itemId, fields).then(() => {
     Object.assign(it, fields); opSyncPartnerMenuItem(itemId, fields);
     status.textContent = 'Offer removed: ' + (it.name || itemId) + '.';
     opRenderAvailabilityList(); try { opRenderTrending(); } catch (e) {}
@@ -18276,7 +18394,7 @@ function opSaveItemCustomerPrice(itemId) {
   const val = raw === '' ? 0 : Number(raw);
   if (isNaN(val) || val < 0) { status.textContent = 'Enter a valid customer price (or leave empty to remove it).'; return; }
   const { db, ref, update } = window.fb;
-  update(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu/' + itemId), { customerPrice: val > 0 ? val : null })
+  neshOpItemUpdate(opCurrentPartnerId, itemId, { customerPrice: val > 0 ? val : null })
     .then(() => {
       item.customerPrice = val > 0 ? val : null;
       opSyncPartnerMenuItem(itemId, { customerPrice: item.customerPrice });
@@ -18302,7 +18420,7 @@ function opSaveItemPortionCustomerPrices(itemId) {
     if (v > 0) out[n] = v;
   }
   const { db, ref, update } = window.fb;
-  update(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu/' + itemId), { customerSizePrices: Object.keys(out).length ? out : null })
+  neshOpItemUpdate(opCurrentPartnerId, itemId, { customerSizePrices: Object.keys(out).length ? out : null })
     .then(() => {
       item.customerSizePrices = Object.keys(out).length ? out : null;
       opSyncPartnerMenuItem(itemId, { customerSizePrices: item.customerSizePrices });
@@ -18323,7 +18441,7 @@ function opSaveItemPrice(itemId) {
     return;
   }
   const { db, ref, update } = window.fb;
-  update(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu/' + itemId), { price })
+  neshOpItemUpdate(opCurrentPartnerId, itemId, { price })
     .then(() => {
       item.price = price;
       status.textContent = 'Price saved: ' + (item.name || itemId) + ' → ₹' + price + (price <= 0 ? ' (₹0 items are not orderable)' : '');
@@ -18335,7 +18453,7 @@ function opToggleItemAvailability(itemId) {
   if (!item || !opCurrentPartnerId) return;
   const { db, ref, update } = window.fb;
   const next = !item.unavailable;
-  update(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu/' + itemId), { unavailable: next })
+  neshOpItemUpdate(opCurrentPartnerId, itemId, { unavailable: next })
     .then(() => {
       item.unavailable = next;
       opRenderAvailabilityList();
@@ -18714,7 +18832,7 @@ async function opConfirmClearStock() {
   status.textContent = 'Clearing…';
   try {
     const { db, ref, remove } = window.fb;
-    await remove(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu'));
+    await neshOpMenuClear(opCurrentPartnerId);
     status.style.color = '#2C4A37';
     status.textContent = 'All stock cleared.';
     document.getElementById('op-pm-clear-stock-auth').style.display = 'none';
@@ -18774,7 +18892,7 @@ async function opAddGroceryItem() {
   try {
     const { db, ref, push, set } = window.fb;
     const data = { name, desc, price: 0, unit, photo: opAddItemPhotoDataUrl || "", unavailable: true, sizes: [] };
-    await set(push(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu')), data);
+    await neshOpMenuWrite(opCurrentPartnerId, { [push(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu')).key]: data });
     status.style.color = '#2C4A37';
     status.textContent = `Added "${name}" to ${p.restaurantName || p._id} — still hidden from customers until the shop sets a price and marks it available.`;
     document.getElementById('op-pm-item-name').value = '';
