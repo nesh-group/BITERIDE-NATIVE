@@ -6933,19 +6933,123 @@ async function saveSuggestEditor() {
 // single change anywhere in the database, which is why download usage
 // was so high. state.restId is already set before this runs (see
 // logInRestaurant above), so the direct path is safe here.
+// ================= ORACLE MENU (Bhaagam B) =================
+// Menu is read from https://api.neshapp.in/shops/:id and written through POST /partner/menu (server checks the shop
+// password, writes Firebase + Postgres together). Firebase stays the source of truth and the automatic fallback.
+// Switch (Firebase app_config/oraclePartner):  missing/false = Firebase only (old behaviour)
+//   true = all shops   |   { "shopid1": true, "shopid2": true } = only those shops (test shops first)
+// ?oracle=0 on this device forces Firebase.
+const NESH_API = 'https://api.neshapp.in';
+let neshMenuSource = 'firebase', neshMenuObj = {}, neshCfg = null, neshFbUnsub = null, neshPoll = null, neshPollBusy = false, neshCfgUnsub = null, neshMenuFor = null;
+function neshOracleActive(shopId) {
+  try { if (new URLSearchParams(location.search).get('oracle') === '0') localStorage.setItem('nesh_partner_oracle_off', '1'); if (new URLSearchParams(location.search).get('oracle') === '1') localStorage.removeItem('nesh_partner_oracle_off'); if (localStorage.getItem('nesh_partner_oracle_off') === '1') return false; } catch (e) {}
+  if (localStorage.getItem('asfood_is_operator') === '1') return false;
+  const c = neshCfg;
+  return c === true || (!!c && typeof c === 'object' && c[shopId] === true);
+}
+function neshApplyPaths(menu, upd) {
+  const clean = v => { if (v === null || v === undefined) return undefined; if (Array.isArray(v)) return v.map(x => { const c = clean(x); return c === undefined ? null : c; }); if (typeof v === 'object') { const o = {}; let n = 0; Object.keys(v).forEach(k => { const c = clean(v[k]); if (c !== undefined) { o[k] = c; n++; } }); return n ? o : undefined; } return v; };
+  const prune = o => { if (!o || typeof o !== 'object' || Array.isArray(o)) return; Object.keys(o).forEach(k => { prune(o[k]); if (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k]) && !Object.keys(o[k]).length) delete o[k]; }); };
+  Object.keys(upd).forEach(k => {
+    const segs = k.split('/'), v = clean(upd[k]); let o = menu;
+    for (let i = 0; i < segs.length - 1; i++) {
+      if (v === undefined && (o[segs[i]] === undefined || o[segs[i]] === null)) return;
+      if (typeof o[segs[i]] !== 'object' || o[segs[i]] === null || Array.isArray(o[segs[i]])) o[segs[i]] = {};
+      o = o[segs[i]];
+    }
+    const last = segs[segs.length - 1];
+    if (v === undefined) delete o[last]; else o[last] = v;
+  });
+  prune(menu);
+  return menu;
+}
+function applyMenuObj(menuObj) {
+  neshMenuObj = menuObj || {};
+  const items = Object.keys(neshMenuObj).map(k => ({ id: k, ...neshMenuObj[k] }));
+  state.menuItems = items; // cached for photo-name matching in bulk photo upload
+  if (typeof updatePopularSub === 'function') updatePopularSub();
+  filterMenuBySearch();
+  const icatScreen = document.getElementById('screen-item-categories');
+  if (icatScreen && icatScreen.classList.contains('active')) renderItemCats();
+}
+// updates = Firebase multi-path update RELATIVE to restaurants/{shopId}/menu ("itemId/price": 50, "newId": {...}, "itemId": null)
+async function neshMenuWrite(shopId, updates) {
+  const { db, ref, update } = window.fb;
+  const viaOracle = shopId === state.restId && state.restaurant && state.restaurant.password && neshOracleActive(shopId);
+  let done = false;
+  if (viaOracle) {
+    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 15000);
+    try {
+      const r = await fetch(NESH_API + '/partner/menu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shopId, password: state.restaurant.password, updates }), signal: ctl.signal });
+      if (r.ok) done = true; else console.warn('Oracle menu write refused/failed, using Firebase', r.status);
+    } catch (e) { console.warn('Oracle menu write failed, using Firebase', e && e.message); }
+    finally { clearTimeout(tm); }
+  }
+  if (!done) await update(ref(db, 'restaurants/' + shopId + '/menu'), updates);   // old direct path / fallback
+  if (shopId === state.restId && neshMenuSource === 'oracle') { neshApplyPaths(neshMenuObj, updates); applyMenuObj(neshMenuObj); }   // no Firebase listener running, refresh the list ourselves
+}
+// Same, for code that already builds absolute 'restaurants/{id}/menu/...' keys
+async function neshMenuWriteAbs(shopId, abs) {
+  const pre = 'restaurants/' + shopId + '/menu/', rel = {};
+  Object.keys(abs).forEach(k => { if (k.indexOf(pre) !== 0) throw new Error('bad menu path'); rel[k.slice(pre.length)] = abs[k]; });
+  return neshMenuWrite(shopId, rel);
+}
+// Edit = per-field paths so untouched fields stay (same as Firebase update on the item)
+const neshItemFields = (id, data) => { const o = {}; Object.keys(data).forEach(k => { if (data[k] !== undefined) o[id + '/' + k] = data[k]; }); return o; };
+
+async function neshFetchMenu(id) {
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 10000);
+  try {
+    const r = await fetch(NESH_API + '/shops/' + encodeURIComponent(id), { signal: ctl.signal, cache: 'no-cache' });   // no-cache = ETag check, tiny 304 when nothing changed
+    if (!r.ok) throw new Error('http ' + r.status);
+    const j = await r.json();
+    const sh = j && (j.shop || j.data || j);
+    if (!sh || typeof sh !== 'object') throw new Error('bad payload');
+    return sh.menu && typeof sh.menu === 'object' ? sh.menu : {};
+  } finally { clearTimeout(tm); }
+}
+function neshStartFirebaseMenu() {
+  if (neshFbUnsub) return;
+  const { db, ref, onValue } = window.fb;
+  neshFbUnsub = onValue(ref(db, 'restaurants/' + state.restId + '/menu'), snap => { if (neshMenuSource === 'firebase') applyMenuObj(snap.val() || {}); },
+    err => console.error('listenMenu onValue error:', err));
+}
+function neshStopFirebaseMenu() { if (neshFbUnsub) { try { neshFbUnsub(); } catch (e) {} neshFbUnsub = null; } }
+async function neshPollMenu() {
+  if (neshPollBusy || !state.restId || !neshOracleActive(state.restId)) return;
+  neshPollBusy = true;
+  try {
+    const m = await neshFetchMenu(state.restId);
+    if (neshMenuSource !== 'oracle') { neshMenuSource = 'oracle'; neshStopFirebaseMenu(); }
+    if (JSON.stringify(m) !== JSON.stringify(neshMenuObj)) applyMenuObj(m);
+  } catch (e) {
+    console.warn('Oracle menu read failed, using Firebase', e && e.message);
+    neshMenuSource = 'firebase'; neshStartFirebaseMenu();
+  } finally { neshPollBusy = false; }
+}
+function neshApplyConfig() {
+  if (neshOracleActive(state.restId)) {
+    neshMenuSource = neshMenuSource;   // switches to 'oracle' only after the first successful read
+    neshPollMenu();
+    if (!neshPoll) neshPoll = setInterval(() => { if (!document.hidden) neshPollMenu(); }, 60000);
+    if (!neshFbUnsub && neshMenuSource !== 'oracle') neshStartFirebaseMenu();   // show the menu from Firebase until Oracle answers
+  } else {
+    if (neshPoll) { clearInterval(neshPoll); neshPoll = null; }
+    neshMenuSource = 'firebase'; neshStartFirebaseMenu();
+  }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && neshPoll) neshPollMenu(); });
+
+// Reads only this restaurant's own menu (Oracle if switched on for this shop, else Firebase / fallback).
 function listenMenu() {
   const { db, ref, onValue } = window.fb;
-  onValue(ref(db, 'restaurants/' + state.restId + '/menu'), snap => {
-    const menuObj = snap.val() || {};
-    const items = Object.keys(menuObj).map(k => ({ id: k, ...menuObj[k] }));
-    state.menuItems = items; // cached for photo-name matching in bulk photo upload
-    if (typeof updatePopularSub === 'function') updatePopularSub();
-    filterMenuBySearch();
-    const icatScreen = document.getElementById('screen-item-categories');
-    if (icatScreen && icatScreen.classList.contains('active')) renderItemCats();
-  }, (err) => {
-    console.error('listenMenu onValue error:', err);
-  });
+  if (neshMenuFor !== state.restId) {   // new login / different shop: reset
+    neshStopFirebaseMenu(); if (neshPoll) { clearInterval(neshPoll); neshPoll = null; }
+    if (neshCfgUnsub) { try { neshCfgUnsub(); } catch (e) {} neshCfgUnsub = null; }
+    neshMenuSource = 'firebase'; neshMenuObj = {}; neshCfg = null; neshMenuFor = state.restId;
+  }
+  neshStartFirebaseMenu();   // start from Firebase straight away; moves to Oracle when the switch says so
+  if (!neshCfgUnsub) neshCfgUnsub = onValue(ref(db, 'app_config/oraclePartner'), s => { neshCfg = s.val(); neshApplyConfig(); }, () => {});
 }
 
 // Filters the cached menu items by the Stock screen's search box (name or
@@ -7001,7 +7105,7 @@ async function applyBulkPrice() {
       updates['restaurants/' + state.restId + '/menu/' + id + '/price'] = newPrice;
       updates['restaurants/' + state.restId + '/menu/' + id + '/priceUpdatedAt'] = Date.now();
     });
-    await update(ref(db), updates);
+    await neshMenuWriteAbs(state.restId, updates);
     statusEl.textContent = "Updated " + ids.length + " item(s) to ₹" + newPrice + ".";
     exitBulkPriceMode();
   } catch (e) {
@@ -7058,7 +7162,7 @@ async function applyBulkUnit() {
     // unit, instead of ids.length separate round-trips.
     const updates = {};
     ids.forEach(id => { updates['restaurants/' + state.restId + '/menu/' + id + '/unit'] = newUnit; });
-    await update(ref(db), updates);
+    await neshMenuWriteAbs(state.restId, updates);
     const unitLabel = newUnit === 'gram' ? 'Gram' : newUnit === 'kg' ? 'Kg' : 'Piece';
     statusEl.textContent = "Updated " + ids.length + " item(s) to " + unitLabel + ".";
     exitBulkUnitMode();
@@ -7116,7 +7220,7 @@ async function applyBulkStock(makeAvailable) {
     // availability, instead of ids.length separate round-trips.
     const updates = {};
     ids.forEach(id => { updates['restaurants/' + state.restId + '/menu/' + id + '/unavailable'] = !makeAvailable; });
-    await update(ref(db), updates);
+    await neshMenuWriteAbs(state.restId, updates);
     statusEl.textContent = "Marked " + ids.length + " item(s) " + (makeAvailable ? "in stock." : "out of stock.");
     exitBulkStockMode();
   } catch (e) {
@@ -7179,8 +7283,7 @@ async function saveIndivPrices() {
   saveBtn.disabled = true;
   statusEl.textContent = "Saving " + count + " change(s)…";
   try {
-    const { db, ref, update } = window.fb;
-    await update(ref(db), updates);
+    await neshMenuWriteAbs(state.restId, updates);
     statusEl.textContent = "Saved " + count + " price change(s).";
     exitIndivPriceMode();
   } catch (e) {
@@ -7291,7 +7394,7 @@ function renderMenu(items, isSearchFiltered) {
             availBtn.disabled = true;
             try {
               const { db, ref, update } = window.fb;
-              await update(ref(db, 'restaurants/' + state.restId + '/menu/' + it.id), { unavailable: !it.unavailable });
+              await neshMenuWrite(state.restId, { [it.id + '/unavailable']: !it.unavailable });
               showToast(it.unavailable ? 'Marked available' : 'Marked unavailable');
             } catch (err) {
               availBtn.disabled = false;
@@ -7530,9 +7633,9 @@ async function saveItem() {
       if (Object.keys(keep).length !== before) data.offerSizePrices = Object.keys(keep).length ? keep : null;
     }
     if (state.editingItemId) {
-      await update(ref(db, 'restaurants/' + state.restId + '/menu/' + state.editingItemId), data);
+      await neshMenuWrite(state.restId, neshItemFields(state.editingItemId, data));
     } else {
-      await set(push(ref(db, 'restaurants/' + state.restId + '/menu')), data);
+      await neshMenuWrite(state.restId, { [push(ref(db, 'restaurants/' + state.restId + '/menu')).key]: data });
     }
     if (state.editingItemId && state.oldItemPhoto) nshPhotoChanged(state.oldItemPhoto, state.photoDataUrl || '');
     showToast(state.editingItemId ? "Item updated" : "Item added to your menu");
@@ -7622,7 +7725,7 @@ async function importPhotosForShop(files, targetRestId, statusEl, btn, menuItems
 
         const matchId = nameToId[normalizeMatchName(stripExt(file.name))];
         if (matchId) {
-          await update(ref(db, 'restaurants/' + targetRestId + '/menu/' + matchId), { photo: url });
+          await neshMenuWrite(targetRestId, { [matchId + '/photo']: url });
           attached++;
         } else {
           unmatched.push({ file: file.name, url });
@@ -7823,13 +7926,13 @@ async function importMenuFileForShop(file, targetRestId, groceriesShop, statusEl
 
       if (pending >= BATCH_SIZE) {
         statusEl.textContent = `Importing… ${added + skipped}/${rows.length} rows processed`;
-        await update(menuRef, updates);
+        await neshMenuWrite(targetRestId, updates);
         updates = {};
         pending = 0;
       }
     }
     if (pending > 0) {
-      await update(menuRef, updates);
+      await neshMenuWrite(targetRestId, updates);
     }
 
     // Item categories (tabs on the shop's menu): add to an existing category with the same name, else create a new one.
@@ -7878,7 +7981,7 @@ async function deleteItem() {
   if (!confirm("Delete this item from your menu?")) return;
   try {
     const { db, ref, remove } = window.fb;
-    await remove(ref(db, 'restaurants/' + state.restId + '/menu/' + state.editingItemId));
+    await neshMenuWrite(state.restId, { [state.editingItemId]: null });
     showToast("Item deleted");
     showScreen('home');
   } catch (e) {
