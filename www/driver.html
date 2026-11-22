@@ -1667,6 +1667,59 @@ function hasBackgroundGeolocationPlugin() {
   return !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation);
 }
 
+// ---------- Oracle location ping (extra copy of the location, sent to api.neshapp.in) ----------
+// Firebase writes below are UNCHANGED; this only ADDS a ping to the Oracle server, so if Oracle is down nothing breaks.
+// Switch (Firebase): app_config/oracleDriverPing = true -> all drivers | "zoneId1,zoneId2" -> only drivers of those zones | missing/false -> off.
+const ORACLE_API = 'https://api.neshapp.in';
+let oraclePingOn = false, oracleCfgAt = 0, oracleFailUntil = 0, oracleLoginBusy = false;
+
+function oracleLoadCfg() {
+  try {
+    const { db, ref, get } = window.fb;
+    get(ref(db, 'app_config/oracleDriverPing')).then(snap => {
+      const v = snap.val();
+      if (v === true) oraclePingOn = true;
+      else if (typeof v === 'string' && v.trim()) {
+        const zones = v.split(',').map(x => x.trim());
+        oraclePingOn = !!(state.driver && zones.indexOf(String(state.driver.zone)) !== -1);
+      } else oraclePingOn = false;
+    }).catch(() => {});
+  } catch (e) {}
+}
+function oracleToken() {
+  try { return localStorage.getItem('nesh_driver_token_for') === state.username ? localStorage.getItem('nesh_driver_token') : null; } catch (e) { return null; }
+}
+function oracleLogin() {
+  if (oracleLoginBusy || !state.username || !state.driver || !state.driver.password) return;
+  oracleLoginBusy = true;
+  fetch(ORACLE_API + '/driver/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: state.username, password: state.driver.password })
+  }).then(r => r.json().catch(() => ({}))).then(j => {
+    if (j && j.ok && j.token) {
+      try { localStorage.setItem('nesh_driver_token', j.token); localStorage.setItem('nesh_driver_token_for', state.username); } catch (e) {}
+    } else oracleFailUntil = Date.now() + 10 * 60 * 1000;   // wrong/changed password or not approved: don't hammer the server
+  }).catch(() => { oracleFailUntil = Date.now() + 60 * 1000; })
+    .finally(() => { oracleLoginBusy = false; });
+}
+function oraclePing(lat, lng) {
+  try {
+    if (!state.username || !window.fb) return;
+    const now = Date.now();
+    if (now - oracleCfgAt > 5 * 60 * 1000) { oracleCfgAt = now; oracleLoadCfg(); }
+    if (!oraclePingOn || now < oracleFailUntil) return;
+    const token = oracleToken();
+    if (!token) { oracleLogin(); return; }
+    fetch(ORACLE_API + '/driver/ping', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: token, lat: lat, lng: lng })
+    }).then(r => {
+      if (r.status === 401) { try { localStorage.removeItem('nesh_driver_token'); } catch (e) {} oracleFailUntil = Date.now() + 60 * 1000; }
+      else if (!r.ok) oracleFailUntil = Date.now() + 60 * 1000;
+    }).catch(() => { oracleFailUntil = Date.now() + 60 * 1000; });
+  } catch (e) {}
+}
+
 // Shared by both tracking paths below — writes the fix into local state
 // (for any "X km away" chips) and, throttled, up to Firebase.
 function handleDriverLocationFix(latitude, longitude) {
@@ -1696,6 +1749,7 @@ function handleDriverLocationFix(latitude, longitude) {
     // like "the driver marker just isn't moving" with nothing to go on.
     console.warn('Location write to taxi_drivers failed:', e);
   });
+  oraclePing(latitude, longitude);
 }
 
 function startBrowserLocationWatch() {
@@ -1732,6 +1786,7 @@ function startLocationHeartbeat() {
     update(ref(db, 'taxi_drivers/' + state.username), {
       location: { lat: state.myLocation.lat, lng: state.myLocation.lng, updatedAt: now },
     }).catch((e) => { console.warn('Location heartbeat write failed:', e); });
+    oraclePing(state.myLocation.lat, state.myLocation.lng);
     // Also poke the native health-check Worker here, not just from a
     // fresh GPS fix in handleDriverLocationFix(). Without this, a driver
     // who's simply stationary (parked, waiting for a job — very normal)
@@ -5011,7 +5066,7 @@ async function doRegisterDriver() {
       return;
     }
     const photoForLocal = regPhotoDataUrl;
-    const photoOk = photoForLocal ? await saveDriverPhoto(username, photoForLocal) : false;
+    const photoOk = photoForLocal ? await saveDriverPhoto(username, photoForLocal, true) : false;
     const record = {
       name, phone, vehicleNumber, username, password,
       vehicleType: selectedRegType,
@@ -5023,6 +5078,7 @@ async function doRegisterDriver() {
     };
     if (photoForLocal) {
       record.hasPhoto = true;
+      if (photoOk && window.__driverPhotoUrl) record.photoUrl = window.__driverPhotoUrl;
       if (!photoOk) record.photo = photoForLocal; // fallback: old behaviour
     }
     await set(ref(db, 'taxi_drivers/' + username), record);
@@ -5156,12 +5212,44 @@ function listenOwnApprovalStatus(id) {
 // driver record only carries a tiny hasPhoto flag. Everything here falls
 // back to the old behaviour if the new node can't be written, so a photo
 // can never be lost or block registration.
-async function saveDriverPhoto(id, dataUrl) {
+// The photo is also uploaded to Cloudflare R2 (same upload Worker the partner app uses) and only its LINK is kept on the driver
+// record (taxi_drivers/{id}/photoUrl) - customers then load the photo from that link (cached) instead of from Firebase.
+window.NESH_UPLOAD_ENDPOINT = 'https://photo-uplod.neshgroup1.workers.dev';
+async function uploadDriverPhotoToR2(dataUrl) {
   try {
-    const { db, ref, set } = window.fb;
-    await set(ref(db, 'driver_photos/' + id), dataUrl);
+    const blob = await (await fetch(dataUrl)).blob();
+    const fd = new FormData(); fd.append('file', blob, 'photo.jpg');
+    const r = await fetch(window.NESH_UPLOAD_ENDPOINT, { method: 'POST', body: fd });
+    if (!r.ok) return '';
+    const j = await r.json();
+    return j && j.url ? String(j.url) : '';
+  } catch (e) { return ''; }
+}
+async function saveDriverPhoto(id, dataUrl, isNewRecord) {
+  try {
+    const { db, ref, set, update } = window.fb;
+    await set(ref(db, 'driver_photos/' + id), dataUrl);   // kept: older app versions still read it
+    const url = await uploadDriverPhotoToR2(dataUrl);
+    window.__driverPhotoUrl = url || '';
+    if (url && !isNewRecord) { try { await update(ref(db, 'taxi_drivers/' + id), { photoUrl: url }); } catch (e) {} }
     return true;
   } catch (e) { return false; }
+}
+// One time per driver: a photo saved before this update gets its link too (uploaded from this driver's own saved photo).
+function migrateDriverPhotoLink(id) {
+  if (!window.fb || !id) return;
+  const flag = 'nesh_photo_link_done_' + id;
+  try { if (localStorage.getItem(flag) === '1') return; } catch (e) {}
+  const { db, ref, get, update } = window.fb;
+  get(ref(db, 'taxi_drivers/' + id + '/photoUrl')).then(async snap => {
+    if (snap.val()) { try { localStorage.setItem(flag, '1'); } catch (e) {} return; }
+    const p = (await get(ref(db, 'driver_photos/' + id))).val();
+    if (typeof p !== 'string' || p.indexOf('data:image') !== 0) return;   // no photo yet (or still being moved) - try again next login
+    const url = await uploadDriverPhotoToR2(p);
+    if (!url) return;
+    await update(ref(db, 'taxi_drivers/' + id), { photoUrl: url });
+    try { localStorage.setItem(flag, '1'); } catch (e) {}
+  }).catch(() => {});
 }
 async function fetchDriverPhoto(id) {
   try {
@@ -5185,6 +5273,7 @@ function migrateLegacyDriverPhoto(id) {
 
 function logInDriver(username, data) {
   migrateLegacyDriverPhoto(username);
+  migrateDriverPhotoLink(username);
   state.username = username;
   state.driver = data;
   localStorage.setItem('nesh_driver_id', username);
@@ -5381,18 +5470,18 @@ document.getElementById('logout-btn').addEventListener('click', () => {
     }
   } catch (e) {}
   stopLocationTracking();
-  localStorage.removeItem('nesh_driver_id');
+  localStorage.removeItem('nesh_driver_id'); try { localStorage.removeItem('nesh_driver_token'); } catch (e) {}
   localStorage.removeItem('nesh_driver_data');
   location.reload();
 });
 
 document.getElementById('pending-logout-btn').addEventListener('click', () => {
-  localStorage.removeItem('nesh_driver_id');
+  localStorage.removeItem('nesh_driver_id'); try { localStorage.removeItem('nesh_driver_token'); } catch (e) {}
   localStorage.removeItem('nesh_driver_data');
   location.reload();
 });
 document.getElementById('rejected-logout-btn').addEventListener('click', () => {
-  localStorage.removeItem('nesh_driver_id');
+  localStorage.removeItem('nesh_driver_id'); try { localStorage.removeItem('nesh_driver_token'); } catch (e) {}
   localStorage.removeItem('nesh_driver_data');
   location.reload();
 });
@@ -6161,7 +6250,7 @@ function init() {
     if (snap.exists()) {
       logInDriver(savedId, snap.val());
     } else if (!settled || cached) {
-      localStorage.removeItem('nesh_driver_id');
+      localStorage.removeItem('nesh_driver_id'); try { localStorage.removeItem('nesh_driver_token'); } catch (e) {}
       localStorage.removeItem('nesh_driver_data');
       showScreen('login');
     }
