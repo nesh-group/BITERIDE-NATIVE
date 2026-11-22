@@ -5243,7 +5243,9 @@ function useGpsFor(inputId, btnId) {
 
 // ---------- LOGIN ----------
 const OPERATOR_USERNAME = "AFSALKN";
-const OPERATOR_PASSWORD = "AFsa12@*";
+// Usernames nobody may register for a shop (the operator login name, in any capitalisation).
+const RESERVED_USERNAMES = [OPERATOR_USERNAME.toLowerCase(), 'operator'];
+function isReservedUsername(u) { return RESERVED_USERNAMES.indexOf(String(u || '').trim().toLowerCase()) >= 0; }
 
 /* Shop login / app-open data saver: the shop app only needs the shop's PROFILE fields here (name, address,
    status, hours, discount, zone...). menu / orders / categories / settlements have their own listeners, so
@@ -5280,11 +5282,15 @@ async function doLogin() {
     errEl.style.display = "block";
     return;
   }
-  // Server checks the operator password and hands back a token for /operator/menu. If the server is unreachable the
-  // old local check still lets the operator in (that check goes away once the server login is proven).
+  // The server checks the operator password and hands back a token for /operator/menu.
   const opTok = username === OPERATOR_USERNAME ? await neshOpLogin(username, password) : null;
-  if (username === OPERATOR_USERNAME && opTok !== 'denied' && (opTok || password === OPERATOR_PASSWORD)) {
-    try { if (opTok) localStorage.setItem('nesh_op_token', opTok); else localStorage.removeItem('nesh_op_token'); } catch (e) {}
+  if (username === OPERATOR_USERNAME && opTok === null) {   // server unreachable (the password is checked only on the server)
+    errEl.textContent = "Cannot reach the server. Check your internet and try again.";
+    errEl.style.display = "block";
+    return;
+  }
+  if (username === OPERATOR_USERNAME && opTok !== 'denied') {
+    try { localStorage.setItem('nesh_op_token', opTok); } catch (e) {}
     localStorage.setItem('asfood_is_operator', '1');
     document.getElementById('login-username').value = '';
     document.getElementById('login-password').value = '';
@@ -6511,6 +6517,11 @@ async function doRegister() {
       return;
     }
 
+    if (isReservedUsername(username)) {
+      errEl.textContent = "This username is already taken";
+      errEl.style.display = "block";
+      return;
+    }
     const snap = await get(ref(db, 'restaurants/' + username));
     let taken = snap.exists();
     if (!taken) {
@@ -12969,8 +12980,29 @@ function neshOpAttach(id, m) {
   opMenuData[id] = menu;
   if (opShopData[id]) { if (menu == null) delete opShopData[id].menu; else opShopData[id].menu = menu; }
 }
+// Operator session is tied to the server password: when it is changed on the server, every operator phone is logged out
+// (checked on open, on coming back to the app and every 2 minutes). Only an explicit 401 logs out - no internet never does.
+function neshOpForceLogout() {
+  if (window.__neshOpOut) return; window.__neshOpOut = true;
+  try { opLogout(); } catch (e) {}
+  setTimeout(() => { try { const el = document.getElementById('login-error'); if (el) { el.textContent = 'Session ended. Please log in again.'; el.style.display = 'block'; } } catch (e) {} window.__neshOpOut = false; }, 400);
+}
+async function neshOpCheck() {
+  try { if (localStorage.getItem('asfood_is_operator') !== '1') return; } catch (e) { return; }
+  if (!neshOpToken()) { neshOpForceLogout(); return; }   // an old session from before the server login: log in again once
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const r = await fetch(NESH_API + '/operator/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: neshOpToken() }), signal: ctl.signal });
+    if (r.status === 401) neshOpForceLogout();
+  } catch (e) {} finally { clearTimeout(tm); }
+}
 function neshOpListenConfig() {
   if (!neshOpCfgUnsub) { const { db, ref, onValue } = window.fb; neshOpCfgUnsub = onValue(ref(db, 'app_config/oracleOperator'), s => { neshOpCfg = s.val(); }, () => {}); }
+  neshOpCheck();
+  if (!window.__neshOpChk) {
+    window.__neshOpChk = setInterval(() => { if (!document.hidden) neshOpCheck(); }, 120000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) neshOpCheck(); });
+  }
   if (!window.__neshOpPoll) window.__neshOpPoll = setInterval(async () => {   // the shop itself may change its menu: refresh the open shop once a minute
     if (document.hidden) return;
     const id = typeof opCurrentPartnerId !== 'undefined' ? opCurrentPartnerId : null;
@@ -12993,7 +13025,7 @@ async function neshOpPost(body) {
   const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 30000);
   try {
     const r = await fetch(NESH_API + '/operator/menu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ token: neshOpToken() }, body)), signal: ctl.signal });
-    if (r.status === 401) { try { localStorage.removeItem('nesh_op_token'); } catch (e) {} }   // expired / password changed: Firebase until next login
+    if (r.status === 401) { try { localStorage.removeItem('nesh_op_token'); } catch (e) {} neshOpForceLogout(); }   // password changed / expired: this write still goes through Firebase, then the operator logs in again
     let j = null; try { j = await r.json(); } catch (e) {}
     return { ok: r.ok && !!(j && j.ok), json: j };
   } catch (e) { console.warn('Oracle operator write failed, using Firebase', e && e.message); return { ok: false, json: null }; }
@@ -17965,6 +17997,7 @@ async function opCreateShop() {
   status.textContent = 'Creating…';
   try {
     const { db, ref, get, set, update } = window.fb;
+    if (isReservedUsername(username)) { fail('This username is reserved.'); btn.disabled = false; return; }
     const snap = await get(ref(db, 'restaurants/' + username));
     let taken = snap.exists();
     if (!taken) { try { const ix = await get(ref(db, 'shopIds')); if (ix.exists()) taken = Object.keys(ix.val() || {}).some(k => k.toLowerCase() === username); } catch (e) {} }
