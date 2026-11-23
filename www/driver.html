@@ -3164,7 +3164,7 @@ var deliveriesReady = false;
 // so other riders' orders from the last 24 hours are no longer downloaded. The index is built once (and re-checked weekly)
 // from the old 24-hour load, see deliveryBuildIndex. If anything about the index fails, the app stays in the old mode.
 var DELIVERY_PENDING_WINDOW_MS = 2 * 60 * 60 * 1000;
-var DELIVERY_RECHECK_MS = 7 * 24 * 3600 * 1000;
+var DELIVERY_RECHECK_MS = 3650 * 24 * 3600 * 1000;   // was 7 days: the weekly heavy re-check downloaded every shop's orders; the own-order index is written at accept time (see driver_delivery_days), so it only runs once per driver now
 var deliveryLight = false;
 var ownDeliveryOrders = {};   // 'restId::orderId' -> { restId, orderId, data, unsub }
 var DELIVERY_SHOP_FIELDS = ['restaurantName', 'name', 'address', 'location', 'phone', 'goSeries', 'businessType'];
