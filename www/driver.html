@@ -1686,6 +1686,153 @@ function oracleLoadCfg() {
     }).catch(() => {});
   } catch (e) {}
 }
+// ---------- Track 2 switch: stop streaming OTHER drivers' fields (bandwidth) ----------
+// Switch (Firebase): app_config/driverListenersOff = true -> all drivers | "zoneId1,zoneId2" -> only drivers of those zones | missing/false -> OFF (this phone behaves exactly as before).
+// When ON this phone no longer listens to every other driver's online/busy/zone fields (nor re-downloads the driver id list). It follows the
+// server's dispatch.pool as before; a job it cannot rank (no pool / empty pool) is SHOWN to the driver (fail-open, accept is atomic) instead of being held.
+// The value is read once at start; any read problem = OFF, so a failure can never hide jobs.
+var LISTENERS_OFF = false;
+function listenersOffLoad(done) {
+  let finished = false;
+  const fin = () => { if (finished) return; finished = true; try { done(); } catch (e) { console.error('listenersOffLoad', e); } };
+  const timer = setTimeout(fin, 3000);
+  try {
+    const { db, ref, get } = window.fb;
+    get(ref(db, 'app_config/driverListenersOff')).then(snap => {
+      if (finished) return;                       // answer came after the 3 s timeout: the old behaviour already started, keep it
+      const v = snap.val();
+      if (v === true) LISTENERS_OFF = true;
+      else if (typeof v === 'string' && v.trim()) {
+        const zones = v.split(',').map(x => x.trim());
+        LISTENERS_OFF = !!(state.driver && state.driver.zone != null && zones.indexOf(String(state.driver.zone)) !== -1);
+      } else LISTENERS_OFF = false;
+    }).catch(() => { LISTENERS_OFF = false; }).then(() => { clearTimeout(timer); fin(); });
+  } catch (e) { LISTENERS_OFF = false; clearTimeout(timer); fin(); }
+}
+// ---------- Track 2b: offer inbox (bandwidth) - served by the Oracle server, NOT Firebase ----------
+// Switch (Firebase, one tiny read at start): app_config/driverInbox = true -> all drivers | "zoneId1,zoneId2" -> only those zones | missing/false -> OFF.
+// When ON this phone asks api.neshapp.in/driver/offers (long-poll) for its open offers. Each offer carries the WHOLE card
+// (order/ride + shop fields), so the phone reads no order, no shop and no driver data from Firebase for offers, and it shows the card
+// WITHOUT its own ranking (the server already chose this driver). The server removes an offer when the job is taken/cancelled.
+// There is NO fallback to the Firebase listeners: if the server cannot be reached the loop just keeps retrying (the FCM ring and its
+// tap-to-open card still work, and the Worker takes over rings if the server's heartbeat stops).
+var INBOX_ON = false;
+var inboxOffers = {};       // id -> { kind, expiresAt (phone serverNow() scale), timer }
+var inboxCards = {};        // 'restId::orderId' -> delivery card from the server
+var inboxRideVal = {};      // rideId -> ride card from the server
+var inboxMetaAsked = {};    // restId -> true
+var inboxLoopOn = false, inboxV = '', inboxCtl = null, ridesApplyHook = null;
+function inboxSwitchLoad(done) {
+  let finished = false;
+  const fin = () => { if (finished) return; finished = true; try { done(); } catch (e) { console.error('inboxSwitchLoad', e); } };
+  const timer = setTimeout(fin, 3000);
+  try {
+    const { db, ref, get } = window.fb;
+    get(ref(db, 'app_config/driverInbox')).then(snap => {
+      if (finished) return;
+      const v = snap.val();
+      if (v === true) INBOX_ON = true;
+      else if (typeof v === 'string' && v.trim()) {
+        const zones = v.split(',').map(x => x.trim());
+        INBOX_ON = !!(state.driver && state.driver.zone != null && zones.indexOf(String(state.driver.zone)) !== -1);
+      } else INBOX_ON = false;
+    }).catch(() => { INBOX_ON = false; }).then(() => { clearTimeout(timer); fin(); });
+  } catch (e) { INBOX_ON = false; clearTimeout(timer); fin(); }
+}
+function isInboxOffered(id) {
+  const o = inboxOffers[id];
+  return !!o && Number(o.expiresAt) > serverNow();
+}
+function inboxShopMeta(restId) {   // only for the rider's OWN older orders (their shop name/address): a few small fields, fetched once, no listener
+  if (inboxMetaAsked[restId] || deliveryShopSubs[restId]) return;
+  inboxMetaAsked[restId] = true;
+  const { db, ref, get } = window.fb;
+  Promise.all(DELIVERY_SHOP_FIELDS.map(f => get(ref(db, 'restaurants/' + restId + '/' + f)))).then(snaps => {
+    const d = deliveryShopData[restId] || (deliveryShopData[restId] = {});
+    DELIVERY_SHOP_FIELDS.forEach((f, i) => { const v = snaps[i].val(); if (v != null && d[f] == null) d[f] = v; });
+    deliveryRebuild();
+  }).catch(() => { delete inboxMetaAsked[restId]; });
+}
+function inboxDrop(id) {
+  const o = inboxOffers[id];
+  if (!o) return;
+  if (o.timer) clearTimeout(o.timer);
+  const kind = o.kind;
+  delete inboxOffers[id];
+  if (kind === 'delivery') { delete inboxCards[id]; deliveryRebuild(); }
+  else { delete inboxRideVal[id]; if (ridesApplyHook) ridesApplyHook(); }
+  if (state.isOnline) { try { refreshRidePopupFromCache(); } catch (e) {} }
+}
+// list = [{ id, kind, expiresAt (server clock), card }], now = server clock when the answer was made
+function inboxApply(list, now) {
+  const wanted = {};
+  (Array.isArray(list) ? list : []).forEach(o => {
+    if (!o || (o.kind !== 'ride' && o.kind !== 'delivery') || !o.id || !o.card || typeof o.card !== 'object') return;
+    const left = Number(o.expiresAt) - Number(now);
+    if (!(left > 0)) return;
+    wanted[String(o.id)] = { kind: o.kind, exp: serverNow() + left, card: o.card };
+  });
+  Object.keys(inboxOffers).forEach(x => { if (!wanted[x]) inboxDrop(x); });
+  Object.keys(wanted).forEach(id => {
+    const w = wanted[id], had = inboxOffers[id];
+    if (had && had.timer) clearTimeout(had.timer);
+    const o = had || (inboxOffers[id] = { kind: w.kind, expiresAt: w.exp, timer: null });
+    o.expiresAt = w.exp;
+    o.timer = setTimeout(() => { const cur = inboxOffers[id]; if (cur && Number(cur.expiresAt) <= serverNow() + 100) inboxDrop(id); }, Math.max(0, w.exp - serverNow()) + 300);
+    if (w.kind === 'delivery') {
+      inboxCards[id] = w.card;
+      const rid = String(id).split('::')[0], d = deliveryShopData[rid] || (deliveryShopData[rid] = {}), c = w.card;   // shop fields for the later "my order" screens, from the card itself
+      if (c._restName && d.restaurantName == null) d.restaurantName = c._restName;
+      if (c._restAddress && d.address == null) d.address = c._restAddress;
+      if (c._restLocation && d.location == null) d.location = c._restLocation;
+      if (c._restPhone && d.phone == null) d.phone = c._restPhone;
+      if (d.goSeries == null) d.goSeries = !!c._restGoSeries;
+      if (c._restIsGroceries && d.businessType == null) d.businessType = 'groceries';
+    } else inboxRideVal[id] = w.card;
+  });
+  deliveryRebuild();
+  if (ridesApplyHook) ridesApplyHook();
+  if (state.isOnline) { try { refreshRidePopupFromCache(); } catch (e) {} }
+}
+const inboxSleep = ms => new Promise(r => setTimeout(r, ms));
+async function inboxLoop() {
+  if (inboxLoopOn) return;
+  inboxLoopOn = true;
+  let backoff = 2000;
+  while (INBOX_ON) {
+    try {
+      if (Date.now() < oracleFailUntil) { await inboxSleep(3000); continue; }
+      const token = oracleToken();
+      if (!token) { oracleLogin(); await inboxSleep(3000); continue; }
+      inboxCtl = new AbortController();
+      const timer = setTimeout(() => { try { inboxCtl.abort(); } catch (e) {} }, 35000);   // the server answers within 25 s
+      let r;
+      try {
+        r = await fetch(ORACLE_API + '/driver/offers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: inboxCtl.signal, body: JSON.stringify({ token: token, v: inboxV }) });
+      } finally { clearTimeout(timer); }
+      if (r.status === 401) { try { localStorage.removeItem('nesh_driver_token'); } catch (e) {} inboxV = ''; await inboxSleep(3000); continue; }
+      if (!r.ok) throw new Error('http ' + r.status);
+      const j = await r.json();
+      backoff = 2000;
+      if (!j || j.ok !== true) throw new Error('bad answer');
+      if (j.unchanged) continue;
+      inboxV = typeof j.v === 'string' ? j.v : '';
+      inboxApply(j.offers, j.now);
+    } catch (e) {
+      if (e && e.name === 'AbortError') continue;
+      await inboxSleep(backoff); backoff = Math.min(backoff * 2, 30000);
+    }
+  }
+  inboxLoopOn = false;
+}
+function startInbox() {
+  if (!INBOX_ON || !state.username) return;
+  console.log('offer inbox ON (served by api.neshapp.in)');
+  inboxLoop();
+  document.addEventListener('visibilitychange', () => {   // back from the background: ask again at once
+    if (!document.hidden && INBOX_ON) { inboxV = ''; try { if (inboxCtl) inboxCtl.abort(); } catch (e) {} }
+  });
+}
 function oracleToken() {
   try { return localStorage.getItem('nesh_driver_token_for') === state.username ? localStorage.getItem('nesh_driver_token') : null; } catch (e) { return null; }
 }
@@ -2647,7 +2794,10 @@ function listenDrivers() {
     const zoneEl = document.getElementById('account-zone');
     if (zoneEl) zoneEl.value = state.driver.zoneName || '';
   });
-  driverDirSync();
+  listenersOffLoad(() => {
+    if (LISTENERS_OFF) { console.log('driver directory listeners OFF (app_config/driverListenersOff)'); return; }
+    driverDirSync();
+  });
 }
 function listenDriversFull() {
   const { db, ref, onValue } = window.fb;
@@ -3042,6 +3192,12 @@ function deliveryRebuild() {
       const rest = deliveryShopData[e.restId] || {};
       flat.push(Object.assign({ _restId: e.restId, _orderId: e.orderId, _restName: rest.restaurantName || rest.name || '', _restAddress: rest.address || '', _restLocation: rest.location || null, _restPhone: rest.phone || '', _restGoSeries: !!rest.goSeries, _restIsGroceries: rest.businessType === 'groceries' }, e.data));
     });
+    // orders the server offered to this rider through the inbox (Track 2b): the card comes complete from api.neshapp.in
+    Object.keys(inboxCards).forEach(key => {
+      const c = inboxCards[key];
+      if (!c || seenKeys[key] || (ownDeliveryOrders[key] && ownDeliveryOrders[key].data)) return;
+      flat.push(Object.assign({}, c));
+    });
     deliveriesCache = flat;
     deliveriesReady = true;
     renderHomeLists();
@@ -3134,6 +3290,7 @@ function ownDeliveryAttach(key) {
   const { db, ref, onValue } = window.fb;
   const entry = { restId, orderId, data: null, unsub: null };
   ownDeliveryOrders[key] = entry;
+  if (INBOX_ON) inboxShopMeta(restId);   // shop listeners are off in inbox mode: fetch the few shop fields once
   entry.unsub = onValue(ref(db, 'restaurants/' + restId + '/orders/' + orderId), snap => {
     entry.data = snap.val();
     if (entry.data && entry.data.status === 'delivered' && entry.unsub) { try { entry.unsub(); } catch (e) {} entry.unsub = null; }   // a delivered order never changes
@@ -3180,7 +3337,8 @@ function listenDeliveryJobs() {
   const go = (light) => {
     deliveryLight = light;
     if (light) ownDeliveriesStart();
-    deliveryDirSync();
+    if (INBOX_ON && light) { deliveriesReady = true; deliveryRebuild(); }   // Track 2b: offers come from the inbox, no per-shop order listeners
+    else deliveryDirSync();
     if (!light) deliveryBuildIndex();
   };
   get(ref(db, 'taxi_drivers/' + state.username + '/deliveriesIndexedAt')).then(snap => {
@@ -3913,6 +4071,7 @@ function shouldOfferToMe(pickup, createdAt, matchFn, amIBusy, useGroup, job) {
 
   const pooled = poolOfferDecision(pickup, createdAt, amIBusy, useGroup, job);
   if (pooled !== null) return pooled;   // decided from the Worker's frozen driver order - no location streaming
+  if (LISTENERS_OFF) return true;       // Track 2: no directory on this phone -> cannot rank -> show the job (fail-open; accept is atomic)
   if (!driverLocTouch(pickup, useGroup)) return false; // other drivers' live locations are still loading - hold the offer for a moment
   let road = null;
   if (job && job.path && roadActive()) {
@@ -4184,7 +4343,7 @@ function refreshRidePopupFromCache() {
           const forcedTo = r.assignedDriverId || r.candidateDriverId || r.chosenDriverId;
           return forcedTo ? forcedTo === state.username : r.vehicleType === state.driver.vehicleType;
         })
-        .filter(r => r.assignedDriverId === state.username || r.candidateDriverId === state.username || r.chosenDriverId === state.username || isNativePinned(r._id) || shouldOfferToMe(r.pickup, r.createdAt, rideMatchFn, amIBusy, undefined, { path: 'rides/' + r._id, road: r.roadKm, dispatch: r.dispatch }))
+        .filter(r => r.assignedDriverId === state.username || r.candidateDriverId === state.username || r.chosenDriverId === state.username || isNativePinned(r._id) || isInboxOffered(r._id) || shouldOfferToMe(r.pickup, r.createdAt, rideMatchFn, amIBusy, undefined, { path: 'rides/' + r._id, road: r.roadKm, dispatch: r.dispatch }))
         .map(r => Object.assign({}, r, { _distanceKm: r.pickup ? myDistanceToPickup(r.pickup) : null }))
     : [];
 
@@ -4206,7 +4365,7 @@ function refreshRidePopupFromCache() {
         .filter(o => !skippedDeliveryIds.has(o._id))
         // Same operator-assignment bypass as rides, above.
         .filter(o => o.assignedDriverId ? o.assignedDriverId === state.username : true)
-        .filter(o => o.assignedDriverId === state.username || isNativePinned(o._id) || shouldOfferToMe(parseLatLngStr(o._restLocation), o.createdAt, deliveryMatchFn, amIBusy, true, { path: 'restaurants/' + o._restId + '/orders/' + o._orderId, road: o.roadKm, dispatch: o.dispatch }))
+        .filter(o => o.assignedDriverId === state.username || isNativePinned(o._id) || isInboxOffered(o._id) || shouldOfferToMe(parseLatLngStr(o._restLocation), o.createdAt, deliveryMatchFn, amIBusy, true, { path: 'restaurants/' + o._restId + '/orders/' + o._orderId, road: o.roadKm, dispatch: o.dispatch }))
         .map(o => Object.assign({}, o, { _distanceKm: (() => { const p = parseLatLngStr(o._restLocation); return p ? myDistanceToPickup(p) : null; })() }))
     : [];
 
@@ -5346,8 +5505,7 @@ function logInDriver(username, data) {
   if (!state.listenersAttached) {
     state.listenersAttached = true;
     listenServerTimeOffset();
-    listenRides();
-    listenDeliveryJobs();
+    inboxSwitchLoad(() => { listenRides(); listenDeliveryJobs(); startInbox(); });   // reads app_config/driverInbox once (3 s max)
     listenDrivers();
     listenDriverDue();
     listenDriverDueAgg();
@@ -5660,7 +5818,7 @@ function listenRides() {
   };
   const apply = () => {
     if (fellBack) return;
-    ridesCache = Object.assign({}, searchingVal, mineVal);
+    ridesCache = Object.assign({}, inboxRideVal, searchingVal, mineVal);
     renderHomeLists();
     recomputeDriverDueGross();
     if (state.isOnline) refreshRidePopupFromCache();
@@ -5668,6 +5826,7 @@ function listenRides() {
       renderRideDetail(state.selectedRideId, ridesCache[state.selectedRideId]);
     }
   };
+  ridesApplyHook = () => { try { apply(); } catch (e) {} };
   // LIGHT mode: only today's + yesterday's rides (looked up through the per-day index, so just those few rides come
   // down) plus the newest few rides live (current ride, anything not indexed yet). Older days load when tapped.
   const startLight = () => {
