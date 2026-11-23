@@ -1489,6 +1489,18 @@
         </div>
         <p class="hint-text" style="margin-top:0;">🔥 Fill this to put the item in the customer app's Trending tab. It must be lower than the price above. Leave empty for no offer.</p>
       </div>
+      <div id="item-lc-section" style="margin:6px 0 10px; padding:12px; border-radius:14px; background:#FFF3E8; border:1px solid #F5C9A0;">
+        <p class="loc-field-label" style="margin:0 0 6px; color:#C2410C;">⏰ Last Call (optional)</p>
+        <div class="field"><input id="item-lc-price" type="number" inputmode="decimal" placeholder="Last Call price (₹) — what the customer pays" /></div>
+        <div class="field"><input id="item-lc-qty" type="number" inputmode="numeric" min="1" placeholder="How many pieces are left?" /></div>
+        <div class="field"><select id="item-lc-mins" style="width:100%;border:0;background:transparent;font:inherit;outline:none;">
+          <option value="30">Ends in 30 minutes</option><option value="60" selected>Ends in 1 hour</option>
+          <option value="120">Ends in 2 hours</option><option value="180">Ends in 3 hours</option>
+          <option value="keep" id="item-lc-keep" style="display:none;">Keep the current end time</option>
+        </select></div>
+        <p class="hint-text" style="margin:0;">Shows in the customer app with a live countdown. It switches off by itself when the time ends or the pieces are sold. Must be lower than the price above. Leave the price empty for no Last Call.</p>
+        <p class="error-text" id="item-lc-error" style="display:none;"></p>
+      </div>
       <div id="item-unit-section">
         <p class="loc-field-label" style="margin-top:2px;">Sold by</p>
         <div class="type-toggle" id="item-unit-toggle" style="gap:8px;">
@@ -4424,6 +4436,8 @@
   // watchdog also checks periodically while the tab is visible so a stall
   // gets fixed even without a visibility change event at all.
   let isConnected = true;
+  window.__srvOff = 0; onValue(ref(db, '.info/serverTimeOffset'), so => { window.__srvOff = Number(so.val()) || 0; });
+  window.neshSrvNow = () => Date.now() + (Number(window.__srvOff) || 0);
   onValue(ref(db, '.info/connected'), snap => {
     isConnected = snap.val() === true;
   });
@@ -7425,6 +7439,12 @@ function openItemForm(item) {
     const offOk = state.restaurant?.businessType === 'groceries' || state.restaurant?.businessType === 'online_shop';
     offSec.style.display = offOk ? "block" : "none";
     document.getElementById('item-offer-price').value = (item && Number(item.offerPrice) > 0) ? item.offerPrice : ""; }
+  { const lcOn = item && Number(item.lastCallPrice) > 0 && Number(item.lastCallEndsAt) > neshSrvNow() && Number(item.lastCallQty) > 0;
+    document.getElementById('item-lc-price').value = lcOn ? item.lastCallPrice : "";
+    document.getElementById('item-lc-qty').value = lcOn ? item.lastCallQty : "";
+    const keepOpt = document.getElementById('item-lc-keep'), minSel = document.getElementById('item-lc-mins');
+    keepOpt.style.display = lcOn ? "" : "none"; minSel.value = lcOn ? "keep" : "60";
+    const lcErr = document.getElementById('item-lc-error'); if (lcErr) lcErr.style.display = "none"; }
   const groceriesShop = isGroceriesShop();
   document.getElementById('item-unit-section').style.display = groceriesShop ? "block" : "none";
   setItemUnitToggle(groceriesShop && item ? (item.unit || "piece") : "piece");
@@ -7606,6 +7626,14 @@ async function saveItem() {
     errEl.style.display = "block";
     return;
   }
+  const lcRaw = document.getElementById('item-lc-price').value.trim();
+  const lcPrice = lcRaw === '' ? 0 : parseFloat(lcRaw);
+  const lcQty = Math.floor(Number(document.getElementById('item-lc-qty').value) || 0);
+  const lcMinsV = document.getElementById('item-lc-mins').value;
+  if (lcRaw !== '') {
+    if (isNaN(lcPrice) || lcPrice <= 0 || lcPrice >= price) { errEl.textContent = "Last Call price must be above 0 and lower than the normal price"; errEl.style.display = "block"; return; }
+    if (lcQty < 1) { errEl.textContent = "Enter how many pieces are left for Last Call"; errEl.style.display = "block"; return; }
+  }
   if (state.photoUploading) {
     errEl.textContent = "Photo is still uploading — wait a moment and try again";
     errEl.style.display = "block";
@@ -7619,6 +7647,11 @@ async function saveItem() {
       ? document.getElementById('item-sizes').value.split(',').map(s => s.trim()).filter(Boolean)
       : []);
     const data = { name, desc, price, unit: isGroceriesShop() ? (state.selectedUnit || "piece") : "piece", photo: state.photoDataUrl || "", unavailable: document.getElementById('item-unavailable').checked, sizes, sizePrices: portionsOn ? portionPrices : null };
+    if (lcPrice > 0) {
+      data.lastCallPrice = lcPrice; data.lastCallQty = lcQty;
+      if (lcMinsV === 'keep') { const old = (state.menuItems || []).find(x => x.id === state.editingItemId); data.lastCallEndsAt = (old && Number(old.lastCallEndsAt) > neshSrvNow()) ? Number(old.lastCallEndsAt) : neshSrvNow() + 3600000; }
+      else data.lastCallEndsAt = neshSrvNow() + (parseInt(lcMinsV, 10) || 60) * 60000;
+    } else { data.lastCallPrice = null; data.lastCallQty = null; data.lastCallEndsAt = null; }
     if (offerSecOn) data.offerPrice = offerPrice > 0 ? offerPrice : null;
     if (offerSecOn && offerPrice > 0) data.offerCustomerPrice = null;   // the shop just set its own offer price -> it replaces an earlier operator (customer-price) offer
     // Operator's per-portion offers: drop any that no longer fit (portion removed, or its price is now at/below the offer). Untouched otherwise, so an offer set meanwhile isn't overwritten.
