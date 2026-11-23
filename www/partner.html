@@ -2463,6 +2463,7 @@
         <button type="button" class="op-order-tab" data-tab="completed" onclick="opSwitchRidesTab('completed')">Completed</button>
         <button type="button" class="op-order-tab" data-tab="cancelled" onclick="opSwitchRidesTab('cancelled')">Cancelled</button>
       </div>
+      <div class="op-search-box" style="margin-bottom:6px;"><input type="date" id="op-rides-date" onchange="opRidesDayChanged()"></div>
       <div class="op-search-box"><input type="text" id="op-rides-search" placeholder="Search by customer or driver..." oninput="opRenderRidesList()"></div>
       <div class="op-search-box"><select id="op-rides-zone-filter" onchange="opRenderRidesList()" style="width:100%; padding:9px 10px; background:#f4faf5; color:#15803d; border:1px solid #cfe6d5; font-size:.85rem; font-family:inherit;"><option value="">All zones</option></select></div>
       <div id="op-rides-list"></div>
@@ -4329,7 +4330,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, onValue, push, set, get, update, remove, goOffline, goOnline, query, orderByKey, startAt, endAt, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getDatabase, ref, onValue, push, set, get, update, remove, goOffline, goOnline, query, orderByKey, orderByChild, equalTo, startAt, endAt, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCrM5wKwsnGtIc7HSTk_5R1d3dXEcYyd7o",
@@ -4343,7 +4344,7 @@
 
   const fbApp = initializeApp(firebaseConfig);
   const db = getDatabase(fbApp);
-  window.fb = { db, ref, onValue, push, set, get, update, remove, query, orderByKey, startAt, endAt, runTransaction };
+  window.fb = { db, ref, onValue, push, set, get, update, remove, query, orderByKey, orderByChild, equalTo, startAt, endAt, runTransaction };
   // Catalog version stamp: any write to a shop's PUBLIC fields (menu, stock, price, status, photo, hours...)
   // bumps `catalogVer`, so customer apps that cache the catalog know to download it again.
   (function () {
@@ -4709,6 +4710,7 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + id).classList.add('active');
   window.scrollTo(0, 0);
+  if (id === 'account' || id === 'due' || id === 'delivery-earnings') { try { ensureOrdersLongListeners(); } catch (e) {} }
 
   if (RESTORABLE_SCREENS.includes(id)) {
     try { localStorage.setItem('asfood_last_screen', id); } catch (e) {}
@@ -5575,9 +5577,9 @@ function logInRestaurant(id, data) {
     initOrdersWindow().finally(() => {
       listenOrdersBadge();
       listenPaymentPending();
-      listenDueAmount();
-      listenDeliveryEarnings();
       listenDailyEarnings();
+      ordersWindowReady = true;   // Due + Delivery-earnings (45-day window) start later, see ensureOrdersLongListeners
+      try { const a = document.querySelector('.screen.active'); if (a && ['screen-account', 'screen-due', 'screen-delivery-earnings'].includes(a.id)) ensureOrdersLongListeners(); } catch (e) {}
     });
     listenPartnerSupportMessages();
     try { pvcpInit(); } catch (e) {}
@@ -6956,12 +6958,7 @@ async function saveSuggestEditor() {
 // ?oracle=0 on this device forces Firebase.
 const NESH_API = 'https://api.neshapp.in';
 let neshMenuSource = 'firebase', neshMenuObj = {}, neshCfg = null, neshFbUnsub = null, neshPoll = null, neshPollBusy = false, neshCfgUnsub = null, neshMenuFor = null;
-function neshOracleActive(shopId) {
-  try { if (new URLSearchParams(location.search).get('oracle') === '0') localStorage.setItem('nesh_partner_oracle_off', '1'); if (new URLSearchParams(location.search).get('oracle') === '1') localStorage.removeItem('nesh_partner_oracle_off'); if (localStorage.getItem('nesh_partner_oracle_off') === '1') return false; } catch (e) {}
-  if (localStorage.getItem('asfood_is_operator') === '1') return false;
-  const c = neshCfg;
-  return c === true || (!!c && typeof c === 'object' && c[shopId] === true);
-}
+function neshOracleActive(shopId) { return true; }   // Oracle is the ONLY menu source now: no Firebase switch, no fallback
 function neshApplyPaths(menu, upd) {
   const clean = v => { if (v === null || v === undefined) return undefined; if (Array.isArray(v)) return v.map(x => { const c = clean(x); return c === undefined ? null : c; }); if (typeof v === 'object') { const o = {}; let n = 0; Object.keys(v).forEach(k => { const c = clean(v[k]); if (c !== undefined) { o[k] = c; n++; } }); return n ? o : undefined; } return v; };
   const prune = o => { if (!o || typeof o !== 'object' || Array.isArray(o)) return; Object.keys(o).forEach(k => { prune(o[k]); if (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k]) && !Object.keys(o[k]).length) delete o[k]; }); };
@@ -6989,19 +6986,16 @@ function applyMenuObj(menuObj) {
 }
 // updates = Firebase multi-path update RELATIVE to restaurants/{shopId}/menu ("itemId/price": 50, "newId": {...}, "itemId": null)
 async function neshMenuWrite(shopId, updates) {
-  const { db, ref, update } = window.fb;
-  const viaOracle = shopId === state.restId && state.restaurant && state.restaurant.password && neshOracleActive(shopId);
-  let done = false;
-  if (viaOracle) {
-    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 15000);
-    try {
-      const r = await fetch(NESH_API + '/partner/menu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shopId, password: state.restaurant.password, updates }), signal: ctl.signal });
-      if (r.ok) done = true; else console.warn('Oracle menu write refused/failed, using Firebase', r.status);
-    } catch (e) { console.warn('Oracle menu write failed, using Firebase', e && e.message); }
-    finally { clearTimeout(tm); }
-  }
-  if (!done) await update(ref(db, 'restaurants/' + shopId + '/menu'), updates);   // old direct path / fallback
-  if (shopId === state.restId && neshMenuSource === 'oracle') { neshApplyPaths(neshMenuObj, updates); applyMenuObj(neshMenuObj); }   // no Firebase listener running, refresh the list ourselves
+  // ORACLE ONLY: the menu is written through the server (which keeps Firebase + Postgres in step). No direct Firebase write, no fallback.
+  if (!(shopId === state.restId && state.restaurant && state.restaurant.password)) throw new Error('Please log in again to change the menu.');
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 15000);
+  let r;
+  try {
+    r = await fetch(NESH_API + '/partner/menu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shopId, password: state.restaurant.password, updates }), signal: ctl.signal });
+  } catch (e) { throw new Error('Menu server not reachable. Check the internet and try again.'); }
+  finally { clearTimeout(tm); }
+  if (!r.ok) throw new Error('Menu server did not accept the change (' + r.status + '). Please try again.');
+  if (shopId === state.restId) { neshMenuSource = 'oracle'; neshApplyPaths(neshMenuObj, updates); applyMenuObj(neshMenuObj); }   // refresh the list ourselves
 }
 // Same, for code that already builds absolute 'restaurants/{id}/menu/...' keys
 async function neshMenuWriteAbs(shopId, abs) {
@@ -7023,48 +7017,35 @@ async function neshFetchMenu(id) {
     return sh.menu && typeof sh.menu === 'object' ? sh.menu : {};
   } finally { clearTimeout(tm); }
 }
-function neshStartFirebaseMenu() {
-  if (neshFbUnsub) return;
-  const { db, ref, onValue } = window.fb;
-  neshFbUnsub = onValue(ref(db, 'restaurants/' + state.restId + '/menu'), snap => { if (neshMenuSource === 'firebase') applyMenuObj(snap.val() || {}); },
-    err => console.error('listenMenu onValue error:', err));
-}
+function neshStartFirebaseMenu() { /* removed: the partner app never listens to the menu in Firebase */ }
 function neshStopFirebaseMenu() { if (neshFbUnsub) { try { neshFbUnsub(); } catch (e) {} neshFbUnsub = null; } }
+let neshMenuLoadedOnce = false;
 async function neshPollMenu() {
-  if (neshPollBusy || !state.restId || !neshOracleActive(state.restId)) return;
+  if (neshPollBusy || !state.restId) return;
   neshPollBusy = true;
   try {
     const m = await neshFetchMenu(state.restId);
-    if (neshMenuSource !== 'oracle') { neshMenuSource = 'oracle'; neshStopFirebaseMenu(); }
+    neshMenuSource = 'oracle'; neshMenuLoadedOnce = true;
     if (JSON.stringify(m) !== JSON.stringify(neshMenuObj)) applyMenuObj(m);
   } catch (e) {
-    console.warn('Oracle menu read failed, using Firebase', e && e.message);
-    neshMenuSource = 'firebase'; neshStartFirebaseMenu();
+    console.warn('Oracle menu read failed (no Firebase fallback), will retry', e && e.message);   // keep showing what we have
+    if (!neshMenuLoadedOnce) setTimeout(() => neshPollMenu(), 8000);
   } finally { neshPollBusy = false; }
 }
 function neshApplyConfig() {
-  if (neshOracleActive(state.restId)) {
-    neshMenuSource = neshMenuSource;   // switches to 'oracle' only after the first successful read
-    neshPollMenu();
-    if (!neshPoll) neshPoll = setInterval(() => { if (!document.hidden) neshPollMenu(); }, 60000);
-    if (!neshFbUnsub && neshMenuSource !== 'oracle') neshStartFirebaseMenu();   // show the menu from Firebase until Oracle answers
-  } else {
-    if (neshPoll) { clearInterval(neshPoll); neshPoll = null; }
-    neshMenuSource = 'firebase'; neshStartFirebaseMenu();
-  }
+  neshMenuSource = 'oracle';
+  neshPollMenu();
+  if (!neshPoll) neshPoll = setInterval(() => { if (!document.hidden) neshPollMenu(); }, 60000);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && neshPoll) neshPollMenu(); });
 
 // Reads only this restaurant's own menu (Oracle if switched on for this shop, else Firebase / fallback).
 function listenMenu() {
-  const { db, ref, onValue } = window.fb;
   if (neshMenuFor !== state.restId) {   // new login / different shop: reset
-    neshStopFirebaseMenu(); if (neshPoll) { clearInterval(neshPoll); neshPoll = null; }
-    if (neshCfgUnsub) { try { neshCfgUnsub(); } catch (e) {} neshCfgUnsub = null; }
-    neshMenuSource = 'firebase'; neshMenuObj = {}; neshCfg = null; neshMenuFor = state.restId;
+    if (neshPoll) { clearInterval(neshPoll); neshPoll = null; }
+    neshMenuSource = 'oracle'; neshMenuObj = {}; neshMenuLoadedOnce = false; neshMenuFor = state.restId;
   }
-  neshStartFirebaseMenu();   // start from Firebase straight away; moves to Oracle when the switch says so
-  if (!neshCfgUnsub) neshCfgUnsub = onValue(ref(db, 'app_config/oraclePartner'), s => { neshCfg = s.val(); neshApplyConfig(); }, () => {});
+  neshApplyConfig();   // Oracle only: first read now, then every 60 s
 }
 
 // Filters the cached menu items by the Stock screen's search box (name or
@@ -8579,6 +8560,23 @@ function shopOrdersQuery() {
   const r = ref(db, 'restaurants/' + state.restId + '/orders');
   return ordersStartKey ? query(r, orderByKey(), startAt(ordersStartKey)) : r;
 }
+// RECENT ONLY (last 48 h, by push-key time): new / in-progress orders, today's earnings, pending payments.
+// Never the whole history. The long 45-day window is read only by the Due / Delivery-earnings totals, and only once
+// the shop opens Account / Due / Delivery earnings (ensureOrdersLongListeners).
+function shopRecentOrdersQuery() {
+  const { db, ref, query, orderByKey, startAt } = window.fb;
+  const r = ref(db, 'restaurants/' + state.restId + '/orders');
+  let k = opPushPrefix(Date.now() - 48 * 3600000);
+  if (ordersStartKey && ordersStartKey > k) k = ordersStartKey;
+  return query(r, orderByKey(), startAt(k));
+}
+let ordersWindowReady = false, ordersLongStarted = false;
+function ensureOrdersLongListeners() {
+  if (!ordersWindowReady || ordersLongStarted) return;
+  ordersLongStarted = true;
+  try { listenDueAmount(); } catch (e) { console.error('listenDueAmount', e); }
+  try { listenDeliveryEarnings(); } catch (e) { console.error('listenDeliveryEarnings', e); }
+}
 async function initOrdersWindow() {
   ordersRollup = emptyOrdersRollup(); ordersStartKey = ''; ordersCompactTried = false;
   try {
@@ -8654,7 +8652,7 @@ async function maybeCompactOrders(snap) {
 
 function listenOrdersBadge() {
   const { db, ref, onValue } = window.fb;
-  onValue(shopOrdersQuery(), snap => {
+  onValue(shopRecentOrdersQuery(), snap => {
     const pendingList = [];
     const inProgressList = [];
     let openOrder = null;
@@ -8946,7 +8944,7 @@ let dailyEarningsOrders = [];
 
 function listenDailyEarnings() {
   const { db, ref, onValue } = window.fb;
-  onValue(shopOrdersQuery(), snap => {
+  onValue(shopRecentOrdersQuery(), snap => {
     const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
     const qualifying = dailyEarningsQualifyingStatuses();
     let total = 0, count = 0;
@@ -9017,7 +9015,7 @@ function renderDailyEarningsUI() {
 // has actually checked their own GPay/bank app and seen the credit land.
 function listenPaymentPending() {
   const { db, ref, onValue } = window.fb;
-  onValue(shopOrdersQuery(), snap => {
+  onValue(shopRecentOrdersQuery(), snap => {
     const list = [];
     snap.forEach(child => {
       const o = child.val();
@@ -10113,6 +10111,7 @@ function opOpenSection(name) {
   if (name === 'pay-requests') opPrLoad();
   if (name === 'visits') opLoadVisits();
   if (name === 'drivers' || name === 'taxi-orders') { opEnsureDrivers(); opEnsureRides(); }
+  if (name === 'taxi-orders') { const rd = document.getElementById('op-rides-date'); if (rd && !rd.value) rd.value = opRidesDayValue(); }
   if (name === 'drivers') { opPopulateDriversZoneFilter(); opRenderDriversList(); }
   if (name === 'taxi-orders') { opPopulateRidesZoneFilter(); opRenderRidesList(); }
   if (name === 'app-videos') { opLoadAppVideos(); opLoadBusVideos(); }
@@ -12969,12 +12968,7 @@ function opScheduleApply() {
 let neshOpCfg = null, neshOpCfgUnsub = null;
 const opMenuViaOracle = new Set();
 function neshOpToken() { try { return localStorage.getItem('nesh_op_token') || ''; } catch (e) { return ''; } }
-function neshOpOn(shopId) {
-  try { const q = new URLSearchParams(location.search).get('oracle'); if (q === '0') localStorage.setItem('nesh_op_oracle_off', '1'); if (q === '1') localStorage.removeItem('nesh_op_oracle_off'); if (localStorage.getItem('nesh_op_oracle_off') === '1') return false; } catch (e) {}
-  if (!neshOpToken()) return false;
-  const c = neshOpCfg;
-  return c === true || (!!c && typeof c === 'object' && c[shopId] === true);
-}
+function neshOpOn(shopId) { return true; }   // Oracle is the ONLY menu path for the operator too
 function neshOpAttach(id, m) {
   const menu = m && typeof m === 'object' && Object.keys(m).length ? m : null;
   opMenuData[id] = menu;
@@ -13039,10 +13033,8 @@ function neshOpLocal(shopId, updates, clear) {   // no Firebase listener runs fo
 }
 // updates = Firebase multi-path update RELATIVE to restaurants/{shopId}/menu
 async function neshOpMenuWrite(shopId, updates) {
-  const { db, ref, update } = window.fb;
-  let done = false;
-  if (neshOpOn(shopId)) { const r = await neshOpPost({ shopId, updates }); done = r.ok; }
-  if (!done) await update(ref(db, 'restaurants/' + shopId + '/menu'), updates);
+  const r = await neshOpPost({ shopId, updates });
+  if (!r.ok) throw new Error('Menu server not reachable or did not accept the change. Try again.');
   neshOpLocal(shopId, updates, false);
 }
 function neshOpItemUpdate(shopId, itemKey, fields) {
@@ -13050,18 +13042,15 @@ function neshOpItemUpdate(shopId, itemKey, fields) {
   return neshOpMenuWrite(shopId, u);
 }
 async function neshOpMenuClear(shopId) {
-  const { db, ref, remove } = window.fb;
-  let done = false;
-  if (neshOpOn(shopId)) { const r = await neshOpPost({ shopId, clear: true }); done = r.ok; }
-  if (!done) await remove(ref(db, 'restaurants/' + shopId + '/menu'));
+  const r = await neshOpPost({ shopId, clear: true });
+  if (!r.ok) throw new Error('Menu server not reachable or did not accept the change. Try again.');
   neshOpLocal(shopId, null, true);
 }
 // list = [{ shopId, updates }]. Oracle shops go 50 per request; the rest (or any failure) via Firebase.
 // Returns [{status:'fulfilled'|'rejected'}] in the same order, like Promise.allSettled.
 async function neshOpMulti(list) {
-  const { db, ref, update } = window.fb;
   const out = new Array(list.length), done = new Set();
-  const via = []; list.forEach((m, i) => { if (neshOpOn(m.shopId)) via.push(i); });
+  const via = list.map((m, i) => i);
   for (let s = 0; s < via.length; s += 50) {
     const idx = via.slice(s, s + 50);
     const r = await neshOpPost({ multi: idx.map(i => ({ shopId: list[i].shopId, updates: list[i].updates })) });
@@ -13070,11 +13059,7 @@ async function neshOpMulti(list) {
       if (i !== undefined && x.ok) { done.add(i); out[i] = { status: 'fulfilled' }; neshOpLocal(list[i].shopId, list[i].updates, false); }
     });
   }
-  await Promise.all(list.map(async (m, i) => {
-    if (done.has(i)) return;
-    try { await update(ref(db, 'restaurants/' + m.shopId + '/menu'), m.updates); neshOpLocal(m.shopId, m.updates, false); out[i] = { status: 'fulfilled' }; }
-    catch (e) { out[i] = { status: 'rejected', reason: e }; }
-  }));
+  list.forEach((m, i) => { if (!done.has(i)) out[i] = { status: 'rejected', reason: new Error('Menu server did not accept this shop') }; });   // no Firebase fallback
   return out;
 }
 
@@ -13132,18 +13117,8 @@ function opEnsureMenus(ids) {
       opMenuP[id] = new Promise(res => {
         let first = true;
         const done = () => { if (first) { first = false; opMenuLoaded.add(id); res(); } };
-        const viaFirebase = () => {
-          opMenuViaOracle.delete(id);
-          opMenuSubs[id] = onValue(ref(db, 'restaurants/' + id + '/menu'), snap => {
-            opMenuData[id] = snap.val();
-            if (opShopData[id]) { if (opMenuData[id] == null) delete opShopData[id].menu; else opShopData[id].menu = opMenuData[id]; }
-            done(); opScheduleApply();
-          }, () => done());
-        };
-        if (neshOpOn(id)) {
-          neshFetchMenu(id).then(m => { opMenuViaOracle.add(id); neshOpAttach(id, m); done(); opScheduleApply(); })
-            .catch(e => { console.warn('Oracle operator menu read failed, using Firebase', id, e && e.message); viaFirebase(); });
-        } else viaFirebase();
+        neshFetchMenu(id).then(m => { opMenuViaOracle.add(id); neshOpAttach(id, m); done(); opScheduleApply(); })
+          .catch(e => { console.warn('Oracle operator menu read failed (no Firebase fallback)', id, e && e.message); delete opMenuP[id]; res(); });   // not marked loaded: the next call retries
       });
     }
     ps.push(opMenuP[id]);
@@ -13154,6 +13129,7 @@ function opEnsureZoneMenus() { return opEnsureMenus(Object.keys(opShopSubs)); }
 function opSyncPartnerLoad() {
   const { db, ref, onValue } = window.fb;
   if (opZoneSel === '__all__') {
+    if (opShopIndex === null && !opShopIndexFailed) return;   // shop index not here yet: wait (called again when it arrives) instead of downloading every shop in full
     Object.keys(opShopSubs).forEach(id => opDropShop(id));
     // LIGHT load (bandwidth saver): Orders / Profit / Report need only each shop's orders,
     // settlements, commission and name - NOT the menu, photos, categories. So read just those
@@ -13165,7 +13141,7 @@ function opSyncPartnerLoad() {
       const LIGHT = ['orders', 'settlements', 'commissionHistory', 'commissionTiers', 'restaurantName', 'approvalStatus', 'businessType', 'goSeries', 'phone'];
       const { query, orderByKey, startAt, endAt } = window.fb;
       const dStr = opOrdersDayValue(), todayStr = opDateKey(Date.now());
-      const winFrom = opPushPrefix(opDayStartMs(dStr) - 864e5 - 600000);
+      const winFrom = opPushPrefix(opDayStartMs(dStr) - (dStr < todayStr ? 600000 : 6 * 3600000));   // that day only (today also keeps the last 6 h so a late-night order still in progress shows)
       const winTo = opPushPrefix(opDayStartMs(dStr) + 864e5 + 600000) + '~';
       const unsubs = [];
       Object.keys(opLightData).forEach(k => delete opLightData[k]);
@@ -13185,13 +13161,18 @@ function opSyncPartnerLoad() {
       opScheduleApply();
       return;
     }
+    // NEVER download the whole `restaurants` node. If the shop index is unavailable, take the shop ids from the Oracle server once and retry the light load.
     opLightMode = false;
-    opFullUnsub = onValue(ref(db, 'restaurants'), snap => {
-      try { opMeasure('restaurants', snap); } catch (e) {}
-      const list = [];
-      snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
-      opApplyPartners(list, true);
-    });
+    if (!window.__opIdxOracleTried) {
+      window.__opIdxOracleTried = true;
+      fetch(NESH_API + '/shops', { cache: 'no-cache' }).then(r => r.ok ? r.json() : Promise.reject(new Error('http ' + r.status))).then(j => {
+        const ids = Object.keys((j && j.shops) || {});
+        if (!ids.length) throw new Error('no shops');
+        const idx = {}; ids.forEach(id => { idx[id] = true; });
+        opShopIndex = idx; opShopIndexFailed = false;
+        opSyncPartnerLoad();
+      }).catch(e => { console.warn('operator: shop list unavailable (no full download)', e && e.message); });
+    }
     return;
   }
   const hadFull = !!opFullUnsub;
@@ -16140,7 +16121,8 @@ function opShowDriverDetail(id, silentRefresh) {
   document.getElementById('op-dm-zone').textContent = d.zoneName || 'Not set';
   opRenderDriverApprovalBlock(d);
   opPopulateDriverZoneSelect();
-  document.getElementById('op-dm-due').textContent = '₹' + opComputeDriverDue(id);
+  document.getElementById('op-dm-due').textContent = opDriverRidesCache[id] ? '₹' + opComputeDriverDue(id) : '...';
+  if (!opDriverRidesCache[id]) opLoadDriverRides(id).then(() => { if (opCurrentDriverId === id) { const de = document.getElementById('op-dm-due'); if (de) de.textContent = '₹' + opComputeDriverDue(id); } }).catch(() => {});
   if (!silentRefresh) {
     document.getElementById('op-dm-zone-status').textContent = '';
     document.getElementById('op-dm-assign-status').textContent = '';
@@ -16204,7 +16186,7 @@ function opRejectDriver() {
 // as opComputeDue for restaurant partners, above.
 function opComputeDriverDue(driverId) {
   let gross = 0;
-  opAllRides.forEach(r => {
+  (opDriverRidesCache[driverId] || []).forEach(r => {
     const status = (r.status || '').toLowerCase();
     if (r.driverId === driverId && ['completed', 'done', 'finished'].includes(status) && r.platformFee) {
       gross += Number(r.platformFee) || 0;
@@ -16222,6 +16204,7 @@ function opSettleDriverDue() {
   const input = document.getElementById('op-dm-settle-input');
   const status = document.getElementById('op-dm-settle-status');
   const amount = Number(input.value);
+  if (!opDriverRidesCache[opCurrentDriverId]) { status.textContent = 'Loading due, try again in a moment.'; return; }
   const currentDue = opComputeDriverDue(opCurrentDriverId);
   if (isNaN(amount) || amount <= 0) {
     status.textContent = 'Enter a valid amount to settle.';
@@ -16328,18 +16311,58 @@ function opAssignOrderToDriver() {
 
 /* ---- Rides (taxi), listened flat for the driver-assignment dropdown ---- */
 let opAllRides = [];
+let opRidesDay = '';
+let opRidesUnsub = null;
+function opRidesDayValue() { return opRidesDay || opDateKey(Date.now()); }
+function opRidesWindow(dStr) {
+  const todayStr = opDateKey(Date.now());
+  const from = opPushPrefix(opDayStartMs(dStr) - (dStr < todayStr ? 600000 : 6 * 3600000));   // today also keeps the last 6 h (a late-night ride still in progress)
+  const to = opPushPrefix(opDayStartMs(dStr) + 864e5 + 600000) + '~';
+  return { from, to, past: dStr < todayStr };
+}
+// One day only, by push-id (key) range: no index needed, never the whole rides node.
+function opRidesQuery(dStr) {
+  const { db, ref, query, orderByKey, startAt, endAt } = window.fb;
+  const w = opRidesWindow(dStr);
+  return w.past ? query(ref(db, 'rides'), orderByKey(), startAt(w.from), endAt(w.to)) : query(ref(db, 'rides'), orderByKey(), startAt(w.from));
+}
 function opListenRides() {
-  const { db, ref, onValue } = window.fb;
-  onValue(ref(db, 'rides'), snap => {
+  const { onValue } = window.fb;
+  if (opRidesUnsub) { try { opRidesUnsub(); } catch (e) {} opRidesUnsub = null; }
+  opRidesUnsub = onValue(opRidesQuery(opRidesDayValue()), snap => {
     try { opMeasure('rides', snap); } catch (e) {}
     const list = [];
     snap.forEach(child => { list.push(Object.assign({ _id: child.key }, child.val())); });
     opAllRides = list;
-    try { const da = document.getElementById('op-section-delete-all'); if (da && da.classList.contains('active')) opRenderDeleteAllPreview(); } catch (e) {}
     if (opCurrentDriverId && document.getElementById('op-driver-modal').classList.contains('show')) {
       opPopulateDriverOrderSelect();
     }
     opRenderRidesList();
+  });
+}
+function opRidesDayChanged() {
+  const el = document.getElementById('op-rides-date');
+  opRidesDay = (el && el.value) || '';
+  opAllRides = [];
+  opRenderRidesList();
+  opRidesStarted = true;
+  try { opListenRides(); } catch (e) {}
+}
+// One driver's own rides (indexed on driverId, like the driver app), fetched once when that driver's card opens.
+const opDriverRidesCache = {};
+function opLoadDriverRides(id) {
+  const { db, ref, get, query, orderByChild, equalTo } = window.fb;
+  return get(query(ref(db, 'rides'), orderByChild('driverId'), equalTo(id))).then(snap => {
+    const list = []; snap.forEach(c => { list.push(Object.assign({ _id: c.key }, c.val())); });
+    opDriverRidesCache[id] = list; return list;
+  });
+}
+// Rides of one picked date (for the Delete-all preview), one-off read.
+function opFetchRidesForDate(dStr) {
+  const { get } = window.fb;
+  return get(opRidesQuery(dStr)).then(snap => {
+    const list = []; snap.forEach(c => { list.push(Object.assign({ _id: c.key }, c.val())); });
+    return list.filter(r => opDateKey(r.createdAt) === dStr);
   });
 }
 
@@ -16919,19 +16942,16 @@ async function opPoLoadMenu() {
   b.disabled = true; b.textContent = 'Loading menu…';
   try {
     if (!opPoCfg.loaded) await opPoLoadCfg();
-    const { db, ref, get } = window.fb;
-    const res = await fetch('https://texi-and-food-default-rtdb.firebaseio.com/restaurants/' + encodeURIComponent(id) + '/menu.json?shallow=true');
-    if (!res.ok) throw new Error('shallow ' + res.status);
-    const keys = await res.json();
-    const ids = Object.keys(keys || {}).slice(0, 300);
+    const menuObj = await neshFetchMenu(id);   // Oracle only
+    const ids = Object.keys(menuObj || {}).slice(0, 300);
     const bt = shop && (shop.businessType === 'groceries' || shop.businessType === 'online_shop') ? shop.businessType : 'hotel';
     const fields = ['name', 'price', 'unit', 'unavailable', 'customerPrice', 'offerPrice', 'offerCustomerPrice']
       .concat(bt === 'hotel' ? ['sizes', 'sizePrices', 'customerSizePrices', 'offerSizePrices', 'offerCustomerSizePrices'] : []);
-    const list = (await Promise.all(ids.map(async k => {
-      const vals = await Promise.all(fields.map(f => get(ref(db, 'restaurants/' + id + '/menu/' + k + '/' + f))));
-      const m = {}; fields.forEach((f, i) => { const v = vals[i].val(); if (v !== null && v !== undefined) m[f] = v; });
+    const list = ids.map(k => {
+      const full = menuObj[k] || {}, m = {};
+      fields.forEach(f => { const v = full[f]; if (v !== null && v !== undefined) m[f] = v; });
       return opPoMenuEntries(shop, m);
-    }))).reduce((a, x) => a.concat(x), []).filter(e => e.name);
+    }).reduce((a, x) => a.concat(x), []).filter(e => e.name);
     if (document.getElementById('op-po-shop').value !== id) return;
     opPoMenuCache[id] = { t: Date.now(), list: list.map(e => Object.assign({ desc: '' }, e)) };
     opPoApplyMenu(opPoMenuCache[id].list);
@@ -17817,7 +17837,14 @@ function opRenderDeleteAllPreview() {
   if (!dateVal) { summaryEl.innerHTML = ''; delBtn.style.display = 'none'; return; }
 
   opDelAllOrdersCache = opFlattenAllOrders().filter(o => opDateKey(o.createdAt) === dateVal);
-  opDelAllRidesCache = opAllRides.filter(r => opDateKey(r.createdAt) === dateVal);
+  opDelAllRidesCache = [];
+  const myDate = dateVal;
+  opFetchRidesForDate(dateVal).then(list => { if (document.getElementById('op-delall-date-input').value !== myDate) return; opDelAllRidesCache = list; opRenderDeleteAllCounts(dateVal); }).catch(() => {});
+  opRenderDeleteAllCounts(dateVal);
+}
+function opRenderDeleteAllCounts(dateVal) {
+  const summaryEl = document.getElementById('op-delall-summary');
+  const delBtn = document.getElementById('op-delall-btn');
 
   const total = opDelAllOrdersCache.length + opDelAllRidesCache.length;
   if (!total) {
@@ -18221,8 +18248,8 @@ function opLoadShopItemsForAvailability() {
   const btn = document.getElementById('op-pm-avail-refresh-btn');
   status.textContent = 'Loading...';
   btn.disabled = true;
-  get(ref(db, 'restaurants/' + opCurrentPartnerId + '/menu')).then(snap => {
-    const menu = snap.val() || {};
+  neshFetchMenu(opCurrentPartnerId).then(menuObj => {
+    const menu = menuObj || {};
     opAvailItems = Object.keys(menu).map(id => ({ id, ...menu[id] })).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     status.textContent = opAvailItems.length ? (opAvailItems.length + ' items loaded.') : 'This shop has no stock items yet.';
     opRenderAvailabilityList();
