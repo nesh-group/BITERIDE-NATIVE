@@ -1083,6 +1083,11 @@
         📷 Got 100 photos? Bulk-upload them (name the file same as the stock item to auto-attach) →
       </button>
     </p>
+    <p style="padding:6px 24px 0; margin:0;">
+      <button class="btn-link" id="story-open-btn" type="button" onclick="openStoryScreen()" style="width:auto; padding:0; font-size:13px; font-weight:700; text-align:left; color:#DC2626;">
+        📸 Post a Story (shows 24 hours) →
+      </button>
+    </p>
     <p style="padding:4px 24px 0; margin:0;">
       <button class="btn-link" id="bulk-price-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;">
         🏷️ Change price for several stock items at once →
@@ -1491,7 +1496,15 @@
       </div>
       <div id="item-lc-section" style="margin:6px 0 10px; padding:12px; border-radius:14px; background:#FFF3E8; border:1px solid #F5C9A0;">
         <p class="loc-field-label" style="margin:0 0 6px; color:#C2410C;">⏰ Last Call (optional)</p>
-        <div class="field"><input id="item-lc-price" type="number" inputmode="decimal" placeholder="Last Call price (₹) — what the customer pays" /></div>
+        <div id="item-lc-portions" style="display:none;margin:0 0 8px;">
+          <p class="hint-text" style="margin:0 0 6px;">Portion items: give a Last Call price for each portion you want (leave a portion empty = normal price). "Pieces" = how many pieces one portion uses from the stock below (Quarter 1, Half 2, Full 4 - change it if your Full is 6).</p>
+          <div style="display:grid;grid-template-columns:70px 1fr 90px;gap:6px;align-items:center;">
+            <b>Quarter</b><div class="field" style="margin:0"><input id="item-lc-p-Quarter" type="number" inputmode="decimal" placeholder="Last Call price" /></div><div class="field" style="margin:0"><input id="item-lc-u-Quarter" type="number" inputmode="numeric" min="1" placeholder="Pieces: 1" /></div>
+            <b>Half</b><div class="field" style="margin:0"><input id="item-lc-p-Half" type="number" inputmode="decimal" placeholder="Last Call price" /></div><div class="field" style="margin:0"><input id="item-lc-u-Half" type="number" inputmode="numeric" min="1" placeholder="Pieces: 2" /></div>
+            <b>Full</b><div class="field" style="margin:0"><input id="item-lc-p-Full" type="number" inputmode="decimal" placeholder="Last Call price" /></div><div class="field" style="margin:0"><input id="item-lc-u-Full" type="number" inputmode="numeric" min="1" placeholder="Pieces: 4" /></div>
+          </div>
+        </div>
+        <div class="field" id="item-lc-price-wrap"><input id="item-lc-price" type="number" inputmode="decimal" placeholder="Last Call price (₹) — what the customer pays" /></div>
         <div class="field"><input id="item-lc-qty" type="number" inputmode="numeric" min="1" placeholder="How many pieces are left?" /></div>
         <div class="field"><select id="item-lc-mins" style="width:100%;border:0;background:transparent;font:inherit;outline:none;">
           <option value="30">Ends in 30 minutes</option><option value="60" selected>Ends in 1 hour</option>
@@ -1536,6 +1549,47 @@
       <p class="error-text" id="item-error" style="display:none;"></p>
       <button class="btn-primary" id="item-save-btn">Save item</button>
       <button class="btn-danger" id="item-delete-btn" style="display:none;">Delete item</button>
+    </div>
+  </section>
+
+  <!-- STORY (photo, 24 hours) -->
+  <section class="screen screen-with-tabs" id="screen-story">
+    <div class="px" style="padding-top:32px;">
+      <button class="btn-back" onclick="showScreen('stock')">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+    </div>
+    <div class="header">
+      <p class="eyebrow">STORY</p>
+      <h1 class="title">Post a story</h1>
+    </div>
+    <div style="padding:0 24px 90px;">
+      <p class="hint-text" style="margin:0 0 10px;">The photo is shown to customers for 24 hours, then it deletes itself.</p>
+      <label for="st-file" class="btn-primary" style="display:block;text-align:center;cursor:pointer;margin-bottom:10px;">📷 Choose photo</label>
+      <input id="st-file" type="file" accept="image/*" style="display:none;" />
+      <img id="st-prev" alt="" style="display:none;width:100%;max-height:320px;object-fit:cover;border-radius:14px;margin:0 0 10px;" />
+      <div class="field"><input id="st-text" type="text" maxlength="100" placeholder="Text on the story (optional)" /></div>
+      <div class="field"><select id="st-item" style="width:100%;border:0;background:transparent;font-size:14px;"><option value="">No Last Call tag</option></select></div>
+      <p class="hint-text" style="margin:0 0 10px;">Tag a live Last Call item: customers will see its price and countdown on the story.</p>
+      <p class="error-text" id="st-error" style="display:none;"></p>
+      <button class="btn-primary" id="st-post-btn" type="button" onclick="postStory()">Post story</button>
+      <div style="margin:22px 0 0;padding-top:14px;border-top:1px solid #e5e7eb;">
+        <h2 class="section-title" style="margin:0 0 6px;">🎬 Video story / Reel</h2>
+        <p class="hint-text" style="margin:0 0 10px;">Video story: shown 24 hours, then deleted. Reel: stays until YOU delete it. Max 60 seconds, 90 MB. The text and Last Call tag above are used for the video too.</p>
+        <label for="st-vfile" class="btn-primary" style="display:block;text-align:center;cursor:pointer;margin-bottom:10px;">🎬 Choose video story</label>
+        <input id="st-vfile" type="file" accept="video/*" style="display:none;" />
+        <label for="st-rfile" class="btn-primary" style="display:block;text-align:center;cursor:pointer;margin-bottom:10px;">🎞️ Choose reel</label>
+        <input id="st-rfile" type="file" accept="video/*" style="display:none;" />
+        <p class="hint-text" id="vd-info" style="margin:0 0 8px;"></p>
+        <div id="vd-bar" style="display:none;height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin:0 0 10px;"><div id="vd-fill" style="height:100%;width:0;background:#2F80ED;"></div></div>
+        <p class="error-text" id="vd-error" style="display:none;"></p>
+        <button class="btn-primary" id="vd-post-btn" type="button" style="display:none;" onclick="postVideo()">Upload video</button>
+      </div>
+      <h2 class="section-title" style="margin:22px 0 8px;">Your live stories</h2>
+      <div id="st-list"><p class="hint-text">Loading...</p></div>
+      <h2 class="section-title" style="margin:22px 0 4px;">Your reels</h2>
+      <p class="hint-text" style="margin:0 0 8px;">A reel stays until you delete it here.</p>
+      <div id="vd-reels"><p class="hint-text">Loading...</p></div>
     </div>
   </section>
 
@@ -1903,6 +1957,11 @@
           <h3>Groceries Catalog</h3>
           <p>Every item across every groceries shop — each shop's own price, when they last updated it, and the resulting customer price</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('nesh-reels')">
+          <div class="op-home-icon">🎞️</div>
+          <h3>NESH Reels</h3>
+          <p>Upload a video reel in NESH's own name (logo + blue tick). It stays until you delete it</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('nesh-item-order')">
           <div class="op-home-icon">🥇</div>
           <h3>NESH Store Item Order</h3>
@@ -2234,6 +2293,26 @@
       <p class="op-note" style="margin-bottom:10px;">Every stock item across every groceries shop. Each shop sets its own price from its own Stock screen — the customer price shown in NESH Store is always the highest price any shop currently has it available at (⭐ marks that shop below).</p>
       <div class="op-search-box"><input type="text" id="op-groc-catalog-search" placeholder="Search items..." oninput="opRenderGroceriesCatalog()"></div>
       <div id="op-groc-catalog-list"></div>
+    </div>
+  </div>
+
+  <!-- NESH REELS (official reels, posted in NESH's name) -->
+  <div class="op-section" id="op-section-nesh-reels">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>NESH Reels</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note" style="margin-bottom:10px;">Customers see these reels as <b>NESH</b> with the NESH logo and a blue tick. A reel stays until you delete it here. Max 60 seconds, 90 MB.</p>
+      <label for="nr-file" class="op-btn op-btn-push" style="display:block;text-align:center;cursor:pointer;margin:0 0 10px;">🎞️ Choose video</label>
+      <input id="nr-file" type="file" accept="video/*" style="display:none;" />
+      <input id="nr-text" type="text" maxlength="100" placeholder="Text on the reel (optional)" style="width:100%;box-sizing:border-box;padding:10px;margin:0 0 10px;font-family:inherit;font-size:.95rem;" />
+      <p class="op-note" id="nr-info" style="margin:0 0 8px;"></p>
+      <div id="nr-bar" style="display:none;height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin:0 0 10px;"><div id="nr-fill" style="height:100%;width:0;background:#2F80ED;"></div></div>
+      <p class="op-note" id="nr-err" style="display:none;color:#DC2626;margin:0 0 8px;"></p>
+      <button type="button" class="op-btn op-btn-push" id="nr-btn" style="display:none;width:100%;margin:0 0 14px;" onclick="nrPost()">Upload NESH reel</button>
+      <h3 style="margin:14px 0 8px;">NESH reels</h3>
+      <div id="nr-list"><p class="op-note">Loading...</p></div>
     </div>
   </div>
 
@@ -4731,7 +4810,7 @@ function showScreen(id) {
   }
 
   const tabBar = document.getElementById('bottom-tab-bar');
-  const tabScreens = { home: 'tab-shop-details', stock: 'tab-stock', 'item-form': 'tab-stock', 'item-categories': 'tab-stock', account: 'tab-account', zone: 'tab-account', 'delivery-charges': 'tab-account', 'delivery-earnings': 'tab-account', 'daily-earnings': 'tab-account', due: 'tab-account' };
+  const tabScreens = { home: 'tab-shop-details', stock: 'tab-stock', 'item-form': 'tab-stock', story: 'tab-stock', 'item-categories': 'tab-stock', account: 'tab-account', zone: 'tab-account', 'delivery-charges': 'tab-account', 'delivery-earnings': 'tab-account', 'daily-earnings': 'tab-account', due: 'tab-account' };
   if (id in tabScreens) {
     tabBar.classList.add('show');
     document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
@@ -5613,6 +5692,335 @@ function logInRestaurant(id, data) {
   renderShopPhone();
   renderShopEta();
   document.getElementById('support-fab').classList.add('show');
+}
+
+
+// ---------- STORY (photo, 24 hours) -> POST /stories/add on the Oracle server (no Firebase) ----------
+let stPhoto = null, stBusy = false;
+function stErr(m) { const e = document.getElementById('st-error'); if (!e) return; e.textContent = m || ''; e.style.display = m ? 'block' : 'none'; }
+function stFillItems() {
+  const sel = document.getElementById('st-item'); if (!sel) return;
+  const now = Date.now(), keep = sel.value;
+  sel.innerHTML = '<option value="">No Last Call tag</option>';
+  Object.keys(neshMenuObj || {}).forEach(id => {
+    const it = neshMenuObj[id];
+    if (it && Number(it.lastCallEndsAt) > now && Number(it.lastCallQty) > 0) {
+      const o = document.createElement('option'); o.value = id; o.textContent = '🔥 ' + (it.name || id); sel.appendChild(o);
+    }
+  });
+  sel.value = keep;
+}
+function openStoryScreen() {
+  stPhoto = null; stErr('');
+  const pv = document.getElementById('st-prev'); if (pv) { pv.style.display = 'none'; pv.removeAttribute('src'); }
+  const f = document.getElementById('st-file'); if (f) f.value = '';
+  const t = document.getElementById('st-text'); if (t) t.value = '';
+  const sel = document.getElementById('st-item'); if (sel) sel.value = '';
+  stFillItems();
+  if (!vdBusy) vdReset();
+  showScreen('story');
+  stLoadMine();
+  vdLoadReels();
+}
+// Photo -> small JPEG (max ~720 px, under ~56 KB) + a tiny thumbnail (~120 px). Done on the phone, so the server stays light.
+function stCompress(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      try {
+        const make = (maxSide, q) => {
+          const sc = Math.min(1, maxSide / Math.max(img.width, img.height)), w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
+          const c = document.createElement('canvas'); c.width = w; c.height = h;
+          const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+          return c.toDataURL('image/jpeg', q);
+        };
+        let side = 720, q = 0.72, main = make(side, q);
+        const LIMIT = 56000 * 1.37;   // base64 text length for ~56 KB of jpeg
+        let guard = 0;
+        while (main.length > LIMIT && guard++ < 14) { if (q > 0.45) q -= 0.07; else { side = Math.round(side * 0.88); } main = make(side, q); }
+        const thumb = make(120, 0.6);
+        URL.revokeObjectURL(url);
+        if (main.length > LIMIT * 1.2) return reject(new Error('Photo is too complex, try another one'));
+        resolve({ main, thumb });
+      } catch (e) { reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read this photo')); };
+    img.src = url;
+  });
+}
+document.addEventListener('change', async ev => {
+  if (!ev.target || ev.target.id !== 'st-file') return;
+  const f = ev.target.files && ev.target.files[0]; if (!f) return;
+  stErr(''); stPhoto = null;
+  try {
+    stPhoto = await stCompress(f);
+    const pv = document.getElementById('st-prev'); pv.src = stPhoto.main; pv.style.display = 'block';
+  } catch (e) { stErr(e && e.message || 'Could not read this photo'); }
+});
+async function postStory() {
+  if (stBusy) return;
+  if (!stPhoto) { stErr('Choose a photo first'); return; }
+  if (!(state.restId && state.restaurant && state.restaurant.password)) { stErr('Please log in again'); return; }
+  stBusy = true; stErr('');
+  const btn = document.getElementById('st-post-btn'); btn.disabled = true; btn.textContent = 'Posting...';
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 25000);
+  try {
+    const r = await fetch(NESH_API + '/stories/add', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+      body: JSON.stringify({ shopId: state.restId, password: state.restaurant.password, image: stPhoto.main, thumb: stPhoto.thumb,
+        text: document.getElementById('st-text').value.trim(), lcItemId: document.getElementById('st-item').value || '' })
+    });
+    let j = null; try { j = await r.json(); } catch (e) {}
+    if (r.ok && j && j.ok) {
+      showToast('Story posted');
+      stPhoto = null; document.getElementById('st-file').value = ''; document.getElementById('st-text').value = '';
+      const pv = document.getElementById('st-prev'); pv.style.display = 'none'; pv.removeAttribute('src');
+      stLoadMine();
+    } else {
+      const er = j && j.error;
+      stErr(er === 'limit' ? 'You already have 10 live stories. Delete one first.' : er === 'auth' ? 'Password not accepted. Please log in again.'
+        : er === 'too many' || r.status === 429 ? 'Too many tries. Wait a minute.' : r.status === 413 ? 'Photo too big for the server (413)' : 'Could not post (' + (er || r.status) + ')');
+    }
+  } catch (e) { stErr('No network. Try again.'); }
+  finally { clearTimeout(tm); stBusy = false; btn.disabled = false; btn.textContent = 'Post story'; }
+}
+async function stLoadMine() {
+  const box = document.getElementById('st-list'); if (!box || !state.restId) return;
+  try {
+    const r = await fetch(NESH_API + '/stories?shop=' + encodeURIComponent(state.restId), { cache: 'no-cache' });
+    const j = await r.json();
+    const list = (j && j.list) || [];
+    if (!list.length) { box.innerHTML = '<p class="hint-text">No live story.</p>'; return; }
+    box.innerHTML = '';
+    list.forEach(s => {
+      const left = Math.max(0, s.exp - Date.now()), hh = Math.floor(left / 3600000), mm = Math.floor(left % 3600000 / 60000);
+      const row = document.createElement('div'); row.style.cssText = 'display:flex;align-items:center;gap:10px;margin:0 0 8px;';
+      const im = document.createElement('img'); im.src = s.thumb; im.alt = ''; im.style.cssText = 'width:54px;height:54px;border-radius:12px;object-fit:cover;flex:none;';
+      const mid = document.createElement('div'); mid.style.cssText = 'flex:1;min-width:0;font-size:13px;';
+      mid.textContent = (s.text || (s.type === 'video' ? 'Video story' : 'Photo story')) + (s.item ? '  🔥' : '') + '  ·  ' + hh + 'h ' + mm + 'm left';
+      const del = document.createElement('button'); del.type = 'button'; del.textContent = 'Delete'; del.className = 'btn-link';
+      del.style.cssText = 'width:auto;color:#DC2626;font-weight:700;flex:none;';
+      del.onclick = async () => {
+        if (!confirm('Delete this story?')) return;
+        del.disabled = true;
+        try {
+          const rr = await fetch(NESH_API + '/stories/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shopId: state.restId, password: state.restaurant.password, id: s.id }) });
+          const jj = await rr.json(); if (jj && jj.ok) { showToast('Deleted'); stLoadMine(); } else { showToast('Could not delete'); del.disabled = false; }
+        } catch (e) { showToast('No network'); del.disabled = false; }
+      };
+      row.appendChild(im); row.appendChild(mid); row.appendChild(del); box.appendChild(row);
+    });
+  } catch (e) { box.innerHTML = '<p class="hint-text">Could not load. Check network.</p>'; }
+}
+
+// ---------- VIDEO STORY / REEL -> POST /videos/start + /videos/up/TOKEN (Oracle + Cloudflare R2, no Firebase) ----------
+let vdFile = null, vdKind = '', vdBusy = false;
+function vdErr(m) { const e = document.getElementById('vd-error'); if (!e) return; e.textContent = m || ''; e.style.display = m ? 'block' : 'none'; }
+function vdInfo(m) { const e = document.getElementById('vd-info'); if (e) e.textContent = m || ''; }
+function vdBar(p) { const b = document.getElementById('vd-bar'), f = document.getElementById('vd-fill'); if (!b || !f) return; b.style.display = p < 0 ? 'none' : 'block'; f.style.width = Math.max(0, p) + '%'; }
+function vdBtn(show, label, disabled) { const b = document.getElementById('vd-post-btn'); if (!b) return; b.style.display = show ? 'block' : 'none'; if (label) b.textContent = label; b.disabled = !!disabled; }
+function vdReset() {
+  vdFile = null; vdKind = ''; vdErr(''); vdInfo(''); vdBar(-1); vdBtn(false, 'Upload video', false);
+  ['st-vfile', 'st-rfile'].forEach(id => { const f = document.getElementById(id); if (f) f.value = ''; });
+}
+function vdFail(msg) { vdBusy = false; vdErr(msg); vdBar(-1); vdInfo(''); vdBtn(!!vdFile, 'Upload video', false); }
+document.addEventListener('change', ev => {
+  const t = ev.target; if (!t || (t.id !== 'st-vfile' && t.id !== 'st-rfile')) return;
+  const f = t.files && t.files[0]; if (!f || vdBusy) return;
+  vdErr(''); vdFile = null; vdBtn(false);
+  const kind = t.id === 'st-rfile' ? 'reel' : 'story';
+  if (f.size > 90 * 1024 * 1024) { vdErr('Video is too big (' + Math.round(f.size / 1048576) + ' MB). Max 90 MB. Trim it or record a shorter one.'); t.value = ''; return; }
+  const url = URL.createObjectURL(f), v = document.createElement('video');
+  v.preload = 'metadata'; v.muted = true;
+  let fin = false;
+  const done = dur => {
+    if (fin) return; fin = true; URL.revokeObjectURL(url);
+    if (dur && isFinite(dur) && dur > 60.5) { vdErr('This video is ' + Math.round(dur) + ' seconds. Max 60 seconds. Please trim it.'); t.value = ''; return; }
+    vdFile = f; vdKind = kind;
+    vdInfo((kind === 'reel' ? 'Reel' : 'Video story') + ': ' + (f.size / 1048576).toFixed(1) + ' MB' + (dur && isFinite(dur) ? ', ' + Math.round(dur) + ' s' : '') + '. Tap Upload.');
+    vdBtn(true, 'Upload ' + (kind === 'reel' ? 'reel' : 'video story'), false);
+  };
+  v.onloadedmetadata = () => done(v.duration);
+  v.onerror = () => done(0);
+  setTimeout(() => done(0), 6000);
+  v.src = url;
+});
+function vdStartMsg(status, j) {
+  const er = j && j.error;
+  if (status === 403 || er === 'auth') return 'Password not accepted. Please log in again.';
+  if (status === 409) return vdKind === 'reel' ? 'You already have 30 reels. Delete one first.' : 'You already have 10 live stories. Delete one first.';
+  if (status === 429) return 'Too many tries. Wait a minute.';
+  if (status === 503) return 'Video upload is not ready on the server (503).';
+  if (status === 413) return 'Too big for the server (413).';
+  return 'Could not start (' + (er || status) + ')';
+}
+async function postVideo() {
+  if (vdBusy) return;
+  if (!vdFile) { vdErr('Choose a video first'); return; }
+  if (!(state.restId && state.restaurant && state.restaurant.password)) { vdErr('Please log in again'); return; }
+  vdBusy = true; vdErr(''); vdBtn(true, 'Starting...', true); vdBar(0);
+  const kind = vdKind, file = vdFile;
+  let st = null;
+  try {
+    const r = await fetch(NESH_API + '/videos/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shopId: state.restId, password: state.restaurant.password, kind: kind,
+        text: document.getElementById('st-text').value.trim(), lcItemId: document.getElementById('st-item').value || '' })
+    });
+    let j = null; try { j = await r.json(); } catch (e) {}
+    if (!(r.ok && j && j.ok && j.token)) { vdFail(vdStartMsg(r.status, j)); return; }
+    st = j;
+  } catch (e) { vdFail('No network. Try again.'); return; }
+  if (st.maxBytes && file.size > st.maxBytes) { vdFail('Video is too big for the server.'); return; }
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', NESH_API + '/videos/up/' + encodeURIComponent(st.token));
+  xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+  xhr.timeout = 600000;
+  xhr.upload.onprogress = e => { if (e.lengthComputable) { const p = Math.round(e.loaded * 100 / e.total); vdBar(p); vdBtn(true, 'Uploading ' + p + '%', true); } };
+  xhr.onerror = () => vdFail('Upload failed. Check the network and try again.');
+  xhr.ontimeout = () => vdFail('Upload took too long. Try on better network.');
+  xhr.onload = () => {
+    let jj = null; try { jj = JSON.parse(xhr.responseText); } catch (e) {}
+    if (xhr.status === 200 && jj && jj.ok && jj.id) { vdProcess(jj.id, kind); return; }
+    vdFail(xhr.status === 413 ? 'Video too big for the server (413)' : 'Upload failed (' + ((jj && jj.error) || xhr.status) + ')');
+  };
+  xhr.send(file);
+}
+function vdProcess(id, kind) {
+  vdBar(-1); vdInfo('Processing... this can take a minute. Please keep this screen open.'); vdBtn(true, 'Processing...', true);
+  let n = 0;
+  const tick = async () => {
+    n++;
+    try {
+      const r = await fetch(NESH_API + '/videos/status/' + encodeURIComponent(id), { cache: 'no-cache' });
+      const j = await r.json();
+      if (j && j.status === 'ready') {
+        showToast(kind === 'reel' ? 'Reel posted' : 'Video story posted');
+        vdBusy = false; vdReset();
+        const t = document.getElementById('st-text'); if (t) t.value = '';
+        const sel = document.getElementById('st-item'); if (sel) sel.value = '';
+        stLoadMine(); vdLoadReels(); return;
+      }
+      if (j && (j.status === 'failed' || j.status === 'gone')) { vdFail('The video could not be processed. Try another video.'); return; }
+    } catch (e) {}
+    if (n > 150) { vdFail('Still processing. Check your live stories / reels again in a few minutes.'); return; }
+    setTimeout(tick, 4000);
+  };
+  setTimeout(tick, 3000);
+}
+async function vdLoadReels() {
+  const box = document.getElementById('vd-reels'); if (!box || !state.restId) return;
+  try {
+    const r = await fetch(NESH_API + '/videos/reels?limit=50&shop=' + encodeURIComponent(state.restId), { cache: 'no-cache' });
+    const j = await r.json();
+    const list = (j && j.list) || [];
+    if (!list.length) { box.innerHTML = '<p class="hint-text">No reel yet.</p>'; return; }
+    box.innerHTML = '';
+    list.forEach(s => {
+      const row = document.createElement('div'); row.style.cssText = 'display:flex;align-items:center;gap:10px;margin:0 0 8px;';
+      const im = document.createElement('img'); im.src = s.poster || ''; im.alt = ''; im.style.cssText = 'width:54px;height:72px;border-radius:12px;object-fit:cover;flex:none;background:#e5e7eb;';
+      const mid = document.createElement('div'); mid.style.cssText = 'flex:1;min-width:0;font-size:13px;';
+      let d = ''; try { d = new Date(Number(s.at)).toLocaleDateString(); } catch (e) {}
+      mid.textContent = (s.text || 'Reel') + (s.item ? '  🔥' : '') + (d ? '  ·  ' + d : '');
+      const del = document.createElement('button'); del.type = 'button'; del.textContent = 'Delete'; del.className = 'btn-link';
+      del.style.cssText = 'width:auto;color:#DC2626;font-weight:700;flex:none;';
+      del.onclick = async () => {
+        if (!confirm('Delete this reel? It will be removed for all customers.')) return;
+        del.disabled = true;
+        try {
+          const rr = await fetch(NESH_API + '/videos/reels/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shopId: state.restId, password: state.restaurant.password, id: s.id }) });
+          const jj = await rr.json(); if (jj && jj.ok) { showToast('Deleted'); vdLoadReels(); } else { showToast('Could not delete'); del.disabled = false; }
+        } catch (e) { showToast('No network'); del.disabled = false; }
+      };
+      row.appendChild(im); row.appendChild(mid); row.appendChild(del); box.appendChild(row);
+    });
+  } catch (e) { box.innerHTML = '<p class="hint-text">Could not load. Check network.</p>'; }
+}
+
+// ---------- NESH OFFICIAL REELS (Operator Panel): POST /videos/start with the operator token -> shop id NESH_OFFICIAL ----------
+let nrFile = null, nrBusy = false;
+function nrEl(i) { return document.getElementById(i); }
+function nrSay(i, m, box) { const e = nrEl(i); if (!e) return; e.textContent = m || ''; if (box) e.style.display = m ? 'block' : 'none'; }
+function nrBar(p) { const b = nrEl('nr-bar'), f = nrEl('nr-fill'); if (!b || !f) return; b.style.display = p < 0 ? 'none' : 'block'; f.style.width = Math.max(0, p) + '%'; }
+function nrBtn(show, label, dis) { const b = nrEl('nr-btn'); if (!b) return; b.style.display = show ? 'block' : 'none'; if (label) b.textContent = label; b.disabled = !!dis; }
+function nrFail(m) { nrBusy = false; nrSay('nr-err', m, true); nrBar(-1); nrSay('nr-info', ''); nrBtn(!!nrFile, 'Upload NESH reel', false); }
+function nrReset() { nrFile = null; nrBusy = false; nrSay('nr-err', '', true); nrSay('nr-info', ''); nrBar(-1); nrBtn(false, 'Upload NESH reel', false); const f = nrEl('nr-file'); if (f) f.value = ''; const t = nrEl('nr-text'); if (t) t.value = ''; }
+document.addEventListener('change', ev => {
+  const t = ev.target; if (!t || t.id !== 'nr-file') return;
+  const f = t.files && t.files[0]; if (!f || nrBusy) return;
+  nrSay('nr-err', '', true); nrFile = null; nrBtn(false);
+  if (f.size > 90 * 1024 * 1024) { nrSay('nr-err', 'Video is too big (' + Math.round(f.size / 1048576) + ' MB). Max 90 MB.', true); t.value = ''; return; }
+  const url = URL.createObjectURL(f), v = document.createElement('video'); v.preload = 'metadata'; v.muted = true;
+  let fin = false;
+  const done = dur => {
+    if (fin) return; fin = true; URL.revokeObjectURL(url);
+    if (dur && isFinite(dur) && dur > 60.5) { nrSay('nr-err', 'This video is ' + Math.round(dur) + ' seconds. Max 60 seconds. Please trim it.', true); t.value = ''; return; }
+    nrFile = f; nrSay('nr-info', (f.size / 1048576).toFixed(1) + ' MB' + (dur && isFinite(dur) ? ', ' + Math.round(dur) + ' s' : '') + '. Tap Upload.'); nrBtn(true, 'Upload NESH reel', false);
+  };
+  v.onloadedmetadata = () => done(v.duration); v.onerror = () => done(0); setTimeout(() => done(0), 6000); v.src = url;
+});
+async function nrPost() {
+  if (nrBusy) return;
+  if (!nrFile) { nrSay('nr-err', 'Choose a video first', true); return; }
+  const tok = neshOpToken(); if (!tok) { nrSay('nr-err', 'Please log in again', true); return; }
+  nrBusy = true; nrSay('nr-err', '', true); nrBtn(true, 'Starting...', true); nrBar(0);
+  const file = nrFile; let st = null;
+  try {
+    const r = await fetch(NESH_API + '/videos/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opToken: tok, kind: 'reel', text: (nrEl('nr-text').value || '').trim() }) });
+    let j = null; try { j = await r.json(); } catch (e) {}
+    if (!(r.ok && j && j.ok && j.token)) { nrFail(r.status === 403 ? 'Operator login not accepted. Log in again.' : r.status === 409 ? 'Limit reached (100 reels). Delete one first.' : r.status === 429 ? 'Too many tries. Wait a minute.' : r.status === 503 ? 'Video upload is not ready on the server (503).' : 'Could not start (' + ((j && j.error) || r.status) + ')'); return; }
+    st = j;
+  } catch (e) { nrFail('No network. Try again.'); return; }
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', NESH_API + '/videos/up/' + encodeURIComponent(st.token));
+  xhr.setRequestHeader('Content-Type', 'application/octet-stream'); xhr.timeout = 600000;
+  xhr.upload.onprogress = e => { if (e.lengthComputable) { const p = Math.round(e.loaded * 100 / e.total); nrBar(p); nrBtn(true, 'Uploading ' + p + '%', true); } };
+  xhr.onerror = () => nrFail('Upload failed. Check the network and try again.');
+  xhr.ontimeout = () => nrFail('Upload took too long. Try on better network.');
+  xhr.onload = () => {
+    let jj = null; try { jj = JSON.parse(xhr.responseText); } catch (e) {}
+    if (xhr.status === 200 && jj && jj.ok && jj.id) nrProcess(jj.id); else nrFail('Upload failed (' + ((jj && jj.error) || xhr.status) + ')');
+  };
+  xhr.send(file);
+}
+function nrProcess(id) {
+  nrBar(-1); nrSay('nr-info', 'Processing... this can take a minute. Keep this screen open.'); nrBtn(true, 'Processing...', true);
+  let n = 0;
+  const tick = async () => {
+    n++;
+    try {
+      const r = await fetch(NESH_API + '/videos/status/' + encodeURIComponent(id), { cache: 'no-cache' }); const j = await r.json();
+      if (j && j.status === 'ready') { showToast('NESH reel posted'); nrReset(); nrLoad(); return; }
+      if (j && (j.status === 'failed' || j.status === 'gone')) { nrFail('The video could not be processed. Try another video.'); return; }
+    } catch (e) {}
+    if (n > 150) { nrFail('Still processing. Check the list again in a few minutes.'); return; }
+    setTimeout(tick, 4000);
+  };
+  setTimeout(tick, 3000);
+}
+async function nrLoad() {
+  const box = nrEl('nr-list'); if (!box) return;
+  try {
+    const r = await fetch(NESH_API + '/videos/reels?limit=50&shop=NESH_OFFICIAL', { cache: 'no-cache' }); const j = await r.json(); const list = (j && j.list) || [];
+    if (!list.length) { box.innerHTML = '<p class="op-note">No NESH reel yet.</p>'; return; }
+    box.innerHTML = '';
+    list.forEach(s => {
+      const row = document.createElement('div'); row.style.cssText = 'display:flex;align-items:center;gap:10px;margin:0 0 8px;';
+      const im = document.createElement('img'); im.src = s.poster || ''; im.alt = ''; im.style.cssText = 'width:54px;height:72px;border-radius:12px;object-fit:cover;flex:none;background:#e5e7eb;';
+      const mid = document.createElement('div'); mid.style.cssText = 'flex:1;min-width:0;font-size:13px;';
+      let d = ''; try { d = new Date(Number(s.at)).toLocaleDateString(); } catch (e) {}
+      mid.textContent = (s.text || 'NESH reel') + (d ? '  ·  ' + d : '');
+      const del = document.createElement('button'); del.type = 'button'; del.textContent = 'Delete'; del.style.cssText = 'width:auto;color:#DC2626;font-weight:700;flex:none;background:none;border:0;';
+      del.onclick = async () => {
+        if (!confirm('Delete this reel for all customers?')) return; del.disabled = true;
+        try {
+          const rr = await fetch(NESH_API + '/videos/reels/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opToken: neshOpToken(), id: s.id }) });
+          const jj = await rr.json(); if (jj && jj.ok) { showToast('Deleted'); nrLoad(); } else { showToast('Could not delete'); del.disabled = false; }
+        } catch (e) { showToast('No network'); del.disabled = false; }
+      };
+      row.appendChild(im); row.appendChild(mid); row.appendChild(del); box.appendChild(row);
+    });
+  } catch (e) { box.innerHTML = '<p class="op-note">Could not load. Check network.</p>'; }
 }
 
 function openStockScreen() {
@@ -7445,6 +7853,24 @@ function openItemForm(item) {
     const keepOpt = document.getElementById('item-lc-keep'), minSel = document.getElementById('item-lc-mins');
     keepOpt.style.display = lcOn ? "" : "none"; minSel.value = lcOn ? "keep" : "60";
     const lcErr = document.getElementById('item-lc-error'); if (lcErr) lcErr.style.display = "none"; }
+  window.neshLcSizeSync = function () {
+    const sec = document.getElementById('item-portions-section'), on = document.getElementById('item-portions-on');
+    const pOn = !!(sec && sec.style.display !== 'none' && on && on.checked);
+    const g = document.getElementById('item-lc-portions'), pw = document.getElementById('item-lc-price-wrap'), qi = document.getElementById('item-lc-qty');
+    if (g) g.style.display = pOn ? 'block' : 'none';
+    if (pw) pw.style.display = pOn ? 'none' : '';
+    if (qi) qi.placeholder = pOn ? 'Total pieces left (all portions together, e.g. 12)' : 'How many pieces are left?';
+  };
+  { // fill the portion Last Call boxes (empty unless a Last Call is live on this item)
+    const lcLive = item && Number(item.lastCallEndsAt) > neshSrvNow() && Number(item.lastCallQty) > 0;
+    let prs = (lcLive && item.lastCallPrices && typeof item.lastCallPrices === 'object') ? item.lastCallPrices : {};
+    if (lcLive && !item.lastCallPrices && item.lastCallSize && Number(item.lastCallPrice) > 0) { prs = {}; prs[item.lastCallSize] = item.lastCallPrice; }
+    const uns = (lcLive && item.lastCallUnits && typeof item.lastCallUnits === 'object') ? item.lastCallUnits : {};
+    ['Quarter', 'Half', 'Full'].forEach(function (n) {
+      const pe = document.getElementById('item-lc-p-' + n), ue = document.getElementById('item-lc-u-' + n);
+      if (pe) pe.value = prs[n] > 0 ? prs[n] : ''; if (ue) ue.value = (prs[n] > 0 && uns[n] > 0) ? uns[n] : '';
+    });
+  }
   const groceriesShop = isGroceriesShop();
   document.getElementById('item-unit-section').style.display = groceriesShop ? "block" : "none";
   setItemUnitToggle(groceriesShop && item ? (item.unit || "piece") : "piece");
@@ -7457,6 +7883,7 @@ function openItemForm(item) {
     document.getElementById('item-portions-section').style.display = portionsOk ? "block" : "none";
     const sp = (item && item.sizePrices && typeof item.sizePrices === 'object') ? item.sizePrices : null;
     document.getElementById('item-portions-on').checked = !!(portionsOk && sp);
+    try { window.neshLcSizeSync && window.neshLcSizeSync(); } catch (e) {}
     document.getElementById('item-portions-fields').style.display = (portionsOk && sp) ? "block" : "none";
     document.getElementById('item-p-quarter').value = (sp && sp.Quarter) ? sp.Quarter : "";
     document.getElementById('item-p-half').value = (sp && sp.Half) ? sp.Half : "";
@@ -7590,6 +8017,7 @@ function handlePhotoSelect(e) {
 }
 
 document.getElementById('item-portions-on').addEventListener('change', function () {
+  try { window.neshLcSizeSync && window.neshLcSizeSync(); } catch (e) {}
   document.getElementById('item-portions-fields').style.display = this.checked ? 'block' : 'none';
 });
 async function saveItem() {
@@ -7626,13 +8054,28 @@ async function saveItem() {
     errEl.style.display = "block";
     return;
   }
-  const lcRaw = document.getElementById('item-lc-price').value.trim();
-  const lcPrice = lcRaw === '' ? 0 : parseFloat(lcRaw);
   const lcQty = Math.floor(Number(document.getElementById('item-lc-qty').value) || 0);
   const lcMinsV = document.getElementById('item-lc-mins').value;
+  let lcRaw = document.getElementById('item-lc-price').value.trim(), lcPrice = lcRaw === '' ? 0 : parseFloat(lcRaw);
+  const lcMap = {}, lcUnits = {};
+  if (portionsOn) {   // each portion can have its own Last Call price; one shared pool of pieces
+    lcRaw = ''; lcPrice = 0;
+    const defU = { Quarter: 1, Half: 2, Full: 4 };
+    for (const n of portionNames) {
+      const pv = document.getElementById('item-lc-p-' + n).value.trim();
+      if (pv === '') continue;
+      const v = parseFloat(pv);
+      if (isNaN(v) || v <= 0 || v >= portionPrices[n]) { errEl.textContent = "Last Call price of " + n + " must be above 0 and lower than its normal price (" + portionPrices[n] + ")"; errEl.style.display = "block"; return; }
+      const uv = Math.floor(Number(document.getElementById('item-lc-u-' + n).value) || defU[n] || 1);
+      lcMap[n] = v; lcUnits[n] = Math.max(1, uv);
+    }
+    const ks = Object.keys(lcMap);
+    if (ks.length) { lcPrice = Math.min.apply(null, ks.map(function (k) { return lcMap[k]; })); lcRaw = String(lcPrice); }
+  }
   if (lcRaw !== '') {
-    if (isNaN(lcPrice) || lcPrice <= 0 || lcPrice >= price) { errEl.textContent = "Last Call price must be above 0 and lower than the normal price"; errEl.style.display = "block"; return; }
-    if (lcQty < 1) { errEl.textContent = "Enter how many pieces are left for Last Call"; errEl.style.display = "block"; return; }
+    if (!portionsOn && (isNaN(lcPrice) || lcPrice <= 0 || lcPrice >= price)) { errEl.textContent = "Last Call price must be above 0 and lower than the normal price"; errEl.style.display = "block"; return; }
+    if (lcQty < 1 || lcQty > 50) { errEl.textContent = "Enter how many pieces are left for Last Call (1 to 50)"; errEl.style.display = "block"; return; }
+    if (portionsOn) { const minU = Math.min.apply(null, Object.keys(lcUnits).map(function (k) { return lcUnits[k]; })); if (lcQty < minU) { errEl.textContent = "Total pieces must be at least " + minU; errEl.style.display = "block"; return; } }
   }
   if (state.photoUploading) {
     errEl.textContent = "Photo is still uploading — wait a moment and try again";
@@ -7648,10 +8091,10 @@ async function saveItem() {
       : []);
     const data = { name, desc, price, unit: isGroceriesShop() ? (state.selectedUnit || "piece") : "piece", photo: state.photoDataUrl || "", unavailable: document.getElementById('item-unavailable').checked, sizes, sizePrices: portionsOn ? portionPrices : null };
     if (lcPrice > 0) {
-      data.lastCallPrice = lcPrice; data.lastCallQty = lcQty;
+      data.lastCallPrice = lcPrice; data.lastCallQty = lcQty; data.lastCallSize = null; data.lastCallPrices = portionsOn ? lcMap : null; data.lastCallUnits = portionsOn ? lcUnits : null;
       if (lcMinsV === 'keep') { const old = (state.menuItems || []).find(x => x.id === state.editingItemId); data.lastCallEndsAt = (old && Number(old.lastCallEndsAt) > neshSrvNow()) ? Number(old.lastCallEndsAt) : neshSrvNow() + 3600000; }
       else data.lastCallEndsAt = neshSrvNow() + (parseInt(lcMinsV, 10) || 60) * 60000;
-    } else { data.lastCallPrice = null; data.lastCallQty = null; data.lastCallEndsAt = null; }
+    } else { data.lastCallPrice = null; data.lastCallQty = null; data.lastCallEndsAt = null; data.lastCallSize = null; data.lastCallPrices = null; data.lastCallUnits = null; }
     if (offerSecOn) data.offerPrice = offerPrice > 0 ? offerPrice : null;
     if (offerSecOn && offerPrice > 0) data.offerCustomerPrice = null;   // the shop just set its own offer price -> it replaces an earlier operator (customer-price) offer
     // Operator's per-portion offers: drop any that no longer fit (portion removed, or its price is now at/below the offer). Untouched otherwise, so an offer set meanwhile isn't overwritten.
@@ -10149,6 +10592,7 @@ function opOpenSection(name) {
   if (name === 'taxi-orders') { opPopulateRidesZoneFilter(); opRenderRidesList(); }
   if (name === 'app-videos') { opLoadAppVideos(); opLoadBusVideos(); }
   if (name === 'video-ads') opLoadVideoAds();
+  if (name === 'nesh-reels') nrLoad();
   if (name === 'coupons') { opCpnBuildShops(); try { opCpnEditReset(false); } catch (e) {} opLoadZoneNames().then(function () { opCpnBuildZones(); opLoadCoupons(); }); }
   if (name === 'loyalty') { opLoyBuildShops(); opLoyLoad(); opLoyLoadClaims(); opLoyLoadNudge(); }
   if (name === 'loyalty-store') { opLsRenderItemSelect(); opLsLoad(); }
