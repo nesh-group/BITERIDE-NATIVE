@@ -684,7 +684,34 @@ window.handleNativeRideAction = function () { window.__nativeQ.push(Array.protot
       </div>
       <p class="error-text" id="login-error" style="display:none;"></p>
       <button class="btn-primary" id="login-submit">Login</button>
+      <button class="btn-link" onclick="openForgot()">Forgot password?</button>
       <button class="btn-link" onclick="startFreshRegister()">New driver? Create an account</button>
+    </div>
+  </section>
+
+  <!-- FORGOT PASSWORD (Gmail OTP) -->
+  <section class="screen" id="screen-forgot">
+    <div class="header">
+      <p class="eyebrow">NESH DRIVER</p>
+      <h1 class="title">Forgot password</h1>
+    </div>
+    <div class="px stack">
+      <div id="forgot-step1" class="stack">
+        <p class="subtitle">Enter your username. We will send a 6-digit code to your recovery email.</p>
+        <div class="field"><input id="forgot-username" type="text" placeholder="Username" autocomplete="off" /></div>
+        <p class="error-text" id="forgot-error1" style="display:none;"></p>
+        <button class="btn-primary" id="forgot-send-btn" onclick="forgotSend()">Send code</button>
+      </div>
+      <div id="forgot-step2" class="stack" style="display:none;">
+        <p class="subtitle" id="forgot-sent-note">Code sent.</p>
+        <div class="field"><input id="forgot-otp" type="tel" inputmode="numeric" maxlength="6" placeholder="6-digit code" autocomplete="off" /></div>
+        <div class="field"><input id="forgot-new" type="password" placeholder="New password (min 6 characters)" /></div>
+        <div class="field"><input id="forgot-new2" type="password" placeholder="Confirm new password" /></div>
+        <p class="error-text" id="forgot-error2" style="display:none;"></p>
+        <button class="btn-primary" id="forgot-reset-btn" onclick="forgotReset()">Reset password</button>
+        <button class="btn-link" onclick="forgotSend(true)">Send code again</button>
+      </div>
+      <button class="btn-link" onclick="showScreen('login')">&larr; Back to login</button>
     </div>
   </section>
 
@@ -749,6 +776,17 @@ window.handleNativeRideAction = function () { window.__nativeQ.push(Array.protot
       <div class="field">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.34 1.79.65 2.65a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.43-1.22a2 2 0 0 1 2.11-.45c.86.31 1.75.53 2.65.65A2 2 0 0 1 22 16.92Z"/></svg>
         <input id="reg-phone" type="tel" placeholder="Phone number" />
+      </div>
+      <div class="field">
+        <input id="reg-email" type="email" placeholder="Email (needed to reset your password)" autocomplete="off" />
+      </div>
+      <div class="stack" style="margin-top:-6px;">
+        <button type="button" class="btn-outline" id="reg-email-send-btn" onclick="regEmailSend()">Send verification code</button>
+        <div id="reg-email-otp-wrap" class="stack" style="display:none;">
+          <div class="field"><input id="reg-email-otp" type="tel" inputmode="numeric" maxlength="6" placeholder="6-digit code from your email" autocomplete="off" /></div>
+          <button type="button" class="btn-outline" id="reg-email-verify-btn" onclick="regEmailVerify()">Confirm code</button>
+        </div>
+        <p class="hint-text" id="reg-email-status" style="margin:0; font-size:12px;"></p>
       </div>
       <div class="field">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg>
@@ -1040,6 +1078,17 @@ window.handleNativeRideAction = function () { window.__nativeQ.push(Array.protot
       <p class="error-text" id="account-service-error" style="display:none;"></p>
       <p class="hint-text" id="account-service-vehicle-note" style="display:none; margin:-4px 0 0; font-size:11px;">Auto/Cab drivers do taxi rides only — food &amp; grocery delivery is for bike drivers.</p>
       <button class="btn-primary" id="account-service-save-btn">Save work type</button>
+    </div>
+    <div class="px stack" style="margin-top:20px;">
+      <p class="hint-text" style="text-transform:uppercase; letter-spacing:1px; font-family:'IBM Plex Mono',monospace; font-size:11px;">Recovery email (for forgot password)</p>
+      <p class="hint-text" id="account-email-status" style="margin:0; font-size:12px;"></p>
+      <div class="field"><input id="account-email" type="email" placeholder="yourname@gmail.com" autocomplete="off" /></div>
+      <button class="btn-primary" id="account-email-send-btn" onclick="recEmailSend()">Send code</button>
+      <div id="account-email-otp-wrap" class="stack" style="display:none;">
+        <div class="field"><input id="account-email-otp" type="tel" inputmode="numeric" maxlength="6" placeholder="6-digit code" autocomplete="off" /></div>
+        <button class="btn-primary" id="account-email-verify-btn" onclick="recEmailVerify()">Verify email</button>
+      </div>
+      <p class="error-text" id="account-email-error" style="display:none;"></p>
     </div>
     <div class="logout-row">
       <a href="./index.html" onclick="try{localStorage.removeItem('nesh_last_app');localStorage.removeItem('nesh_portal');}catch(e){}" style="display:block;text-align:center;color:var(--muted-2);font-size:13px;margin-bottom:12px;text-decoration:none;">&larr; Switch app</a>
@@ -2793,6 +2842,7 @@ function listenDrivers() {
     setNativeDriverProfile();
     const zoneEl = document.getElementById('account-zone');
     if (zoneEl) zoneEl.value = state.driver.zoneName || '';
+    renderRecoveryEmail();
   });
   listenersOffLoad(() => {
     if (LISTENERS_OFF) { console.log('driver directory listeners OFF (app_config/driverListenersOff)'); return; }
@@ -5097,6 +5147,7 @@ function startFreshRegister() {
   document.getElementById('reg-username').value = '';
   document.getElementById('reg-username').readOnly = false;
   document.getElementById('reg-password').value = '';
+  document.getElementById('reg-email').value = ''; regVerifiedEmail = ''; regEmailRefresh();
   const zoneSel = document.getElementById('reg-zone');
   zoneSel.value = '';
   zoneSel.disabled = false;
@@ -5123,6 +5174,7 @@ function startEditResubmit() {
   document.getElementById('reg-username').value = regEditId || '';
   document.getElementById('reg-username').readOnly = true;
   document.getElementById('reg-password').value = data.password || '';
+  document.getElementById('reg-email').value = data.recoveryEmail || ''; regVerifiedEmail = String(data.recoveryEmail || '').toLowerCase(); regEmailRefresh();
   const zoneSel = document.getElementById('reg-zone');
   zoneSel.value = data.zone || '';
   zoneSel.disabled = true; // only the operator can change a driver's zone
@@ -5177,6 +5229,17 @@ async function doRegisterDriver() {
     errEl.style.display = 'block';
     return;
   }
+  const regEmail = regEmailVal();
+  if (!regEmail) {
+    errEl.textContent = "Please enter your email.";
+    errEl.style.display = 'block';
+    return;
+  }
+  if (regEmail !== regVerifiedEmail) {
+    errEl.textContent = "Please verify your email with the code first.";
+    errEl.style.display = 'block';
+    return;
+  }
   if (!regPhotoDataUrl) {
     errEl.textContent = "Please add your photo before creating your account.";
     errEl.style.display = 'block';
@@ -5210,6 +5273,7 @@ async function doRegisterDriver() {
         updates.hasPhoto = true;
       }
       await update(ref(db, 'taxi_drivers/' + regEditId), updates);
+      if (regEmail !== String((state.driver && state.driver.recoveryEmail) || '').toLowerCase()) await regEmailAttach(regEditId, password, regEmail);
       const fresh = Object.assign({}, state.driver, updates, regPhotoDataUrl ? { photo: regPhotoDataUrl } : {});
       const editedId = regEditId;
       regEditMode = false;
@@ -5241,6 +5305,7 @@ async function doRegisterDriver() {
       if (!photoOk) record.photo = photoForLocal; // fallback: old behaviour
     }
     await set(ref(db, 'taxi_drivers/' + username), record);
+    await regEmailAttach(username, password, regEmail);
     regPhotoDataUrl = '';
     logInDriver(username, Object.assign({}, record, photoForLocal ? { photo: photoForLocal } : {}));
   } catch (e) {
@@ -5251,6 +5316,150 @@ async function doRegisterDriver() {
   }
 }
 document.getElementById('reg-submit').addEventListener('click', doRegisterDriver);
+
+// ---------- Registration email verification (must be verified before the account is created) ----------
+var regVerifiedEmail = '';
+function regEmailVal() { return document.getElementById('reg-email').value.trim().toLowerCase(); }
+function regEmailRefresh() {
+  const em = regEmailVal(), ok = !!em && em === regVerifiedEmail;
+  const sendBtn = document.getElementById('reg-email-send-btn'), st = document.getElementById('reg-email-status');
+  sendBtn.style.display = ok ? 'none' : 'block';
+  if (ok) document.getElementById('reg-email-otp-wrap').style.display = 'none';
+  st.textContent = ok ? '\u2713 Email verified' : '';
+  st.style.color = ok ? '#0E8A5C' : '';
+}
+async function regEmailSend() {
+  const email = regEmailVal(), errEl = document.getElementById('reg-error');
+  errEl.style.display = 'none';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.textContent = 'Enter a valid email'; errEl.style.display = 'block'; return; }
+  const btn = document.getElementById('reg-email-send-btn'); btn.disabled = true;
+  try {
+    const j = await otpPost('/driver/register/send', { email });
+    if (j.ok) { document.getElementById('reg-email-otp-wrap').style.display = 'flex'; showToast('Code sent to ' + email); }
+    else { errEl.textContent = otpErrText(j); errEl.style.display = 'block'; }
+  } catch (e) { errEl.textContent = otpErrText({}); errEl.style.display = 'block'; }
+  finally { btn.disabled = false; }
+}
+async function regEmailVerify() {
+  const email = regEmailVal(), otp = document.getElementById('reg-email-otp').value.trim(), errEl = document.getElementById('reg-error');
+  errEl.style.display = 'none';
+  if (!/^\d{6}$/.test(otp)) { errEl.textContent = 'Enter the 6-digit code'; errEl.style.display = 'block'; return; }
+  const btn = document.getElementById('reg-email-verify-btn'); btn.disabled = true;
+  try {
+    const j = await otpPost('/driver/register/verify', { email, otp });
+    if (j.ok) { regVerifiedEmail = email; document.getElementById('reg-email-otp').value = ''; regEmailRefresh(); showToast('Email verified'); }
+    else { errEl.textContent = otpErrText(j); errEl.style.display = 'block'; }
+  } catch (e) { errEl.textContent = otpErrText({}); errEl.style.display = 'block'; }
+  finally { btn.disabled = false; }
+}
+// after the account record is written: the server saves the verified email on it
+async function regEmailAttach(username, password, email) {
+  try {
+    const j = await otpPost('/driver/register/attach', { username, password, email });
+    if (!j.ok) showToast('Email not saved. Add it from Account > Recovery email.');
+  } catch (e) { showToast('Email not saved. Add it from Account > Recovery email.'); }
+}
+document.getElementById('reg-email').addEventListener('input', regEmailRefresh);
+
+// ---------- Forgot password + recovery email (Gmail OTP, served by api.neshapp.in /driver/forgot/*, /driver/email/*) ----------
+function otpPost(path, body) {
+  return fetch(ORACLE_API + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(r => r.json().catch(() => ({})).then(j => { j = j || {}; j.status = r.status; return j; }));
+}
+function otpErrText(j) {
+  if (j.error === 'wait') return 'Please wait ' + (j.wait || 60) + ' seconds before asking for a new code.';
+  if (j.error === 'too many') return 'Too many tries. Try again after some time.';
+  if (j.error === 'no email') return 'No recovery email on this account. Please call the NESH operator to reset your password.';
+  if (j.error === 'no account') return 'No driver account found for this username.';
+  if (j.error === 'wrong') return 'Wrong code. Check and try again.';
+  if (j.error === 'expired') return 'Code expired. Ask for a new code.';
+  if (j.error === 'wrong password') return 'Your current password does not match.';
+  if (j.error === 'mail failed') return 'Could not send the mail. Try again in a minute.';
+  return "Couldn't reach the server. Check your connection and try again.";
+}
+function showMsg(id, text) { const el = document.getElementById(id); el.textContent = text || ''; el.style.display = text ? 'block' : 'none'; }
+function openForgot() {
+  document.getElementById('forgot-username').value = document.getElementById('login-username').value.trim();
+  ['forgot-otp', 'forgot-new', 'forgot-new2'].forEach(i => { document.getElementById(i).value = ''; });
+  document.getElementById('forgot-step1').style.display = 'flex';
+  document.getElementById('forgot-step2').style.display = 'none';
+  showMsg('forgot-error1', ''); showMsg('forgot-error2', '');
+  showScreen('forgot');
+}
+async function forgotSend(again) {
+  const username = document.getElementById('forgot-username').value.trim();
+  const errId = again ? 'forgot-error2' : 'forgot-error1';
+  showMsg('forgot-error1', ''); showMsg('forgot-error2', '');
+  if (!username) { showMsg('forgot-error1', 'Enter your username'); return; }
+  const btn = document.getElementById('forgot-send-btn'); btn.disabled = true;
+  try {
+    const j = await otpPost('/driver/forgot/send', { username });
+    if (j.ok) {
+      document.getElementById('forgot-sent-note').textContent = 'Code sent to ' + (j.masked || 'your email') + '. It works for 10 minutes.';
+      document.getElementById('forgot-step1').style.display = 'none';
+      document.getElementById('forgot-step2').style.display = 'flex';
+      showToast('Code sent');
+    } else showMsg(errId, otpErrText(j));
+  } catch (e) { showMsg(errId, otpErrText({})); }
+  finally { btn.disabled = false; }
+}
+async function forgotReset() {
+  const username = document.getElementById('forgot-username').value.trim();
+  const otp = document.getElementById('forgot-otp').value.trim();
+  const p1 = document.getElementById('forgot-new').value, p2 = document.getElementById('forgot-new2').value;
+  showMsg('forgot-error2', '');
+  if (!/^\d{6}$/.test(otp)) { showMsg('forgot-error2', 'Enter the 6-digit code'); return; }
+  if (p1.length < 6) { showMsg('forgot-error2', 'Password must be at least 6 characters'); return; }
+  if (p1 !== p2) { showMsg('forgot-error2', 'Passwords do not match'); return; }
+  const btn = document.getElementById('forgot-reset-btn'); btn.disabled = true;
+  try {
+    const j = await otpPost('/driver/forgot/reset', { username, otp, newPassword: p1 });
+    if (j.ok) {
+      document.getElementById('login-username').value = username;
+      document.getElementById('login-password').value = '';
+      showScreen('login');
+      showToast('Password changed. Login with the new password.');
+    } else showMsg('forgot-error2', otpErrText(j));
+  } catch (e) { showMsg('forgot-error2', otpErrText({})); }
+  finally { btn.disabled = false; }
+}
+function renderRecoveryEmail() {
+  const st = document.getElementById('account-email-status'); if (!st) return;
+  const em = state.driver && state.driver.recoveryEmail;
+  st.textContent = em ? 'Verified: ' + em + '. You can change it below.' : 'Not set. Add and verify an email so you can reset your password yourself.';
+}
+async function recEmailSend() {
+  const email = document.getElementById('account-email').value.trim().toLowerCase();
+  showMsg('account-email-error', '');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showMsg('account-email-error', 'Enter a valid email'); return; }
+  if (!state.username || !state.driver) return;
+  const btn = document.getElementById('account-email-send-btn'); btn.disabled = true;
+  try {
+    const j = await otpPost('/driver/email/send', { username: state.username, password: state.driver.password, email });
+    if (j.ok) { document.getElementById('account-email-otp-wrap').style.display = 'flex'; showToast('Code sent to ' + email); }
+    else showMsg('account-email-error', otpErrText(j));
+  } catch (e) { showMsg('account-email-error', otpErrText({})); }
+  finally { btn.disabled = false; }
+}
+async function recEmailVerify() {
+  const email = document.getElementById('account-email').value.trim().toLowerCase();
+  const otp = document.getElementById('account-email-otp').value.trim();
+  showMsg('account-email-error', '');
+  if (!/^\d{6}$/.test(otp)) { showMsg('account-email-error', 'Enter the 6-digit code'); return; }
+  const btn = document.getElementById('account-email-verify-btn'); btn.disabled = true;
+  try {
+    const j = await otpPost('/driver/email/verify', { username: state.username, password: state.driver.password, email, otp });
+    if (j.ok) {
+      document.getElementById('account-email-otp-wrap').style.display = 'none';
+      document.getElementById('account-email-otp').value = '';
+      document.getElementById('account-email').value = '';
+      if (state.driver) state.driver.recoveryEmail = email;
+      renderRecoveryEmail();
+      showToast('Recovery email saved');
+    } else showMsg('account-email-error', otpErrText(j));
+  } catch (e) { showMsg('account-email-error', otpErrText({})); }
+  finally { btn.disabled = false; }
+}
 
 async function doLogin() {
   const username = document.getElementById('login-username').value.trim();
