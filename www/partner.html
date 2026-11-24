@@ -2100,6 +2100,11 @@
           <h3>Driver Zones</h3>
           <p>Create and manage the named zones drivers pick from at registration</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('blue-tick')">
+          <div class="op-home-icon">✅</div>
+          <h3>Blue Tick</h3>
+          <p>Give or remove the verified tick for shops</p>
+        </div>
         <div class="op-home-card" onclick="opOpenSection('go-series')">
           <div class="op-home-icon">🚚</div>
           <h3>Go Series</h3>
@@ -2242,6 +2247,11 @@
           <h3>Send Notification</h3>
           <p>Push an announcement/offer to every customer who has the app</p>
         </div>
+        <div class="op-home-card" onclick="opOpenSection('notify-sched')">
+          <div class="op-home-icon">⏰</div>
+          <h3>Scheduled &amp; Auto Notifications</h3>
+          <p>Timed pushes, usual-time reminders, re-engage messages, message texts and limits</p>
+        </div>
       </div>
     </div>
   </div>
@@ -2307,6 +2317,7 @@
       <label for="nr-file" class="op-btn op-btn-push" style="display:block;text-align:center;cursor:pointer;margin:0 0 10px;">🎞️ Choose video</label>
       <input id="nr-file" type="file" accept="video/*" style="display:none;" />
       <input id="nr-text" type="text" maxlength="100" placeholder="Text on the reel (optional)" style="width:100%;box-sizing:border-box;padding:10px;margin:0 0 10px;font-family:inherit;font-size:.95rem;" />
+      <label style="display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:14px;"><input type="checkbox" id="nr-notify" style="width:18px;height:18px;"> <span>Send notification to <b>everyone</b> (if not ticked: only people who follow NESH)</span></label>
       <p class="op-note" id="nr-info" style="margin:0 0 8px;"></p>
       <div id="nr-bar" style="display:none;height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin:0 0 10px;"><div id="nr-fill" style="height:100%;width:0;background:#2F80ED;"></div></div>
       <p class="op-note" id="nr-err" style="display:none;color:#DC2626;margin:0 0 8px;"></p>
@@ -2691,6 +2702,80 @@
       <div id="op-visitors-box" style="margin:10px 0 16px;"></div>
       <p class="op-note">Tap a day to see who visited (name + phone if they were logged in) and which zone they were in. Outside every zone shows "Out of zone" with the nearest landmark. Location is saved once per day per device, once the customer app knows where they are.</p>
       <div id="op-visits-list"></div>
+    </div>
+  </div>
+
+  <!-- SCHEDULED & AUTO NOTIFICATIONS (Oracle server: /operator/notify) -->
+  <div class="op-section" id="op-section-notify-sched">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Scheduled &amp; Auto Notifications</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Everything here runs on the Oracle server (api.neshapp.in), all times are IST. Only customers who have notifications on and use the latest app are reached. Whether the server actually sends (shadow / test / live) is set on the server.</p>
+      <p class="op-note" id="op-ns-status" style="font-weight:600;"></p>
+
+      <h3 style="color:#15803d; font-size:14px; margin:22px 0 6px;">📊 Reach &amp; sent</h3>
+      <div class="op-note" id="op-ns-stats">Loading...</div>
+
+      <h3 style="color:#15803d; font-size:14px; margin:22px 0 6px;">⚙️ Auto notifications</h3>
+      <label style="display:block;color:#15803d;font-size:.85rem;margin-bottom:6px;"><input type="checkbox" id="op-ns-usual-on" checked> 🍽️ Usual-time reminder — sent shortly before the time a customer normally orders (only if they have not ordered today)</label>
+      <label style="display:block;color:#15803d;font-size:.85rem;margin-bottom:6px;"><input type="checkbox" id="op-ns-reengage-on" checked> 👋 Re-engage — customer has not ordered for some days (max 2 messages, a week apart)</label>
+      <p class="op-note" style="margin:8px 0 4px;">Usual-time: send how many minutes before? (empty = server default)</p>
+      <input type="number" id="op-ns-lead" min="1" max="180" placeholder="e.g. 20" style="width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:8px;box-sizing:border-box;">
+      <p class="op-note" style="margin:0 0 4px;">Re-engage: after how many days without an order?</p>
+      <input type="number" id="op-ns-after" min="1" max="60" placeholder="e.g. 7" style="width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:8px;box-sizing:border-box;">
+      <p class="op-note" style="margin:0 0 4px;">Maximum pushes per customer per day (❗ important timed pushes ignore this)</p>
+      <input type="number" id="op-ns-cap" min="1" max="20" placeholder="e.g. 4" style="width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:8px;box-sizing:border-box;">
+      <button type="button" class="op-btn" onclick="opNsSaveSettings()">💾 Save settings</button>
+
+      <h3 style="color:#15803d; font-size:14px; margin:22px 0 6px;">✏️ Message texts (usual-time &amp; re-engage)</h3>
+      <p class="op-note">Use {name} for the customer's first name. If you add several texts for a kind, one is picked at random each time. No text added = the built-in Malayalam message.</p>
+      <div id="op-ns-tpl-list"></div>
+      <select id="op-ns-tpl-kind" style="width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:8px;box-sizing:border-box;"><option value="usual">Usual-time reminder</option><option value="reengage">Re-engage</option></select>
+      <input type="text" id="op-ns-tpl-title" maxlength="100" placeholder="Title (e.g. {name}, വിശക്കുന്നുണ്ടോ? 😋)" style="width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:8px;box-sizing:border-box;">
+      <textarea id="op-ns-tpl-body" maxlength="300" placeholder="Message" style="height:70px;width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:8px;box-sizing:border-box;"></textarea>
+      <input type="text" id="op-ns-tpl-image" placeholder="Image URL (optional) - or upload below" style="width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:8px;box-sizing:border-box;">
+      <div style="margin:0 0 8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <input type="file" id="op-ns-tpl-file" accept="image/*" style="display:none;" onchange="opNsUploadImg(event, 'op-ns-tpl-image', 'op-ns-tpl-image-st', 'op-ns-tpl-image-prev')">
+        <button type="button" class="op-btn" style="width:auto;padding:8px 14px;font-size:.8rem;margin:0;" onclick="document.getElementById('op-ns-tpl-file').click()">📷 Upload photo</button>
+        <span id="op-ns-tpl-image-st" class="op-note" style="margin:0;"></span>
+      </div>
+      <img id="op-ns-tpl-image-prev" style="display:none;max-width:140px;max-height:140px;border-radius:6px;margin:0 0 8px;border:1px solid #b7d3be;">
+      <button type="button" class="op-btn" onclick="opNsAddTpl()">➕ Add text</button>
+
+      <h3 style="color:#15803d; font-size:14px; margin:22px 0 6px;">⏰ Timed notifications</h3>
+      <p class="op-note">Sent automatically at the chosen time. If you pick a time that passed less than 30 minutes ago it is sent right away.</p>
+      <div id="op-ns-sched-list"></div>
+      <p class="op-note" id="op-ns-form-title" style="font-weight:600;margin:14px 0 6px;">New timed notification</p>
+      <input type="text" id="op-ns-title" maxlength="100" placeholder="Title (e.g. 🎉 Lunch offer!)" style="width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:8px;box-sizing:border-box;">
+      <textarea id="op-ns-body" maxlength="300" placeholder="Message" style="height:80px;width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:8px;box-sizing:border-box;"></textarea>
+      <input type="text" id="op-ns-image" placeholder="Image URL (optional, https only)" style="width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:8px;box-sizing:border-box;">
+      <div style="margin:0 0 8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <input type="file" id="op-ns-file" accept="image/*" style="display:none;" onchange="opNsUploadImg(event, 'op-ns-image', 'op-ns-image-st', 'op-ns-image-prev')">
+        <button type="button" class="op-btn" style="width:auto;padding:8px 14px;font-size:.8rem;margin:0;" onclick="document.getElementById('op-ns-file').click()">📷 Upload photo</button>
+        <span id="op-ns-image-st" class="op-note" style="margin:0;"></span>
+      </div>
+      <img id="op-ns-image-prev" style="display:none;max-width:140px;max-height:140px;border-radius:6px;margin:0 0 8px;border:1px solid #b7d3be;">
+      <p class="op-note" style="margin:0 0 4px;">Time (IST)</p>
+      <input type="time" id="op-ns-time" style="width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:8px;box-sizing:border-box;">
+      <p class="op-note" style="margin:0 0 4px;">Repeat</p>
+      <select id="op-ns-repeat" onchange="opNsRepeatChanged()" style="width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:8px;box-sizing:border-box;"><option value="daily">Every day</option><option value="days">Chosen weekdays</option><option value="once">One date only</option></select>
+      <div id="op-ns-days-wrap" style="display:none;margin-bottom:8px;color:#15803d;font-size:.85rem;">
+        <label><input type="checkbox" class="op-ns-day" value="1"> Mon</label> &nbsp;
+        <label><input type="checkbox" class="op-ns-day" value="2"> Tue</label> &nbsp;
+        <label><input type="checkbox" class="op-ns-day" value="3"> Wed</label> &nbsp;
+        <label><input type="checkbox" class="op-ns-day" value="4"> Thu</label> &nbsp;
+        <label><input type="checkbox" class="op-ns-day" value="5"> Fri</label> &nbsp;
+        <label><input type="checkbox" class="op-ns-day" value="6"> Sat</label> &nbsp;
+        <label><input type="checkbox" class="op-ns-day" value="0"> Sun</label>
+      </div>
+      <div id="op-ns-date-wrap" style="display:none;"><input type="date" id="op-ns-date" style="width:100%;padding:10px;background:#ffffff;color:#1f2937;border:1px solid #b7d3be;font-size:.85rem;margin-bottom:8px;box-sizing:border-box;"></div>
+      <p class="op-note" style="margin:0 0 4px;">Send to which customers? (zone = the zone of their last known location)</p>
+      <div id="op-ns-zones" style="color:#15803d;font-size:.85rem;line-height:1.9;margin-bottom:8px;">Loading zones...</div>
+      <label style="display:block;color:#15803d;font-size:.85rem;margin-bottom:6px;"><input type="checkbox" id="op-ns-important"> ❗ Important — ignores the daily limit</label>
+      <button type="button" class="op-btn op-btn-push" id="op-ns-save-btn" onclick="opNsSaveSched()">💾 Save timed notification</button>
+      <button type="button" class="op-btn" id="op-ns-cancel-btn" style="display:none;" onclick="opNsFormReset()">Cancel edit</button>
     </div>
   </div>
 
@@ -3326,6 +3411,24 @@
 
       <h2 style="margin-top:18px;">Currently in Go Series</h2>
       <div id="op-goseries-shop-list" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <div class="op-section" id="op-section-blue-tick">
+    <div class="op-section-header">
+      <button class="op-back-btn" onclick="opOpenSection('home')">←</button>
+      <h2>Blue Tick</h2>
+    </div>
+    <div class="op-section-body">
+      <p class="op-note">Customers see a blue tick next to the name of every shop listed under "Has blue tick". Only you can give or remove it here.</p>
+      <h3 style="margin:10px 0 6px;">Has blue tick</h3>
+      <div id="op-bt-list" style="margin-bottom:16px;"></div>
+      <h3 style="margin:10px 0 6px;">Add a blue tick</h3>
+      <div class="op-search-box" style="margin-bottom:6px;">
+        <input type="text" id="op-bt-search" placeholder="Search shops..." oninput="opBtRender()">
+      </div>
+      <div id="op-bt-picker" style="max-height:260px; overflow-y:auto;"></div>
+      <p class="op-note" id="op-bt-status" style="margin-top:10px;"></p>
     </div>
   </div>
 
@@ -4440,7 +4543,7 @@
   // bumps `catalogVer`, so customer apps that cache the catalog know to download it again.
   (function () {
     const f = window.fb, orig = { set, update, remove, push };
-    const PUB = /^restaurants\/[^/]+(\/(menu|itemCategories|popularItems|suggestItems|photo|bannerPhoto|status|restaurantName|address|location|businessType|openTime|closeTime|hoursEnabled|deliveryCharges|deliveryZone|discount\w*|goSeries|gpayNumber|minOrderAmount|opCategory|shopUnavailable\w*|deliveryTimeMins|opDeliveryTimeMins|martRanges|priceMarkup|ratingCount|ratingSum)(\/|$))?$|^restaurants\/[^/]+\/(menu|itemCategories|popularItems|suggestItems|photo|bannerPhoto|status|restaurantName|address|location|businessType|openTime|closeTime|hoursEnabled|deliveryCharges|deliveryZone|discount\w*|goSeries|gpayNumber|minOrderAmount|opCategory|shopUnavailable\w*|deliveryTimeMins|opDeliveryTimeMins|martRanges|priceMarkup|ratingCount|ratingSum)(\/|$)/;
+    const PUB = /^restaurants\/[^/]+(\/(menu|itemCategories|popularItems|suggestItems|photo|bannerPhoto|status|restaurantName|address|location|businessType|openTime|closeTime|hoursEnabled|deliveryCharges|deliveryZone|discount\w*|goSeries|verified|gpayNumber|minOrderAmount|opCategory|shopUnavailable\w*|deliveryTimeMins|opDeliveryTimeMins|martRanges|priceMarkup|ratingCount|ratingSum)(\/|$))?$|^restaurants\/[^/]+\/(menu|itemCategories|popularItems|suggestItems|photo|bannerPhoto|status|restaurantName|address|location|businessType|openTime|closeTime|hoursEnabled|deliveryCharges|deliveryZone|discount\w*|goSeries|verified|gpayNumber|minOrderAmount|opCategory|shopUnavailable\w*|deliveryTimeMins|opDeliveryTimeMins|martRanges|priceMarkup|ratingCount|ratingSum)(\/|$)/;
     const pathOf = r => { try { return String(r).replace(/^https?:\/\/[^/]+\/?/, '').replace(/\/$/, ''); } catch (e) { return ''; } };
     let bumpT = null; const dirty = new Set();
     // Stamps what changed: catalogVerShop/{shopId} = now (customer apps re-download ONLY that shop) and the old global
@@ -5944,7 +6047,7 @@ function nrSay(i, m, box) { const e = nrEl(i); if (!e) return; e.textContent = m
 function nrBar(p) { const b = nrEl('nr-bar'), f = nrEl('nr-fill'); if (!b || !f) return; b.style.display = p < 0 ? 'none' : 'block'; f.style.width = Math.max(0, p) + '%'; }
 function nrBtn(show, label, dis) { const b = nrEl('nr-btn'); if (!b) return; b.style.display = show ? 'block' : 'none'; if (label) b.textContent = label; b.disabled = !!dis; }
 function nrFail(m) { nrBusy = false; nrSay('nr-err', m, true); nrBar(-1); nrSay('nr-info', ''); nrBtn(!!nrFile, 'Upload NESH reel', false); }
-function nrReset() { nrFile = null; nrBusy = false; nrSay('nr-err', '', true); nrSay('nr-info', ''); nrBar(-1); nrBtn(false, 'Upload NESH reel', false); const f = nrEl('nr-file'); if (f) f.value = ''; const t = nrEl('nr-text'); if (t) t.value = ''; }
+function nrReset() { nrFile = null; nrBusy = false; nrSay('nr-err', '', true); nrSay('nr-info', ''); nrBar(-1); nrBtn(false, 'Upload NESH reel', false); const f = nrEl('nr-file'); if (f) f.value = ''; const t = nrEl('nr-text'); if (t) t.value = ''; const nf = nrEl('nr-notify'); if (nf) nf.checked = false; }
 document.addEventListener('change', ev => {
   const t = ev.target; if (!t || t.id !== 'nr-file') return;
   const f = t.files && t.files[0]; if (!f || nrBusy) return;
@@ -5966,7 +6069,7 @@ async function nrPost() {
   nrBusy = true; nrSay('nr-err', '', true); nrBtn(true, 'Starting...', true); nrBar(0);
   const file = nrFile; let st = null;
   try {
-    const r = await fetch(NESH_API + '/videos/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opToken: tok, kind: 'reel', text: (nrEl('nr-text').value || '').trim() }) });
+    const r = await fetch(NESH_API + '/videos/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opToken: tok, kind: 'reel', text: (nrEl('nr-text').value || '').trim(), notifyAll: !!(nrEl('nr-notify') && nrEl('nr-notify').checked) }) });
     let j = null; try { j = await r.json(); } catch (e) {}
     if (!(r.ok && j && j.ok && j.token)) { nrFail(r.status === 403 ? 'Operator login not accepted. Log in again.' : r.status === 409 ? 'Limit reached (100 reels). Delete one first.' : r.status === 429 ? 'Too many tries. Wait a minute.' : r.status === 503 ? 'Video upload is not ready on the server (503).' : 'Could not start (' + ((j && j.error) || r.status) + ')'); return; }
     st = j;
@@ -10598,6 +10701,7 @@ function opOpenSection(name) {
   if (name === 'loyalty-store') { opLsRenderItemSelect(); opLsLoad(); }
   if (name === 'referral') opRefLoad();
   if (name === 'notify') { opLoadPosters(); opRenderNotifyZones(); }
+  if (name === 'notify-sched') opNsLoad();
   if (name === 'zones') opRenderZonesList();
   if (name === 'category-order') opRenderCategoryOrder();
   if (name === 'shop-categories') opRenderShopCategoriesList();
@@ -10624,6 +10728,7 @@ function opOpenSection(name) {
   if (name === 'driver-sos') opRenderSosList();
   if (name === 'driver-shifts') { opRenderShiftsList(); const d = document.getElementById('op-shift-date'); if (d && !d.value) d.value = new Date().toISOString().slice(0,10); }
   if (name === 'go-series') opLoadGoSeries();
+  if (name === 'blue-tick') opBtLoad();
   if (name === 'shop-delivery') { opCloseShopDeliveryEditor(); opRenderShopDeliveryList(); try { fzInit(); } catch (e) {} }
   if (name === 'delivery-time') { opCloseEtaEditor(); opRenderEtaList(); }
   if (name === 'shop-deals') { opCloseShopDealEditor(); opRenderShopDealsList(); }
@@ -10832,6 +10937,240 @@ function opLoadVisitors(dayKey) {
       });
     });
   }).catch(() => { box.innerHTML = '<div class="op-mc-row">Failed to load — check Firebase rules for visitLog.</div>'; });
+}
+
+/* ---- Scheduled & Auto Notifications (Oracle server /operator/notify/*) ----
+   Auth: same operator token as the menu (neshOpToken), sent as  Authorization: Bearer <token>. */
+const OP_NS_DAYN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const OP_NS_KINDN = { usual: 'Usual-time', reengage: 'Re-engage', broadcast: 'Timed' };
+let opNsSched = [], opNsTpl = [], opNsEditId = null;
+function opNsEl(id) { return document.getElementById(id); }
+function opNsStatus(t, ok) { const el = opNsEl('op-ns-status'); if (!el) return; el.textContent = t || ''; el.style.color = ok === false ? '#b91c1c' : '#15803d'; }
+function opNsDigits(id) { return String(id).replace(/\D/g, ''); }
+function opNsThumb(u) {
+  return u ? '<img src="' + escapeHtml(u) + '" alt="" style="display:block;max-width:110px;max-height:70px;border-radius:6px;margin:6px 0;border:1px solid #b7d3be;">' : '';
+}
+function opNsPrev(inputId, prevId) {
+  const i = opNsEl(inputId), im = opNsEl(prevId); if (!i || !im) return;
+  const u = String(i.value || '').trim();
+  if (/^https:\/\/\S{4,}$/i.test(u)) { im.src = u; im.style.display = 'block'; } else { im.removeAttribute('src'); im.style.display = 'none'; }
+}
+document.addEventListener('input', e => {
+  const id = e.target && e.target.id;
+  if (id === 'op-ns-image') opNsPrev('op-ns-image', 'op-ns-image-prev');
+  else if (id === 'op-ns-tpl-image') opNsPrev('op-ns-tpl-image', 'op-ns-tpl-image-prev');
+});
+// Photos for usual / re-engage texts and timed pushes are REUSED later, so unlike the one-off broadcast
+// photo they are NOT registered for 24h auto-delete. Shrunk to max 1024 px first (FCM shows small pictures best).
+function opNsShrink(file) {
+  return new Promise(res => {
+    try {
+      const img = new Image(), u = URL.createObjectURL(file);
+      img.onload = () => {
+        const k = Math.min(1, 1024 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(u);
+        c.toBlob(b => res(b || file), 'image/jpeg', 0.85);
+      };
+      img.onerror = () => { URL.revokeObjectURL(u); res(file); };
+      img.src = u;
+    } catch (e) { res(file); }
+  });
+}
+async function opNsUploadImg(e, inputId, statusId, prevId) {
+  const file = e.target.files && e.target.files[0]; if (!file) return;
+  const st = opNsEl(statusId); st.textContent = 'Uploading…';
+  try {
+    const url = await uploadPhotoToCloudinary(await opNsShrink(file));
+    opNsEl(inputId).value = url; opNsPrev(inputId, prevId); st.textContent = '✅ Uploaded';
+  } catch (err) { st.textContent = '❌ Upload failed, try again'; }
+  finally { e.target.value = ''; }
+}
+async function opNsApi(method, path, body) {
+  const tok = neshOpToken();
+  if (!tok) throw new Error('Not connected to the Oracle server. Log out of the operator panel and log in again.');
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const opt = { method, headers: { 'Authorization': 'Bearer ' + tok }, signal: ctl.signal };
+    if (body !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+    const r = await fetch(NESH_API + '/operator/notify' + path, opt);
+    if (r.status === 401) { try { localStorage.removeItem('nesh_op_token'); } catch (e) {} neshOpForceLogout(); throw new Error('Session expired - log in again.'); }
+    let j = {}; try { j = await r.json(); } catch (e) {}
+    if (!r.ok) throw new Error(j && j.error ? 'Server did not accept it (' + j.error + ')' : 'Server error ' + r.status);
+    return j;
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw new Error('Server did not answer. Try again.');
+    if (e instanceof TypeError) throw new Error('Cannot reach the server (check internet / server CORS).');
+    throw e;
+  } finally { clearTimeout(tm); }
+}
+function opNsZoneName(id) { const z = (typeof opShopZones !== 'undefined' ? opShopZones : []).find(x => x._id === id); return z ? (z.name || id) : id; }
+function opNsCurZones() {
+  const all = opNsEl('op-ns-zall');
+  if (!all || all.checked) return 'all';
+  return Array.from(document.querySelectorAll('#op-ns-zones input[data-nszone]:checked')).map(c => c.getAttribute('data-nszone'));
+}
+function opNsRenderZones(sel) {
+  const box = opNsEl('op-ns-zones'); if (!box) return;
+  try { opListenShopZones(); } catch (e) {}
+  const all = !Array.isArray(sel) || !sel.length;
+  const zones = (typeof opShopZones !== 'undefined' ? opShopZones : []).filter(z => opSzBoundsOk(z));
+  box.innerHTML = '<label style="display:block;"><input type="checkbox" id="op-ns-zall"' + (all ? ' checked' : '') + ' onchange="opNsZoneAll()"> 🌍 All customers</label>'
+    + zones.map(z => '<label style="display:block;"><input type="checkbox" data-nszone="' + escapeHtml(z._id) + '"' + (!all && sel.indexOf(z._id) >= 0 ? ' checked' : '') + ' onchange="opNsZoneOne()"> 📍 ' + escapeHtml(z.name || z._id) + '</label>').join('');
+}
+function opNsZoneAll() { if (opNsEl('op-ns-zall').checked) document.querySelectorAll('#op-ns-zones input[data-nszone]').forEach(c => { c.checked = false; }); else opNsZoneOne(); }
+function opNsZoneOne() { opNsEl('op-ns-zall').checked = document.querySelectorAll('#op-ns-zones input[data-nszone]:checked').length === 0; }
+function opNsRepeatChanged() {
+  const v = opNsEl('op-ns-repeat').value;
+  opNsEl('op-ns-days-wrap').style.display = v === 'days' ? 'block' : 'none';
+  opNsEl('op-ns-date-wrap').style.display = v === 'once' ? 'block' : 'none';
+}
+function opNsFormReset() {
+  opNsEditId = null;
+  ['op-ns-title', 'op-ns-body', 'op-ns-image', 'op-ns-time', 'op-ns-date'].forEach(id => { opNsEl(id).value = ''; });
+  opNsEl('op-ns-repeat').value = 'daily';
+  document.querySelectorAll('.op-ns-day').forEach(c => { c.checked = false; });
+  opNsEl('op-ns-important').checked = false;
+  opNsRepeatChanged(); opNsRenderZones('all');
+  opNsPrev('op-ns-image', 'op-ns-image-prev'); opNsEl('op-ns-image-st').textContent = '';
+  opNsEl('op-ns-form-title').textContent = 'New timed notification';
+  opNsEl('op-ns-save-btn').textContent = '💾 Save timed notification';
+  opNsEl('op-ns-cancel-btn').style.display = 'none';
+}
+function opNsRenderStats(st) {
+  const r = (st && st.reach) || {};
+  const fmt = rows => (rows || []).map(x => (OP_NS_KINDN[x.kind] || escapeHtml(x.kind)) + ': <b>' + escapeHtml(x.n) + '</b>').join(' · ') || 'nothing yet';
+  opNsEl('op-ns-stats').innerHTML = '👥 Can be reached: <b>' + escapeHtml(r.reachable == null ? '?' : r.reachable) + '</b> of ' + escapeHtml(r.total == null ? '?' : r.total) + ' known customers (switched off by customer: ' + escapeHtml(r.opted_out == null ? '?' : r.opted_out) + ')<br>Sent today — ' + fmt(st && st.today) + '<br>Last 7 days — ' + fmt(st && st.last7days);
+}
+function opNsRenderSettings(m) {
+  m = m || {};
+  opNsEl('op-ns-usual-on').checked = String(m.usual_on || 'on').toLowerCase() !== 'off';
+  opNsEl('op-ns-reengage-on').checked = String(m.reengage_on || 'on').toLowerCase() !== 'off';
+  opNsEl('op-ns-lead').value = m.usual_lead_min || '';
+  opNsEl('op-ns-after').value = m.reengage_after_d || '';
+  opNsEl('op-ns-cap').value = m.daily_cap || '';
+}
+function opNsRenderTpl() {
+  const box = opNsEl('op-ns-tpl-list');
+  if (!opNsTpl.length) { box.innerHTML = '<p class="op-note">No custom texts yet - the built-in message is used.</p>'; return; }
+  box.innerHTML = opNsTpl.map(t => {
+    const id = opNsDigits(t.id);
+    return '<div style="border:1px solid #b7d3be;background:#fff;padding:10px;margin-bottom:8px;border-radius:6px;opacity:' + (t.enabled ? 1 : .55) + ';">'
+      + '<span class="op-note" style="margin:0;">' + (OP_NS_KINDN[t.kind] || escapeHtml(t.kind)) + (t.enabled ? '' : ' · OFF') + (t.image_url ? ' · 🖼️' : '') + '</span><br>'
+      + '<b style="color:#15803d;">' + escapeHtml(t.title) + '</b>' + opNsThumb(t.image_url)
+      + '<div style="font-size:.85rem;color:#1f2937;margin:4px 0 8px;">' + escapeHtml(t.body) + '</div>'
+      + '<button type="button" class="op-btn" onclick="opNsToggleTpl(\'' + id + '\')">' + (t.enabled ? 'Turn off' : 'Turn on') + '</button>'
+      + '<button type="button" class="op-btn" onclick="opNsDelTpl(\'' + id + '\')">🗑 Delete</button></div>';
+  }).join('');
+}
+function opNsRenderSched() {
+  const box = opNsEl('op-ns-sched-list');
+  if (!opNsSched.length) { box.innerHTML = '<p class="op-note">No timed notifications yet.</p>'; return; }
+  box.innerHTML = opNsSched.map(s => {
+    const id = opNsDigits(s.id);
+    const when = s.once_date ? ('only on ' + escapeHtml(s.once_date)) : (!s.days || s.days === 'daily' ? 'every day' : String(s.days).split(',').map(d => OP_NS_DAYN[Number(d)] || d).join(', '));
+    const zn = (!s.zones || String(s.zones).toLowerCase() === 'all') ? 'All customers' : String(s.zones).split(',').map(z => escapeHtml(opNsZoneName(z))).join(', ');
+    return '<div style="border:1px solid #b7d3be;background:#fff;padding:10px;margin-bottom:8px;border-radius:6px;opacity:' + (s.enabled ? 1 : .55) + ';">'
+      + '<b style="color:#15803d;">' + escapeHtml(s.title) + '</b>' + (s.important ? ' <span style="color:#b91c1c;font-size:.75rem;">❗ important</span>' : '') + opNsThumb(s.image_url)
+      + '<div style="font-size:.85rem;color:#1f2937;margin:4px 0;">' + escapeHtml(s.body) + '</div>'
+      + '<div class="op-note" style="margin:0 0 8px;">⏰ ' + escapeHtml(s.send_time) + ' IST · ' + when + ' · 📍 ' + zn + (s.image_url ? ' · 🖼️' : '') + (s.last_sent_date ? ' · last sent ' + escapeHtml(s.last_sent_date) : '') + (s.enabled ? '' : ' · OFF') + '</div>'
+      + '<button type="button" class="op-btn" onclick="opNsEdit(\'' + id + '\')">✏️ Edit</button>'
+      + '<button type="button" class="op-btn" onclick="opNsToggle(\'' + id + '\')">' + (s.enabled ? 'Turn off' : 'Turn on') + '</button>'
+      + '<button type="button" class="op-btn" onclick="opNsDelSched(\'' + id + '\')">🗑 Delete</button></div>';
+  }).join('');
+}
+async function opNsLoad() {
+  opNsRenderZones(opNsCurZones());
+  if (!opNsEditId) opNsFormReset();
+  if (!neshOpToken()) { opNsStatus('Not connected to the Oracle server. Log out of the operator panel and log in again (the server must be reachable).', false); return; }
+  opNsStatus('Loading...');
+  try {
+    const r = await Promise.all([opNsApi('GET', '/stats'), opNsApi('GET', '/settings'), opNsApi('GET', '/schedules'), opNsApi('GET', '/templates/usual'), opNsApi('GET', '/templates/reengage')]);
+    opNsRenderStats(r[0]); opNsRenderSettings(r[1].settings);
+    opNsSched = r[2].schedules || [];
+    opNsTpl = (r[3].templates || []).concat(r[4].templates || []);
+    opNsRenderSched(); opNsRenderTpl();
+    opNsRenderZones(opNsCurZones());
+    opNsStatus('');
+  } catch (e) { opNsStatus(e.message || 'Could not load.', false); }
+}
+async function opNsSaveSettings() {
+  const body = { usual_on: opNsEl('op-ns-usual-on').checked ? 'on' : 'off', reengage_on: opNsEl('op-ns-reengage-on').checked ? 'on' : 'off' };
+  const lead = opNsEl('op-ns-lead').value.trim(), after = opNsEl('op-ns-after').value.trim(), cap = opNsEl('op-ns-cap').value.trim();
+  if (lead) body.usual_lead_min = lead;
+  if (after) body.reengage_after_d = after;
+  if (cap) body.daily_cap = cap;
+  try { await opNsApi('PUT', '/settings', body); opNsStatus('Settings saved ✓'); } catch (e) { opNsStatus(e.message, false); }
+}
+async function opNsAddTpl() {
+  const title = opNsEl('op-ns-tpl-title').value.trim(), body = opNsEl('op-ns-tpl-body').value.trim();
+  if (!title || !body) return opNsStatus('Enter a title and a message.', false);
+  try {
+    await opNsApi('POST', '/templates', { kind: opNsEl('op-ns-tpl-kind').value, title, body, image_url: opNsEl('op-ns-tpl-image').value.trim(), enabled: true });
+    ['op-ns-tpl-title', 'op-ns-tpl-body', 'op-ns-tpl-image'].forEach(id => { opNsEl(id).value = ''; });
+    opNsPrev('op-ns-tpl-image', 'op-ns-tpl-image-prev'); opNsEl('op-ns-tpl-image-st').textContent = '';
+    await opNsLoad(); opNsStatus('Text added ✓');
+  } catch (e) { opNsStatus(e.message, false); }
+}
+async function opNsToggleTpl(id) {
+  const t = opNsTpl.find(x => opNsDigits(x.id) === id); if (!t) return;
+  try { await opNsApi('PUT', '/templates/' + id, { enabled: !t.enabled }); await opNsLoad(); } catch (e) { opNsStatus(e.message, false); }
+}
+async function opNsDelTpl(id) {
+  if (!confirm('Delete this message text?')) return;
+  try { await opNsApi('DELETE', '/templates/' + id); await opNsLoad(); } catch (e) { opNsStatus(e.message, false); }
+}
+async function opNsSaveSched() {
+  const title = opNsEl('op-ns-title').value.trim(), body = opNsEl('op-ns-body').value.trim(), time = opNsEl('op-ns-time').value;
+  if (!title || !body) return opNsStatus('Enter a title and a message.', false);
+  if (!time) return opNsStatus('Pick the time.', false);
+  const rep = opNsEl('op-ns-repeat').value;
+  const zs = opNsCurZones();
+  const p = { title, body, image_url: opNsEl('op-ns-image').value.trim(), send_time: time, important: opNsEl('op-ns-important').checked, zones: zs === 'all' ? 'all' : zs.join(',') };
+  if (rep === 'once') {
+    const d = opNsEl('op-ns-date').value; if (!d) return opNsStatus('Pick the date.', false);
+    p.once_date = d; p.days = 'daily';
+  } else {
+    p.once_date = '';
+    if (rep === 'days') {
+      const ds = Array.from(document.querySelectorAll('.op-ns-day:checked')).map(c => c.value);
+      if (!ds.length) return opNsStatus('Pick at least one weekday.', false);
+      p.days = ds.join(',');
+    } else p.days = 'daily';
+  }
+  try {
+    if (opNsEditId) await opNsApi('PUT', '/schedules/' + opNsEditId, p);
+    else await opNsApi('POST', '/schedules', Object.assign({ enabled: true }, p));
+    opNsEditId = null; opNsFormReset(); await opNsLoad(); opNsStatus('Saved ✓');
+  } catch (e) { opNsStatus(e.message, false); }
+}
+function opNsEdit(id) {
+  const s = opNsSched.find(x => opNsDigits(x.id) === id); if (!s) return;
+  opNsEditId = id;
+  opNsEl('op-ns-title').value = s.title || ''; opNsEl('op-ns-body').value = s.body || ''; opNsEl('op-ns-image').value = s.image_url || '';
+  opNsEl('op-ns-time').value = s.send_time || '';
+  opNsPrev('op-ns-image', 'op-ns-image-prev');
+  opNsEl('op-ns-important').checked = !!s.important;
+  const rep = s.once_date ? 'once' : (s.days && s.days !== 'daily' ? 'days' : 'daily');
+  opNsEl('op-ns-repeat').value = rep; opNsRepeatChanged();
+  opNsEl('op-ns-date').value = s.once_date || '';
+  const dset = rep === 'days' ? String(s.days).split(',') : [];
+  document.querySelectorAll('.op-ns-day').forEach(c => { c.checked = dset.indexOf(c.value) >= 0; });
+  const zl = (!s.zones || String(s.zones).toLowerCase() === 'all') ? 'all' : String(s.zones).split(',');
+  opNsRenderZones(zl);
+  opNsEl('op-ns-form-title').textContent = 'Editing: ' + (s.title || '');
+  opNsEl('op-ns-save-btn').textContent = '💾 Update timed notification';
+  opNsEl('op-ns-cancel-btn').style.display = 'inline-block';
+  opNsEl('op-ns-title').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+async function opNsToggle(id) {
+  const s = opNsSched.find(x => opNsDigits(x.id) === id); if (!s) return;
+  try { await opNsApi('PUT', '/schedules/' + id, { enabled: !s.enabled }); await opNsLoad(); } catch (e) { opNsStatus(e.message, false); }
+}
+async function opNsDelSched(id) {
+  if (!confirm('Delete this timed notification?')) return;
+  try { await opNsApi('DELETE', '/schedules/' + id); if (opNsEditId === id) opNsFormReset(); await opNsLoad(); } catch (e) { opNsStatus(e.message, false); }
 }
 
 /* ---- Send Notification (FCM topic broadcast: all customers, or only chosen zones) ----
@@ -12320,6 +12659,42 @@ function opRemoveShopFromGoSeries(id) {
   }).catch(err => alert('Error: ' + err.message));
 }
 
+/* ---- Blue Tick (operator gives / removes restaurants/{id}/verified; shown next to the shop name in the customer app) ---- */
+function opBtLoad() {
+  const s = document.getElementById('op-bt-search'); if (s) s.value = '';
+  const st = document.getElementById('op-bt-status'); if (st) st.textContent = '';
+  opBtRender();
+}
+function opBtRender() {
+  const list = document.getElementById('op-bt-list'), pick = document.getElementById('op-bt-picker');
+  if (!list || !pick) return;
+  const q = ((document.getElementById('op-bt-search') || {}).value || '').trim().toLowerCase();
+  const all = (opAllPartners || []).slice().sort((a, b) => (a.restaurantName || a._id).localeCompare(b.restaurantName || b._id));
+  const has = all.filter(p => p.verified);
+  list.innerHTML = has.length ? has.map(p => `
+    <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center;">
+      <div><div class="op-partner-name">${escapeHtml(p.restaurantName || p._id)} <span style="color:#1D9BF0;">✔</span></div>
+      <div class="op-partner-sub">${escapeHtml(opTypeLabel(p.businessType))}</div></div>
+      <button type="button" class="op-btn op-btn-danger" style="margin:0;" onclick="opBtSet('${p._id}', false)">✕ Remove</button>
+    </div>`).join('') : '<p class="op-note">No shop has a blue tick yet.</p>';
+  const rest = all.filter(p => !p.verified).filter(p => !q || (p.restaurantName || '').toLowerCase().includes(q) || p._id.toLowerCase().includes(q));
+  pick.innerHTML = rest.length ? rest.slice(0, 40).map(p => `
+    <div class="op-partner-item" style="display:flex; justify-content:space-between; align-items:center;">
+      <div><div class="op-partner-name">${escapeHtml(p.restaurantName || p._id)}</div>
+      <div class="op-partner-sub">${escapeHtml(opTypeLabel(p.businessType))}</div></div>
+      <button type="button" class="op-btn op-btn-push" style="margin:0;" onclick="opBtSet('${p._id}', true)">✔ Give tick</button>
+    </div>`).join('') : '<p class="op-note">' + (q ? 'No matching shops.' : 'No more shops.') + '</p>';
+}
+function opBtSet(id, on) {
+  const { db, ref, update } = window.fb;
+  const st = document.getElementById('op-bt-status');
+  update(ref(db, 'restaurants/' + id), { verified: on ? true : null }).then(() => {
+    const p = (opAllPartners || []).find(x => x._id === id); if (p) p.verified = !!on;
+    if (st) st.textContent = on ? 'Blue tick given. Customers see it within about a minute.' : 'Blue tick removed.';
+    opBtRender();
+  }).catch(err => alert('Error: ' + err.message));
+}
+
 /* ---- Estimated Delivery Time (operator value wins over the shop's own) ---- */
 let opEtaEditingId = null;
 function opEtaSummary(p) {
@@ -13544,7 +13919,7 @@ async function neshOpMulti(list) {
    A shop's menu is attached only when something needs it (opEnsureMenus): a menu screen, the shop detail, a stock action.
    Any failure falls back to the old full-shop listener, so behaviour never gets worse than before. ---- */
 const opMenuSubs = {}, opMenuP = {}, opMenuData = {}, opMenuLoaded = new Set(), opFullShops = new Set(), opShopReady = new Set();
-const OP_SHOP_KNOWN_KEYS = ['orders', 'settlements', 'commissionHistory', 'commissionTiers', 'restaurantName', 'approvalStatus', 'businessType', 'goSeries', 'phone',
+const OP_SHOP_KNOWN_KEYS = ['orders', 'settlements', 'commissionHistory', 'commissionTiers', 'restaurantName', 'approvalStatus', 'businessType', 'goSeries', 'verified', 'phone',
   'itemCategories', 'popularItems', 'suggestItems', 'martRanges', 'bannerPhoto', 'activeSession', 'rejectionReason', 'priceMarkup', 'orderRollup', 'ratingSum', 'ratingCount'];
 const OP_MENU_SECTIONS = ['trending', 'groceries-catalog', 'nesh-item-order', 'nesh-sections', 'nesh-categories', 'item-categories', 'groceries-queue'];
 function opDropShop(id) {
@@ -13615,7 +13990,7 @@ function opSyncPartnerLoad() {
     if (opFullUnsub) return;
     if (opShopIndex && !opShopIndexFailed) {
       opLightMode = true;
-      const LIGHT = ['orders', 'settlements', 'commissionHistory', 'commissionTiers', 'restaurantName', 'approvalStatus', 'businessType', 'goSeries', 'phone'];
+      const LIGHT = ['orders', 'settlements', 'commissionHistory', 'commissionTiers', 'restaurantName', 'approvalStatus', 'businessType', 'goSeries', 'verified', 'phone'];
       const { query, orderByKey, startAt, endAt } = window.fb;
       const dStr = opOrdersDayValue(), todayStr = opDateKey(Date.now());
       const winFrom = opPushPrefix(opDayStartMs(dStr) - (dStr < todayStr ? 600000 : 6 * 3600000));   // that day only (today also keeps the last 6 h so a late-night order still in progress shows)
