@@ -1576,6 +1576,8 @@
       <div style="margin:22px 0 0;padding-top:14px;border-top:1px solid #e5e7eb;">
         <h2 class="section-title" style="margin:0 0 6px;">🎬 Video story / Reel</h2>
         <p class="hint-text" style="margin:0 0 10px;">Video story: shown 24 hours, then deleted. Reel: stays until YOU delete it. Max 60 seconds, 90 MB. The text and Last Call tag above are used for the video too.</p>
+        <div class="field"><select id="st-timer" style="width:100%;border:0;background:transparent;font-size:14px;"><option value="0">⏱️ Notification timer: none</option><option value="60">⏱️ Timer: 1 hour</option><option value="120">⏱️ Timer: 2 hours</option><option value="180">⏱️ Timer: 3 hours</option><option value="360">⏱️ Timer: 6 hours</option><option value="720">⏱️ Timer: 12 hours</option><option value="1440">⏱️ Timer: 24 hours</option></select></div>
+        <p class="hint-text" style="margin:0 0 10px;">Reel only: your followers' notification shows a countdown and disappears when the time ends.</p>
         <label for="st-vfile" class="btn-primary" style="display:block;text-align:center;cursor:pointer;margin-bottom:10px;">🎬 Choose video story</label>
         <input id="st-vfile" type="file" accept="video/*" style="display:none;" />
         <label for="st-rfile" class="btn-primary" style="display:block;text-align:center;cursor:pointer;margin-bottom:10px;">🎞️ Choose reel</label>
@@ -5968,7 +5970,7 @@ async function postVideo() {
     const r = await fetch(NESH_API + '/videos/start', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ shopId: state.restId, password: state.restaurant.password, kind: kind,
-        text: document.getElementById('st-text').value.trim(), lcItemId: document.getElementById('st-item').value || '' })
+        text: document.getElementById('st-text').value.trim(), lcItemId: document.getElementById('st-item').value || '', notifyMins: (kind === 'reel' ? parseInt((document.getElementById('st-timer') || {}).value, 10) || 0 : 0) })
     });
     let j = null; try { j = await r.json(); } catch (e) {}
     if (!(r.ok && j && j.ok && j.token)) { vdFail(vdStartMsg(r.status, j)); return; }
