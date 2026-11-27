@@ -55,6 +55,11 @@ on:
   push:
     branches: [main]
 
+env:
+  # Raise ONLY when native code changes (new plugin / permission / Java).
+  # Must be the same number in the OTA publish + promote workflows.
+  NATIVE_GEN: '7'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -123,6 +128,11 @@ jobs:
           # from the "Turn on Auto-start" modal, instead of only giving the
           # driver generic text instructions to find it themselves.
           npm install @squareetlabs/capacitor-dont-kill-my-app --legacy-peer-deps
+          # Live-update (OTA) plugin. Major version must equal Capacitor core's major.
+          CAP_MAJOR=$(node -p "require('@capacitor/core/package.json').version.split('.')[0]")
+          echo "Capacitor core major: $CAP_MAJOR"
+          npm install @capgo/capacitor-updater@$CAP_MAJOR --legacy-peer-deps
+          npm ls @capgo/capacitor-updater --depth=0 || true
 
       - name: Generate native Android project (if not already present)
         run: |
@@ -188,6 +198,28 @@ jobs:
             cfg.android = cfg.android || {};
             cfg.android.useLegacyBridge = true;
             fs.writeFileSync(path, JSON.stringify(cfg, null, 2));
+          "
+
+      - name: Configure OTA live updates (own Driver/Partner channel)
+        run: |
+          node -e "
+            const fs = require('fs');
+            const path = 'capacitor.config.json';
+            const cfg = JSON.parse(fs.readFileSync(path, 'utf8'));
+            cfg.plugins = cfg.plugins || {};
+            cfg.plugins.CapacitorUpdater = {
+              autoUpdate: true,
+              updateUrl: 'https://api.neshapp.in/ota/dp/update?g=' + process.env.NATIVE_GEN,
+              statsUrl: '',
+              channelUrl: '',
+              directUpdate: false,
+              appReadyTimeout: 20000,
+              resetWhenUpdate: true,
+              autoDeleteFailed: true,
+              autoDeletePrevious: true
+            };
+            fs.writeFileSync(path, JSON.stringify(cfg, null, 2));
+            console.log(JSON.stringify(cfg.plugins.CapacitorUpdater));
           "
 
       - name: Add permissions and native components to AndroidManifest.xml
@@ -1611,6 +1643,13 @@ jobs:
           public class AlertFcmService extends FirebaseMessagingService {
               @Override
               public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
+                  // Silent OTA nudge: wake the live-update worker and stop. Never touches ring handling.
+                  try {
+                      if ("1".equals(remoteMessage.getData().get("nesh_ota"))) {
+                          ee.forgr.capacitor_updater.HeadlessUpdateWorker.enqueue(getApplicationContext());
+                          return;
+                      }
+                  } catch (Throwable ignored) { }
                   super.onMessageReceived(remoteMessage);
                   Map<String, String> data = remoteMessage.getData();
                   String type = data.get("type");
@@ -3230,6 +3269,9 @@ jobs:
           grep -q "window.NESH_BUILD_NUMBER = ${PARTNER_BUILD};" www/partner.html || { echo "::error::Could not bake build number into www/partner.html"; exit 1; }
           echo "Driver HTML:"; grep -o "NESH_BUILD_NUMBER = [0-9]*" www/driver.html
           echo "Partner HTML:"; grep -o "NESH_BUILD_NUMBER = [0-9]*" www/partner.html
+
+      - name: Add OTA helper script to every page
+        run: node dp-ota-inject.js www
 
       - name: Sync Capacitor Android project
         run: npx cap sync android
