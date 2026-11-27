@@ -205,6 +205,33 @@
   }
   .bulk-import-btn:disabled{ opacity:.5; cursor:not-allowed; }
 
+
+  /* ===== Stock screen / item form redesign ===== */
+  .stk-actions{ padding:4px 24px 0; display:flex; gap:10px; }
+  .stk-actions .add-item-btn{ flex:1.4; justify-content:center; padding:14px 16px; font-size:15px; border-radius:14px; box-shadow:0 4px 14px rgba(47,128,237,.35); }
+  .stk-actions .bulk-import-btn{ flex:1; justify-content:center; padding:14px 10px; font-size:13px; border-radius:14px; }
+  .stk-label{ padding:18px 24px 8px; margin:0; color:var(--muted-2); font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; }
+  .tool-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:0 24px; }
+  .tool-grid > div{ min-width:0; }
+  .tool-btn{ width:100%; text-align:left; display:block; background:var(--field-bg); border:1px solid var(--field-border); border-radius:14px; padding:12px; cursor:pointer; color:var(--cloud); font-family:'Inter',sans-serif; }
+  .tool-btn:active{ transform:scale(.98); }
+  .tool-btn .t-ic{ display:block; font-size:22px; line-height:1; margin-bottom:6px; }
+  .tool-btn .t-tt{ display:block; font-size:13px; font-weight:700; }
+  .tool-btn .t-sb{ display:block; font-size:11px; color:var(--muted); margin-top:2px; line-height:1.3; }
+  .tool-btn.t-lc{ border-color:#F59E0B; background:linear-gradient(135deg,#3A2410,#123A5E); }
+  .menu-list .chit{ border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,.12); }
+  .lc-badge{ display:inline-block; font-size:10px; font-weight:700; color:#fff; background:#F97316; border-radius:20px; padding:2px 8px; vertical-align:middle; margin-left:4px; }
+  .frm-label{ margin:0 0 6px; color:var(--muted); font-size:13px; font-weight:600; font-family:'Inter',sans-serif; }
+  #screen-item-form .field{ border-radius:14px; padding:14px; }
+  #screen-item-form #item-save-btn{ padding:16px; font-size:16px; border-radius:14px; }
+  .lc-card{ margin:10px 0; padding:14px; border-radius:18px; background:linear-gradient(135deg,#3A2410,#4A2A10); border:1.5px solid #F59E0B; }
+  .lc-head{ display:flex; align-items:center; gap:10px; margin:0 0 12px; }
+  .lc-head .lc-ic{ font-size:26px; }
+  .lc-head b{ display:block; color:#FFD7A8; font-size:16px; }
+  .lc-head small{ display:block; color:#E6BF93; font-size:12px; margin-top:2px; line-height:1.3; }
+  .lc-lbl{ margin:10px 0 6px; color:#FFD7A8; font-size:13px; font-weight:700; font-family:'Inter',sans-serif; }
+  .lc-card .hint-text{ color:#E6BF93; }
+  .lc-card b{ color:#fff; }
   .menu-list{ padding:16px 24px 100px; display:flex; flex-direction:column; gap:12px; }
   .home-orders-list{ padding:16px 24px 4px; display:flex; flex-direction:column; gap:12px; }
   .order-chit{ background:var(--cloud); border-radius:10px; padding:14px; cursor:pointer; border:none; width:100%; text-align:left; font-family:'Inter',sans-serif; display:block; }
@@ -1058,18 +1085,18 @@
       <p class="eyebrow">STOCK</p>
       <h1 class="title">Stock items</h1>
     </div>
-    <div class="section-row">
-      <h2 class="section-title">Menu items</h2>
-      <div style="display:flex; gap:8px;" id="menu-add-item-actions">
-        <button class="bulk-import-btn" id="bulk-import-btn" type="button">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--marigold)" stroke-width="2.5"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>
-          Bulk import
-        </button>
-        <button class="add-item-btn" onclick="openItemForm()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0B2545" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add item
-        </button>
-      </div>
+    <div class="section-row" style="padding-bottom:10px;">
+      <h2 class="section-title">Your items</h2>
+    </div>
+    <div class="stk-actions" id="menu-add-item-actions">
+      <button class="add-item-btn" onclick="openItemForm()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0B2545" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add item
+      </button>
+      <button class="bulk-import-btn" id="bulk-import-btn" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--marigold)" stroke-width="2.5"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>
+        Excel import
+      </button>
     </div>
     <input type="file" id="bulk-import-input" accept=".xlsx,.xls,.csv" style="display:none;" />
     <p class="hint-text" id="bulk-import-columns-hint" style="padding:6px 24px 0; margin:0; font-size:11px; color:#6E8CAE; font-family:'Inter',sans-serif;">
@@ -1078,53 +1105,18 @@
     <p id="menu-groceries-item-note" style="display:none; padding:6px 24px 0; margin:0; font-size:12px; color:#6E8CAE; font-family:'Inter',sans-serif;">
       🛒 Items here are added by NESH Store — set your own price for each one below, then mark it available.
     </p>
-    <p style="padding:6px 24px 0; margin:0;">
-      <button class="btn-link" id="bulk-photo-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;">
-        📷 Got 100 photos? Bulk-upload them (name the file same as the stock item to auto-attach) →
-      </button>
-    </p>
-    <p style="padding:6px 24px 0; margin:0;">
-      <button class="btn-link" id="story-open-btn" type="button" onclick="openStoryScreen()" style="width:auto; padding:0; font-size:13px; font-weight:700; text-align:left; color:#DC2626;">
-        📸 Post a Story (shows 24 hours) →
-      </button>
-    </p>
-    <p style="padding:4px 24px 0; margin:0;">
-      <button class="btn-link" id="bulk-price-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;">
-        🏷️ Change price for several stock items at once →
-      </button>
-    </p>
-    <p id="bulk-unit-btn-wrap" style="padding:4px 24px 0; margin:0;">
-      <button class="btn-link" id="bulk-unit-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;">
-        ⚖️ Change unit for several stock items at once →
-      </button>
-    </p>
-    <p id="bulk-stock-btn-wrap" style="padding:4px 24px 0; margin:0;">
-      <button class="btn-link" id="bulk-stock-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;">
-        📦 Mark several items in/out of stock at once →
-      </button>
-    </p>
-    <p style="padding:4px 24px 0; margin:0; display:none;" id="popular-items-wrap">
-      <button class="btn-link" id="popular-items-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;" onclick="openPopularEditor()">
-        ⭐ Choose popular products (max 5) →
-      </button>
-      <span id="popular-items-sub" style="display:block; font-size:11px; color:#6E8CAE; margin-top:2px;"></span>
-    </p>
-    <p style="padding:4px 24px 0; margin:0; display:none;" id="suggest-items-wrap">
-      <button class="btn-link" id="suggest-items-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;" onclick="openSuggestEditor()">
-        🥤 Choose suggested add-ons for customers (max 8) →
-      </button>
-      <span id="suggest-items-sub" style="display:block; font-size:11px; color:#6E8CAE; margin-top:2px;"></span>
-    </p>
-    <p style="padding:4px 24px 0; margin:0;">
-      <button class="btn-link" id="item-cats-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;" onclick="openItemCategoriesScreen()">
-        🗂️ Set item categories (tabs on your menu) →
-      </button>
-    </p>
-    <p style="padding:4px 24px 0; margin:0;">
-      <button class="btn-link" id="indiv-price-btn" type="button" style="width:auto; padding:0; font-size:12px; text-align:left;">
-        ✏️ Edit each item's price individually →
-      </button>
-    </p>
+    <p class="stk-label">⚡ Quick tools</p>
+    <div class="tool-grid">
+      <div><button class="tool-btn" id="bulk-photo-btn" type="button"><span class="t-ic">📷</span><span class="t-tt">Bulk photos</span><span class="t-sb">Upload many photos. Name the file same as the item</span></button></div>
+      <div><button class="tool-btn" id="bulk-price-btn" type="button"><span class="t-ic">🏷️</span><span class="t-tt">Change prices</span><span class="t-sb">Pick several items, set one price</span></button></div>
+      <div><button class="tool-btn" id="indiv-price-btn" type="button"><span class="t-ic">✏️</span><span class="t-tt">Edit each price</span><span class="t-sb">Type a new price on every item</span></button></div>
+      <div id="bulk-stock-btn-wrap"><button class="tool-btn" id="bulk-stock-btn" type="button"><span class="t-ic">📦</span><span class="t-tt">In / out of stock</span><span class="t-sb">Mark several items at once</span></button></div>
+      <div id="bulk-unit-btn-wrap"><button class="tool-btn" id="bulk-unit-btn" type="button"><span class="t-ic">⚖️</span><span class="t-tt">Change unit</span><span class="t-sb">Piece / Gram / Kg for many items</span></button></div>
+      <div><button class="tool-btn" id="item-cats-btn" type="button" onclick="openItemCategoriesScreen()"><span class="t-ic">🗂️</span><span class="t-tt">Categories</span><span class="t-sb">Tabs on your menu</span></button></div>
+      <div style="display:none;" id="popular-items-wrap"><button class="tool-btn" id="popular-items-btn" type="button" onclick="openPopularEditor()"><span class="t-ic">⭐</span><span class="t-tt">Popular products</span><span class="t-sb" id="popular-items-sub">Choose up to 5</span></button></div>
+      <div style="display:none;" id="suggest-items-wrap"><button class="tool-btn" id="suggest-items-btn" type="button" onclick="openSuggestEditor()"><span class="t-ic">🥤</span><span class="t-tt">Add-ons</span><span class="t-sb" id="suggest-items-sub">Suggest up to 8 to customers</span></button></div>
+    </div>
+    <p class="hint-text" style="padding:10px 24px 0;">⏰ <b style="color:#F59E0B;">Last Call:</b> open an item (tap it) and fill the orange <b>Last Call</b> box to sell leftovers fast with a countdown.</p>
     <input type="file" id="bulk-photo-input" accept="image/*" multiple style="display:none;" />
     <p id="bulk-photo-status" style="padding:4px 24px 0; font-size:12px; color:var(--marigold); font-family:'Inter',sans-serif; display:none;"></p>
     <p id="bulk-import-status" style="padding:4px 24px 0; font-size:12px; color:var(--marigold); font-family:'Inter',sans-serif; display:none;"></p>
@@ -1463,6 +1455,7 @@
         </div>
         <p class="hint-text" id="item-link-status" style="margin:0;"></p>
       </div>
+      <p class="frm-label">📷 Item photo</p>
       <div class="photo-upload" id="photo-upload-wrap" style="cursor:default;">
         <span id="photo-upload-placeholder">Tap Camera or Gallery below</span>
         <img id="photo-preview" style="display:none;" />
@@ -1479,12 +1472,15 @@
         <input type="file" accept="image/*" capture="environment" id="item-photo-camera-input" style="display:none;" />
         <input type="file" accept="image/*" id="item-photo-input" style="display:none;" />
       </div>
+      <p class="frm-label">✏️ Item name</p>
       <div class="field">
         <input id="item-name" type="text" placeholder="Item name" />
       </div>
+      <p class="frm-label">📝 Short description <span style="font-weight:400;color:var(--muted-2);">(optional)</span></p>
       <div class="field">
         <textarea id="item-desc" placeholder="Short description" rows="2"></textarea>
       </div>
+      <p class="frm-label">💰 Price (₹)</p>
       <div class="field">
         <input id="item-price" type="number" inputmode="decimal" placeholder="Price (₹)" />
       </div>
@@ -1494,8 +1490,8 @@
         </div>
         <p class="hint-text" style="margin-top:0;">🔥 Fill this to put the item in the customer app's Trending tab. It must be lower than the price above. Leave empty for no offer.</p>
       </div>
-      <div id="item-lc-section" style="margin:6px 0 10px; padding:12px; border-radius:14px; background:#FFF3E8; border:1px solid #F5C9A0;">
-        <p class="loc-field-label" style="margin:0 0 6px; color:#C2410C;">⏰ Last Call (optional)</p>
+      <div id="item-lc-section" class="lc-card">
+        <div class="lc-head"><span class="lc-ic">⏰</span><div><b>Last Call</b><small>Optional. Sell what is left quickly at a lower price, with a live countdown for customers.</small></div></div>
         <div id="item-lc-portions" style="display:none;margin:0 0 8px;">
           <p class="hint-text" style="margin:0 0 6px;">Portion items: give a Last Call price for each portion you want (leave a portion empty = normal price). "Pieces" = how many pieces one portion uses from the stock below (Quarter 1, Half 2, Full 4 - change it if your Full is 6).</p>
           <div style="display:grid;grid-template-columns:70px 1fr 90px;gap:6px;align-items:center;">
@@ -1504,14 +1500,17 @@
             <b>Full</b><div class="field" style="margin:0"><input id="item-lc-p-Full" type="number" inputmode="decimal" placeholder="Last Call price" /></div><div class="field" style="margin:0"><input id="item-lc-u-Full" type="number" inputmode="numeric" min="1" placeholder="Pieces: 4" /></div>
           </div>
         </div>
+        <p class="lc-lbl">1️⃣ Last Call price (₹)</p>
         <div class="field" id="item-lc-price-wrap"><input id="item-lc-price" type="number" inputmode="decimal" placeholder="Last Call price (₹) — what the customer pays" /></div>
+        <p class="lc-lbl">2️⃣ How many are left?</p>
         <div class="field"><input id="item-lc-qty" type="number" inputmode="numeric" min="1" placeholder="How many pieces are left?" /></div>
+        <p class="lc-lbl">3️⃣ How long?</p>
         <div class="field"><select id="item-lc-mins" style="width:100%;border:0;background:transparent;font:inherit;outline:none;">
           <option value="30">Ends in 30 minutes</option><option value="60" selected>Ends in 1 hour</option>
           <option value="120">Ends in 2 hours</option><option value="180">Ends in 3 hours</option>
           <option value="keep" id="item-lc-keep" style="display:none;">Keep the current end time</option>
         </select></div>
-        <p class="hint-text" style="margin:0;">Shows in the customer app with a live countdown. It switches off by itself when the time ends or the pieces are sold. Must be lower than the price above. Leave the price empty for no Last Call.</p>
+        <p class="hint-text" style="margin:10px 0 0;">Price must be lower than the normal price. It switches off by itself when time ends or the pieces are sold. Leave the price empty if you do not want a Last Call.</p>
         <p class="error-text" id="item-lc-error" style="display:none;"></p>
       </div>
       <div id="item-unit-section">
@@ -1555,7 +1554,7 @@
   <!-- STORY (photo, 24 hours) -->
   <section class="screen screen-with-tabs" id="screen-story">
     <div class="px" style="padding-top:32px;">
-      <button class="btn-back" onclick="showScreen('stock')">
+      <button class="btn-back" onclick="showScreen('home')">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2F80ED" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
     </div>
@@ -1835,13 +1834,7 @@
   </section>
 
   <nav class="bottom-tab-bar" id="bottom-tab-bar">
-    <button class="tab-item" id="tab-orders" onclick="window.location.href='restaurant-orders.html'">
-      <span style="position:relative;">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-        <span class="tab-badge" id="pending-badge">0 new</span>
-      </span>
-      Your Orders
-    </button>
+    <span style="display:none;"><span id="pending-badge"></span></span>
     <button class="tab-item" id="tab-shop-details" onclick="showScreen('home')">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>
       Dashboard
@@ -1849,6 +1842,10 @@
     <button class="tab-item" id="tab-stock" onclick="openStockScreen()">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
       Stock Item
+    </button>
+    <button class="tab-item" id="tab-story" onclick="openStoryScreen()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="14" height="16" rx="2"/><path d="m16 10 6-3v10l-6-3"/></svg>
+      Reels / Story
     </button>
     <button class="tab-item" id="tab-account" onclick="openAccountScreen()">
       <span style="position:relative;">
@@ -4915,7 +4912,7 @@ function showScreen(id) {
   }
 
   const tabBar = document.getElementById('bottom-tab-bar');
-  const tabScreens = { home: 'tab-shop-details', stock: 'tab-stock', 'item-form': 'tab-stock', story: 'tab-stock', 'item-categories': 'tab-stock', account: 'tab-account', zone: 'tab-account', 'delivery-charges': 'tab-account', 'delivery-earnings': 'tab-account', 'daily-earnings': 'tab-account', due: 'tab-account' };
+  const tabScreens = { home: 'tab-shop-details', stock: 'tab-stock', 'item-form': 'tab-stock', story: 'tab-story', 'item-categories': 'tab-stock', account: 'tab-account', zone: 'tab-account', 'delivery-charges': 'tab-account', 'delivery-earnings': 'tab-account', 'daily-earnings': 'tab-account', due: 'tab-account' };
   if (id in tabScreens) {
     tabBar.classList.add('show');
     document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
@@ -7859,7 +7856,7 @@ function renderMenu(items, isSearchFiltered) {
           ${state.bulkStockMode ? `<input type="checkbox" class="bulk-stock-checkbox" data-id="${it.id}" ${isStockSelected ? 'checked' : ''} style="width:20px; height:20px; margin-right:4px; flex-shrink:0;" />` : ''}
           ${it.photo ? `<img class="menu-photo" src="${it.photo}" />` : `<div class="menu-photo"></div>`}
           <div class="menu-info">
-            <p class="menu-name">${it.name}${it.unavailable ? ' <span class="nav-badge" style="background:var(--chili); font-size:9px; vertical-align:middle;">Unavailable</span>' : ''}</p>
+            <p class="menu-name">${it.name}${(Number(it.lastCallPrice) > 0 && Number(it.lastCallEndsAt) > neshSrvNow()) ? ' <span class="lc-badge">⏰ Last Call ₹' + it.lastCallPrice + '</span>' : ''}${it.unavailable ? ' <span class="nav-badge" style="background:var(--chili); font-size:9px; vertical-align:middle;">Unavailable</span>' : ''}</p>
             <p class="menu-desc">${it.desc || ""}</p>
             ${priceHtml}
           </div>
@@ -7910,6 +7907,7 @@ function renderMenu(items, isSearchFiltered) {
         inp.addEventListener('click', (e) => e.stopPropagation());
       } else {
         card.querySelector('.menu-edit-btn').addEventListener('click', () => openItemForm(it));
+        if (!groceriesShop) { card.style.cursor = 'pointer'; card.addEventListener('click', (e) => { if (e.target.closest('button, input')) return; openItemForm(it); }); }
         const availBtn = card.querySelector('.menu-avail-btn');
         if (availBtn) {
           availBtn.addEventListener('click', async (e) => {
@@ -8216,7 +8214,7 @@ async function saveItem() {
     }
     if (state.editingItemId && state.oldItemPhoto) nshPhotoChanged(state.oldItemPhoto, state.photoDataUrl || '');
     showToast(state.editingItemId ? "Item updated" : "Item added to your menu");
-    showScreen('home');
+    showScreen('stock');
   } catch (e) {
     errEl.textContent = "Couldn't save item — check your connection and try again.";
     errEl.style.display = "block";
@@ -8560,7 +8558,7 @@ async function deleteItem() {
     const { db, ref, remove } = window.fb;
     await neshMenuWrite(state.restId, { [state.editingItemId]: null });
     showToast("Item deleted");
-    showScreen('home');
+    showScreen('stock');
   } catch (e) {
     alert("Couldn't delete item — check your connection and try again.");
   }
