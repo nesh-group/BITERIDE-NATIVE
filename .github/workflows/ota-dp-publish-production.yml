@@ -1,0 +1,135 @@
+name: Publish Driver/Partner OTA to EVERYONE (dp-production)
+
+# Manual only. Publishes the CURRENT www/ as a live-update bundle to the PRODUCTION channel
+# (R2 folder dp-production/). EVERY driver/partner phone that already has the OTA-capable APK
+# gets it the next time the app is opened. Type YES in the "confirm" box to run.
+# It does NOT build an APK, does NOT create a GitHub Release, does NOT write to Firebase
+# and does NOT send any push.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type YES to publish to ALL drivers/partners"
+        required: true
+        default: "NO"
+
+env:
+  # Must equal NATIVE_GEN in build-apk.yml (raise both only when native code changes).
+  NATIVE_GEN: '7'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dp-ota-publish-production
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm
+        run: |
+          [ "${{ github.event.inputs.confirm }}" = "YES" ] || { echo "::error::Type YES in the confirm box to publish to everyone"; exit 1; }
+
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Read the CURRENT build numbers from Firebase (do not use run_number),
+      # so the in-app "UPDATE" check keeps comparing against the real APK build.
+      - name: Read current Driver/Partner build numbers
+        id: nums
+        env:
+          DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: |
+          set -e
+          [ -n "$DB_URL" ] || { echo "::error::FIREBASE_DB_URL secret is not set in this repo"; exit 1; }
+          curl -fsS "${DB_URL}/appConfig/latestVersion.json" -o prev.json
+          python3 - << 'PYEOF'
+          import json, os
+          p = json.load(open('prev.json')) or {}
+          def n(k):
+              try: return int(p.get(k) or 0)
+              except Exception: return 0
+          d = n('driverBuild') or n('build')
+          q = n('partnerBuild') or n('build')
+          if not d or not q:
+              raise SystemExit('::error::could not read driverBuild/partnerBuild from Firebase')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as o:
+              o.write(f'driver_build={d}\npartner_build={q}\n')
+          print('driverBuild', d, 'partnerBuild', q)
+          PYEOF
+
+      - name: Bake build numbers + add OTA helper script
+        env:
+          DRIVER_BUILD: ${{ steps.nums.outputs.driver_build }}
+          PARTNER_BUILD: ${{ steps.nums.outputs.partner_build }}
+        run: |
+          set -e
+          sed -i "s/window.NESH_BUILD_NUMBER = [0-9]*;/window.NESH_BUILD_NUMBER = ${DRIVER_BUILD};/" www/driver.html
+          sed -i "s/window.NESH_BUILD_NUMBER = [0-9]*;/window.NESH_BUILD_NUMBER = ${PARTNER_BUILD};/" www/partner.html
+          grep -q "window.NESH_BUILD_NUMBER = ${DRIVER_BUILD};" www/driver.html || { echo "::error::could not bake driver build number"; exit 1; }
+          grep -q "window.NESH_BUILD_NUMBER = ${PARTNER_BUILD};" www/partner.html || { echo "::error::could not bake partner build number"; exit 1; }
+          node dp-ota-inject.js www
+
+      - name: Build bundle and publish to dp-production (R2)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.OTA_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.OTA_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT: https://${{ secrets.OTA_R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          R2_BUCKET: ${{ secrets.OTA_R2_BUCKET }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -e
+          VERSION="1.${NATIVE_GEN}.${RUN_NUMBER}"
+          ZIP="dp-bundle-${VERSION}.zip"
+          (cd www && zip -qr "../${ZIP}" .)
+          SUM=$(sha256sum "$ZIP" | cut -d' ' -f1)
+          # manifest.json: one entry per file (name + sha256 + size)
+          VERSION="$VERSION" ZIP="$ZIP" SUM="$SUM" python3 - << 'PYEOF'
+          import os, json, hashlib
+          files = []
+          for root, _, names in os.walk('www'):
+              for n in sorted(names):
+                  p = os.path.join(root, n)
+                  rel = os.path.relpath(p, 'www').replace(os.sep, '/')
+                  data = open(p, 'rb').read()
+                  files.append({'file_name': rel, 'file_hash': hashlib.sha256(data).hexdigest(), 'file_size': len(data)})
+          m = {
+              'version': os.environ['VERSION'],
+              'zip': os.environ['ZIP'],
+              'checksum': os.environ['SUM'],
+              'native_build': None,
+              'native_name': None,
+              'native_gen': os.environ['NATIVE_GEN'],
+              'files': files,
+          }
+          json.dump(m, open('manifest.json', 'w'), indent=1)
+          print('files in bundle:', len(files))
+          PYEOF
+          # delta objects: one per file, named by sha256 (skip ones already there)
+          aws s3 ls "s3://${R2_BUCKET}/dp-production/files/" --endpoint-url "$R2_ENDPOINT" | awk '{print $4}' | sort -u > have.txt || true
+          python3 -c "import json;[print(f['file_hash'], f['file_name']) for f in json.load(open('manifest.json'))['files']]" | sort -u -k1,1 > want.txt
+          awk 'FILENAME==ARGV[1]{h[$1]=1;next} !($1 in h)' have.txt want.txt > todo.txt
+          while read H NAME; do
+            case "$NAME" in *.html) CT=text/html;; *.js) CT=application/javascript;; *.css) CT=text/css;; *.json) CT=application/json;; *.svg) CT=image/svg+xml;; *.png) CT=image/png;; *.mp3) CT=audio/mpeg;; *) CT=application/octet-stream;; esac
+            aws s3 cp "www/$NAME" "s3://${R2_BUCKET}/dp-production/files/$H" --endpoint-url "$R2_ENDPOINT" --content-type "$CT" --cache-control "public, max-age=31536000, immutable" --only-show-errors
+          done < todo.txt
+          echo "delta files uploaded: $(wc -l < todo.txt)"
+          # zip first, manifest last
+          aws s3 cp "$ZIP" "s3://${R2_BUCKET}/dp-production/${ZIP}" --endpoint-url "$R2_ENDPOINT" --content-type application/zip --cache-control "public, max-age=31536000, immutable"
+          aws s3 cp manifest.json "s3://${R2_BUCKET}/dp-production/manifest.json" --endpoint-url "$R2_ENDPOINT" --content-type application/json --cache-control "no-cache"
+          # remove older bundle zips of this channel
+          for A in $(aws s3 ls "s3://${R2_BUCKET}/dp-production/" --endpoint-url "$R2_ENDPOINT" | awk '{print $4}' | grep -E '^dp-bundle-.*\.zip$'); do
+            [ "$A" = "$ZIP" ] || aws s3 rm "s3://${R2_BUCKET}/dp-production/$A" --endpoint-url "$R2_ENDPOINT"
+          done
+          curl -fsI --retry 3 --retry-delay 3 "https://ota.neshapp.in/dp-production/${ZIP}" >/dev/null && echo "public URL ok" || { echo "::error::dp-production URL not reachable"; exit 1; }
+          echo "Published ${ZIP} to dp-production (version ${VERSION}, native_gen ${NATIVE_GEN})"
