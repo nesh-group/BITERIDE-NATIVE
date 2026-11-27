@@ -54,6 +54,10 @@ on:
   # app update the same way [force-partner] forces the Partner one.
   push:
     branches: [main]
+    # Web-only changes (www/) go out by OTA (Publish Driver/Partner OTA workflows),
+    # so they must NOT build an APK or show the UPDATE banner.
+    paths-ignore:
+      - 'www/**'
 
 env:
   # Raise ONLY when native code changes (new plugin / permission / Java).
